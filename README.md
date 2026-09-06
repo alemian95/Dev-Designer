@@ -1,75 +1,33 @@
-# React + TypeScript + Vite
+# Dev Designer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Editor web **solo frontend** di diagrammi per sviluppatori: ER, flowchart, UML class e UML sequence.
+Nessun backend, nessun account: il documento vive nel browser e si importa/esporta come file.
 
-Currently, two official plugins are available:
+## Stato
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Fondamenta e spike completati. Non c'è ancora l'editor: il branch corrente porta lo scaffold del
+progetto e i risultati dello spike su rendering SVG e parsing DDL.
 
-## React Compiler
+- [Spec di design](docs/superpowers/specs/2026-09-06-dev-designer-design.md)
+- [Piano: scaffold e spike](docs/superpowers/plans/2026-09-06-scaffold-e-spike.md)
+- [Risultati dello spike](docs/superpowers/spikes/2026-09-06-spike-results.md)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Stack
 
-## Expanding the ESLint configuration
+- React 19 + TypeScript 6, build con Vite 8.
+- Tailwind CSS 4 con shadcn/ui e Radix per la cornice dell'interfaccia.
+- Canvas SVG scritto a mano, un componente React per nodo.
+- Import DDL: `libpg-query` (WASM) per PostgreSQL, `node-sql-parser` per MySQL/MariaDB, entrambi in worker.
+- Test con Vitest, lint con ESLint 10.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Comandi
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Richiede Node >= 22 e pnpm 10.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+pnpm install   # installa le dipendenze
+pnpm dev       # dev server Vite
+pnpm build     # type check (tsc -b) + build di produzione
+pnpm lint      # ESLint
+pnpm test      # Vitest
 ```

@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .superpowers/
+
+# dump SQL reali degli spike (generati in locale con Docker), non il codice in src/spike/
+/spike/

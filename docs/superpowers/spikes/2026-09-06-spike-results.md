@@ -1,39 +1,45 @@
 # Spike — risultati
 
-Macchina: <modello, browser e versione>
+Macchina: MacBook (Mac Apple Silicon, Darwin 25.1, 11 core). Sezione A misurata nel browser
+integrato (Chromium in-app); sezioni B e C su Chrome 148 e Node 22 / vitest 5.
 
 ## A. Canvas SVG a mano
 
-| Scenario | Entità | FPS min | Note |
-|---|---|---|---|
-| drag | 300 | | |
-| pan | 300 | | |
-| zoom | 300 | | |
-| drag | 600 | | |
-| drag | 1000 | | |
+**Metodo e suo limite.** È misurato il **solo costo di scripting di React** per evento `pointermove`
+(render + commit sul DOM), in millisecondi: layout e paint sono **esclusi**, perché la misura è stata
+fatta con il pannello del browser **nascosto** e quindi senza frame dipinti. Non è un FPS reale, è il
+tempo che React consuma dentro ogni evento di movimento. La prima esecuzione a 300 entità è stata
+scartata per warm-up del JIT.
 
-Performance panel (drag, 300): rendering ms/frame = , scripting ms/frame =
+| Entità | Drag ms/frame avg (p95) | Pan ms/frame avg (p95) |
+|---|---|---|
+| 150 | 2,4 (2,8) | 1,8 (3,2) |
+| 300 | 4,6–5,7 (5,3–14,2) | 3,5–4,6 (5,3–12,5) |
+| 600 | 10,7–11,6 (25–35) | 7,1 (12,9) |
+| 1000 | 19,0 (48,8) | 12,5 (20,7) |
+| 2000 | 37,5 (62,2) | 27,0 (43,2) |
 
-**Verdetto A:** go / no-go — motivazione in una riga.
+**Lettura.** La crescita è lineare nel numero di entità: circa **18 µs per entità per spostamento**, sia
+in drag sia in pan. Il dato che conta è il pan: cambia un solo attributo `transform` sul gruppo del
+viewport, eppure costa quasi quanto il drag. Vuol dire che a ogni evento viene **ri-renderizzato per
+intero il componente radice** — il layer degli edge non è memoizzato, e anche con i nodi memoizzati
+l'albero viene comunque attraversato.
 
-### Come misurare (da fare a mano, con il mouse)
+**Verdetto A: go con riserva.** A 300 entità lo scripting sta sotto gli **8 ms**, cioè dentro il budget
+di 16 ms a 60 FPS con un margine doppio per macchine più lente: l'SVG a mano con React per nodo regge
+il target della spec. La riserva è che il renderer definitivo deve fare tre cose, altrimenti il costo
+per frame continua a crescere con il numero di entità:
 
-`pnpm dev`, poi su `http://localhost:5173` in Chrome:
+1. tenere il `transform` del viewport **fuori dal render del componente radice** (ref, o componente
+   minimo iscritto allo store transitorio);
+2. **memoizzare il layer degli edge per singolo edge**;
+3. tenere lo **stato del drag fuori da React**, come già previsto dalla spec.
 
-1. Con 300 entità: trascinare un'entità per 5 secondi con movimenti continui. Annotare il valore minimo del contatore FPS in toolbar.
-2. Pan (trascinare sullo sfondo) per 5 secondi. Annotare il minimo FPS.
-3. Zoom con la rotella avanti e indietro. Annotare il minimo FPS.
-4. Ripetere il punto 1 con 600 e con 1000 entità (campo "entità" in toolbar).
-5. DevTools → Performance → registrare 5 secondi di drag a 300 entità: annotare il tempo medio per frame di "Rendering" e "Scripting".
+Con questi tre accorgimenti il costo per frame smette di crescere con il numero di entità.
 
-Criterio go: ≥ 50 FPS minimo in drag con 300 entità. Sotto i 30 FPS a 300 entità è no-go per l'SVG
-a mano con React che ridisegna per nodo, e si valuta lo stato transitorio fuori da React
-(mutare `transform` via ref durante il drag).
-
-Scorciatoia senza mouse: il pulsante **auto-drag** in toolbar muove l'entità `t0` di 2 px per frame
-per 5 secondi via `requestAnimationFrame` e stampa in console i frame completati e la media fps.
-È un drag programmatico di un solo nodo: utile come indicatore, non sostituisce la misura a mano
-(non include il costo di hit-testing né i movimenti reali del puntatore).
+La misura con i frame effettivamente dipinti (FPS reali, layout e paint inclusi) **non è stata fatta**.
+Il canvas dello spike resta nella storia git al commit **`28a03a1`**: per rifarla, `git checkout 28a03a1`,
+`pnpm dev`, e trascinare con il mouse leggendo il contatore FPS in toolbar.
 
 ## B. libpg-query (Postgres)
 
@@ -76,7 +82,10 @@ scartano le righe che iniziano con `\` prima del parse — **2 righe filtrate** 
 sintetico. **L'importer definitivo deve fare lo stesso** (e in generale ignorare i meta-comandi psql,
 `\connect` compreso).
 
-Dimensione `.wasm` in dist: **1.150.984 byte (1.124 KB, 235,5 KB gzip)** in `dist/assets/libpg-query.wasm`.
+Dimensione `.wasm` in dist: **1.150.984 byte (1.124 KB)** in `dist/assets/libpg-query.wasm`, che
+compresso misura **222,9 KB gzip** (`gzip -6`, 228.199 byte) e **164,6 KB brotli** (168.575 byte),
+misurati sul binario emesso in `dist`. Il report di `vite build` stampa `gzip: 235.54 kB` per lo stesso
+file: è la sua stima, non una misura sul binario finale — vale il numero qui sopra.
 
 **Caricamento: nessuna delle due strade del brief funziona; serve un plugin Vite** (~15 righe in
 `vite.config.ts`). Emscripten cerca `libpg-query.wasm` in `scriptDirectory`, cioè accanto allo script
@@ -101,7 +110,7 @@ in cui il `.wasm` deve atterrare dipende da `build.assetsDir` (qui `assets`, har
 **Verdetto B:** **go** — criterio: caricamento + parse < 3 s su 200 tabelle. Misurato nel browser
 sulla build: ~136 ms totali (120 di parse) sulla fixture da 200 tabelle e 153 KB, cioè ~20x sotto il
 criterio; il dump reale sta in ~60 ms. Il costo vero è il megabyte di `.wasm` da scaricare, che è
-lazy (solo all'import) e comprimibile a 235 KB.
+lazy (solo all'import) e comprimibile a 223 KB gzip / 165 KB brotli.
 
 ## C. node-sql-parser (MySQL)
 
@@ -129,10 +138,15 @@ Falliti ricorrenti: **uno solo, e solo sulla fixture sintetica** —
   dentro `/*!40101 SET NAMES utf8mb4 */`, quindi il filtro dei commenti condizionali lo toglie di mezzo;
   è il generatore sintetico (fedele al brief) che lo scrive nudo. Sul dump reale: **zero fallimenti**.
 
-**Commenti condizionali.** Lo split scarta le righe che iniziano con `/*!` (commenti eseguibili MySQL) **e
-con `/*M!`** (varianti MariaDB): il dump reale si apre con `/*M!999999\- enable the sandbox mode */`, che
-senza quel filtro finisce in testa al primo chunk e lo fa fallire. L'importer definitivo deve filtrare
-entrambi i prefissi.
+**Commenti condizionali.** Lo split scarta **l'intero chunk** che inizia con `/*!` (commenti eseguibili
+MySQL) **o con `/*M!`** (varianti MariaDB): il dump reale si apre con `/*M!999999\- enable the sandbox
+mode */`, che senza quel filtro finisce in testa al primo chunk e lo fa fallire. Il denominatore grezzo
+sul dump reale è **139 chunk**, di cui **90 scartati** come commenti eseguibili e **49 misurati** (sono i
+49 della tabella qui sopra). Attenzione: scartare il chunk intero è una scorciatoia dello spike, valida
+qui perché in un `mysqldump --no-data` i commenti eseguibili contengono solo `SET`/`SAVEPOINT` di
+sessione. Per l'**importer definitivo la regola giusta è spogliare il commento eseguibile dal chunk**
+(togliere `/*!NNNNN` e `*/` e parsare quello che resta), non scartare il chunk: `mysqldump` racchiude in
+quella forma anche DDL che serve, per esempio i modificatori di `CREATE TABLE`.
 
 **`CHECK (json_valid(...))`: parsati, nessun fallimento.** Sono 25 constraint su 5 tabelle (le colonne JSON
 generate da Laravel su MariaDB, che le materializza come `longtext ... CHECK (json_valid(col))`). Non
@@ -172,10 +186,11 @@ Conteggi sul dump reale (24 `CREATE TABLE`): 178 colonne, 23 `primary key`, 11 `
 
 **Import.** La prima forma del brief funziona così com'è: `import { Parser } from "node-sql-parser/build/mysql"`
 sotto vitest 5 / Vite 8 (il pacchetto è UMD/CJS, l'interop di Vite espone il named export). Non è servita
-né la forma `import pkg from ...` né l'entry principale con `database: "MySQL"`. Lo shim di tipi
-`src/spike/shims.d.ts` resta ma è **ridondante** con la 5.4.0: il pacchetto pubblica `build/mysql.d.ts` e
-non ha campo `exports`, quindi `moduleResolution: bundler` risolve i tipi da solo (verificato: `tsc -b --force`
-passa anche senza shim).
+né la forma `import pkg from ...` né l'entry principale con `database: "MySQL"`. Lo shim di tipi che lo
+spike aveva in `src/spike/shims.d.ts` è **ridondante** con la 5.4.0 — il pacchetto pubblica
+`build/mysql.d.ts` e non ha campo `exports`, quindi `moduleResolution: bundler` risolve i tipi da solo
+(verificato: `tsc -b --force` passa anche senza shim) — ed è stato rimosso con il resto dello spike:
+l'importer definitivo non deve reintrodurlo.
 
 Dimensione del chunk `node-sql-parser/build/mysql`: **284,31 KB (59,92 KB gzip)**. Misurata con una sonda
 temporanea (`import()` dinamico dal codice dell'app, poi rimossa) perché oggi la libreria è importata solo
@@ -191,7 +206,8 @@ referenziate. **Nessun costrutto ricorrente fallisce**: in particolare i 25 `CHE
 tabelle — il rischio principale di questo dump MariaDB — sono parsati correttamente. Non serve un parser
 proprio del sottoinsieme DDL.
 
-Da portare nel piano successivo: filtrare `/*!` **e** `/*M!`; leggere le `KEY` da `resource: "index"`;
+Da portare nel piano successivo: gestire `/*!` **e** `/*M!` spogliando il commento eseguibile dal chunk
+invece di scartarlo; leggere le `KEY` da `resource: "index"`;
 trattare l'assenza di `nullable` come "nullabile"; confrontare `constraint_type` in modo
 case-insensitive (`"primary key"` minuscolo vs `"FOREIGN KEY"` maiuscolo).
 
@@ -203,3 +219,76 @@ definitivo deve fare chunking consapevole di stringhe e `DELIMITER`, oppure acce
 di schema e dichiararlo esplicitamente all'utente.
 
 ## Decisioni per il piano successivo
+
+**Rendering: SVG a mano con React per nodo → confermato, con tre vincoli.** A 300 entità il costo di
+scripting per evento sta sotto gli 8 ms (sezione A). Il renderer definitivo deve però tenere il
+`transform` del viewport fuori dal render del componente radice, memoizzare il layer degli edge per
+singolo edge e tenere lo stato del drag fuori da React: senza questi tre accorgimenti il costo per
+frame cresce linearmente con il numero di entità (~18 µs per entità per spostamento). Da rifare, quando
+il canvas vero esiste, la misura con i frame dipinti.
+
+**Postgres: `libpg-query` → confermato.** Caricamento + parse ~136 ms su 200 tabelle contro un criterio
+di 3 s (sezione B).
+
+- **Caricamento del WASM: plugin `libpgQueryWasm()` in `vite.config.ts`** — middleware in dev che serve
+  qualunque richiesta che finisce per `/libpg-query.wasm`, `emitFile` in build. Non è una scorciatoia
+  dello spike ma la soluzione definitiva: `loadModule()` di libpg-query **non espone `locateFile`**,
+  quindi non c'è modo di indicare il percorso dal codice applicativo, ed Emscripten cerca il binario
+  accanto allo script che lo carica. Il plugin resta in repo dopo la rimozione dello spike, perché
+  serve all'importer definitivo tanto quanto è servito allo spike. Nota: il percorso di atterraggio del
+  binario è legato a `build.assetsDir` (`assets`, oggi hardcoded nel plugin).
+- **Meta-comandi psql da filtrare prima del parse.** `pg_dump` 18 racchiude il dump fra `\restrict` e
+  `\unrestrict`; non sono SQL e fanno fallire l'intero dump. L'importer deve scartare le righe che
+  iniziano con `\` **fuori dai literal** (una stringa o un dollar-quote possono contenere un backslash a
+  inizio riga), riconoscendo i meta-comandi come **insieme chiuso** (`\restrict`, `\unrestrict`,
+  `\connect`, `\.`, …) invece di tagliare ogni backslash che incontra.
+
+**MySQL/MariaDB: `node-sql-parser` → confermato.** 100% (49/49) degli statement del dump reale parsati,
+AST completo su colonne, PK, UNIQUE, KEY e FK (sezione C). Non serve un parser proprio del sottoinsieme
+DDL. Cose da portare nell'importer, tutte verificate sull'output reale del test:
+
+- i percorsi AST della sezione C sono quelli buoni: usarli, non andare a memoria;
+- `nullable` **è assente** sulle colonne nullabili (c'è solo quando la colonna è `NOT NULL`): trattare
+  l'assenza come "nullabile", non come "sconosciuto";
+- le `KEY` non uniche stanno su `resource: "index"`, non su `resource: "constraint"`;
+- `constraint_type` ha **case incoerente** (`"primary key"` e `"unique key"` minuscoli, `"FOREIGN KEY"`
+  maiuscolo): confrontare case-insensitive;
+- esiste anche l'entry `node-sql-parser/build/mariadb`, da valutare contro `build/mysql` quando la
+  sorgente è MariaDB (il dump reale di questo spike lo è);
+- i commenti eseguibili `/*!` e `/*M!` vanno **spogliati dal chunk**, non scartati insieme al chunk;
+- lo split degli statement deve essere consapevole di stringhe e `DELIMITER`, **oppure** l'importer
+  accetta solo dump di schema e lo dichiara esplicitamente all'utente. Lo split di questo spike
+  (`split(/;\s*\r?\n/)`) vale solo per `mysqldump --no-data`.
+
+**Fixture per i test dell'importer:** i dump sintetici in `spike/fixtures/*.synthetic.sql` (committati,
+rigenerabili con `scripts/gen-pg-dump.mjs` e `scripts/gen-mysql-dump.mjs`) restano la fixture del
+repo; i dump reali restano locali e non committati.
+
+**Test e TypeScript.** `tsc -b` compila anche i test che stanno dentro `src/`, e lì `node:fs` non
+risolve senza `/// <reference types="node" />` in testa a ogni file di test. Il piano successivo deve
+introdurre un **tsconfig dedicato ai test** (o spostarli fuori da `src/`) invece di ripetere la
+direttiva file per file.
+
+**Debiti minori, rinviati alla revisione finale del piano successivo:**
+
+- `strict` non è dichiarato in nessuno dei tsconfig: TS 6 lo attiva di default, ma è meglio esplicito;
+- `README.md` è ancora il boilerplate del template Vite;
+- il font Oxanium è dichiarato dal preset (`--font-heading` in `src/index.css`, dipendenza
+  `@fontsource-variable/oxanium`) ma nessun componente lo usa;
+- nessun pin di `packageManager` / `engines` in `package.json` (pnpm 10, Node 22 sono solo convenzione);
+- `createRequire(...).resolve("libpg-query/wasm/libpg-query.wasm")` in `vite.config.ts` viene eseguito
+  al caricamento della config: se la dipendenza sparisce, a rompersi è qualunque comando Vite, non solo
+  l'import;
+- il plugin emette il `.wasm` in `dist/assets/` **incondizionatamente**: verificato dopo la rimozione
+  dello spike, il binario da 1,1 MB finisce nella build anche se nessun modulo dell'app importa
+  `libpg-query`. È peso morto finché l'importer non esiste; quando esisterà l'emissione andrà legata
+  all'effettiva presenza del modulo nel bundle.
+
+**Sorprese (cose che la spec non prevedeva):**
+
+- nessuna delle due strade previste per il `.wasm` (default Vite, copia in `public/`) funziona: è
+  servito un plugin;
+- `pg_dump` 18 emette meta-comandi psql che fanno fallire il parse dell'intero dump;
+- il costo del pan è quasi pari a quello del drag, che è il sintomo del re-render della radice;
+- lo shim di tipi per `node-sql-parser` non serve con la 5.4.0 (il pacchetto pubblica `build/mysql.d.ts`
+  e non ha campo `exports`).

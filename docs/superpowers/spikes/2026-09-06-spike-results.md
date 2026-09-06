@@ -11,6 +11,14 @@ fatta con il pannello del browser **nascosto** e quindi senza frame dipinti. Non
 tempo che React consuma dentro ogni evento di movimento. La prima esecuzione a 300 entità è stata
 scartata per warm-up del JIT.
 
+**Ambiente della misura.** `pnpm dev` — quindi **build di sviluppo di React**, non di produzione — con
+`<StrictMode>` **attivo** in `src/main.tsx`, cioè con **doppia invocazione delle funzioni di render**;
+pannello del browser **nascosto**; Chromium integrato nell'app; Mac Apple Silicon. Ne derivano **due bias
+opposti, nessuno dei due quantificato**: dev build e StrictMode rendono i numeri **pessimistici** (lavoro
+di render contato più volte e senza le ottimizzazioni della build di produzione); l'esclusione di layout e
+paint li rende **ottimistici** (manca tutto il costo di disegno). I valori qui sotto vanno letti come
+ordine di grandezza dell'asse scripting, non come una misura di frame rate.
+
 | Entità | Drag ms/frame avg (p95) | Pan ms/frame avg (p95) |
 |---|---|---|
 | 150 | 2,4 (2,8) | 1,8 (3,2) |
@@ -25,23 +33,67 @@ viewport, eppure costa quasi quanto il drag. Vuol dire che a ogni evento viene *
 intero il componente radice** — il layer degli edge non è memoizzato, e anche con i nodi memoizzati
 l'albero viene comunque attraversato.
 
-**Verdetto A: go con riserva.** A 300 entità lo scripting sta sotto gli **8 ms**, cioè dentro il budget
-di 16 ms a 60 FPS con un margine doppio per macchine più lente: l'SVG a mano con React per nodo regge
-il target della spec. Il margine doppio però vale sull'**avg**: il **p95** a 300 entità arriva a 14,2 ms
-in drag, cioè quasi tutto il budget, e questo con layout e paint ancora esclusi — un motivo in più per
-rifare la misura con i frame dipinti. La riserva è che il renderer definitivo deve fare tre cose, altrimenti il costo
-per frame continua a crescere con il numero di entità:
+**Verdetto A: go sull'asse scripting, con riserva.** A 300 entità lo scripting sta sotto gli **8 ms**,
+cioè dentro il budget di 16 ms a 60 FPS con un margine doppio per macchine più lente — e con StrictMode e
+dev build a carico della misura il numero reale è verosimilmente più basso. Questo dice che **l'asse React
+non è il collo di bottiglia a quella scala**; non dice che il target della spec sia raggiunto. **Il criterio
+del piano — «≥ 50 FPS minimo in drag con 300 entità» — resta non misurato**, e diventa il **primo task del
+piano successivo**: sul canvas vero, in build di produzione, senza `<StrictMode>`, con il pannello visibile
+e quindi con i frame effettivamente dipinti. Anche restando sull'asse scripting, il margine doppio vale
+sull'**avg**: il **p95** a 300 entità arriva a 14,2 ms in drag, cioè quasi tutto il budget, e questo con
+layout e paint ancora esclusi. La riserva è che il renderer definitivo deve fare tre cose, altrimenti il
+costo di scripting per frame continua a crescere con il numero di entità:
 
 1. tenere il `transform` del viewport **fuori dal render del componente radice** (ref, o componente
    minimo iscritto allo store transitorio);
 2. **memoizzare il layer degli edge per singolo edge**;
 3. tenere lo **stato del drag fuori da React**, come già previsto dalla spec.
 
-Con questi tre accorgimenti il costo per frame smette di crescere con il numero di entità.
+Con questi tre accorgimenti il costo **di scripting** dovrebbe smettere di crescere con il numero di
+entità — è un'**ipotesi**, non un risultato misurato, e vale **solo sull'asse React**. Il costo di **paint**
+non lo tocca nessuna delle tre: a 300 entità restano da dipingere ~3.750 `<text>` e ~600 `<rect>`, e quanto
+costino è **ignoto e va misurato**. La leva per il paint è un'altra: il **culling del viewport** (disegnare
+solo ciò che sta dentro l'inquadratura), che la spec §4.3 già anticipa con il tetto dichiarato delle
+centinaia di entità e le entità collassate oltre quella soglia.
 
 La misura con i frame effettivamente dipinti (FPS reali, layout e paint inclusi) **non è stata fatta**.
-Il canvas dello spike resta nella storia git al commit **`28a03a1`**: per rifarla, `git checkout 28a03a1`,
-`pnpm dev`, e trascinare con il mouse leggendo il contatore FPS in toolbar.
+
+**Riproducibilità.** Il canvas dello spike resta nella storia git al commit **`28a03a1`**. La tabella
+avg/p95 qui sopra è stata prodotta con uno script eseguito nella console del browser, **non presente in
+git**: è riportato qui sotto perché la misura sia ripetibile. Uso: `git checkout 28a03a1`, `pnpm dev`,
+aprire la pagina e incollare lo script nella console del browser.
+
+```js
+SVGSVGElement.prototype.setPointerCapture = function () {}
+const yieldMacro = () => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0) })
+const setCount = (n) => { const i = document.querySelector('input[type="number"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, String(n)); i.dispatchEvent(new Event('input', { bubbles: true })) }
+const ev = (t, type, x, y) => t.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1 }))
+const stats = (a) => { const s = [...a].sort((x, y) => x - y); return { avg: +(s.reduce((x, y) => x + y, 0) / s.length).toFixed(2), p95: +s[Math.floor(s.length * 0.95)].toFixed(2) } }
+const settle = async () => { for (let i = 0; i < 20; i++) await yieldMacro() }
+async function phase(down, move, x0, y0, watch, attr, n = 60) {
+  ev(down, 'pointerdown', x0, y0); await settle(); const cost = []
+  for (let i = 1; i <= n; i++) { const b = watch.getAttribute(attr); const t0 = performance.now(); ev(move, 'pointermove', x0 + i * 2, y0 + i); let y = 0; while (watch.getAttribute(attr) === b && y++ < 50) await yieldMacro(); cost.push(performance.now() - t0) }
+  ev(move, 'pointerup', x0 + n * 2, y0 + n); await settle(); return stats(cost)
+}
+const out = {}
+for (const n of [300, 150, 300, 600, 1000, 2000]) { // la prima esecuzione a 300 è warm-up e si scarta
+  setCount(n); await settle(); await settle()
+  const svg = document.querySelector('svg'), g = document.querySelector('[data-id="t0"]'), root = svg.firstElementChild
+  const r = g.getBoundingClientRect(), sr = svg.getBoundingClientRect()
+  out[n] = { drag: await phase(g, svg, r.left + 20, r.top + 10, g, 'transform'), pan: await phase(svg, svg, sr.left + 5, sr.bottom - 5, root, 'transform') }
+}
+console.log(JSON.stringify(out))
+```
+
+Avvertenza sul contatore in toolbar: il pulsante di **auto-drag** del canvas a `28a03a1` divide per
+**5 secondi costanti** invece che per il tempo realmente trascorso, e non ha guardia contro il doppio
+avvio. Il numero che mostra è quindi solo **indicativo**; i valori in tabella vengono dallo script qui
+sopra, non da lui.
+
+**Cosa non è stato misurato.** Oltre agli FPS reali (layout e paint inclusi): la **selezione multipla a
+rettangolo** — la spec §5.2 la chiedeva esplicitamente, ma il canvas dello spike aveva solo la selezione
+singola; è il **caso peggiore**, perché ri-renderizza tutti i nodi insieme — e lo **zoom**, che il piano
+elencava fra gli scenari da cronometrare.
 
 ## B. libpg-query (Postgres)
 
@@ -211,6 +263,12 @@ referenziate. **Nessun costrutto ricorrente fallisce**: in particolare i 25 `CHE
 tabelle — il rischio principale di questo dump MariaDB — sono parsati correttamente. Non serve un parser
 proprio del sottoinsieme DDL.
 
+**Limite dell'ambiente di misura.** `node-sql-parser` è stato eseguito **solo in Node / vitest**: mai in un
+web worker `type: "module"`, mai dentro un bundle browser (la dimensione del chunk qui sopra viene da una
+sonda, non da un uso reale). È la **prima cosa da verificare nel ramo MySQL del piano successivo**, perché
+il pacchetto è **UMD/CJS** e l'interop dentro un worker a moduli è la stessa classe di problema incontrata
+con il `.wasm` di libpg-query nella sezione B.
+
 Da portare nel piano successivo: gestire `/*!` **e** `/*M!` spogliando il commento eseguibile dal chunk
 invece di scartarlo; leggere le `KEY` da `resource: "index"`;
 trattare l'assenza di `nullable` come "nullabile"; confrontare `constraint_type` in modo
@@ -228,9 +286,18 @@ di schema e dichiararlo esplicitamente all'utente.
 **Rendering: SVG a mano con React per nodo → confermato, con tre vincoli.** A 300 entità il costo di
 scripting per evento sta sotto gli 8 ms (sezione A). Il renderer definitivo deve però tenere il
 `transform` del viewport fuori dal render del componente radice, memoizzare il layer degli edge per
-singolo edge e tenere lo stato del drag fuori da React: senza questi tre accorgimenti il costo per
-frame cresce linearmente con il numero di entità (~18 µs per entità per spostamento). Da rifare, quando
-il canvas vero esiste, la misura con i frame dipinti.
+singolo edge e tenere lo stato del drag fuori da React: senza questi tre accorgimenti il costo **di
+scripting** per frame cresce linearmente con il numero di entità (~18 µs per entità per spostamento).
+Che con quei tre accorgimenti smetta di crescere è un'**ipotesi** e riguarda **solo lo scripting**: il
+costo di **paint** (~3.750 `<text>` e ~600 `<rect>` a 300 entità) resta **ignoto e da misurare**, e la
+leva per il paint è il **culling del viewport**, che la spec §4.3 già anticipa con le entità collassate.
+
+- **La misura con i frame dipinti è il primo task del piano successivo.** Il criterio del piano
+  («≥ 50 FPS minimo in drag con 300 entità») non è stato misurato: va fatto sul canvas vero, in build di
+  produzione, senza `<StrictMode>` e con il pannello visibile. Nello stesso giro vanno coperti anche
+  **selezione multipla a rettangolo** e **zoom**, che lo spike non ha misurato.
+- **Culling del viewport** come leva per il costo di paint: disegnare solo ciò che sta dentro
+  l'inquadratura. Nessuno dei tre accorgimenti sull'asse React tocca il paint.
 
 **Postgres: `libpg-query` → confermato.** Caricamento + parse ~136 ms su 200 tabelle contro un criterio
 di 3 s (sezione B).
@@ -265,6 +332,22 @@ DDL. Cose da portare nell'importer, tutte verificate sull'output reale del test:
   accetta solo dump di schema e lo dichiara esplicitamente all'utente. Lo split di questo spike
   (`split(/;\s*\r?\n/)`) vale solo per `mysqldump --no-data`.
 
+**Importer: il canale `warnings` nasce alimentato dai dati veri.** Il contratto della spec §4.4 è
+`(ddl: string) => { model, warnings }`; l'importer deve riempire `warnings` fin dal primo giorno, con quello
+che i parser già producono e che lo spike buttava via:
+
+- **Postgres**: gli errori di `libpg-query` portano `sqlDetails` con **posizione e messaggio** dello
+  statement che ha fallito. Lo spike li collassava in `String(err)`, perdendo tutto: l'importer deve
+  propagarli nel warning, così l'utente sa *dove* nel dump è il problema.
+- **MySQL**: gli **statement scartati dal chunking** (commenti eseguibili `/*!` e `/*M!`, chunk non
+  parsabili) devono diventare warning, non sparire in silenzio — 90 chunk su 139 sono stati scartati sul
+  dump reale senza che nulla lo segnalasse.
+
+**Il worker dell'importer deve avere `onerror` e un timeout.** Il worker dello spike non li aveva: un
+fallimento di caricamento del modulo o del `.wasm`, o un parse che non ritorna, lasciano la promessa
+appesa per sempre e il dialog di import bloccato senza messaggio. Servono un handler `onerror` (e
+`onmessageerror`) che respinga la promessa e un timeout che la chiuda con un errore leggibile.
+
 **Fixture per i test dell'importer:** i dump sintetici in `spike/fixtures/*.synthetic.sql` (committati,
 rigenerabili con `scripts/gen-pg-dump.mjs` e `scripts/gen-mysql-dump.mjs`) restano la fixture del
 repo; i dump reali restano locali e non committati.
@@ -276,18 +359,25 @@ direttiva file per file.
 
 **Debiti minori, rinviati alla revisione finale del piano successivo:**
 
-- `strict` non è dichiarato in nessuno dei tsconfig: TS 6 lo attiva di default, ma è meglio esplicito;
-- `README.md` è ancora il boilerplate del template Vite;
+- ~~`strict` non è dichiarato in nessuno dei tsconfig: TS 6 lo attiva di default, ma è meglio esplicito~~
+  — **risolto** nella revisione finale del branch: `"strict": true` esplicito in `tsconfig.app.json` e
+  `tsconfig.node.json`;
+- ~~`README.md` è ancora il boilerplate del template Vite~~ — **risolto** nella revisione finale del branch;
 - il font Oxanium è dichiarato dal preset (`--font-heading` in `src/index.css`, dipendenza
   `@fontsource-variable/oxanium`) ma nessun componente lo usa;
-- nessun pin di `packageManager` / `engines` in `package.json` (pnpm 10, Node 22 sono solo convenzione);
+- ~~nessun pin di `packageManager` / `engines` in `package.json` (pnpm 10, Node 22 sono solo convenzione)~~
+  — **risolto** nella revisione finale del branch;
 - `createRequire(...).resolve("libpg-query/wasm/libpg-query.wasm")` in `vite.config.ts` viene eseguito
   al caricamento della config: se la dipendenza sparisce, a rompersi è qualunque comando Vite, non solo
-  l'import;
+  l'import (si risolve insieme al punto qui sotto);
 - il plugin emette il `.wasm` in `dist/assets/` **incondizionatamente**: verificato dopo la rimozione
   dello spike, il binario da 1,1 MB finisce nella build anche se nessun modulo dell'app importa
-  `libpg-query`. È peso morto finché l'importer non esiste; quando esisterà l'emissione andrà legata
-  all'effettiva presenza del modulo nel bundle.
+  `libpg-query`. È peso morto finché l'importer non esiste. Il plugin `libpgQueryWasm` va quindi reso
+  **condizionale** nel piano successivo: emettere il `.wasm` **solo se un chunk della build importa
+  davvero `libpg-query`**, agganciare il percorso di atterraggio a `config.build.assetsDir` invece di
+  hardcodare `assets`, e spostare la risoluzione del file (`createRequire(...).resolve(...)`, oggi eseguita
+  al caricamento della config) **dentro gli hook** del plugin, così che una dipendenza mancante rompa
+  l'import e non qualunque comando Vite.
 
 **Sorprese (cose che la spec non prevedeva):**
 

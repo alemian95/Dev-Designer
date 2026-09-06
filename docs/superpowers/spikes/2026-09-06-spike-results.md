@@ -105,4 +105,94 @@ lazy (solo all'import) e comprimibile a 235 KB.
 
 ## C. node-sql-parser (MySQL)
 
+`node-sql-parser@5.4.0`, entry per dialetto `node-sql-parser/build/mysql`, `astify(s, { database: "MySQL" })`
+uno statement alla volta. Misure in Node (vitest 5) sulla stessa macchina della sezione B.
+
+Come in B, due fixture: il dump reale è il caso da superare, il sintetico a 200 tabelle è la scala.
+
+- `spike/fixtures/mysql.sql` — reale (`mysqldump --no-data`, **MariaDB 10.5.27**, dump 10.19), 24 tabelle, 22.942 byte, 531 righe.
+- `spike/fixtures/mysql.synthetic.sql` — sintetica (`node scripts/gen-mysql-dump.mjs 200`), 200 tabelle, 249.284 byte.
+
+| Fixture | Statement totali | Parsati | Falliti | ms |
+|---|---|---|---|---|
+| reale (24 tabelle) | 49 | 49 (100%) | 0 | 34 |
+| sintetica (200 tabelle) | 401 | 400 (99,75%) | 1 | 112 |
+
+Composizione degli statement riconosciuti: reale = 24 `drop:table` + 24 `create:table` + 1 chunk di soli
+commenti (`-- Dump completed on ...`, che `astify` risolve in un array vuoto e conta come parsato);
+sintetica = 200 `drop:table` + 200 `create:table`.
+
+Falliti ricorrenti: **uno solo, e solo sulla fixture sintetica** —
+
+- `SET NAMES utf8mb4` → `SyntaxError: Expected "#", "--", "/*", ":=", "=", or [ \t\n\r] but "u" found.`
+  Il parser vuole `SET NAMES = utf8mb4`. Non è un caso reale: `mysqldump` emette sempre quello statement
+  dentro `/*!40101 SET NAMES utf8mb4 */`, quindi il filtro dei commenti condizionali lo toglie di mezzo;
+  è il generatore sintetico (fedele al brief) che lo scrive nudo. Sul dump reale: **zero fallimenti**.
+
+**Commenti condizionali.** Lo split scarta le righe che iniziano con `/*!` (commenti eseguibili MySQL) **e
+con `/*M!`** (varianti MariaDB): il dump reale si apre con `/*M!999999\- enable the sandbox mode */`, che
+senza quel filtro finisce in testa al primo chunk e lo fa fallire. L'importer definitivo deve filtrare
+entrambi i prefissi.
+
+**`CHECK (json_valid(...))`: parsati, nessun fallimento.** Sono 25 constraint su 5 tabelle (le colonne JSON
+generate da Laravel su MariaDB, che le materializza come `longtext ... CHECK (json_valid(col))`). Non
+rompono il parse e non degradano l'AST: finiscono su `create_definitions[i].check` della colonna, con la
+chiamata a funzione già in forma di albero. Idem `bigint(20) unsigned`, `tinyint(1)`, `longtext`,
+`CHARACTER SET` / `COLLATE` per colonna, `DEFAULT -1`, e la tabella senza PRIMARY KEY (`customer_user`,
+semplicemente non ha un `create_definitions[i]` con `constraint_type: "primary key"`).
+
+Percorsi nell'AST di `CREATE TABLE` (verificati sull'output del test, non a memoria). Nota: su un solo
+statement `astify` restituisce **l'oggetto**, non un array — l'array arriva solo con più statement.
+
+- nome tabella: `ast.table[0].table` (`ast.table[0].db` è `null` sui dump `--no-data`)
+- colonne: `ast.create_definitions[i]` con `resource === "column"`
+  - nome: `.column.column` — tipo: `.definition.dataType` (maiuscolo: `BIGINT`, `VARCHAR`, `LONGTEXT`)
+  - lunghezza/precisione: `.definition.length` (numero), `.definition.scale`
+  - modificatori di tipo: `.definition.suffix` (es. `["UNSIGNED"]`)
+  - nullable: `.nullable` **presente solo se NOT NULL** (`{ type: "not null", value: "not null" }`); se la
+    colonna è nullabile la chiave manca del tutto
+  - default: `.default_val.value` (`{ type: "number", value: 0 }`, `{ type: "null", value: null }`)
+  - auto increment: `.auto_increment === "auto_increment"` (chiave assente altrimenti)
+  - charset/collation: `.character_set.value.value`, `.collate.collate.name`
+  - check di colonna: `.check` (`constraint_type: "check"`, `.definition[0]` è l'espressione)
+- PRIMARY KEY: `resource === "constraint"`, `constraint_type === "primary key"`, colonne in
+  `.definition[]` come `{ type: "column_ref", column }`
+- UNIQUE KEY: `resource === "constraint"`, `constraint_type === "unique key"`, nome indice in `.index`,
+  colonne in `.definition[]`
+- KEY (indice non unico): attenzione, **`resource === "index"`** (non `"constraint"`) e nessun
+  `constraint_type`; `keyword === "key"`, nome in `.index`, colonne in `.definition[]`
+- FOREIGN KEY: `resource === "constraint"`, `constraint_type === "FOREIGN KEY"` (maiuscolo, a differenza
+  di `"primary key"` / `"unique key"`), nome del vincolo in `.constraint`, colonne locali in `.definition[]`,
+  e il riferimento in `.reference_definition`: tabella `.reference_definition.table[0].table`, colonne
+  `.reference_definition.definition[]`, azioni `.reference_definition.on_action[]`
+  (`{ type: "on delete", value: { type: "origin", value: "cascade" } }`)
+
+Conteggi sul dump reale (24 `CREATE TABLE`): 178 colonne, 23 `primary key`, 11 `unique key`, 18 `index`,
+10 `FOREIGN KEY`, 25 `check` di colonna, 1 tabella senza PK.
+
+**Import.** La prima forma del brief funziona così com'è: `import { Parser } from "node-sql-parser/build/mysql"`
+sotto vitest 5 / Vite 8 (il pacchetto è UMD/CJS, l'interop di Vite espone il named export). Non è servita
+né la forma `import pkg from ...` né l'entry principale con `database: "MySQL"`. Lo shim di tipi
+`src/spike/shims.d.ts` resta ma è **ridondante** con la 5.4.0: il pacchetto pubblica `build/mysql.d.ts` e
+non ha campo `exports`, quindi `moduleResolution: bundler` risolve i tipi da solo (verificato: `tsc -b --force`
+passa anche senza shim).
+
+Dimensione del chunk `node-sql-parser/build/mysql`: **284,31 KB (59,92 KB gzip)**. Misurata con una sonda
+temporanea (`import()` dinamico dal codice dell'app, poi rimossa) perché oggi la libreria è importata solo
+dal test e non finisce in `dist`; sul disco il file `build/mysql.js` è 275.999 byte (51,3 KB gzip). Vite non
+ha emesso alcun avviso di dimensione (il limite di default è 500 KB). È un chunk **lazy** e per dialetto:
+l'entry unica `node-sql-parser` porterebbe dentro tutti i dialetti.
+
+**Verdetto C:** **go** — criterio: ≥ 95% degli statement di un mysqldump reale parsati e AST che espone
+colonne, PK e FK. Misurato: **100% (49/49) sul dump reale**, 99,75% sul sintetico con l'unico fallimento su
+uno statement che `mysqldump` non emette mai in chiaro. L'AST espone nome tabella, colonne con tipo /
+nullable / default / auto_increment, PRIMARY KEY, UNIQUE KEY, KEY e FOREIGN KEY con tabella e colonne
+referenziate. **Nessun costrutto ricorrente fallisce**: in particolare i 25 `CHECK (json_valid(...))` su 5
+tabelle — il rischio principale di questo dump MariaDB — sono parsati correttamente. Non serve un parser
+proprio del sottoinsieme DDL.
+
+Da portare nel piano successivo: filtrare `/*!` **e** `/*M!`; leggere le `KEY` da `resource: "index"`;
+trattare l'assenza di `nullable` come "nullabile"; confrontare `constraint_type` in modo
+case-insensitive (`"primary key"` minuscolo vs `"FOREIGN KEY"` maiuscolo).
+
 ## Decisioni per il piano successivo

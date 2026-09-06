@@ -466,6 +466,8 @@ git add -A && git commit -m "spike: canvas SVG a mano con N entità e contatore 
 
 ---
 
+> **CHECKPOINT prima del Task 3 — fermarsi e chiedere all'utente.** I Task 3 e 4 hanno bisogno dei dump reali `spike/fixtures/postgres.sql` (`pg_dump --schema-only`) e `spike/fixtures/mysql.sql` (`mysqldump --no-data`). L'utente li genera con dei container Docker e ha chiesto di essere avvisato a questo punto. Non proseguire con i dump sintetici come sostituto senza il suo ok esplicito: i sintetici servono al test di scala, non a validare i parser.
+
 ### Task 3: Spike B — libpg-query su un pg_dump reale
 
 **Files:**

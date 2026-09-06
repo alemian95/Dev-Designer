@@ -2,6 +2,8 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/er-geometry"
 import { sessionStore } from "@/editor/session-store"
 import { EdgesLayer, NodesLayer } from "./layers"
+import { Overlay } from "./Overlay"
+import { useCanvasInteraction } from "./use-canvas-interaction"
 import { ViewportGroup } from "./ViewportGroup"
 
 const GRID_EXTENT = 50_000
@@ -9,6 +11,7 @@ const GRID_EXTENT = 50_000
 /** Un solo <svg>. `children` finisce nel gruppo viewport sopra i nodi (overlay, Task 8). */
 export function Canvas({ children }: { children?: ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null)
+  useCanvasInteraction(svgRef)
 
   useEffect(() => {
     const svg = svgRef.current
@@ -33,6 +36,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
           <EdgesLayer />
           <NodesLayer />
           {children}
+          <Overlay />
         </ViewportGroup>
       </svg>
     </div>

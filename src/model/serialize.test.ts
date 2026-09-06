@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createErDocument, SCHEMA_VERSION } from "./document"
-import { migrateDocument } from "./migrations"
+import { runMigrations, migrateDocument, type Migration } from "./migrations"
 import { parseDocument, toJson } from "./serialize"
 
 describe("toJson", () => {
@@ -52,5 +52,22 @@ describe("migrateDocument", () => {
 
   it("rifiuta schemaVersion mancante", () => {
     expect(migrateDocument({ id: "x" }).ok).toBe(false)
+  })
+})
+
+describe("runMigrations", () => {
+  const v1toV2: Migration = (raw) => ({ ...raw, aggiunto: true })
+
+  it("applica lo step indicizzato sulla versione di partenza", () => {
+    const steps = new Map<number, Migration>([[1, v1toV2]])
+    expect(runMigrations({ schemaVersion: 1, id: "x" }, steps, 2)).toEqual({
+      ok: true,
+      value: { schemaVersion: 2, id: "x", aggiunto: true },
+    })
+  })
+
+  it("segnala lo step mancante indicando la versione di partenza", () => {
+    const result = runMigrations({ schemaVersion: 1, id: "x" }, new Map(), 2)
+    expect(result).toEqual({ ok: false, error: "manca la migrazione dalla versione 1" })
   })
 })

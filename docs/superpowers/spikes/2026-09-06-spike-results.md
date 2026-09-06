@@ -56,7 +56,11 @@ costino è **ignoto e va misurato**. La leva per il paint è un'altra: il **cull
 solo ciò che sta dentro l'inquadratura), che la spec §4.3 già anticipa con il tetto dichiarato delle
 centinaia di entità e le entità collassate oltre quella soglia.
 
-La misura con i frame effettivamente dipinti (FPS reali, layout e paint inclusi) **non è stata fatta**.
+La misura con i frame effettivamente dipinti (FPS reali, layout e paint inclusi) **è stata fatta dopo**,
+nel piano successivo: [Misura FPS a frame dipinti](../../perf/2026-09-06-fps-frame-dipinti.md). Esito
+**FAIL** a 300 entità per lo zoom (p95 41,7 ms contro il criterio di 20); drag, pan e marquee stanno sul
+pavimento del display. Conferma la lettura di questa sezione — l'asse React non è il collo di bottiglia —
+e la riserva che si teneva: il costo che rompe il criterio è **layout e paint**, non scripting.
 
 **Riproducibilità.** Il canvas dello spike resta nella storia git al commit **`28a03a1`**. La tabella
 avg/p95 qui sopra è stata prodotta con uno script eseguito nella console del browser, **non presente in
@@ -292,7 +296,8 @@ Che con quei tre accorgimenti smetta di crescere è un'**ipotesi** e riguarda **
 costo di **paint** (~3.750 `<text>` e ~600 `<rect>` a 300 entità) resta **ignoto e da misurare**, e la
 leva per il paint è il **culling del viewport**, che la spec §4.3 già anticipa con le entità collassate.
 
-- **La misura con i frame dipinti è il primo task del piano successivo.** Il criterio del piano
+- **La misura con i frame dipinti è il primo task del piano successivo** — fatta, esito FAIL:
+  [Misura FPS a frame dipinti](../../perf/2026-09-06-fps-frame-dipinti.md). Il criterio del piano
   («≥ 50 FPS minimo in drag con 300 entità») non è stato misurato: va fatto sul canvas vero, in build di
   produzione, senza `<StrictMode>` e con il pannello visibile. Nello stesso giro vanno coperti anche
   **selezione multipla a rettangolo** e **zoom**, che lo spike non ha misurato.

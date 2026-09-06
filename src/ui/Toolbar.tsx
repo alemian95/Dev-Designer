@@ -44,19 +44,19 @@ export function Toolbar() {
         <Hint label="Relazione (R)"><ToggleGroupItem value="relation" aria-label="Relazione" className={TOOL_ITEM}><Spline /></ToggleGroupItem></Hint>
       </ToggleGroup>
       <Separator orientation="vertical" className="h-6" />
-      <Hint label="Annulla (⌘Z)"><Button variant="ghost" size="icon" disabled={!canUndo} onClick={() => documentStore.getState().undo()}><Undo2 /></Button></Hint>
-      <Hint label="Ripeti (⇧⌘Z)"><Button variant="ghost" size="icon" disabled={!canRedo} onClick={() => documentStore.getState().redo()}><Redo2 /></Button></Hint>
+      <Hint label="Annulla (⌘Z)"><Button variant="ghost" size="icon" aria-label="Annulla" disabled={!canUndo} onClick={() => documentStore.getState().undo()}><Undo2 /></Button></Hint>
+      <Hint label="Ripeti (⇧⌘Z)"><Button variant="ghost" size="icon" aria-label="Ripeti" disabled={!canRedo} onClick={() => documentStore.getState().redo()}><Redo2 /></Button></Hint>
       <Separator orientation="vertical" className="h-6" />
-      <Hint label="Duplica (⌘D)"><Button variant="ghost" size="icon" disabled={!hasSelection} onClick={duplicateSelection}><Copy /></Button></Hint>
-      <Hint label="Elimina (⌫)"><Button variant="ghost" size="icon" disabled={!hasSelection} onClick={deleteSelection}><Trash2 /></Button></Hint>
+      <Hint label="Duplica (⌘D)"><Button variant="ghost" size="icon" aria-label="Duplica" disabled={!hasSelection} onClick={duplicateSelection}><Copy /></Button></Hint>
+      <Hint label="Elimina (⌫)"><Button variant="ghost" size="icon" aria-label="Elimina" disabled={!hasSelection} onClick={deleteSelection}><Trash2 /></Button></Hint>
       <Separator orientation="vertical" className="h-6" />
-      <Hint label="Riduci (⌘-)"><Button variant="ghost" size="icon" onClick={() => zoomBy(0.8)}><ZoomOut /></Button></Hint>
+      <Hint label="Riduci (⌘-)"><Button variant="ghost" size="icon" aria-label="Riduci zoom" onClick={() => zoomBy(0.8)}><ZoomOut /></Button></Hint>
       <ZoomLabel />
-      <Hint label="Ingrandisci (⌘+)"><Button variant="ghost" size="icon" onClick={() => zoomBy(1.25)}><ZoomIn /></Button></Hint>
-      <Hint label="Adatta (F)"><Button variant="ghost" size="icon" onClick={fitToContent}><Maximize2 /></Button></Hint>
+      <Hint label="Ingrandisci (⌘+)"><Button variant="ghost" size="icon" aria-label="Ingrandisci zoom" onClick={() => zoomBy(1.25)}><ZoomIn /></Button></Hint>
+      <Hint label="Adatta (F)"><Button variant="ghost" size="icon" aria-label="Adatta" onClick={fitToContent}><Maximize2 /></Button></Hint>
       <div className="ml-auto" />
       <Hint label={theme === "dark" ? "Tema chiaro" : "Tema scuro"}>
-        <Button variant="ghost" size="icon" onClick={toggle}>{theme === "dark" ? <Sun /> : <Moon />}</Button>
+        <Button variant="ghost" size="icon" aria-label={theme === "dark" ? "Tema chiaro" : "Tema scuro"} onClick={toggle}>{theme === "dark" ? <Sun /> : <Moon />}</Button>
       </Hint>
     </header>
   )

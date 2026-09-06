@@ -21,7 +21,7 @@
 - Selettori Zustand che restituiscono oggetti o array nuovi vanno avvolti in `useShallow` (zustand v5 usa `useSyncExternalStore`: un riferimento nuovo a ogni chiamata è un loop infinito).
 - Criterio prestazioni (Task 11): a 300 entità, in build di produzione, il **p95 del tempo di frame ≤ 20 ms** (≥ 50 FPS) in drag, drag di tutta la selezione, pan, marquee e zoom. Il tetto voluto dall'utente è 60 FPS: non si ottimizza oltre.
 - Nuove dipendenze ammesse: `zustand`, `immer`, `zod` (dependencies), `playwright` (devDependency). Nessun'altra.
-- Componenti shadcn ammessi in questo piano: `button` (esiste), `input`, `label`, `separator`, `toggle-group`, `tooltip`. Checkbox e select sono elementi HTML nativi.
+- Componenti shadcn ammessi in questo piano: `button` (esiste), `input`, `label`, `separator`, `toggle-group` (porta con sé `toggle`, sua dipendenza obbligatoria), `tooltip`. Checkbox e select sono elementi HTML nativi.
 - Testi UI, commenti, docstring e commit in italiano; identificatori in inglese. Commit in stile `feat: …`, `test: …`, `docs: …`, `chore: …`.
 - Identità git: prima del primo commit verificare `git config --local user.email` = `alessandromian95@gmail.com` (altrimenti eseguire `git-config-personal`).
 - Per API di librerie non riportate qui, leggere il file generato o la documentazione ufficiale, non andare a memoria (in particolare i componenti shadcn generati in `src/components/ui/`).
@@ -66,7 +66,7 @@ docs/perf/2026-09-06-fps-frame-dipinti.md  risultati Task 11
 
 **Files:**
 - Modify: `package.json` (via pnpm), `eslint.config.js`
-- Create: `src/components/ui/{input,label,separator,toggle-group,tooltip}.tsx` (generati da shadcn)
+- Create: `src/components/ui/{input,label,separator,toggle,toggle-group,tooltip}.tsx` (generati da shadcn; `toggle` è dipendenza di `toggle-group`)
 
 **Interfaces:**
 - Produces: alias `@/model/*`, `@/editor/*`, `@/ui/*` già risolti da `tsconfig` e `vite.config.ts`; regola ESLint che rende errore un import di React in `src/model` o `src/editor`.
@@ -87,7 +87,7 @@ Atteso: email `alessandromian95@gmail.com`; `package.json` con le quattro dipend
 pnpm dlx shadcn@latest add input label separator toggle-group tooltip -y
 ```
 
-Atteso: cinque file in `src/components/ui/`. Leggerli: le API (`asChild`, `type="single"`, nomi degli export) servono ai Task 9 e 10.
+Atteso: sei file in `src/components/ui/` (`toggle.tsx` arriva come dipendenza di `toggle-group`). Leggerli: le API (`asChild`, `type="single"`, nomi degli export) servono ai Task 9 e 10.
 
 - [ ] **Step 3: Regola degli strati in `eslint.config.js`**
 

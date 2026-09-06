@@ -9,6 +9,9 @@ const addEntity = (key: string) => (draft: Parameters<typeof erDiagram>[0]) => {
   d.view.nodes[key] = { x: 0, y: 0, collapsed: false }
 }
 
+/** Catturato al caricamento del modulo, quindi prima che il beforeEach chiami load(): è lo stato iniziale dello store. */
+const initialDoc = documentStore.getState().doc
+
 describe("documentStore", () => {
   beforeEach(() => documentStore.getState().load(createErDocument("t", "t")))
 
@@ -46,6 +49,15 @@ describe("documentStore", () => {
   it("la storia è limitata", () => {
     for (let i = 0; i < HISTORY_LIMIT + 5; i++) documentStore.getState().dispatch(addEntity(`e${i}`))
     expect(documentStore.getState().past).toHaveLength(HISTORY_LIMIT)
+  })
+
+  it("il documento iniziale non è mutabile, anche senza load", () => {
+    expect(() => {
+      ;(initialDoc as { name: string }).name = "x"
+    }).toThrow()
+    expect(() => {
+      erDiagram(initialDoc).model.entities["a"] = { name: "a", attributes: [] }
+    }).toThrow()
   })
 
   it("il documento non è mutabile dall'esterno", () => {

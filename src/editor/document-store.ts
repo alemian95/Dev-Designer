@@ -1,4 +1,4 @@
-import { applyPatches, enablePatches, produceWithPatches, type Patch } from "immer"
+import { applyPatches, enablePatches, freeze, produceWithPatches, type Patch } from "immer"
 import { createStore } from "zustand/vanilla"
 import { createErDocument, type DevDocument } from "@/model/document"
 
@@ -14,6 +14,12 @@ interface HistoryEntry {
 
 export const HISTORY_LIMIT = 200
 
+/**
+ * Congela in profondità un documento che non proviene da Immer, così l'invariante
+ * "il documento è immutabile dall'esterno" vale già prima del primo dispatch.
+ */
+const freezeDoc = (doc: DevDocument): DevDocument => freeze(doc, true)
+
 export interface DocumentState {
   doc: DevDocument
   past: HistoryEntry[]
@@ -27,7 +33,7 @@ export interface DocumentState {
 }
 
 export const documentStore = createStore<DocumentState>()((set, get) => ({
-  doc: createErDocument("Senza titolo"),
+  doc: freezeDoc(createErDocument("Senza titolo")),
   past: [],
   future: [],
   dispatch: (recipe) => {
@@ -49,8 +55,6 @@ export const documentStore = createStore<DocumentState>()((set, get) => ({
     set({ doc: applyPatches(doc, entry.patches), past: [...past, entry], future: rest })
   },
   load: (doc) => {
-    // produce senza modifiche: congela il documento in profondità come farebbe il primo dispatch.
-    const [frozen] = produceWithPatches(doc, () => {})
-    set({ doc: frozen, past: [], future: [] })
+    set({ doc: freezeDoc(doc), past: [], future: [] })
   },
 }))

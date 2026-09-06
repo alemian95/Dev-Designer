@@ -128,4 +128,9 @@
   html {
     @apply font-mono;
     }
+  .dd-canvas {
+    display: block;
+    user-select: none;
+    touch-action: none;
+  }
 }

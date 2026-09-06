@@ -85,6 +85,7 @@ PlantUML, documento multi diagramma, backend di qualsiasi tipo.
 | Stato | Zustand | Store documento + store transitorio |
 | Mutazioni e undo | Immer con patch | Comandi producono patch e inverse |
 | Validazione | zod | Schema del file e tipi da una sola fonte |
+| UI della cornice | shadcn/ui + Tailwind | Primitive Radix accessibili, codice nel repo, solo i componenti usati |
 | Rendering | SVG scritto a mano dentro React | Hit testing dal DOM, testo nativo, export fedele |
 | Font | monospace incorporato | Dimensioni deterministiche senza misurazione |
 | Auto layout | ELK.js in worker | Problema difficile già risolto |
@@ -109,6 +110,25 @@ PlantUML, documento multi diagramma, backend di qualsiasi tipo.
   servono account o collaborazione, che non sono nel piano.
 - **Import da codice**: da un ORM lo schema non si deduce senza replicare le
   convenzioni di ogni framework. Il DDL è l'unica fonte affidabile per l'ER.
+- **daisyUI, Bulma, Bootstrap, Tabler, PatternFly** per la cornice: i primi
+  tre sono solo CSS e lasciano a noi menu, focus trap e tastiera; Tabler è un
+  tema per dashboard; PatternFly è un design system enterprise pesante.
+
+### UI della cornice
+
+La cornice (toolbar, palette, pannello proprietà, menu, dialog, command
+palette) usa shadcn/ui su Tailwind. Il canvas SVG non usa nessuna libreria UI.
+
+- Lista chiusa di componenti: Button, Toggle Group, Dropdown Menu, Context
+  Menu, Dialog, Popover, Tooltip, Command, Input, Select, Tabs, Scroll Area,
+  Separator. Altri solo quando servono.
+- I token del tema di shadcn sono variabili CSS e sono gli stessi usati dal
+  canvas SVG: chiaro e scuro sono un solo sistema, l'export li risolve una
+  volta sola.
+- Il reset (preflight) di Tailwind tocca anche `svg`; il canvas ne è escluso
+  con una regola dedicata.
+- Il setup iniziale di shadcn (comando e preset) è fornito dall'utente dal
+  configuratore del sito ufficiale.
 
 ## 4. Architettura
 

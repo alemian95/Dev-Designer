@@ -19,15 +19,17 @@ scartata per warm-up del JIT.
 | 1000 | 19,0 (48,8) | 12,5 (20,7) |
 | 2000 | 37,5 (62,2) | 27,0 (43,2) |
 
-**Lettura.** La crescita è lineare nel numero di entità: circa **18 µs per entità per spostamento**, sia
-in drag sia in pan. Il dato che conta è il pan: cambia un solo attributo `transform` sul gruppo del
+**Lettura.** La crescita è lineare nel numero di entità: circa **18 µs per entità per spostamento in
+drag** e **~13 µs in pan**. Il dato che conta è il pan: cambia un solo attributo `transform` sul gruppo del
 viewport, eppure costa quasi quanto il drag. Vuol dire che a ogni evento viene **ri-renderizzato per
 intero il componente radice** — il layer degli edge non è memoizzato, e anche con i nodi memoizzati
 l'albero viene comunque attraversato.
 
 **Verdetto A: go con riserva.** A 300 entità lo scripting sta sotto gli **8 ms**, cioè dentro il budget
 di 16 ms a 60 FPS con un margine doppio per macchine più lente: l'SVG a mano con React per nodo regge
-il target della spec. La riserva è che il renderer definitivo deve fare tre cose, altrimenti il costo
+il target della spec. Il margine doppio però vale sull'**avg**: il **p95** a 300 entità arriva a 14,2 ms
+in drag, cioè quasi tutto il budget, e questo con layout e paint ancora esclusi — un motivo in più per
+rifare la misura con i frame dipinti. La riserva è che il renderer definitivo deve fare tre cose, altrimenti il costo
 per frame continua a crescere con il numero di entità:
 
 1. tenere il `transform` del viewport **fuori dal render del componente radice** (ref, o componente
@@ -79,13 +81,16 @@ Mappa dei tipi di statement (dal test Node):
 **Meta-comandi psql.** `pg_dump` 18 racchiude il dump fra `\restrict <token>` e `\unrestrict <token>`.
 Non sono SQL: passati a `parse()` fanno fallire l'intero dump con un errore di sintassi. Test e worker
 scartano le righe che iniziano con `\` prima del parse — **2 righe filtrate** sul dump reale, 0 sul
-sintetico. **L'importer definitivo deve fare lo stesso** (e in generale ignorare i meta-comandi psql,
-`\connect` compreso).
+sintetico. Tagliare ogni riga che inizia con `\` è però una scorciatoia dello spike: **l'importer
+definitivo deve filtrare un insieme chiuso di meta-comandi psql fuori dai literal**, come prescritto in
+[Decisioni per il piano successivo](#decisioni-per-il-piano-successivo).
 
 Dimensione `.wasm` in dist: **1.150.984 byte (1.124 KB)** in `dist/assets/libpg-query.wasm`, che
 compresso misura **222,9 KB gzip** (`gzip -6`, 228.199 byte) e **164,6 KB brotli** (168.575 byte),
 misurati sul binario emesso in `dist`. Il report di `vite build` stampa `gzip: 235.54 kB` per lo stesso
-file: è la sua stima, non una misura sul binario finale — vale il numero qui sopra.
+file: il numero è diverso prima di tutto perché l'unità è diversa — Vite usa kB decimali (÷1000), quindi
+i 228.199 byte qui sopra sono **228,20 kB** nella sua unità, non 222,9 KiB — e per il resto (~3%) perché
+i parametri di compressione non coincidono con `gzip -6`.
 
 **Caricamento: nessuna delle due strade del brief funziona; serve un plugin Vite** (~15 righe in
 `vite.config.ts`). Emscripten cerca `libpg-query.wasm` in `scriptDirectory`, cioè accanto allo script

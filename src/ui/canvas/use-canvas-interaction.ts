@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from "react"
+import { flushSync } from "react-dom"
 import { addEntity, addRelationship, moveNodes } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
 import { edgeGeometry } from "@/editor/edge-routing"
@@ -32,7 +33,7 @@ function hitTest(el: Element | null): Hit {
   return { kind: "canvas" }
 }
 
-function isTextInput(target: EventTarget | null): boolean {
+function isTextInput(target: EventTarget | null): target is HTMLElement {
   return target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
 }
 
@@ -170,6 +171,13 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0 && e.button !== 1) return
       if (session().editing) return // l'input inline gestisce il blur da solo
+      // Il down sul canvas cambia la selezione e smonta subito il pannello proprietà: se un campo di
+      // testo ha il fuoco va sfocato *prima*, altrimenti l'input viene tolto dal DOM senza mai emettere
+      // `blur` e il testo appena digitato — che `CommitInput` salva proprio sul blur — sparirebbe in
+      // silenzio. Il blur esplicito fa partire il commit mentre il campo è ancora montato; `flushSync`
+      // manda in pagina il risultato del comando prima dell'hit test, che legge il DOM per coordinate.
+      const active = document.activeElement
+      if (isTextInput(active)) flushSync(() => active.blur())
       svg.setPointerCapture(e.pointerId)
       // Lo strumento entità apre l'editor inline già nel down: senza annullare il default il
       // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.

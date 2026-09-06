@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/er-geometry"
 import { sessionStore } from "@/editor/session-store"
+import { InlineEditor } from "./InlineEditor"
 import { EdgesLayer, NodesLayer } from "./layers"
 import { Overlay } from "./Overlay"
 import { useCanvasInteraction } from "./use-canvas-interaction"
@@ -39,6 +40,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
           <Overlay />
         </ViewportGroup>
       </svg>
+      <InlineEditor />
     </div>
   )
 }

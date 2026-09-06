@@ -171,7 +171,9 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       if (e.button !== 0 && e.button !== 1) return
       if (session().editing) return // l'input inline gestisce il blur da solo
       svg.setPointerCapture(e.pointerId)
-      if (e.button === 1) e.preventDefault()
+      // Lo strumento entità apre l'editor inline già nel down: senza annullare il default il
+      // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.
+      if (e.button === 1 || session().tool === "entity") e.preventDefault()
       step({ type: "down", info: info(e), spaceHeld })
     }
     const onPointerMove = (e: PointerEvent) => {

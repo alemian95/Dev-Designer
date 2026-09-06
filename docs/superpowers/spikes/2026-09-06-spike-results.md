@@ -195,4 +195,11 @@ Da portare nel piano successivo: filtrare `/*!` **e** `/*M!`; leggere le `KEY` d
 trattare l'assenza di `nullable` come "nullabile"; confrontare `constraint_type` in modo
 case-insensitive (`"primary key"` minuscolo vs `"FOREIGN KEY"` maiuscolo).
 
+**Limite dello split degli statement.** Lo split usato in questo spike è ingenuo: taglia sul `;` a fine
+riga (`split(/;\s*\r?\n/)`) ed è valido **solo** per dump `mysqldump --no-data` di sole `CREATE TABLE`. Si
+rompe sugli `INSERT` con `;` dentro le stringhe e su trigger/routine con `DELIMITER`. Il **100% (49/49)**
+misurato sopra vale entro questo dominio e non dimostra la strategia di chunking in generale: l'importer
+definitivo deve fare chunking consapevole di stringhe e `DELIMITER`, oppure accettare in ingresso solo dump
+di schema e dichiararlo esplicitamente all'utente.
+
 ## Decisioni per il piano successivo

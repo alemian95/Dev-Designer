@@ -83,7 +83,11 @@ try {
     await page.locator("#upload-input").setInputFiles({ name: "rotto.dd.json", mimeType: "application/json", buffer: Buffer.from("{}") })
     await page.waitForSelector("[data-notice-bar]")
     await expectText(page, "[data-notice-bar]", "File non valido")
+    // Il confine di fiducia non è solo "non carica": niente deve essere cambiato. Il conteggio dei
+    // nodi da solo non lo dice — un nodo sostituito o rinominato passerebbe inosservato.
     await expectNodes(page, 1)
+    await expectText(page, "[data-node-id]", ENTITY)
+    await expectDirty(page, false)
   })
 
   await step("una seconda scheda apre in sola lettura e può prendere il controllo", async () => {

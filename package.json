@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "perf": "vite build && node scripts/perf/fps.mjs",
+    "e2e": "vite build && node scripts/e2e/persistenza.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

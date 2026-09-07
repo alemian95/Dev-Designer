@@ -64,6 +64,16 @@ function deps(over: Partial<DocumentIoDeps> = {}): DocumentIoDeps & { db: Return
   } as DocumentIoDeps & { db: ReturnType<typeof memoryDb>; files: FileOps }
 }
 
+/** Un autosave finto che registra l'id del documento caricato al momento di ogni `flush`. */
+function recordingAutosave() {
+  const flushed: string[] = []
+  const autosave = {
+    flush: vi.fn(async () => { flushed.push(documentStore.getState().doc.id) }),
+    stop: () => {},
+  }
+  return { flushed, autosave }
+}
+
 const withEntity = (name: string, id: string): DevDocument => {
   const doc = createErDocument(name, id)
   const { recipe } = addEntity({}, { x: 0, y: 0 })
@@ -169,6 +179,16 @@ describe("openFile", () => {
     await createDocumentIo(d).openFile({ name: "doc.dd.json", text: toJson(fromFile), handle: null })
     expect(documentStore.getState().doc).toEqual(fromFile)
     expect(documentSession.getState().dirty).toBe(false)
+  })
+
+  it("openWithPicker annullato non apre niente e lascia lo stato com'era", async () => {
+    const d = deps()
+    await createDocumentIo(d).openWithPicker()
+    expect(d.files.pickOpen).toHaveBeenCalledTimes(1)
+    expect(documentStore.getState().doc.id).toBe("init")
+    expect(documentSession.getState()).toMatchObject({ docId: "", notice: null })
+    expect(d.db.records.size).toBe(0)
+    expect(d.db.last).toBeNull()
   })
 
   it("un buffer identico al file non chiede niente", async () => {
@@ -296,6 +316,95 @@ describe("seconda scheda", () => {
     d.db.last = "s1"
     await createDocumentIo(d).restoreLast()
     expect(documentSession.getState().readOnly).toBe(true)
+  })
+
+  it("in sola lettura non sovrascrive il record del documento, ma resta l'ultimo aperto", async () => {
+    const d = deps({ confirm: vi.fn(() => false) })
+    const busy: LockRequester = { request: (n, o, cb) => (o.ifAvailable ? cb(null) : cb({ name: n, mode: "exclusive" })) }
+    d.lock = { ...lock(), locks: busy }
+    // L'altra scheda possiede "s2" e ha lavoro non ancora scritto su file.
+    const buffered = withEntity("doc", "s2")
+    const rec = record(buffered, { updatedAt: 900, savedToFileAt: 800 })
+    d.db.records.set("s2", rec)
+    const fromFile = createErDocument("doc", "s2")
+    await createDocumentIo(d).openFile({ name: "doc.dd.json", text: toJson(fromFile), handle: null })
+    expect(documentSession.getState().readOnly).toBe(true)
+    expect(documentStore.getState().doc).toEqual(fromFile)
+    expect(d.db.records.get("s2")).toBe(rec)
+    expect(d.db.last).toBe("s2")
+  })
+})
+
+describe("cambio documento", () => {
+  it("newDocument salva l'ultima modifica del documento che lascia", async () => {
+    const { flushed, autosave } = recordingAutosave()
+    const d = deps({ autosave })
+    const io = createDocumentIo(d)
+    await io.newDocument()
+    const first = documentStore.getState().doc.id
+    await io.newDocument()
+    expect(flushed).toEqual(["init", first])
+  })
+
+  it("openRecent salva l'ultima modifica del documento che lascia", async () => {
+    const { flushed, autosave } = recordingAutosave()
+    const d = deps({ autosave })
+    const io = createDocumentIo(d)
+    const saved = withEntity("recente", "c1")
+    d.db.records.set("c1", record(saved, { updatedAt: 900, savedToFileAt: 900 }))
+    documentStore.getState().load(createErDocument("uscente", "out"))
+    await io.openRecent("c1")
+    expect(flushed).toEqual(["out"])
+    expect(documentStore.getState().doc).toEqual(saved)
+  })
+
+  it("restoreLast salva l'ultima modifica del documento che lascia", async () => {
+    const { flushed, autosave } = recordingAutosave()
+    const d = deps({ autosave })
+    const io = createDocumentIo(d)
+    const saved = withEntity("salvato", "c2")
+    d.db.records.set("c2", record(saved, { updatedAt: 900, savedToFileAt: 900 }))
+    d.db.last = "c2"
+    documentStore.getState().load(createErDocument("uscente", "out"))
+    await io.restoreLast()
+    expect(flushed).toEqual(["out"])
+    expect(documentStore.getState().doc).toEqual(saved)
+  })
+})
+
+describe("takeControl", () => {
+  it("se l'altra scheda non risponde avvisa e non rimonta niente", async () => {
+    const d = deps()
+    // Il lock si concede a `tryOwn` (ifAvailable) ma non alla presa: è il timeout di `takeOver`.
+    const refusesTake: LockRequester = { request: (n, o, cb) => (o.ifAvailable ? cb({ name: n, mode: "exclusive" }) : cb(null)) }
+    d.lock = { ...lock(), locks: refusesTake }
+    const io = createDocumentIo(d)
+    const mine = withEntity("mio", "t1")
+    d.db.records.set("t1", record(mine, { updatedAt: 900, savedToFileAt: 900 }))
+    d.db.last = "t1"
+    await io.restoreLast()
+    // Nel frattempo il db è avanzato: se `takeControl` rimontasse, il documento cambierebbe.
+    d.db.records.set("t1", record(createErDocument("più recente", "t1"), { updatedAt: 1200, savedToFileAt: 900 }))
+    await io.takeControl()
+    expect(documentSession.getState().notice).toContain("non risponde")
+    expect(documentSession.getState().docId).toBe("t1")
+    expect(documentStore.getState().doc).toEqual(mine)
+  })
+
+  it("dopo una cessione riuscita riparte dal record scritto dall'altra scheda", async () => {
+    const d = deps()
+    const io = createDocumentIo(d)
+    const ceded = withEntity("ceduto", "t2")
+    const older = createErDocument("ceduto", "t2")
+    d.db.records.set("t2", record(older, { updatedAt: 500, savedToFileAt: 500 }))
+    d.db.last = "t2"
+    await io.restoreLast()
+    expect(documentStore.getState().doc).toEqual(older)
+    // L'altra scheda cede e lascia il suo ultimo autosave, più recente del file.
+    d.db.records.set("t2", record(ceded, { fileName: "t2.dd.json", updatedAt: 1100, savedToFileAt: 900 }))
+    await io.takeControl()
+    expect(documentStore.getState().doc).toEqual(ceded)
+    expect(documentSession.getState()).toMatchObject({ docId: "t2", fileName: "t2.dd.json", dirty: true, readOnly: false })
   })
 })
 

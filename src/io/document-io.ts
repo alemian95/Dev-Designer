@@ -118,10 +118,17 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
   }
 
   async function activate(doc: DevDocument, s: Mounted, over: Partial<DocumentRecord>): Promise<void> {
+    // `load` non è un comando: la sottoscrizione dell'autosave lo ignora e il debounce del documento
+    // uscente resterebbe armato, per poi scrivere quello nuovo. Il flush qui salva l'ultima modifica
+    // di chi si lascia e disinnesca quel timer, quindi va prima di `mount`.
+    await autosave.flush()
     mount(doc, s)
-    await own(doc.id, "try")
+    const owned = await own(doc.id, "try")
     await safe(async () => {
-      await db.put(record(doc, over))
+      // Il record è condiviso fra le schede sotto la chiave dell'id: scriverlo da una scheda in sola
+      // lettura cancellerebbe il buffer non salvato della proprietaria. `lastOpenedId` non è il record
+      // di un documento, e "l'ultimo aperto" è vero anche per chi lo apre in sola lettura.
+      if (owned) await db.put(record(doc, over))
       await db.setLastOpenedId(doc.id)
     }, undefined)
   }
@@ -145,6 +152,8 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
       notice(`Il documento salvato nel browser non è leggibile (${parsed.error}): ne è stato creato uno nuovo.`)
       return
     }
+    // Come in `activate`: l'ultima modifica del documento uscente prima di sostituirlo.
+    await autosave.flush()
     mountRecord(rec, parsed.document)
     await own(rec.id, "try")
   }
@@ -190,6 +199,8 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
       notice(`Documento non leggibile: ${parsed.error}`)
       return
     }
+    // Come in `activate`: l'ultima modifica del documento uscente prima di sostituirlo.
+    await autosave.flush()
     mountRecord(rec, parsed.document)
     await own(rec.id, "try")
     await safe(() => db.setLastOpenedId(rec.id), undefined)

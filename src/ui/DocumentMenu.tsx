@@ -38,7 +38,8 @@ export function DocumentMenu() {
       <DropdownMenu onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" data-document-menu className="gap-1 font-medium">
-            <span className="max-w-48 truncate">{name}</span>
+            {/* Il nome è anche il nome accessibile del pulsante: un file col nome vuoto lo lascerebbe senza. */}
+            <span className="max-w-48 truncate">{name || "Senza titolo"}</span>
             {dirty && <span aria-label="Modifiche non salvate" title="Modifiche non salvate" className="text-primary">●</span>}
             <ChevronDown className="size-3.5 opacity-60" />
           </Button>

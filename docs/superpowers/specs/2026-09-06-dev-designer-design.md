@@ -227,7 +227,9 @@ nodi a posizione libera.
 - `model`, `io`, funzione di layout del sequence: Vitest con fixture (dump veri
   in ingresso, modello atteso in uscita; e viceversa per gli exporter).
 - Renderer: snapshot dell'SVG esportato per alcuni diagrammi fixture.
-- Un solo e2e Playwright: apri, disegna un'entità, salva, ricarica, ritrova.
+- Un solo e2e Playwright (`pnpm e2e`): disegna un'entità, ricarica, ritrova; salva, riapri, ritrova;
+  due schede. Sul percorso di fallback, perché i dialoghi nativi non sono pilotabili — vedi la spec
+  della persistenza, §7.
 - Nessun test per componente React.
 
 ## 5. Spike (codice da buttare, 1–2 giorni)

@@ -96,6 +96,16 @@ describe("takeOver", () => {
     expect(order).toEqual(["cede", "lost"])
   })
 
+  it("un onCede che fallisce non blocca la cessione", async () => {
+    const locks = new FakeLocks()
+    const name = `lock-test-${++channelName}`
+    const a = (await tryOwn("d1", async () => { throw new Error("quota esaurita") }, deps(locks, name)))!
+    const b = await takeOver("d1", async () => {}, deps(locks, name))
+    expect(b).not.toBeNull()
+    owned.push(b!)
+    await a.lost // il lock è stato rilasciato nonostante l'errore
+  })
+
   it("senza una proprietaria che risponde va in timeout e ritorna null", async () => {
     const locks = new FakeLocks()
     // La proprietaria ascolta su un altro canale: la richiesta non la raggiunge.

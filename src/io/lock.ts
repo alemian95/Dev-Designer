@@ -59,7 +59,11 @@ function own(docId: string, onCede: () => Promise<void>, deps: LockDeps, options
         const onMessage = (e: MessageEvent<LockMessage>) => {
           if (ceding || e.data.type !== "request" || e.data.docId !== docId) return
           ceding = true
-          void onCede().finally(release)
+          // Se l'ultimo salvataggio fallisce la cessione procede comunque: l'autosave
+          // segnala il proprio errore per conto suo, e qui conta non lasciare il lock preso.
+          void onCede()
+            .catch(() => {})
+            .finally(release)
         }
         channel.addEventListener("message", onMessage)
         resolveOwnership({ docId, release, lost })

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { deleteSelection, duplicateSelection, fitToContent, zoomBy } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore, type Tool } from "@/editor/session-store"
+import { DocumentMenu } from "./DocumentMenu"
 import { useTheme } from "./use-theme"
 
 /** `TooltipTrigger asChild` sovrascrive il `data-state` del toggle: lo stato attivo si legge da `aria-checked`. */
@@ -37,7 +38,9 @@ export function Toolbar() {
 
   return (
     <header className="flex h-12 items-center gap-2 border-b px-3">
-      <span className="mr-2 text-sm font-semibold">Dev Designer</span>
+      <span className="text-sm font-semibold">Dev Designer</span>
+      <DocumentMenu />
+      <Separator orientation="vertical" className="h-6" />
       <ToggleGroup type="single" value={tool} onValueChange={(v) => v && setTool(v as Tool)}>
         <Hint label="Seleziona (V)"><ToggleGroupItem value="select" aria-label="Seleziona" className={TOOL_ITEM}><MousePointer2 /></ToggleGroupItem></Hint>
         <Hint label="Entità (E)"><ToggleGroupItem value="entity" aria-label="Entità" className={TOOL_ITEM}><Square /></ToggleGroupItem></Hint>

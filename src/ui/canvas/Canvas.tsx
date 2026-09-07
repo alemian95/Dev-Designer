@@ -1,6 +1,5 @@
-import { useEffect, useRef, type ReactNode } from "react"
+import { useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/er-geometry"
-import { sessionStore } from "@/editor/session-store"
 import { InlineEditor } from "./InlineEditor"
 import { EdgesLayer, NodesLayer } from "./layers"
 import { Overlay } from "./Overlay"
@@ -12,17 +11,8 @@ const GRID_EXTENT = 50_000
 /** Un solo <svg>. `children` finisce nel gruppo viewport sopra i nodi (overlay, Task 8). */
 export function Canvas({ children }: { children?: ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null)
+  // L'hook osserva l'svg: aggiorna la dimensione del canvas nella sessione e invalida il rect in cache.
   useCanvasInteraction(svgRef)
-
-  useEffect(() => {
-    const svg = svgRef.current
-    if (!svg) return
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) sessionStore.getState().setCanvasSize({ w: entry.contentRect.width, h: entry.contentRect.height })
-    })
-    observer.observe(svg)
-    return () => observer.disconnect()
-  }, [])
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">

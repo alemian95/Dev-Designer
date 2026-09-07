@@ -102,19 +102,37 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     let activeButton: number | null = null
 
     const session = () => sessionStore.getState()
+
+    /**
+     * `getBoundingClientRect` è una lettura che forza stile e layout. Durante un drag `previewDrag`
+     * ha appena riscritto centinaia di `transform` e di path, e la lettura successiva obbliga il
+     * browser a ricalcolare tutto quel lavoro in sincrono — a ogni `pointermove`, che arriva più
+     * spesso dei frame. Il rect si mette quindi in cache e si invalida quando può cambiare davvero.
+     */
+    let rect: DOMRect | null = null
+    const invalidateRect = () => {
+      rect = null
+    }
     const toScreen = (e: MouseEvent): Point => {
-      const r = svg.getBoundingClientRect()
+      const r = (rect ??= svg.getBoundingClientRect())
       return { x: e.clientX - r.left, y: e.clientY - r.top }
     }
     const info = (e: PointerEvent): PointerInfo => {
       const screen = toScreen(e)
+      let hit: Hit | null = null
       return {
         screen,
         world: screenToWorld(session().viewport, screen),
         button: (e.button === 1 || e.button === 2 ? e.button : 0) as 0 | 1 | 2,
         shift: e.shiftKey,
         alt: e.altKey,
-        hit: hitTest(elementAt(e)),
+        // Anche `elementFromPoint` forza stile e layout, e il reducer guarda `hit` solo su down e su
+        // up: in `onMove` non lo legge mai. Getter memoizzato, così il valore resta identico a prima
+        // nei punti dove serve (`commit-connect` e il doppio click dipendono da `elementFromPoint`,
+        // non da `e.target`, per via del pointer capture) ma il drag non lo paga.
+        get hit() {
+          return (hit ??= hitTest(elementAt(e)))
+        },
       }
     }
 
@@ -230,6 +248,20 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       step({ type: "cancel" })
     }
 
+    // Unico osservatore sull'svg: aggiorna la dimensione del canvas nella sessione (serve a `fitToRect`)
+    // e invalida il rect in cache. Le due cose cambiano insieme, quindi stanno insieme.
+    const observer = new ResizeObserver(([entry]) => {
+      invalidateRect()
+      if (entry) session().setCanvasSize({ w: entry.contentRect.width, h: entry.contentRect.height })
+    })
+    observer.observe(svg)
+
+    // Il rect è relativo al viewport, quindi uno scroll lo sposta. Oggi la pagina non scorre — la
+    // cornice è una griglia `h-screen` e l'unico contenitore scorrevole è il pannello laterale, che
+    // non muove il canvas — ma un listener in capture costa una riga e non scatta mai a vuoto,
+    // mentre un rect stantio darebbe un drag disallineato senza dare alcun segno di sé.
+    window.addEventListener("scroll", invalidateRect, { capture: true, passive: true })
+
     svg.addEventListener("pointerdown", onPointerDown)
     svg.addEventListener("pointermove", onPointerMove)
     svg.addEventListener("pointerup", onPointerUp)
@@ -240,6 +272,8 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     window.addEventListener("keydown", onKeyDown)
     window.addEventListener("keyup", onKeyUp)
     return () => {
+      observer.disconnect()
+      window.removeEventListener("scroll", invalidateRect, { capture: true })
       svg.removeEventListener("pointerdown", onPointerDown)
       svg.removeEventListener("pointermove", onPointerMove)
       svg.removeEventListener("pointerup", onPointerUp)

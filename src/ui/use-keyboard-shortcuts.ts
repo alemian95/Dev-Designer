@@ -13,12 +13,18 @@ function inTextInput(target: EventTarget | null): boolean {
 
 function onKeyDown(e: KeyboardEvent): void {
   if (inTextInput(e.target)) return
-  // In sola lettura nessuna scorciatoia agisce sul documento; il controllo si prende dalla barra.
-  if (documentSession.getState().readOnly) return
   const mod = e.metaKey || e.ctrlKey
   const session = sessionStore.getState()
   const doc = documentStore.getState()
   const key = e.key.toLowerCase()
+  // Le scorciatoie che toccano il documento: in sola lettura non agiscono, ma restano consumate,
+  // perché senza preventDefault ⌘S farebbe comparire il dialogo di salvataggio del browser.
+  // ⌘O non è fra queste: apre un altro documento, come la voce di menu che resta abilitata.
+  const touchesDocument = (mod && ["s", "z", "y", "d"].includes(key)) || (!mod && (e.key === "Delete" || e.key === "Backspace"))
+  if (documentSession.getState().readOnly && touchesDocument) {
+    e.preventDefault()
+    return
+  }
   let handled = true
   if (mod && key === "s" && e.shiftKey) void documentIo.saveAs()
   else if (mod && key === "s") void documentIo.save()

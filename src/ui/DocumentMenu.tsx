@@ -37,7 +37,7 @@ export function DocumentMenu() {
     <>
       <DropdownMenu onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" aria-label="Documento" data-document-menu className="gap-1 font-medium">
+          <Button variant="ghost" size="sm" data-document-menu className="gap-1 font-medium">
             <span className="max-w-48 truncate">{name}</span>
             {dirty && <span aria-label="Modifiche non salvate" title="Modifiche non salvate" className="text-primary">●</span>}
             <ChevronDown className="size-3.5 opacity-60" />

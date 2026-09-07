@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { documentStore } from '@/editor/document-store'
 import { autosave, documentIo } from '@/io/app-io'
+import { documentSession } from '@/io/document-session'
 import { buildStressDocument } from '@/perf/stress'
 import App from '@/ui/App'
 
@@ -13,7 +14,13 @@ async function bootstrap(): Promise<void> {
     autosave.stop()
     documentStore.getState().load(buildStressDocument(stress))
   } else {
-    await documentIo.restoreLast()
+    // L'app deve partire anche se il ripristino fallisce: un errore qui lascerebbe la pagina bianca.
+    try {
+      await documentIo.restoreLast()
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e)
+      documentSession.getState().patch({ notice: `Non è stato possibile riaprire l'ultimo documento (${reason}): si parte da uno nuovo.` })
+    }
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

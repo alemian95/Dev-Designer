@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "perf": "vite build && node scripts/perf/fps.mjs",
+    "e2e": "vite build && node scripts/e2e/persistenza.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.5",
+    "idb": "8.0.3",
     "immer": "^11.1.18",
     "libpg-query": "^17.7.4",
     "lucide-react": "^1.41.0",
@@ -43,6 +45,7 @@
     "eslint": "^10.9.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",
+    "fake-indexeddb": "6.2.5",
     "globals": "^17.11.0",
     "playwright": "^1.63.0",
     "typescript": "~6.0.2",

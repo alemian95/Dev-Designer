@@ -52,4 +52,16 @@ export default defineConfig([
       }],
     },
   },
+  {
+    // Strato io: conosce model, editor, zustand e idb. Mai React né ui.
+    files: ['src/io/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@/ui/**', '**/ui/**'],
+          message: 'src/io non conosce React né src/ui.',
+        }],
+      }],
+    },
+  },
 ])

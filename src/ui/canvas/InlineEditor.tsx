@@ -19,6 +19,12 @@ export function InlineEditor() {
   const tl = worldToScreen(viewport, { x: view.x, y: view.y })
   const close = () => sessionStore.getState().setEditing(null)
   const commit = (value: string) => {
+    // Il blur committa sempre, anche quando l'editor si chiude col testo intatto: senza questa guardia
+    // una rinomina identica passerebbe dal dispatch e sporcherebbe la pila undo.
+    if (value.trim() === entity.name) {
+      close()
+      return
+    }
     const recipe = renameEntity(editing.key, value, entity.schema)
     if (recipe && documentStore.getState().dispatch(recipe)) {
       sessionStore.getState().setSelection([selId("entity", entityKey({ name: value.trim(), schema: entity.schema }))])

@@ -57,8 +57,11 @@ export function renameEntity(key: string, name: string, schema?: string): Recipe
     const newKey = entityKey({ name: newName, schema: newSchema })
     if (newKey !== key && newKey in d.model.entities) return
     if (newKey === key) {
-      entity.name = newName
-      entity.schema = newSchema
+      // Assegnare comunque produrrebbe una patch anche a valore identico: su un'entità senza schema
+      // `entity.schema = undefined` crea una chiave che nel base non c'è, e Immer la conta come modifica.
+      // Il risultato sarebbe una voce di undo fantasma per una rinomina che non rinomina niente.
+      if (entity.name !== newName) entity.name = newName
+      if (entity.schema !== newSchema) entity.schema = newSchema
       return
     }
     const moved: Entity = { ...entity, name: newName, schema: newSchema }

@@ -77,6 +77,16 @@ describe("comandi ER", () => {
     expect(er().model.entities["auth.users"]).toMatchObject({ name: "users", schema: "auth" })
   })
 
+  it("renameEntity con nome identico non produce patch e non tocca lo schema", () => {
+    // Su un'entità senza schema, assegnare `schema = undefined` creerebbe una chiave assente nel
+    // base: Immer la conterebbe come modifica e la rinomina a vuoto entrerebbe nella pila undo.
+    expect(state().dispatch(renameEntity("users", "users")!)).toBe(false)
+    expect(state().past).toHaveLength(0)
+    expect("schema" in er().model.entities.users!).toBe(false)
+    // Anche con spazi attorno al nome: il trim riporta al valore corrente.
+    expect(state().dispatch(renameEntity("users", "  users  ")!)).toBe(false)
+  })
+
   it("renameEntity rifiuta nome vuoto e collisione", () => {
     expect(renameEntity("users", "  ")).toBeNull()
     expect(state().dispatch(renameEntity("users", "posts")!)).toBe(false)

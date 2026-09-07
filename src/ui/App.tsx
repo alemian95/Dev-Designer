@@ -14,11 +14,13 @@ export default function App() {
   const readOnly = useStore(documentSession, (s) => s.readOnly)
   return (
     <TooltipProvider>
-      <div className="grid h-screen grid-rows-[auto_auto_1fr] bg-background text-foreground">
+      {/* Colonna flex e non griglia a righe fisse: `NoticeBar` non rende alcun nodo quando non c'è
+          niente da dire, e con una griglia il contenuto scalerebbe nella riga sbagliata. */}
+      <div className="flex h-screen flex-col bg-background text-foreground">
         <Toolbar />
         <NoticeBar />
         {/* Sola lettura: un velo sul contenuto, la barra sopra resta cliccabile (spec §5). */}
-        <div className={cn("grid min-h-0 grid-cols-[1fr_320px]", readOnly && "pointer-events-none select-none opacity-70")}>
+        <div className={cn("grid min-h-0 flex-1 grid-cols-[1fr_320px]", readOnly && "pointer-events-none select-none opacity-70")}>
           <Canvas />
           <aside className="flex min-h-0 flex-col border-l">
             <div className="min-h-0 flex-1 overflow-auto"><PropertiesPanel /></div>

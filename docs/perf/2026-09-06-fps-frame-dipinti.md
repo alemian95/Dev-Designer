@@ -9,6 +9,9 @@ spike aveva lasciato aperto: là gli FPS reali **non erano stati misurati**
 due volte (p95 34–42 ms contro 20). A 600 entità cadono anche il drag di tutta la selezione e lo zoom
 peggiora ancora.
 
+Dopo la misura una correzione ha tolto dal percorso di `pointermove` due letture che forzavano stile e
+layout: la **rimisura** sta al §3bis, la conseguenza sul Task 12 al §7. Il verdetto non cambia.
+
 ## 1. Cosa misura e come
 
 Lo script è `scripts/perf/fps.mjs`, si esegue con `pnpm perf [N]` e fa, nell'ordine:
@@ -85,6 +88,11 @@ esecuzioni riportate qui sotto ha avuto bisogno della ripetizione.
 | Commit dell'app misurato | `753e62b` |
 | Ripetizioni | 4 esecuzioni indipendenti a 300 entità, 2 a 600 |
 
+**Un secondo ambiente, al §3bis.** La rimisura dopo la correzione delle letture che forzano il layout
+è su un display a **60 Hz** e devicePixelRatio **1**: pavimento a riposo 17,4 ms invece di 9,3. I p95
+delle due sezioni non si confrontano fra loro — il §3bis porta il proprio "prima", misurato sullo
+stesso display.
+
 **Nota sul viewport.** Il piano chiedeva 1400×900. Su questo schermo (1512×982 punti logici) una finestra
 di Chrome non può avere 900 px di area utile: fra barra dei menu, barra delle schede e barra degli
 indirizzi restano 787 px. Lo script ridimensiona la finestra vera per avvicinarsi il più possibile al
@@ -157,6 +165,85 @@ marqueeAll 9,3. Identica.
 A 600 entità il `marqueeAll` seleziona 525 entità su 600, non tutte: il fit si ferma alla scala minima
 (0,1) e il diagramma non entra tutto nell'inquadratura. È un limite dell'applicazione, non della misura.
 
+## 3bis. Rimisura dopo la correzione delle letture che forzano il layout
+
+La review finale del branch ha trovato, nel percorso di `pointermove`, due letture del DOM che forzano
+il ricalcolo sincrono di stile e layout: `svg.getBoundingClientRect()` per le coordinate schermo e
+`document.elementFromPoint` per l'hit test. Arrivavano subito dopo che `previewDrag` aveva riscritto
+centinaia di `transform` e di path, e a ogni evento, che è più spesso dei frame. La correzione
+(commit `9ace358`) mette in cache il rect — lo invalida il `ResizeObserver` — e rende l'hit test un
+getter memoizzato, perché il reducer lo legge solo su `down` e su `up`, mai in `onMove`.
+
+La domanda aperta era: **quanto di quel costo era forced layout?** Risposta: poco sul frame, molto sullo
+scripting.
+
+**Attenzione al confronto.** Questa rimisura è su un display a **60 Hz** (pavimento a riposo 17,4 ms) e
+devicePixelRatio **1**, non sul pannello ProMotion a 120 Hz del §2 (pavimento 9,3 ms, dPR 2). I p95
+assoluti **non sono confrontabili** con quelli del §3: a 60 Hz ogni scenario tranne lo zoom sta già sul
+pavimento, e il p95 non ha più risoluzione per mostrare un miglioramento. Per questo il "prima" è stato
+rimisurato **nella stessa sessione e sullo stesso display**, mettendo da parte la correzione con
+`git stash`, e il confronto utile è sulle colonne del profiler.
+
+Ambiente della rimisura: viewport **1400×888 CSS px**, devicePixelRatio **1**, display a 60 Hz, Chrome
+152.0.0.0, riposo p95 17,4 ms. Prima = `9ace358` con la correzione messa da parte, 2 esecuzioni; dopo =
+`9ace358`, 3 esecuzioni.
+
+### p95 del tempo di frame a 300 entità, prima e dopo
+
+| Scenario | p95 prima | p95 dopo | Verdetto |
+|---|---|---|---|
+| drag | 17,5 · 17,2 | 17,6 · 17,0 · 17,4 | PASS → PASS |
+| dragAll | 16,8 · 17,4 | 17,4 · 17,3 · 17,4 | PASS → PASS |
+| pan | 17,3 · 17,5 | 17,5 · 17,4 · 17,3 | PASS → PASS |
+| marquee | 17,5 · 17,3 | 17,5 · 17,2 · 17,5 | PASS → PASS |
+| zoom | 33,6 · 33,8 | **33,8 · 33,5 · 33,6** | FAIL → **FAIL** |
+| marqueeAll (extra) | 17,3 · 17,3 | 16,8 · 17,3 · 17,3 | PASS → PASS |
+
+**Il p95 non si muove**, ed era prevedibile: tutti gli scenari tranne lo zoom sono al pavimento del
+display già prima, e lo zoom non passa dal codice corretto (la rotella non chiama `info()`).
+**Lo zoom resta un FAIL**, a 33,5–33,8 ms su una soglia di 20.
+
+### Dove va il tempo, prima e dopo (ms sull'intero scenario, dal profiler)
+
+Esecuzione di riferimento per lato; fra parentesi l'intervallo sulle altre.
+
+| Scenario | script prima | script dopo | stile prima | stile dopo | layout prima | layout dopo |
+|---|---|---|---|---|---|---|
+| drag | 109,6 (110,2) | **35,8** (31,8–36,2) | 28,9 | 32,7 | 123,6 | 117,1 |
+| dragAll | 431,8 (437,0) | **402,2** (390,6–413,1) | 1.199,4 | **1.217,4** | 103,5 | 121,3 |
+| pan | 165,9 (177,8) | **89,8** (88,4–119,5) | 14,2 | 12,8 | 3,6 | 3,4 |
+| marquee | 110,4 (109,8) | **20,0** (18,1–21,1) | 13,5 | 15,2 | 41,8 | 43,5 |
+| zoom | 24,6 (33,6) | 26,4 (28,5–30,3) | 4,0 | 4,0 | 1.739,7 | 1.699,0 |
+| marqueeAll | 78,8 (75,4) | **19,9** (20,7–21,5) | 10,5 | 11,9 | 31,3 | 31,7 |
+
+**Il tempo di scripting crolla dove le due letture stavano nel percorso**: marquee 110 → 20 ms (−82%),
+drag 110 → 33 (−70%), marqueeAll 76 → 20 (−74%), pan 178 → 99 (−45%). Sono ~2 secondi di interazione
+per scenario, quindi in valore assoluto si parla di decine di millisecondi risparmiati su centinaia di
+eventi: reale, misurato, e comunque molto sotto il budget di un frame. Lo zoom è invariato, come deve
+essere: non passa da `info()`.
+
+**Il ricalcolo di stile di `dragAll` non si muove: 1.199 → 1.217 ms.** È la risposta alla domanda
+aperta, e la risposta è **no**: quel costo non era forced layout dovuto alle letture. È il lavoro di
+scrivere ogni frame il `transform` di 300 nodi e la geometria di ~580 edge sul DOM. Togliere le letture
+non lo tocca, perché la scrittura resta.
+
+### 600 entità dopo la correzione
+
+| Scenario | FPS medio | p95 ms/frame | max ms/frame | (p95 al §3, 120 Hz) |
+|---|---|---|---|---|
+| drag | 55,6 | 17,4 | 83,8 | 9,3 |
+| dragAll | 38,9 | **34,0** | 116,6 | **34,3** |
+| pan | 59,5 | 17,3 | 33,3 | 9,4 |
+| marquee | 58,6 | 16,8 | 66,7 | 9,3 |
+| zoom | 23,7 | **83,3** | 100,5 | **75,9** |
+| marqueeAll (extra) | 58,1 | 17,3 | 82,5 | 9,3 |
+
+Gli scenari che al §3 erano al pavimento del display qui stanno al pavimento dell'altro display, e non
+dicono niente di nuovo. I due che sfondano il criterio sfondano di nuovo, con gli stessi ordini di
+grandezza: `dragAll` 34,0 ms (era 34,3) e zoom 83,3 ms (era 75,9 — peggio, ma su un display e un dPR
+diversi: la differenza non è attribuibile alla correzione, che a 600 entità come a 300 non tocca il
+percorso dello zoom). **Nessun verdetto cambia.**
+
 ## 4. Verdetto
 
 Criterio: **p95 ≤ 20 ms per ogni scenario, a 300 entità**.
@@ -173,6 +260,9 @@ Criterio: **p95 ≤ 20 ms per ogni scenario, a 300 entità**.
 **Esito complessivo a 300 entità: FAIL**, per lo zoom.
 
 A 600 entità falliscono zoom (75,9 ms) e dragAll (34,3 ms).
+
+La correzione delle letture che forzano il layout (§3bis) **non cambia nessuno di questi verdetti**:
+lo zoom resta un FAIL a 300 entità, e a 600 restano fuori zoom e dragAll.
 
 Il **p95 è la definizione operativa di "FPS minimo"** del criterio: il **max** contiene il singolo frame
 sporco (GC, primo paint, commit di una selezione) e non è un buon giudice. Va però letto, perché un frame
@@ -239,28 +329,51 @@ costa **un** frame da ~42 ms, non una sequenza di frame lenti.
   tutti, ma l'attribuzione al paint sarebbe una deduzione, non una misura.
 - **Editing, import, undo/redo**: fuori dagli scenari del criterio.
 
-## 7. Conseguenza per il Task 12 (culling del viewport)
+## 7. Conseguenza per il Task 12 (culling del viewport): rinviato
 
-**La misura è un FAIL, quindi il culling del viewport si fa.** Ma la misura dice anche *quanto* serve e
-dove non basta, e sarebbe un errore leggerla come «il culling risolve».
+**Il Task 12 (culling del viewport) è rinviato.** Lo scenario che fallisce è lo zoom, e
+`scripts/perf/zoom-bands.mjs` dimostra che il suo costo dipende dal numero di nodi nel DOM, non da
+quanti sono inquadrati: il culling non lo tocca. A 300 entità — il criterio del piano — gli altri
+quattro scenari passano. La leva giusta per lo zoom è un livello di dettaglio (entità collassate oltre
+una soglia di scala), che il piano non prevede: va nel piano successivo.
 
-**Dove il culling è la leva giusta.** Lo scenario `dragAll` spende 1.225 ms di ricalcolo di stile per
-riscrivere ogni frame il DOM di 300 nodi e ~580 edge, dei quali alla scala 1 se ne vedono 8. Togliere dal
-DOM ciò che è fuori inquadratura attacca quel costo direttamente. È lo scenario che a 300 entità passa con
-2 ms di margine e che a 600 entità **fallisce** (34,3 ms): è lì che il culling compra la scalabilità.
+**I numeri su cui si regge la decisione.**
 
-**Dove il culling non basta.** Lo zoom, cioè lo scenario che fa fallire il criterio, costa uguale che si
-vedano 28 entità o 216 (§5). Il culling aiuta nelle bande in cui l'inquadratura contiene poco — e quelle
-bande sono già a 35 ms — ma **alla scala minima tutto il diagramma è dentro l'inquadratura e non c'è
-niente da tagliare**. Per rientrare nel criterio sullo zoom serve ridurre il numero di elementi SVG a
-prescindere dall'inquadratura: livello di dettaglio sotto una certa scala (niente testo degli attributi
-quando è illeggibile) o entità collassate, come la spec §4.3 già anticipa. Il piano non ha oggi un task
-per questo.
+*Il culling non attacca lo scenario che fallisce.* La diagnostica per bande di scala (§5) misura
+32,5–35,3 ms per frame **indipendentemente** dal numero di entità inquadrate, che nelle quattro bande va
+da 28 a 216. Il costo cambia invece con i nodi nel documento: 41,7 ms a 300 entità, 75,9 ms a 600, quasi
+il doppio per il doppio dei nodi. E alla scala minima, dove lo zoom è più caro, **tutto il diagramma è
+dentro l'inquadratura: non c'è niente da tagliare.** Il culling migliorerebbe le bande in cui si vede
+poco, e quelle bande sono già a 35 ms.
 
-**Ordine consigliato:** Task 12 come previsto (è la leva su `dragAll`, l'unico scenario di trascinamento a
-rischio, e va comunque fatta prima di aumentare la scala di lavoro), e subito dopo una decisione esplicita
-sullo zoom — livello di dettaglio o accettazione consapevole del limite — perché il culling da solo non lo
-risolve. Il tetto voluto è 60 FPS e non oltre: nessuna delle due leve va spinta più in là.
+*A 300 entità gli altri quattro scenari passano.* drag 10,4 · dragAll 18,0 · pan 10,3 · marquee 10,3 ms,
+tutti sotto la soglia di 20 (§4). Il criterio del piano è 300 entità: su quel criterio il culling non
+compra niente che manchi.
+
+*La motivazione residua del culling si è indebolita ancora.* L'argomento migliore per il culling era
+`dragAll`, che a 300 entità passava con 2 ms di margine spendendo 1.225 ms di ricalcolo di stile per
+riscrivere ogni frame 300 nodi e ~580 edge, dei quali alla scala 1 se ne vedono 8. La rimisura (§3bis)
+mostra che quel costo **non era forced layout** — tolte le due letture che forzavano il layout, il
+ricalcolo di stile di `dragAll` resta 1.217 ms contro 1.199 — quindi è tutto scrittura sul DOM, e il
+culling la ridurrebbe davvero. Ma resta l'unico scenario che il culling aiuta, resta sotto la soglia a
+300 entità, e la correzione ha intanto tolto da tutti gli scenari di puntatore il 45–82% del tempo di
+scripting senza toccare il DOM. Non basta a giustificare un task di culling ora.
+
+**Il limite noto, dichiarato.** Oltre le ~300 entità il **drag di tutta la selezione sfora**: a 600
+entità è 34 ms di p95 contro una soglia di 20, e a 300 passa con appena 2 ms di margine. Lo **zoom sfora
+già a 300 entità** (33,5–41,7 ms secondo il display, contro 20) e a 600 arriva a 75–83 ms. Sono limiti
+accettati consapevolmente per questo piano, non problemi risolti.
+
+**Ordine per il piano successivo:**
+
+1. **Livello di dettaglio sulla scala** — entità collassate, o senza testo degli attributi, sotto una
+   soglia di scala. È l'unica leva che attacca lo zoom, ed è lo scenario che fa fallire il criterio. La
+   spec §4.3 già anticipa le entità collassate; il piano non aveva un task per usarle come LOD.
+2. **Culling del viewport** (l'ex Task 12), come leva su `dragAll` e prerequisito per alzare la scala di
+   lavoro oltre le 300 entità. Il punto d'ingresso esiste già: `visibleWorldRect` in
+   `src/editor/viewport.ts`, che resta in codice con un commento che rimanda a questa decisione.
+
+Il tetto voluto resta 60 FPS e non oltre: nessuna delle due leve va spinta più in là.
 
 ## Riprodurre
 

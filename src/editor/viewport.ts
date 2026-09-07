@@ -43,6 +43,13 @@ export function transformAttr(vp: Viewport): string {
   return `translate(${vp.x} ${vp.y}) scale(${vp.scale})`
 }
 
+/**
+ * Il rettangolo di mondo inquadrato. Oggi nessuno lo chiama: è il punto d'ingresso del culling del
+ * viewport (Task 12), che la misura di prestazioni ha fatto **rinviare** — non è codice rimasto qui
+ * per dimenticanza, è una decisione a verbale. Lo scenario che fallisce il criterio è lo zoom, e il
+ * suo costo dipende dal numero di nodi nel DOM, non da quanti ne sono inquadrati: il culling non lo
+ * tocca. Vedi `docs/perf/2026-09-06-fps-frame-dipinti.md` §7.
+ */
 export function visibleWorldRect(vp: Viewport, size: Size): Rect {
   const tl = screenToWorld(vp, { x: 0, y: 0 })
   return { x: tl.x, y: tl.y, w: size.w / vp.scale, h: size.h / vp.scale }

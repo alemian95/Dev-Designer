@@ -87,6 +87,10 @@ export function download(name: string, text: string): void {
   const a = document.createElement("a")
   a.href = url
   a.download = name
+  // L'ancora va nel documento: staccata dal DOM il click non avvia il download (Chrome headless,
+  // Firefox). E la revoca è differita, perché il browser legge il blob dopo il click, non durante.
+  document.body.append(a)
   a.click()
-  URL.revokeObjectURL(url)
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }

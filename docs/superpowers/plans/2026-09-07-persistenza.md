@@ -2262,3 +2262,27 @@ Nessun requisito senza task. Il rilevamento che il file sia cambiato fuori dall'
 **Segnaposto:** nessun "TBD", nessun "gestire i casi limite", ogni step con codice ha il codice.
 
 **Coerenza dei nomi fra task:** `DocumentRecord`/`RecentEntry`/`DocumentDb` (T2) usati in T5, T6, T7; `documentSession.patch` (T3) in T5, T6, T7; `OpenedFile`, `chooseSavePath(caps, hasHandle, forceNew)`, `suggestedFileName`, `readFile` (T3) in T6, T7; `tryOwn(docId, onCede, deps)`, `takeOver(docId, onCede, deps, timeoutMs?)`, `Ownership.lost/release` (T4) in T6; `Autosave.flush/stop`, `startAutosave({ db })` (T5) in T6, T7; `DocumentIo` con `restoreLast, newDocument, openWithPicker, openFile, openRecent, save, saveAs, takeControl` (T6) in T7; `UPLOAD_INPUT_ID`, `requestOpen` (T7) nell'e2e come `#upload-input`; `data-document-menu`, `data-notice-bar`, `data-take-control` (T7) nell'e2e (T8).
+
+---
+
+## Errata
+
+Difetti del codice di questo piano, trovati eseguendolo. Il codice consegnato è quello corretto: se
+qualcuno rieseguisse il piano alla lettera, ritroverebbe questi.
+
+| Task | Cosa era sbagliato | Cosa è giusto |
+|---|---|---|
+| 3 | Lo Step 5 annuncia "9 passed", il codice di test dello stesso task ha 8 blocchi `it`. | 8. |
+| 4 | `lost: held`. `held` è la promessa che *innesca* il rilascio: quando si risolve il lock è ancora preso, e il terzo test prescritto dal piano falliva contro il codice prescritto dal piano. | `lost` agganciata all'esito di `locks.request(...)`, che si risolve dopo il rilascio. |
+| 4 | `void onCede().finally(release)`: se l'ultimo salvataggio prima di cedere fallisce (quota, transazione abortita), la promessa scartata con `void` diventa un rigetto non gestito. | `.catch()` esplicito prima di `.finally(release)`: la cessione procede comunque, l'autosave segnala il proprio errore per conto suo. |
+| 6 | Il test importa `erDiagram` senza usarlo: rompe `pnpm lint`. | Import rimosso. |
+| 6 | Lo Step 4 annuncia "21 passed", il file di test ha 22 blocchi `it`. | 22. |
+| 6 | `activate()` scarta l'esito di `own()` e fa `db.put` comunque: una scheda in sola lettura sovrascrive il record di chi possiede il documento, contro l'invariante "una sola scheda scrive" (spec §2). | `db.put` condizionato all'esito di `own()`; `setLastOpenedId` resta incondizionato. |
+| 6 | Cambiare documento non salva l'ultima modifica di quello che si lascia: `flush()` si astiene se `!dirty`, e la sottoscrizione dell'autosave esce prima di `clear()` quando `load` azzera la cronologia, quindi il timer resta orfano e scatta sul documento nuovo. Contro "nessun lavoro perso" (spec §1). | `await autosave.flush()` **prima** di `mount()` in `activate`, `restoreLast` e `openRecent`. `flush()` comincia con `clear()`, quindi la stessa chiamata disinnesca anche il timer orfano. |
+| 6 | `openWithPicker` e `takeControl` senza test, e `takeControl` ha politica propria (avviso di timeout, rilettura del record dopo la cessione). | Tre test aggiunti. |
+| 7 | `App.tsx` usa `grid-rows-[auto_auto_1fr]` contando su tre figli, ma `NoticeBar` non rende alcun nodo DOM quando non c'è niente da dire: il contenuto cade nella riga `auto` e il canvas collassa. | Colonna flex: un figlio assente non occupa una traccia. |
+| 7 | La guardia `readOnly` in `use-keyboard-shortcuts.ts` esce prima di `e.preventDefault()`: in sola lettura ⌘S fa comparire il dialogo di salvataggio del browser. E blocca ⌘O, che è lecito perché apre un altro documento. | Si consumano solo i tasti che toccano il documento (`s`, `z`, `y`, `d`, Delete/Backspace). ⌘R, ⌘P e ⌘F devono restare nativi: `if (mod) e.preventDefault()` sarebbe peggio del difetto. |
+| 7 | `main.tsx` ha `createRoot(...).render()` dopo `await documentIo.restoreLast()` e `void bootstrap()` senza `catch`: un rigetto lascia la pagina bianca per sempre. | `try/catch` intorno al solo ripristino, il render sempre fuori, e un avviso all'utente. |
+| 8 | `getByRole("menuitem", { name: /^Salva$/ })` non trova niente: il nome accessibile è `"Salva ⌘S"`. | Si separa "Salva" da "Salva con nome…" per esclusione. |
+| 8 | Riaprire il menu subito dopo aver cliccato una voce è una corsa: il click richiude il menu e la voce si stacca dal DOM. Attendere `data-state="closed"` sul trigger non basta, perché torna "closed" mentre Radix smonta ancora il pannello e `body` ha `pointer-events: none`. | Attesa su una condizione completa: nessun `[role="menu"]` nel DOM e `body` che riceve di nuovo eventi. |
+| 8 | Il `catch` stampa solo `e.message` e perde il *call log* di Playwright, cioè l'unica cosa che dice quale locator ha aspettato invano. | Stampa l'errore intero. |

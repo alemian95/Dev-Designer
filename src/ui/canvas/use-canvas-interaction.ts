@@ -96,10 +96,6 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     let mode: Mode = IDLE
     let spaceHeld = false
     let dragTargets: DragTargets | null = null
-    // Con un mouse tutti i pulsanti condividono lo stesso `pointerId`: senza ricordare quale ha
-    // aperto il modo, premere e rilasciare il destro durante un drag committerebbe il drag mentre il
-    // sinistro è ancora premuto.
-    let activeButton: number | null = null
 
     const session = () => sessionStore.getState()
 
@@ -201,7 +197,6 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const active = document.activeElement
       if (isTextInput(active)) flushSync(() => active.blur())
       svg.setPointerCapture(e.pointerId)
-      activeButton = e.button
       // Lo strumento entità apre l'editor inline già nel down: senza annullare il default il
       // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.
       if (e.button === 1 || session().tool === "entity") e.preventDefault()
@@ -210,9 +205,14 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onPointerMove = (e: PointerEvent) => {
       if (mode.type !== "idle") step({ type: "move", info: info(e) })
     }
+    /**
+     * Nessun filtro sul pulsante, ed è deliberato: Chrome consegna `pointerup` una volta sola, quando
+     * l'ultimo pulsante si alza (i rilasci intermedi arrivano come `pointermove` con `button`
+     * impostato). Filtrare sul pulsante che ha aperto il modo lascerebbe il modo aperto per sempre
+     * quando il sinistro si rilascia prima del destro — verificato: il nodo continua a seguire il
+     * cursore a pulsanti tutti alzati.
+     */
     const onPointerUp = (e: PointerEvent) => {
-      if (e.button !== activeButton) return
-      activeButton = null
       if (svg.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId)
       step({ type: "up", info: info(e) })
     }
@@ -243,10 +243,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       if (e.code === "Space") spaceHeld = false
     }
     const onContextMenu = (e: MouseEvent) => e.preventDefault()
-    const onPointerCancel = () => {
-      activeButton = null
-      step({ type: "cancel" })
-    }
+    const onPointerCancel = () => step({ type: "cancel" })
 
     // Unico osservatore sull'svg: aggiorna la dimensione del canvas nella sessione (serve a `fitToRect`)
     // e invalida il rect in cache. Le due cose cambiano insieme, quindi stanno insieme.

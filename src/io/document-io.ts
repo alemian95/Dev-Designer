@@ -236,6 +236,11 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     }
     const at = now()
     patch({ handle, fileName, lastSavedAt: at, dirty: false })
+    // Il file è scritto e questo resta vero. Il record condiviso no: fra il controllo in testa e qui
+    // c'è il picker, e in quell'attesa un'altra scheda può aver ottenuto la cessione del lock.
+    // Scriverlo ora lo sovrascriverebbe col documento catturato prima dell'attesa, cancellando il
+    // lavoro della nuova proprietaria.
+    if (session().readOnly) return
     await safe(() => db.put(record(doc, { handle, fileName, savedToFileAt: at, updatedAt: at })), undefined)
   }
 

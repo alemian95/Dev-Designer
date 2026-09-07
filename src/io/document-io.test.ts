@@ -272,6 +272,27 @@ describe("save", () => {
     expect(documentSession.getState().notice).toContain("non esiste più")
   })
 
+  it("se la proprietà si perde mentre il picker è aperto, il record condiviso non si sovrascrive", async () => {
+    // Il picker nativo resta aperto per un tempo arbitrario: in quell'attesa un'altra scheda può
+    // ottenere la cessione del lock e scrivere. Al ritorno non si tocca più il record.
+    const d = deps({
+      files: files({
+        pickSave: vi.fn(async () => {
+          documentSession.getState().patch({ readOnly: true }) // l'altra scheda ha preso il controllo
+          return handle
+        }),
+      }),
+    })
+    const io = createDocumentIo(d)
+    await io.newDocument()
+    const docId = documentSession.getState().docId
+    const before = await d.db.get(docId)
+    await io.saveAs()
+    expect(d.files.writeHandle).toHaveBeenCalled() // il file lo si scrive: l'utente l'ha chiesto
+    // Il record condiviso no: non è più nostro. Resta quello di prima, non uno con `savedToFileAt`.
+    expect(await d.db.get(docId)).toEqual(before)
+  })
+
   it("in sola lettura non salva", async () => {
     const d = deps()
     const io = createDocumentIo(d)

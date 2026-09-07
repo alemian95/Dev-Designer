@@ -96,6 +96,10 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     let mode: Mode = IDLE
     let spaceHeld = false
     let dragTargets: DragTargets | null = null
+    // Con un mouse tutti i pulsanti condividono lo stesso `pointerId`: senza ricordare quale ha
+    // aperto il modo, premere e rilasciare il destro durante un drag committerebbe il drag mentre il
+    // sinistro è ancora premuto.
+    let activeButton: number | null = null
 
     const session = () => sessionStore.getState()
     const toScreen = (e: MouseEvent): Point => {
@@ -179,6 +183,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const active = document.activeElement
       if (isTextInput(active)) flushSync(() => active.blur())
       svg.setPointerCapture(e.pointerId)
+      activeButton = e.button
       // Lo strumento entità apre l'editor inline già nel down: senza annullare il default il
       // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.
       if (e.button === 1 || session().tool === "entity") e.preventDefault()
@@ -188,6 +193,8 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       if (mode.type !== "idle") step({ type: "move", info: info(e) })
     }
     const onPointerUp = (e: PointerEvent) => {
+      if (e.button !== activeButton) return
+      activeButton = null
       if (svg.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId)
       step({ type: "up", info: info(e) })
     }
@@ -206,7 +213,11 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       if (isTextInput(e.target)) return
       if (e.code === "Space") {
         spaceHeld = true
-        e.preventDefault()
+        // Il default dello Space si annulla solo quando il fuoco è sul canvas o su nessun elemento:
+        // il listener è su `window` e un `<button>` non è un campo di testo, quindi annullare il
+        // keydown gli impedirebbe di ricevere il click al keyup — nessun pulsante di toolbar o
+        // pannello si attiverebbe con la barra spaziatrice, e lo stesso vale per i `<select>`.
+        if (e.target === document.body || (e.target instanceof Node && svg.contains(e.target))) e.preventDefault()
       }
       if (e.key === "Escape") step({ type: "cancel" })
     }
@@ -214,7 +225,10 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       if (e.code === "Space") spaceHeld = false
     }
     const onContextMenu = (e: MouseEvent) => e.preventDefault()
-    const onPointerCancel = () => step({ type: "cancel" })
+    const onPointerCancel = () => {
+      activeButton = null
+      step({ type: "cancel" })
+    }
 
     svg.addEventListener("pointerdown", onPointerDown)
     svg.addEventListener("pointermove", onPointerMove)

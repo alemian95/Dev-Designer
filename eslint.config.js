@@ -29,11 +29,11 @@ export default defineConfig([
   },
   {
     // Strato model: TypeScript puro. Solo zod.
-    files: ['src/model/**/*.ts'],
+    files: ['src/model/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [{
-          group: ['react', 'react-dom', 'react/*', 'zustand', 'zustand/*', 'immer',
+          group: ['react', 'react-dom', 'react/*', 'react-dom/*', 'zustand', 'zustand/*', 'immer',
             '@/editor/**', '@/ui/**', '@/io/**', '**/editor/**', '**/ui/**', '**/io/**'],
           message: 'src/model è TypeScript puro: niente React, store o strati superiori.',
         }],
@@ -42,11 +42,11 @@ export default defineConfig([
   },
   {
     // Strato editor: conosce model, zustand e immer. Mai React né ui.
-    files: ['src/editor/**/*.ts'],
+    files: ['src/editor/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [{
-          group: ['react', 'react-dom', 'react/*', '@/ui/**', '@/io/**', '**/ui/**', '**/io/**'],
+          group: ['react', 'react-dom', 'react/*', 'react-dom/*', '@/ui/**', '@/io/**', '**/ui/**', '**/io/**'],
           message: 'src/editor non conosce React né src/ui.',
         }],
       }],

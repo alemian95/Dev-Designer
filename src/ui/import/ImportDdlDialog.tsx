@@ -15,7 +15,7 @@ import { spawnParseWorker } from "@/io/ddl/spawn"
 import { documentSession } from "@/io/document-session"
 import { entityKey } from "@/model/document"
 
-/** Etichette per i tipi di statement più frequenti; per gli altri si mostra la chiave del parser. */
+/** Etichette per i tipi di statement più frequenti; per gli altri si ricava un'etichetta leggibile. */
 const SKIPPED_LABELS: Record<string, string> = {
   IndexStmt: "indici",
   CreateSeqStmt: "sequenze",
@@ -35,6 +35,27 @@ const SKIPPED_LABELS: Record<string, string> = {
   "meta-comando psql": "meta-comandi psql",
 }
 
+/**
+ * `skipped` mescola quattro vocabolari (nodi Postgres, sottotipi `AT_*` di un ALTER, le forme
+ * `type:keyword` di node-sql-parser, frasi italiane già pronte): non ha senso mapparli tutti, ma
+ * una chiave ignota non deve mai arrivare grezza all'utente (la revisione ha visto comparire
+ * `use:undefined`). Ripulita di prefissi/suffissi da programmatore e spaziata sul cambio di caso,
+ * resta leggibile pur non tradotta.
+ */
+const humanizeSkipped = (kind: string): string => {
+  const known = SKIPPED_LABELS[kind]
+  if (known) return known
+  const cleaned = kind
+    .replace(/^AT_/, "")
+    .replace(/Stmt$/, "")
+    .replace(/:undefined$/, "")
+    .replace(/:/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .trim()
+    .toLowerCase()
+  return cleaned || "altre istruzioni"
+}
+
 type Stage =
   | { kind: "vuoto" }
   | { kind: "analisi" }
@@ -46,7 +67,7 @@ const keyOf = (t: SqlTable): string => entityKey({ name: t.name, schema: t.schem
 
 const summary = (skipped: Record<string, number>): string =>
   Object.entries(skipped)
-    .map(([kind, n]) => `${n} ${SKIPPED_LABELS[kind] ?? kind}`)
+    .map(([kind, n]) => `${n} ${humanizeSkipped(kind)}`)
     .join(", ")
 
 export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -168,7 +189,7 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
               <details open data-import-warnings>
                 <summary className="cursor-pointer text-muted-foreground">{stage.warnings.length} avvisi</summary>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                  {stage.warnings.map((w) => <li key={w}>{w}</li>)}
+                  {stage.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               </details>
             )}
@@ -207,7 +228,7 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
                   <details data-import-warnings>
                     <summary className="cursor-pointer text-xs text-muted-foreground">{stage.result.warnings.length} avvisi dal parser</summary>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                      {stage.result.warnings.map((w) => <li key={w.message}>{w.message}</li>)}
+                      {stage.result.warnings.map((w, i) => <li key={i}>{w.message}</li>)}
                     </ul>
                   </details>
                 )}

@@ -94,6 +94,22 @@ describe("parseMysql", () => {
     expect(r.warnings).toHaveLength(1)
   })
 
+  it("USE stabilisce lo schema corrente: due tabelle omonime in database diversi restano distinte", () => {
+    // Tipico di `mysqldump --databases`: ogni CREATE TABLE non è qualificato, ma è preceduto da un
+    // USE che ne fissa il database. Indicizzare per solo nome nudo fonde le due `clienti` in una.
+    const r = parseMysql(
+      "USE `primo`;\nCREATE TABLE `clienti` (`id` int, `nome` varchar(255));\n" +
+        "USE `secondo`;\nCREATE TABLE `clienti` (`id` int, `email` varchar(255));",
+    )
+    expect(r.tables).toHaveLength(2)
+    const primo = r.tables.find((t) => t.schema === "primo" && t.name === "clienti")
+    const secondo = r.tables.find((t) => t.schema === "secondo" && t.name === "clienti")
+    expect(primo?.columns.map((c) => c.name)).toEqual(["id", "nome"])
+    expect(secondo?.columns.map((c) => c.name)).toEqual(["id", "email"])
+    expect(r.warnings).toEqual([])
+    expect(r.skipped["use:undefined"]).toBeUndefined()
+  })
+
   it("digerisce la fixture sintetica da 200 tabelle con le sue 199 foreign key", () => {
     const r = parseMysql(synthetic)
     expect(r.tables).toHaveLength(200)

@@ -58,6 +58,9 @@ function typeText(d: ColumnType | undefined): string {
 
 const isUnique = (t: string): boolean => ["unique key", "unique", "unique index"].includes(t)
 
+/** Chiave qualificata dallo schema, come `pg.ts`: due tabelle omonime in schemi diversi non collidono. */
+const tableKey = (t: Pick<SqlTable, "name" | "schema">): string => (t.schema ? `${t.schema}.${t.name}` : t.name)
+
 function readForeignKey(d: Definition): SqlForeignKey {
   const ref = d.reference_definition as ReferenceDefinition | undefined
   return {
@@ -120,7 +123,10 @@ export function parseMysql(ddl: string): DdlParseResult {
   const warnings: ParseWarning[] = []
   const skipped: Record<string, number> = {}
   const byName = new Map<string, SqlTable>()
-  const alters: Array<{ table?: Array<{ table?: string }>; expr?: unknown }> = []
+  const alters: Array<{ table?: Array<{ table?: string; db?: string | null }>; expr?: unknown; schema?: string }> = []
+  // Lo schema fissato dall'ultimo `USE`: `mysqldump --databases` non qualifica i CREATE TABLE che
+  // seguono, si affida a questo per stabilire in quale database finiscono.
+  let currentSchema: string | undefined
 
   for (const chunk of splitStatements(ddl)) {
     const sql = stripExecutableComments(chunk)
@@ -141,14 +147,36 @@ export function parseMysql(ddl: string): DdlParseResult {
       const kind = `${String(one.type)}:${String(one.keyword)}`
       if (one.type === "create" && one.keyword === "table") {
         const table = readCreate(one as Parameters<typeof readCreate>[0])
-        byName.set(table.name, table)
-      } else if (one.type === "alter") alters.push(one as (typeof alters)[number])
-      else countSkipped(skipped, kind)
+        // Il CREATE TABLE può qualificare lo schema da sé; quando non lo fa, è quello dell'ultimo USE.
+        if (!table.schema && currentSchema) table.schema = currentSchema
+        byName.set(tableKey(table), table)
+      } else if (one.type === "alter") {
+        alters.push({ ...(one as (typeof alters)[number]), schema: currentSchema })
+      } else if (one.type === "use") {
+        // `USE db` fissa lo schema corrente per le CREATE TABLE non qualificate che seguono: è ciò
+        // che stabilisce il database di destinazione in un dump `--databases`, non uno statement da
+        // scartare (finiva in `skipped` con la chiave "use:undefined", perdendo l'informazione).
+        const db = (one as { db?: unknown }).db
+        currentSchema = typeof db === "string" ? db : undefined
+      } else countSkipped(skipped, kind)
     }
   }
 
+  /**
+   * Un ALTER può non qualificare lo schema anche quando il CREATE lo fa (implicito nell'ultimo USE):
+   * si cerca prima con lo schema — il proprio se lo dà, altrimenti quello dell'USE in vigore quando
+   * l'ALTER è stato letto — e si ripiega sul nome nudo solo se è unico, come fa `pg.ts`.
+   */
+  const lookup = (t: { table?: string; db?: string | null } | undefined, schema?: string): SqlTable | undefined => {
+    const effectiveSchema = t?.db ?? schema
+    const exact = byName.get(effectiveSchema ? `${effectiveSchema}.${t?.table ?? ""}` : (t?.table ?? ""))
+    if (exact) return exact
+    const matches = [...byName.values()].filter((table) => table.name === t?.table)
+    return matches.length === 1 ? matches[0] : undefined
+  }
+
   for (const alter of alters) {
-    const table = byName.get(alter.table?.[0]?.table ?? "")
+    const table = lookup(alter.table?.[0], alter.schema)
     if (!table) {
       warnings.push({ message: `ALTER TABLE su una tabella non presente nel dump: ${alter.table?.[0]?.table ?? "?"}` })
       continue

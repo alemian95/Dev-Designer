@@ -103,6 +103,26 @@ describe("createParser", () => {
     expect(w.sent.map((s) => s.id)).toEqual([1, 2])
   })
 
+  it("dopo un errore di caricamento la parse successiva fa nascere un nuovo worker", async () => {
+    let spawns = 0
+    const workers: FakeWorker[] = []
+    const parser = createParser(() => {
+      spawns++
+      const w = new FakeWorker()
+      workers.push(w)
+      return w
+    })
+    const first = parser.parse("x", "postgres")
+    workers[0].emit("error", new Event("error"))
+    await expect(first).rejects.toThrow(/caricato/)
+    expect(spawns).toBe(1)
+
+    const second = parser.parse("y", "postgres")
+    expect(spawns).toBe(2)
+    workers[1].reply({ id: 2, ok: true, result: EMPTY })
+    await expect(second).resolves.toEqual(EMPTY)
+  })
+
   it("dispose termina il worker e rigetta le analisi in corso", async () => {
     const w = new FakeWorker()
     const parser = createParser(() => w)

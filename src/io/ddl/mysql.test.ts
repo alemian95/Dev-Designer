@@ -35,6 +35,23 @@ describe("parseMysql", () => {
     ])
   })
 
+  it("riconosce tutte e tre le grafie di UNIQUE emesse da node-sql-parser", () => {
+    // `node-sql-parser` emette `constraint_type` diverso a seconda della sintassi scritta nel DDL:
+    // "unique key" per `UNIQUE KEY`, "unique" per `UNIQUE` nudo, "unique index" per `UNIQUE INDEX`.
+    const r = parseMysql(`CREATE TABLE \`t\` (
+      \`a\` int,
+      \`b\` int,
+      \`c\` int,
+      UNIQUE KEY \`t_a_unique\` (\`a\`),
+      UNIQUE (\`b\`),
+      UNIQUE INDEX \`t_c_uidx\` (\`c\`)
+    );`)
+    const t = find(r, "t")
+    expect(t.unique).toEqual([["a"], ["b"], ["c"]])
+    expect(r.warnings).toEqual([])
+    expect(r.skipped).toEqual({})
+  })
+
   it("la PRIMARY KEY spegne nullable anche senza NOT NULL scritto", () => {
     const r = parseMysql("CREATE TABLE `t` (`id` int, PRIMARY KEY (`id`));")
     expect(find(r, "t").columns[0].nullable).toBe(false)

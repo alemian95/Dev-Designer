@@ -68,7 +68,17 @@ export function createParser(spawn: () => ParseWorker, timeoutMs: number = PARSE
     if (worker) return worker
     const w = spawn()
     w.addEventListener("message", settle as (event: never) => void)
-    w.addEventListener("error", (() => failAll("il parser non è stato caricato")) as (event: never) => void)
+    // Dopo `error` il worker è morto (es. il `.wasm` non è caricato): si azzera il riferimento
+    // *dopo* aver rigettato le richieste in corso, così la prossima `parse()` ne fa nascere uno nuovo.
+    w.addEventListener(
+      "error",
+      (() => {
+        failAll("il parser non è stato caricato")
+        worker = null
+      }) as (event: never) => void,
+    )
+    // `messageerror`: un singolo messaggio non deserializzabile, non il worker nel suo complesso —
+    // resta valido e serve le analisi successive.
     w.addEventListener("messageerror", (() => failAll("risposta del parser illeggibile")) as (event: never) => void)
     worker = w
     return w

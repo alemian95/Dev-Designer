@@ -4,6 +4,14 @@ export interface SqlColumn {
   name: string
   /** Tipo come lo scrive il dialetto d'origine, ricomposto: `varchar(255)`, `bigint(20) unsigned`. */
   type: string
+  /**
+   * Nullabilità **effettiva**, non quella letterale del DDL: una colonna nella PRIMARY KEY è già
+   * `false` qui, anche quando il DDL non scrive NOT NULL su di lei. `pg.ts` e `mysql.ts` impongono
+   * la regola al momento di leggere il vincolo PRIMARY KEY — sia inline nel CREATE TABLE sia in un
+   * ALTER TABLE successivo — e la impongono su ogni colonna della chiave, non solo su quelle già
+   * marcate NOT NULL nel testo. Chi consuma `SqlColumn` (map.ts compreso) legge questo campo da
+   * solo: non deve ricontrollare `primaryKey` per dedurre la stessa cosa una seconda volta.
+   */
   nullable: boolean
 }
 

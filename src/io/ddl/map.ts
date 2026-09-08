@@ -26,8 +26,11 @@ function attribute(table: SqlTable, column: SqlColumn, fkColumns: ReadonlySet<st
     type: column.type,
     primaryKey,
     foreignKey: fkColumns.has(column.name),
-    // La PRIMARY KEY implica NOT NULL in entrambi i dialetti, anche dove il DDL non lo scrive.
-    nullable: column.nullable && !primaryKey,
+    // `column.nullable` è già effettiva (vedi la docstring in schema.ts): gli adapter impongono già
+    // che una colonna della PRIMARY KEY sia NOT NULL, quindi ricontrollare `primaryKey` qui sarebbe
+    // ridondante — e, prima di questa correzione, lo era davvero: le due condizioni derivano dallo
+    // stesso confronto (`table.primaryKey.includes(column.name)`), quindi non divergono mai.
+    nullable: column.nullable,
     // Un UNIQUE su più colonne non è rappresentabile sull'attributo: non marca nessuna delle sue colonne.
     unique: table.unique.some((u) => u.length === 1 && u[0] === column.name),
   }

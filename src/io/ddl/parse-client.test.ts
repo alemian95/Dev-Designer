@@ -1,0 +1,114 @@
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { createParser, type ParseRequest, type ParseResponse, type ParseWorker } from "./parse-client"
+import type { DdlParseResult } from "./schema"
+
+const EMPTY: DdlParseResult = { tables: [], warnings: [], skipped: {} }
+
+/** Worker finto: registra le richieste e lascia al test il momento in cui rispondere. */
+class FakeWorker implements ParseWorker {
+  sent: ParseRequest[] = []
+  terminated = false
+  private listeners = new Map<string, Array<(e: unknown) => void>>()
+
+  postMessage(message: ParseRequest): void {
+    this.sent.push(message)
+  }
+
+  terminate(): void {
+    this.terminated = true
+  }
+
+  addEventListener(type: string, listener: (e: never) => void): void {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener as (e: unknown) => void])
+  }
+
+  emit(type: string, event: unknown): void {
+    for (const l of this.listeners.get(type) ?? []) l(event)
+  }
+
+  reply(response: ParseResponse): void {
+    this.emit("message", { data: response })
+  }
+}
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe("createParser", () => {
+  it("risolve con il risultato del worker", async () => {
+    const w = new FakeWorker()
+    const parser = createParser(() => w)
+    const pending = parser.parse("create table t ()", "postgres")
+    expect(w.sent[0]).toMatchObject({ id: 1, dialect: "postgres", ddl: "create table t ()" })
+    w.reply({ id: 1, ok: true, result: EMPTY })
+    await expect(pending).resolves.toEqual(EMPTY)
+  })
+
+  it("rigetta col messaggio quando il worker riporta un errore", async () => {
+    const w = new FakeWorker()
+    const parser = createParser(() => w)
+    const pending = parser.parse("x", "mysql")
+    w.reply({ id: 1, ok: false, message: "parser esploso" })
+    await expect(pending).rejects.toThrow("parser esploso")
+  })
+
+  it("un errore di caricamento del worker rigetta invece di lasciare la promessa appesa", async () => {
+    const w = new FakeWorker()
+    const parser = createParser(() => w)
+    const pending = parser.parse("x", "postgres")
+    w.emit("error", new Event("error"))
+    await expect(pending).rejects.toThrow(/caricato/)
+  })
+
+  it("un messaggio illeggibile rigetta", async () => {
+    const w = new FakeWorker()
+    const parser = createParser(() => w)
+    const pending = parser.parse("x", "postgres")
+    w.emit("messageerror", new Event("messageerror"))
+    await expect(pending).rejects.toThrow(/illeggibile/)
+  })
+
+  it("senza risposta va in timeout", async () => {
+    vi.useFakeTimers()
+    const w = new FakeWorker()
+    const parser = createParser(() => w, 1000)
+    const pending = parser.parse("x", "postgres")
+    vi.advanceTimersByTime(1000)
+    await expect(pending).rejects.toThrow(/in tempo/)
+  })
+
+  it("una risposta con id ignoto viene scartata e non rompe niente", async () => {
+    const w = new FakeWorker()
+    const parser = createParser(() => w)
+    const pending = parser.parse("x", "postgres")
+    w.reply({ id: 999, ok: true, result: EMPTY })
+    w.reply({ id: 1, ok: true, result: EMPTY })
+    await expect(pending).resolves.toEqual(EMPTY)
+  })
+
+  it("il worker si crea una volta sola e serve più analisi", async () => {
+    let spawns = 0
+    const w = new FakeWorker()
+    const parser = createParser(() => {
+      spawns++
+      return w
+    })
+    const a = parser.parse("a", "postgres")
+    const b = parser.parse("b", "mysql")
+    w.reply({ id: 1, ok: true, result: EMPTY })
+    w.reply({ id: 2, ok: true, result: EMPTY })
+    await Promise.all([a, b])
+    expect(spawns).toBe(1)
+    expect(w.sent.map((s) => s.id)).toEqual([1, 2])
+  })
+
+  it("dispose termina il worker e rigetta le analisi in corso", async () => {
+    const w = new FakeWorker()
+    const parser = createParser(() => w)
+    const pending = parser.parse("x", "postgres")
+    parser.dispose()
+    expect(w.terminated).toBe(true)
+    await expect(pending).rejects.toThrow(/annullata/)
+  })
+})

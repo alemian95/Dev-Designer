@@ -168,6 +168,19 @@ describe("mapToEr — risoluzione dei riferimenti", () => {
   })
 })
 
+describe("mapToEr — nome di tabella con un punto", () => {
+  it("una tabella con un punto nel nome risolve comunque la FK che la referenzia", () => {
+    // `entityKey` di un'entità senza schema è il nome nudo, punto compreso: "my.table". Ricavare il
+    // nome nudo spezzando quella chiave sul primo punto lo confonderebbe con uno schema "my".
+    const target = table({ name: "my.table", columns: [{ name: "id", type: "bigint", nullable: false }], primaryKey: ["id"] })
+    const source = child({ foreignKeys: [{ name: "child_fk", columns: ["parent_id"], refTable: "my.table", refColumns: ["id"] }] })
+    const r = mapToEr({ tables: [source, target], model: EMPTY_MODEL })
+    expect(r.relationships).toHaveLength(1)
+    expect(r.relationships[0].target.entity).toBe("my.table")
+    expect(r.warnings).toEqual([])
+  })
+})
+
 describe("mapToEr — invariante attributes non vuoto", () => {
   it("una FK con columns vuoto viene scartata con un avviso, non produce una relazione con attributes: []", () => {
     const t = child({ foreignKeys: [{ name: "broken_fk", columns: [], refTable: "parent", refColumns: ["id"] }] })

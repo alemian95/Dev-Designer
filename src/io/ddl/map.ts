@@ -33,9 +33,6 @@ function attribute(table: SqlTable, column: SqlColumn, fkColumns: ReadonlySet<st
   }
 }
 
-/** Il nome senza schema, per risolvere i riferimenti che non lo qualificano. */
-const bareName = (key: string): string => (key.includes(".") ? key.slice(key.indexOf(".") + 1) : key)
-
 export function mapToEr({ tables, model }: MapInput): MapOutput {
   const warnings: string[] = []
   const entities: Record<string, Entity> = {}
@@ -51,10 +48,15 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
 
   // Le entità già sul canvas contano quanto quelle in arrivo: una FK può puntare a una di quelle.
   const known = new Set([...Object.keys(entities), ...Object.keys(model.entities)])
+  // Il nome nudo, per risolvere i riferimenti che non qualificano lo schema: si legge dal campo
+  // `name` dell'entità (già nudo, per costruzione), non ricavandolo dalla chiave. Spezzarlo dalla
+  // chiave sul primo punto confonderebbe un nome di tabella che contiene un punto con uno schema.
   const byBareName = new Map<string, string[]>()
   for (const key of known) {
-    const bare = bareName(key)
-    byBareName.set(bare, [...(byBareName.get(bare) ?? []), key])
+    // Una chiave può comparire in entrambe le mappe quando l'import sostituisce un'entità già sul
+    // canvas: `known` la deduplica, e si legge l'entità da quella in arrivo se c'è.
+    const name = (entities[key] ?? model.entities[key]).name
+    byBareName.set(name, [...(byBareName.get(name) ?? []), key])
   }
 
   const resolve = (fk: SqlForeignKey, from: string): string | null => {

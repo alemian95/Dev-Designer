@@ -123,6 +123,46 @@ describe("createParser", () => {
     await expect(second).resolves.toEqual(EMPTY)
   })
 
+  it("dopo un timeout il worker viene terminato e la parse successiva ne fa nascere uno nuovo", async () => {
+    vi.useFakeTimers()
+    let spawns = 0
+    const workers: FakeWorker[] = []
+    const parser = createParser(() => {
+      spawns++
+      const w = new FakeWorker()
+      workers.push(w)
+      return w
+    }, 1000)
+
+    const first = parser.parse("x", "postgres")
+    vi.advanceTimersByTime(1000)
+    await expect(first).rejects.toThrow(/in tempo/)
+    expect(spawns).toBe(1)
+    expect(workers[0].terminated).toBe(true)
+
+    vi.useRealTimers()
+    const second = parser.parse("y", "postgres")
+    expect(spawns).toBe(2)
+    workers[1].reply({ id: 2, ok: true, result: EMPTY })
+    await expect(second).resolves.toEqual(EMPTY)
+  })
+
+  it("un timeout rigetta anche le altre richieste in corso sullo stesso worker, che viene terminato", async () => {
+    vi.useFakeTimers()
+    const w = new FakeWorker()
+    const parser = createParser(() => w, 1000)
+
+    const late = parser.parse("a", "postgres")
+    vi.advanceTimersByTime(500)
+    const early = parser.parse("b", "postgres")
+    vi.advanceTimersByTime(500)
+    await expect(late).rejects.toThrow(/in tempo/)
+    // `early` non è ancora scaduta di suo (il suo timer parte 500ms dopo), ma il worker su cui
+    // era in corso è stato terminato dal timeout di `late`: resta appesa per sempre, altrimenti.
+    await expect(early).rejects.toThrow()
+    expect(w.terminated).toBe(true)
+  })
+
   it("dispose termina il worker e rigetta le analisi in corso", async () => {
     const w = new FakeWorker()
     const parser = createParser(() => w)

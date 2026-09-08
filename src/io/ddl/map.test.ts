@@ -176,10 +176,21 @@ describe("mapToEr — invariante attributes non vuoto", () => {
     expect(r.warnings.some((w) => w.includes("broken_fk"))).toBe(true)
   })
 
-  it("una FK con refColumns vuoto viene scartata con un avviso", () => {
-    const t = child({ foreignKeys: [{ name: "broken_fk", columns: ["parent_id"], refTable: "parent", refColumns: [] }] })
+})
+
+describe("mapToEr — REFERENCES senza lista di colonne referenziate", () => {
+  it("refColumns vuoto e il target ha una PRIMARY KEY: la relazione si risolve con quella PK", () => {
+    const t = child({ foreignKeys: [{ name: "child_fk", columns: ["parent_id"], refTable: "parent", refColumns: [] }] })
     const r = mapToEr({ tables: [t, parent()], model: EMPTY_MODEL })
+    expect(r.relationships).toHaveLength(1)
+    expect(r.relationships[0].target.attributes).toEqual(["id"])
+  })
+
+  it("refColumns vuoto e il target non ha una PRIMARY KEY: la FK è irrisolvibile, si scarta col motivo vero", () => {
+    const t = child({ foreignKeys: [{ name: "broken_fk", columns: ["parent_id"], refTable: "parent", refColumns: [] }] })
+    const parentWithoutPk = table({ name: "parent", columns: [{ name: "id", type: "bigint", nullable: false }] })
+    const r = mapToEr({ tables: [t, parentWithoutPk], model: EMPTY_MODEL })
     expect(r.relationships).toEqual([])
-    expect(r.warnings.some((w) => w.includes("broken_fk"))).toBe(true)
+    expect(r.warnings.some((w) => w.includes("broken_fk") && w.includes("PRIMARY KEY"))).toBe(true)
   })
 })

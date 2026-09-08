@@ -81,17 +81,34 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
     const sourceKey = entityKey({ name: t.name, schema: t.schema })
     const nullableOf = new Map(t.columns.map((c) => [c.name, c.nullable]))
     for (const fk of t.foreignKeys) {
-      // Una FK senza colonne su un lato o l'altro è un DDL malformato: produrrebbe una relazione con
-      // attributes: [], indistinguibile da una disegnata a mano (vedi RelationshipEndSchema.attributes).
-      // Il comando di import si fida di quell'invariante per potare solo le relazioni derivate da FK
-      // al re-import, quindi qui il caso va scartato esplicitamente invece che lasciato passare.
-      if (fk.columns.length === 0 || fk.refColumns.length === 0) {
+      // Una FK senza colonne sul lato figlio è un DDL malformato (richiederebbe una FOREIGN KEY ()
+      // con lista vuota, sintatticamente non valida): il caso è irraggiungibile in pratica, ma va
+      // scartato esplicitamente per non produrre una relazione con attributes: [], indistinguibile
+      // da una disegnata a mano (vedi RelationshipEndSchema.attributes). Il comando di import si fida
+      // di quell'invariante per potare solo le relazioni derivate da FK al re-import.
+      if (fk.columns.length === 0) {
         const label = fk.name ? `"${fk.name}"` : `su ${sourceKey}`
         warnings.push(`relazione saltata: la chiave esterna ${label} non specifica colonne`)
         continue
       }
       const targetKey = resolve(fk, `${sourceKey}(${fk.columns.join(", ")})`)
       if (!targetKey) continue
+
+      // REFERENCES senza lista di colonne è sintassi SQL standard e valida: significa "la PRIMARY
+      // KEY della tabella referenziata". Si risolve qui e non nell'adapter perché qui la tabella
+      // target è già nota e la sua primaryKey a portata di mano, e la correzione vale così per
+      // entrambi i dialetti in un colpo solo.
+      let refColumns = fk.refColumns
+      if (refColumns.length === 0) {
+        const targetPk = (entities[targetKey] ?? model.entities[targetKey])?.attributes.filter((a) => a.primaryKey).map((a) => a.name) ?? []
+        if (targetPk.length === 0) {
+          const label = fk.name ? `"${fk.name}"` : `su ${sourceKey}`
+          warnings.push(`relazione saltata: la chiave esterna ${label} non indica le colonne referenziate e "${targetKey}" non ha una PRIMARY KEY`)
+          continue
+        }
+        refColumns = targetPk
+      }
+
       // Colonna sconosciuta: prudenza, la si tratta come nullabile.
       const optional = fk.columns.some((c) => nullableOf.get(c) ?? true)
       // Se le colonne della FK sono la PK o un UNIQUE del figlio, per ogni padre c'è al più un figlio.
@@ -101,7 +118,7 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
       relationships.push({
         ...(fk.name ? { name: fk.name } : {}),
         source: { entity: sourceKey, attributes: fk.columns, cardinality: source },
-        target: { entity: targetKey, attributes: fk.refColumns, cardinality: target },
+        target: { entity: targetKey, attributes: refColumns, cardinality: target },
         identifying: t.primaryKey.length > 0 && fk.columns.every((c) => t.primaryKey.includes(c)),
       })
     }

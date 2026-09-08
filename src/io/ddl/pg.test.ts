@@ -52,6 +52,11 @@ describe("parsePostgres", () => {
     expect(find(r, "t").foreignKeys[0].columns).toEqual(["parent_id"])
   })
 
+  it("REFERENCES senza lista di colonne referenziate lascia refColumns vuoto (si risolve altrove, sulla PK del target)", async () => {
+    const r = await parsePostgres("CREATE TABLE t (id bigint primary key, parent_id bigint, FOREIGN KEY (parent_id) REFERENCES parent);")
+    expect(find(r, "t").foreignKeys).toEqual([{ columns: ["parent_id"], refTable: "parent", refColumns: [] }])
+  })
+
   it("i vincoli in linea nel CREATE TABLE si leggono come quelli aggiunti dopo", async () => {
     const r = await parsePostgres("CREATE TABLE t (id int PRIMARY KEY, code text UNIQUE, UNIQUE (id, code));")
     expect(find(r, "t").primaryKey).toEqual(["id"])

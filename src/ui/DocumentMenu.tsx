@@ -1,4 +1,4 @@
-import { ChevronDown, FilePlus2, FolderOpen, Save, SaveAll } from "lucide-react"
+import { ChevronDown, FileCode2, FilePlus2, FolderOpen, Save, SaveAll } from "lucide-react"
 import { useState, type ChangeEvent } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import type { RecentEntry } from "@/io/db"
 import { documentSession } from "@/io/document-session"
 import { readFile } from "@/io/file"
 import { requestOpen, UPLOAD_INPUT_ID } from "./document-actions"
+import { ImportDdlDialog } from "./import/ImportDdlDialog"
 
 const when = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" })
 
@@ -21,6 +22,7 @@ export function DocumentMenu() {
   const dirty = useStore(documentSession, (s) => s.dirty)
   const readOnly = useStore(documentSession, (s) => s.readOnly)
   const [recent, setRecent] = useState<RecentEntry[]>([])
+  const [importOpen, setImportOpen] = useState(false)
 
   // I recenti si leggono all'apertura del menu, non a ogni render.
   const onOpenChange = (open: boolean) => {
@@ -47,6 +49,7 @@ export function DocumentMenu() {
         <DropdownMenuContent align="start" className="w-72">
           <DropdownMenuItem onSelect={() => void documentIo.newDocument()}><FilePlus2 /> Nuovo</DropdownMenuItem>
           <DropdownMenuItem onSelect={requestOpen}><FolderOpen /> Apri… <DropdownMenuShortcut>⌘O</DropdownMenuShortcut></DropdownMenuItem>
+          <DropdownMenuItem disabled={readOnly} onSelect={() => setImportOpen(true)}><FileCode2 /> Importa DDL…</DropdownMenuItem>
           <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.save()}><Save /> Salva <DropdownMenuShortcut>⌘S</DropdownMenuShortcut></DropdownMenuItem>
           <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.saveAs()}><SaveAll /> Salva con nome… <DropdownMenuShortcut>⇧⌘S</DropdownMenuShortcut></DropdownMenuItem>
           {recent.length > 0 && (
@@ -65,6 +68,8 @@ export function DocumentMenu() {
       </DropdownMenu>
       {/* Fallback senza File System Access API: l'e2e lo riempie con setInputFiles. */}
       <input id={UPLOAD_INPUT_ID} type="file" accept=".dd.json,application/json" hidden aria-label="Carica documento" onChange={(e) => void onUpload(e)} />
+      {/* Fratello del DropdownMenu, non figlio: aperto dalla voce di menu, litigherebbe sul fuoco col menu che si chiude. */}
+      <ImportDdlDialog open={importOpen} onOpenChange={setImportOpen} />
     </>
   )
 }

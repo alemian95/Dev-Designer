@@ -55,10 +55,12 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const [chosen, setChosen] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState("")
   const parser = useRef<DdlParser | null>(null)
-  // Si incrementa a ogni `analyse`: la risoluzione di un'analisi si applica solo se la generazione
-  // è ancora quella corrente. Senza questa guardia un'analisi lenta e superata da un'altra (l'utente
-  // incolla un dump grosso, poi uno piccolo prima che il primo risponda) potrebbe sovrascrivere lo
-  // stato più recente con un risultato ormai stantio.
+  // Si incrementa a ogni `analyse` e a ogni chiusura: la risoluzione di un'analisi si applica solo
+  // se la generazione è ancora quella corrente. Senza questa guardia un'analisi lenta e superata da
+  // un'altra (l'utente incolla un dump grosso, poi uno piccolo prima che il primo risponda)
+  // potrebbe sovrascrivere lo stato più recente, e chiudere il dialog mentre analizza farebbe
+  // comparire un errore fantasma alla riapertura (il rigetto di `dispose` arriva un microtask dopo
+  // l'azzeramento sincrono dello stato).
   const generation = useRef(0)
 
   // Iscrizione e non `getState()`: il render deve essere puro, e dopo un import la lista si riaggiorna.
@@ -112,6 +114,10 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
   const close = (next: boolean) => {
     if (!next) {
+      // Invalida prima qualunque analisi in corso: la sua risoluzione (o il rigetto che `dispose`
+      // sta per causare) arriverà dopo, e non deve più toccare uno stato che l'utente ha chiuso —
+      // un annullamento voluto non è un errore, quindi non deve produrre uno stage "errore".
+      generation.current++
       // Terminare il worker è ciò che rende immediato l'annullamento e non lascia lavoro orfano.
       parser.current?.dispose()
       parser.current = null

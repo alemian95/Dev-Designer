@@ -1,7 +1,10 @@
 /**
  * End-to-end dell'import DDL: copre apri il dialog → incolla un DDL → analizza → importa → due
  * entità e una relazione sul canvas → annulla → canvas vuoto. E il re-import, che non deve
- * duplicare la relazione.
+ * duplicare la relazione. Copre anche il ramo MySQL: un dump con nomi inventati, rilevato da solo
+ * (mai passato dal toggle a mano), che produce a sua volta tabelle e una relazione — è il ramo che
+ * nessun test unitario esercita (nessuno importa `parse.worker.ts` né `spawn.ts`), e la sua interop
+ * `node-sql-parser` dentro un module worker sotto Vite era stata verificata solo a mano, una volta.
  *
  * Il server statico e il browser sono avviati una sola volta da `scripts/e2e/run.mjs` e condivisi
  * con lo scenario della persistenza: questa funzione apre solo il proprio contesto (IndexedDB
@@ -14,6 +17,24 @@ import { expectMenu, expectNodes, expectText, isMainModule, startEnv } from "./h
 
 const DDL = `CREATE TABLE parent (id bigint PRIMARY KEY);
 CREATE TABLE child (id bigint PRIMARY KEY, parent_id bigint NOT NULL REFERENCES parent(id));`
+
+/**
+ * Dump MySQL con nomi inventati (mai un frammento delle fixture reali dell'utente, git-ignored):
+ * backtick, `ENGINE=` e `AUTO_INCREMENT` bastano a farlo rilevare come MySQL da `detect.ts` senza
+ * bisogno del toggle manuale (verificato: la testa del testo segna 3 indizi MySQL contro 0 Postgres).
+ * Due tabelle e una FOREIGN KEY: il minimo che produce sia un'entità sia una relazione da verificare
+ * sul canvas vero.
+ */
+const MYSQL_DDL = `CREATE TABLE \`zorble\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB;
+CREATE TABLE \`fluvian\` (
+  \`id\` bigint unsigned NOT NULL AUTO_INCREMENT,
+  \`zorble_id\` bigint unsigned NOT NULL,
+  PRIMARY KEY (\`id\`),
+  CONSTRAINT \`fluvian_zorble_fk\` FOREIGN KEY (\`zorble_id\`) REFERENCES \`zorble\` (\`id\`)
+) ENGINE=InnoDB;`
 
 /**
  * Apre il menu documento e sceglie "Importa DDL…". Non si usa `pickFromMenu`: quella voce non
@@ -95,6 +116,27 @@ export async function run(browser, base) {
       // non esiste un `data-relationship-id` separato, quindi si conta quello.
       const edges = await page.evaluate(() => document.querySelectorAll("[data-edge-id]").length)
       if (edges !== 1) throw new Error(`attesa una relazione, trovate ${edges}`)
+    })
+
+    // Il dialog non si chiude da sé dopo un import: l'ultimo passo lo ha già richiuso lui stesso col
+    // pulsante "Chiudi", quindi si riparte da "dialog chiuso", lo stato che `openImportDialog` richiede.
+    await step("apre il dialog e incolla un dump MySQL: il dialetto si rileva da solo", async () => {
+      await openImportDialog(page)
+      await paste(page, MYSQL_DDL)
+      await expectText(page, "[data-import-summary]", "2 tabelle")
+      // Non si è mai toccato il toggle: se questo segna "MySQL" è `detectDialect` ad averlo scelto.
+      const checked = await page.getByRole("radio", { name: "MySQL" }).getAttribute("aria-checked")
+      if (checked !== "true") throw new Error(`dialetto rilevato non è MySQL (aria-checked=${checked})`)
+    })
+
+    await step("importa il dump MySQL: due entità e una relazione in più sul canvas", async () => {
+      await page.getByRole("button", { name: /^Importa 2 tabelle$/ }).click()
+      // Le due tabelle precedenti (parent, child) restano: 2 + 2 di questo import.
+      await expectNodes(page, 4)
+      const edges = await page.evaluate(() => document.querySelectorAll("[data-edge-id]").length)
+      if (edges !== 2) throw new Error(`attese 2 relazioni dopo l'import MySQL, trovate ${edges}`)
+      await page.getByRole("button", { name: "Chiudi" }).click()
+      await page.waitForSelector("[data-import-dialog]", { state: "detached" })
     })
 
     await context.close()

@@ -6,23 +6,32 @@ import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 
 /**
- * Emscripten cerca `libpg-query.wasm` accanto allo script che lo carica (`scriptDirectory`), che nel
- * worker è la sua URL: `/src/spike/` in dev, `/assets/` nella build. Vite non emette quel binario da
- * solo e `loadModule()` non espone `locateFile`, quindi lo serviamo noi in dev e lo emettiamo in build.
+ * Emscripten cerca `libpg-query.wasm` accanto allo script che lo carica (`scriptDirectory`), e
+ * `loadModule()` non espone `locateFile`: il percorso non si può indicare dal codice applicativo.
+ * Quindi in dev lo serviamo noi e in build lo emettiamo. L'emissione resterebbe da fare solo se un
+ * modulo importa davvero `libpg-query` (è un megabyte) — ma in questo Vite (build su rolldown)
+ * l'hook `resolveId` dei plugin JS non viene mai invocato per gli specifier risolti nativamente:
+ * verificato strumentando il plugin, zero chiamate su 2097 moduli trasformati, anche nella build in
+ * cui il worker importa davvero la libreria. Senza un segnale affidabile su cui condizionare,
+ * l'emissione resta incondizionata: è un costo noto e accettato, non un difetto di questa build.
  */
 function libpgQueryWasm(): Plugin {
-  const file = createRequire(import.meta.url).resolve("libpg-query/wasm/libpg-query.wasm")
+  const wasmPath = () => createRequire(import.meta.url).resolve("libpg-query/wasm/libpg-query.wasm")
+  let assetsDir = "assets"
   return {
     name: "libpg-query-wasm",
+    configResolved(config) {
+      assetsDir = config.build.assetsDir
+    },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         if (!req.url?.split("?")[0].endsWith("/libpg-query.wasm")) return next()
         res.setHeader("Content-Type", "application/wasm")
-        res.end(readFileSync(file))
+        res.end(readFileSync(wasmPath()))
       })
     },
     generateBundle() {
-      this.emitFile({ type: "asset", fileName: "assets/libpg-query.wasm", source: readFileSync(file) })
+      this.emitFile({ type: "asset", fileName: `${assetsDir}/libpg-query.wasm`, source: readFileSync(wasmPath()) })
     },
   }
 }

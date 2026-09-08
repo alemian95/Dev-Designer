@@ -95,6 +95,8 @@ del verdetto ha anche `20` scritto a mano invece di interpolare
   incoerenza di convenzione, nessun test la copre.
 - `documentStore` è un singleton di modulo. Una factory servirebbe solo per
   editor multipli: YAGNI.
+- `spaceHeld` che non si azzera al blur → promosso a **DT-2**.
+- `removeAttribute` che lascia riferimenti pendenti → promosso a **DT-5**.
 - `PointerInfo.alt` è dichiarato e popolato ma mai letto; il ramo 2 di
   `PointerInfo.button` è irraggiungibile.
 - Nessun test sul marquee additivo (shift+drag sul vuoto), sullo shift+click

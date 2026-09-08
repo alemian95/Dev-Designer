@@ -88,6 +88,13 @@ describe("parseMysql", () => {
     expect(find(r, "t").foreignKeys[0].refTable).toBe("o")
   })
 
+  it("ALTER TABLE ADD PRIMARY KEY fuori dal CREATE TABLE spegne nullable come quella in linea", () => {
+    const r = parseMysql("CREATE TABLE `t` (`id` int, `name` varchar(255));\nALTER TABLE `t` ADD PRIMARY KEY (`id`);")
+    const t = find(r, "t")
+    expect(t.primaryKey).toEqual(["id"])
+    expect(t.columns.find((c) => c.name === "id")?.nullable).toBe(false)
+  })
+
   it("un chunk non parsabile è un avviso e non fa perdere il resto", () => {
     const r = parseMysql("CREATE TABLE `ok` (`a` int);\nSET NAMES utf8mb4;\nCREATE TABLE `altra` (`b` int);")
     expect(r.tables.map((t) => t.name)).toEqual(["ok", "altra"])

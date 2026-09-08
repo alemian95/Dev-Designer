@@ -107,11 +107,22 @@ async function allNodes(sql: string, warnings: ParseWarning[]): Promise<Node[]> 
   } catch (whole) {
     warnings.push(warnOf(whole, "il dump non è stato letto in un colpo, si procede statement per statement"))
     const out: Node[] = []
+    // Il ripiego analizza un frammento alla volta: `cursorPosition` che il parser calcola è relativo
+    // a quel frammento, non al dump intero, e va tradotto nell'offset del testo originale che
+    // `ParseWarning.at` promette (vedi schema.ts) sommando dove il frammento comincia in `sql`.
+    // `cursor` avanza in un solo verso perché ogni frammento di `splitStatements` è una sottostringa
+    // verbatim di `sql` (a parte lo spazio iniziale già tolto) e i frammenti sono nello stesso ordine
+    // del testo: `indexOf` a partire dal cursore trova sempre il frammento giusto, in tempo
+    // complessivamente lineare invece che quadratico nel numero di frammenti.
+    let cursor = 0
     for (const text of splitStatements(sql)) {
+      const base = sql.indexOf(text, cursor)
+      cursor = base + text.length
       try {
         out.push(...nodesOf(await parse(text)))
       } catch (one) {
-        warnings.push(warnOf(one, `statement non riconosciuto (${text.slice(0, 60).replace(/\s+/g, " ")})`))
+        const w = warnOf(one, `statement non riconosciuto (${text.slice(0, 60).replace(/\s+/g, " ")})`)
+        warnings.push(w.at === undefined ? w : { ...w, at: w.at + base })
       }
     }
     return out

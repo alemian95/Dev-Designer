@@ -40,6 +40,8 @@ describe("parsePostgres", () => {
     expect(child.foreignKeys).toEqual([
       { name: "child_fk", columns: ["parent_id"], refSchema: "app", refTable: "parent", refColumns: ["id"] },
     ])
+    // La PRIMARY KEY aggiunta con ALTER spegne `nullable` come quella scritta in linea nel CREATE.
+    expect(child.columns.find((c) => c.name === "id")?.nullable).toBe(false)
   })
 
   it("ALTER COLUMN SET NOT NULL cambia la colonna già raccolta", async () => {

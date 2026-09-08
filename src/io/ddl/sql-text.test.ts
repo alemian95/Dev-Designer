@@ -103,6 +103,14 @@ describe("splitStatements", () => {
    * quadratica il rapporto misurato è ~3.9 (200 tabelle: 483 ms, 400 tabelle: 1864 ms); con la versione
    * a cursore è ~1.2 (200: 6 ms, 400: 8 ms). La soglia è tenuta larga (3, a metà tra i due regimi)
    * apposta per non rendere il test instabile su una macchina più lenta o più carica.
+   *
+   * A 200/400 tabelle, però, le misure assolute sono ~2 ms: con un timer a bassa risoluzione o una CI
+   * carica il rumore può avvicinarsi alla misura stessa, rendendo il rapporto instabile pur restando
+   * la funzione lineare. Si usano quindi 800/1600 tabelle, dove le misure stanno comodamente in decine
+   * di millisecondi (qui: ~13 ms e ~22 ms, rapporto ~1.7, stabile su più esecuzioni) invece che in poche
+   * unità. Salire ancora costerebbe comunque poco, proprio perché la funzione ora è lineare — un'altra
+   * misura indipendente su 1600 tabelle, in isolamento, ha dato 7 ms — ma 800/1600 bastano già a uscire
+   * dalla zona di rumore senza allungare il test.
    */
   it("il tempo raddoppiando l'input non è quadratico (non più di ~3x, non ~4x)", () => {
     // Genera N CREATE TABLE con identificatori backtick-quoted, come un vero dump MySQL: è la grafia
@@ -116,8 +124,8 @@ describe("splitStatements", () => {
       return parts.join("\n")
     }
 
-    const small = genMysqlLike(200)
-    const big = genMysqlLike(400)
+    const small = genMysqlLike(800)
+    const big = genMysqlLike(1600)
 
     const t0 = performance.now()
     const rSmall = splitStatements(small)
@@ -128,14 +136,14 @@ describe("splitStatements", () => {
     const msBig = t2 - t1
 
     // La prestazione non deve aver cambiato la semantica: stesso numero di statement, stesso
-    // contenuto. `big` è `small` con altre 200 tabelle in coda, quindi i primi 200 statement dei due
+    // contenuto. `big` è `small` con altre 800 tabelle in coda, quindi i primi 800 statement dei due
     // input devono coincidere esattamente.
-    expect(rSmall).toHaveLength(200)
-    expect(rBig).toHaveLength(400)
-    expect(rBig.slice(0, 200)).toEqual(rSmall)
+    expect(rSmall).toHaveLength(800)
+    expect(rBig).toHaveLength(1600)
+    expect(rBig.slice(0, 800)).toEqual(rSmall)
     expect(rSmall[0]).toContain("CREATE TABLE `tbl_0`")
-    expect(rSmall[199]).toContain("CREATE TABLE `tbl_199`")
-    expect(rBig[399]).toContain("CREATE TABLE `tbl_399`")
+    expect(rSmall[799]).toContain("CREATE TABLE `tbl_799`")
+    expect(rBig[1599]).toContain("CREATE TABLE `tbl_1599`")
 
     expect(msBig).toBeLessThanOrEqual(msSmall * 3)
   })

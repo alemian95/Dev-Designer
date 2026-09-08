@@ -107,7 +107,9 @@ const inCode = (list: readonly Span[], at: number): boolean =>
  * numero di tratti — i backtick di un `mysqldump` vero ne producono a migliaia), avanza un indice
  * che non torna mai indietro. `list` copre tutto il testo senza buchi (`spans` lo garantisce), quindi
  * avanzare finché il tratto corrente finisce prima di `at` trova sempre il tratto giusto.
- * Resta privata: non cambia la firma pubblica di `inCode`, usata altrove con accessi non ordinati.
+ * Resta privata: non cambia la firma pubblica di `inCode`, il cui unico altro chiamante
+ * (`stripPsqlMeta`) scandisce comunque riga per riga in avanti, ma non ha bisogno del cursore perché
+ * lì il costo non è un problema.
  */
 function makeCodeCursor(list: readonly Span[]): (at: number) => boolean {
   let idx = 0

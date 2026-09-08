@@ -110,12 +110,11 @@ export function createParser(spawn: () => ParseWorker, timeoutMs: number = PARSE
           pending.delete(id)
           reject(new Error("il parser non ha risposto in tempo"))
           // Il worker che non ha risposto in tempo resta bloccato sull'analisi abbandonata: va
-          // trattato come inutilizzabile esattamente come nel percorso `error` sopra, altrimenti
-          // le richieste successive si accodano a un worker che non risponderà mai (misurato:
-          // 4,5 s invece dei ~50 ms normali). Le altre richieste eventualmente ancora in corso
-          // sullo stesso worker non possono più essere servite — il worker sta per morire — quindi
-          // si rigettano qui con un messaggio esplicito: lasciarle appese per sempre sarebbe peggio.
-          failAll("il parser non ha risposto in tempo: il worker è stato terminato e rimpiazzato")
+          // trattato come inutilizzabile esattamente come nel percorso `error` sopra, così la
+          // prossima `parse()` ne fa nascere uno pulito invece di accodarsi a uno che non risponderà
+          // mai (misurato: 4,5 s invece dei ~50 ms normali). Non c'è nessun'altra richiesta da
+          // rigettare qui: l'abbandono in cima a `parse()` garantisce che `pending` non contenga mai
+          // più di una voce, ed è quella appena rimossa sopra — non serve un `failAll`.
           worker?.terminate()
           worker = null
         }, timeoutMs)

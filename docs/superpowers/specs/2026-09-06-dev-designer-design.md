@@ -213,8 +213,14 @@ nodi a posizione libera.
 
 ### 4.4 Import DDL
 
-- Un solo contratto: `(ddl: string) => { model, warnings }`. Tollerante: le
-  istruzioni non riconosciute vengono saltate e segnalate.
+Dettagli di realizzazione nella spec dedicata:
+`docs/superpowers/specs/2026-09-08-import-ddl-design.md`.
+
+- Il contratto del client del worker è `(ddl: string, dialect: Dialect) =>
+  Promise<DdlParseResult>`: produce solo tabelle, colonne e foreign key grezze.
+  Il `model` (entità e relazioni) lo costruisce `map.ts` in un passo separato,
+  perché fra l'analisi e la mappatura sta la scelta delle tabelle da importare.
+  Tollerante: le istruzioni non riconosciute vengono saltate e segnalate.
 - PostgreSQL: libpg-query in WASM. Gestisce un `pg_dump` intero, compresi gli
   `ALTER TABLE ... ADD CONSTRAINT` dove finiscono le FK.
 - MySQL: node-sql-parser, verificato nello spike su un dump reale. Fallback:
@@ -227,9 +233,10 @@ nodi a posizione libera.
 - `model`, `io`, funzione di layout del sequence: Vitest con fixture (dump veri
   in ingresso, modello atteso in uscita; e viceversa per gli exporter).
 - Renderer: snapshot dell'SVG esportato per alcuni diagrammi fixture.
-- Un solo e2e Playwright (`pnpm e2e`): disegna un'entità, ricarica, ritrova; salva, riapri, ritrova;
-  due schede. Sul percorso di fallback, perché i dialoghi nativi non sono pilotabili — vedi la spec
-  della persistenza, §7.
+- Due scenari e2e Playwright (`pnpm e2e`), su una build e un server condivisi: la persistenza
+  (disegna un'entità, ricarica, ritrova; salva, riapri, ritrova; due schede — sul percorso di
+  fallback, perché i dialoghi nativi non sono pilotabili, vedi la spec della persistenza, §7) e
+  l'import DDL (incolla, analizza, importa, annulla, re-importa senza duplicare).
 - Nessun test per componente React.
 
 ## 5. Spike (codice da buttare, 1–2 giorni)

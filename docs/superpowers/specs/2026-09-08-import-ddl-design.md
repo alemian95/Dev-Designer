@@ -51,10 +51,22 @@ editor/commands/import.ts  → una Recipe, una dispatch, un undo
 ```
 
 Il worker è **unico** e carica l'adapter del dialetto con `import()` dinamico.
-Due worker separati raddoppierebbero il protocollo dei messaggi e la
-protezione (`onerror`, timeout, `terminate`) senza guadagnare nulla: lo
-splitting dei chunk resta lazy per dialetto perché è `import()` a produrlo, non
-il numero di file worker. Chi importa Postgres non scarica `node-sql-parser`.
+**Verificato su `dist/` dopo `pnpm build`, quell'`import()` non tiene i due
+parser in chunk separati**: il formato di default dei worker in Vite è `iife`,
+che disabilita il code splitting, e in `dist/` c'è un solo
+`parse.worker-*.js` (332 KB) che contiene sia `create_definitions`
+(node-sql-parser) sia il riferimento a `libpg-query.wasm`, senza alcun
+`import(` residuo. Chi importa Postgres scarica comunque tutto
+`node-sql-parser`, e viceversa. Ciò che resta davvero pigro è il `.wasm` di
+libpg-query (~1,1 MB): non è incorporato nel chunk, si carica solo alla prima
+parse, ed è quello il peso grosso da non scaricare a vuoto — non
+`node-sql-parser`. `worker.format: "es"` renderebbe vero lo splitting fra i due
+parser, ma non è stato cambiato: è l'unica leva che governa l'interop di
+`node-sql-parser` (UMD/CJS) dentro un module worker, verificata a mano una
+volta sola, ed è il punto più fragile di tutta la catena — proprio quello che
+oggi funziona. Due worker separati avrebbero comunque raddoppiato il protocollo
+dei messaggi e la protezione (`onerror`, timeout, `terminate`) senza risolvere
+questo.
 
 Il parse sta in un worker e non sul thread principale nonostante i numeri dello
 spike (136 ms su 200 tabelle) perché serve poter **annullare**, e perché un dump
@@ -366,9 +378,13 @@ e che un fallimento di caricamento del `.wasm` lasciava la promessa appesa per
 sempre. Quindi: `onerror` e `onmessageerror` respingono la promessa con un
 messaggio leggibile; un **timeout di 30 s** la chiude (200 tabelle costano
 136 ms, il margine è tre ordini di grandezza); `dispose()` chiama `terminate()`,
-così chiudere il dialog annulla davvero e non lascia lavoro orfano; le risposte
-con `id` diverso da quello atteso si scartano, così un parse superato da un
-altro non sovrascrive il risultato buono.
+così chiudere il dialog annulla davvero e non lascia lavoro orfano; una `parse`
+chiamata mentre la precedente non si è ancora risolta **abbandona quest'ultima**
+(la rigetta e termina il worker su cui girava), così un'analisi superata da
+un'altra non sovrascrive mai il risultato buono — proseguirla sarebbe anche
+lavoro sprecato, dato che chi chiama non la aspetta più. Nel dialog, una guardia
+di generazione ignora comunque ogni risoluzione non più corrente, per lo stesso
+motivo anche a fronte di una chiusura del dialog nel frattempo (§12).
 
 Gli errori di `libpg-query` portano `sqlDetails` con posizione e messaggio dello
 statement fallito. Lo spike li collassava in `String(err)` perdendo tutto: qui

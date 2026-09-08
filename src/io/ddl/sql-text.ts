@@ -102,6 +102,23 @@ const inCode = (list: readonly Span[], at: number): boolean =>
   list.some((s) => s.code && at >= s.start && at < s.end)
 
 /**
+ * Variante di `inCode` con cursore, valida solo per scansioni a posizione monotona crescente come
+ * quella di `splitStatements`: invece di cercare in tutta `list` a ogni carattere (quadratico nel
+ * numero di tratti — i backtick di un `mysqldump` vero ne producono a migliaia), avanza un indice
+ * che non torna mai indietro. `list` copre tutto il testo senza buchi (`spans` lo garantisce), quindi
+ * avanzare finché il tratto corrente finisce prima di `at` trova sempre il tratto giusto.
+ * Resta privata: non cambia la firma pubblica di `inCode`, usata altrove con accessi non ordinati.
+ */
+function makeCodeCursor(list: readonly Span[]): (at: number) => boolean {
+  let idx = 0
+  return (at: number): boolean => {
+    while (idx < list.length - 1 && list[idx].end <= at) idx++
+    const s = list[idx]
+    return s !== undefined && s.code && at >= s.start && at < s.end
+  }
+}
+
+/**
  * Toglie le righe di meta-comando psql che stanno in stato codice, lasciando il resto intatto —
  * il carattere `\n` compreso, così le posizioni degli statement restano vicine all'originale.
  */
@@ -132,6 +149,7 @@ const DELIMITER = /^[ \t]*DELIMITER[ \t]+(\S+)[ \t]*$/i
  */
 export function splitStatements(sql: string): string[] {
   const list = spans(sql)
+  const codeAt = makeCodeCursor(list)
   const out: string[] = []
   let terminator = ";"
   let start = 0
@@ -146,7 +164,7 @@ export function splitStatements(sql: string): string[] {
   }
 
   while (i < sql.length) {
-    if (!inCode(list, i)) {
+    if (!codeAt(i)) {
       i++
       continue
     }

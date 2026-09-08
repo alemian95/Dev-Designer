@@ -90,6 +90,51 @@ describe("splitStatements", () => {
   it("l'ultimo statement senza punto e virgola finale non si perde", () => {
     expect(splitStatements("select 1")).toEqual(["select 1"])
   })
+
+  /**
+   * `inCode` era quadratico: cercava in tutta la lista di tratti a ogni carattere, e la lista cresce
+   * col testo (i backtick di un `mysqldump` vero ne producono a migliaia). Una misura di tempo assoluto
+   * è fragile su una macchina condivisa, quindi qui si verifica la *scalabilità*: il tempo su un input
+   * doppio non deve superare ~3 volte quello sull'input singolo. Con la vecchia implementazione
+   * quadratica il rapporto misurato è ~3.9 (200 tabelle: 483 ms, 400 tabelle: 1864 ms); con la versione
+   * a cursore è ~1.2 (200: 6 ms, 400: 8 ms). La soglia è tenuta larga (3, a metà tra i due regimi)
+   * apposta per non rendere il test instabile su una macchina più lenta o più carica.
+   */
+  it("il tempo raddoppiando l'input non è quadratico (non più di ~3x, non ~4x)", () => {
+    // Genera N CREATE TABLE con identificatori backtick-quoted, come un vero dump MySQL: è la grafia
+    // che fa crescere il numero di tratti di `spans()` e che rendeva `inCode` costoso.
+    const genMysqlLike = (n: number): string => {
+      const parts: string[] = []
+      for (let i = 0; i < n; i++) {
+        const cols = Array.from({ length: 12 }, (_, c) => `  \`col_${c}\` varchar(255) DEFAULT NULL`).join(",\n")
+        parts.push(`CREATE TABLE \`tbl_${i}\` (\n\`id\` bigint unsigned NOT NULL,\n${cols},\n  PRIMARY KEY (\`id\`)\n) ENGINE=InnoDB;`)
+      }
+      return parts.join("\n")
+    }
+
+    const small = genMysqlLike(200)
+    const big = genMysqlLike(400)
+
+    const t0 = performance.now()
+    const rSmall = splitStatements(small)
+    const t1 = performance.now()
+    const rBig = splitStatements(big)
+    const t2 = performance.now()
+    const msSmall = t1 - t0
+    const msBig = t2 - t1
+
+    // La prestazione non deve aver cambiato la semantica: stesso numero di statement, stesso
+    // contenuto. `big` è `small` con altre 200 tabelle in coda, quindi i primi 200 statement dei due
+    // input devono coincidere esattamente.
+    expect(rSmall).toHaveLength(200)
+    expect(rBig).toHaveLength(400)
+    expect(rBig.slice(0, 200)).toEqual(rSmall)
+    expect(rSmall[0]).toContain("CREATE TABLE `tbl_0`")
+    expect(rSmall[199]).toContain("CREATE TABLE `tbl_199`")
+    expect(rBig[399]).toContain("CREATE TABLE `tbl_399`")
+
+    expect(msBig).toBeLessThanOrEqual(msSmall * 3)
+  })
 })
 
 describe("stripExecutableComments", () => {

@@ -37,7 +37,16 @@ export interface SqlTable {
 
 export interface ParseWarning {
   message: string
-  /** Offset nel testo, quando il parser lo dà (`sqlDetails.cursorPosition` di libpg-query). */
+  /**
+   * Offset nel testo **originale incollato dall'utente**, quando il parser lo dà
+   * (`sqlDetails.cursorPosition` di libpg-query). Non è l'offset nel testo che il parser vede
+   * davvero (quello passato dopo `stripPsqlMeta`): coincide con l'originale perché `stripPsqlMeta`
+   * sostituisce i meta-comandi rimossi con altrettanti spazi invece di cancellarli, quindi il testo
+   * spogliato ha la stessa lunghezza di quello incollato e nessuna posizione si sposta. Prima di
+   * questa garanzia l'offset era calcolato su un testo più corto dell'originale (di quanto pesavano
+   * i meta-comandi tolti), e con un `\restrict` iniziale di `pg_dump` 18 puntava sistematicamente
+   * al carattere sbagliato.
+   */
   at?: number
 }
 

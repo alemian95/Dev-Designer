@@ -119,8 +119,13 @@ function makeCodeCursor(list: readonly Span[]): (at: number) => boolean {
 }
 
 /**
- * Toglie le righe di meta-comando psql che stanno in stato codice, lasciando il resto intatto —
- * il carattere `\n` compreso, così le posizioni degli statement restano vicine all'originale.
+ * Toglie le righe di meta-comando psql che stanno in stato codice, sostituendole con altrettanti
+ * spazi invece di cancellarle — il carattere `\n` restava già intatto, ma il contenuto della riga no:
+ * prima di questa correzione la riga rimossa spariva del tutto, e il testo risultante era più corto
+ * dell'originale di quanto pesava ogni meta-comando tolto. Conservare la lunghezza è ciò che rende
+ * utilizzabile `ParseWarning.at` (vedi la docstring in schema.ts): l'offset che `libpg-query` calcola
+ * su questo testo spogliato coincide, carattere per carattere, con la posizione nel testo originale
+ * incollato dall'utente, perché nessun carattere è stato tolto — solo sostituito.
  */
 export function stripPsqlMeta(sql: string): { sql: string; removed: string[] } {
   const list = spans(sql)
@@ -133,6 +138,7 @@ export function stripPsqlMeta(sql: string): { sql: string; removed: string[] } {
     const m = /^[ \t]*\\([A-Za-z]+|\.)/.exec(line)
     if (m && inCode(list, at + line.indexOf("\\")) && PSQL_META.has(m[1])) {
       removed.push(line.trim())
+      out += " ".repeat(line.length)
     } else out += line
     out += end < sql.length ? "\n" : ""
     at = end + 1

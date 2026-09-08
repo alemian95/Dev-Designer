@@ -74,6 +74,18 @@ describe("parsePostgres", () => {
     expect(find(r, "t").columns).toHaveLength(1)
   })
 
+  it("l'offset di un avviso punta al carattere giusto nel testo originale anche con un \\restrict iniziale", async () => {
+    // `stripPsqlMeta` sostituisce `\restrict abc` con altrettanti spazi invece di cancellarlo: il
+    // testo che il parser vede ha la stessa lunghezza dell'originale incollato dall'utente, quindi
+    // l'offset che restituisce combacia carattere per carattere anche quando lo statement rotto viene
+    // dopo un meta-comando. Prima della correzione la riga sarebbe sparita e ogni offset successivo
+    // sarebbe stato sfasato di `"\\restrict abc".length` (13) caratteri in meno.
+    const original = "\\restrict abc\nCREATE TABLE ok (a int);\nNOT SQL AT ALL;\n"
+    const r = await parsePostgres(original)
+    const whole = r.warnings.find((w) => w.message.startsWith("il dump non è stato letto in un colpo"))
+    expect(whole?.at).toBe(original.indexOf("NOT SQL"))
+  })
+
   it("uno statement non riconosciuto non fa perdere gli altri, e diventa un avviso con la posizione", async () => {
     const r = await parsePostgres("CREATE TABLE ok (a int); NOT SQL AT ALL; CREATE TABLE altra (b int);")
     expect(r.tables.map((t) => t.name)).toEqual(["ok", "altra"])

@@ -42,10 +42,14 @@ describe("spans", () => {
 })
 
 describe("stripPsqlMeta", () => {
-  it("toglie i meta-comandi di pg_dump 18 e li riporta", () => {
-    const r = stripPsqlMeta("\\restrict abc\ncreate table t ();\n\\unrestrict abc\n")
-    expect(r.sql).toBe("\ncreate table t ();\n\n")
+  it("toglie i meta-comandi di pg_dump 18 sostituendoli con spazi, non cancellandoli", () => {
+    const sql = "\\restrict abc\ncreate table t ();\n\\unrestrict abc\n"
+    const r = stripPsqlMeta(sql)
+    expect(r.sql).toBe(`${" ".repeat("\\restrict abc".length)}\ncreate table t ();\n${" ".repeat("\\unrestrict abc".length)}\n`)
     expect(r.removed).toEqual(["\\restrict abc", "\\unrestrict abc"])
+    // La lunghezza si conserva: è ciò che rende gli offset di `libpg-query` calcolati su `r.sql`
+    // validi anche sul testo originale, carattere per carattere.
+    expect(r.sql.length).toBe(sql.length)
   })
 
   it("non tocca un backslash a inizio riga dentro una stringa", () => {

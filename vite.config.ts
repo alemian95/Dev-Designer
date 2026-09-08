@@ -8,20 +8,33 @@ import tailwindcss from "@tailwindcss/vite"
 /**
  * Emscripten cerca `libpg-query.wasm` accanto allo script che lo carica (`scriptDirectory`), e
  * `loadModule()` non espone `locateFile`: il percorso non si può indicare dal codice applicativo.
- * Quindi in dev lo serviamo noi e in build lo emettiamo. L'emissione resterebbe da fare solo se un
- * modulo importa davvero `libpg-query` (è un megabyte) — ma in questo Vite (build su rolldown)
- * l'hook `resolveId` dei plugin JS non viene mai invocato per gli specifier risolti nativamente:
- * verificato strumentando il plugin, zero chiamate su 2097 moduli trasformati, anche nella build in
- * cui il worker importa davvero la libreria. Senza un segnale affidabile su cui condizionare,
- * l'emissione resta incondizionata: è un costo noto e accettato, non un difetto di questa build.
+ * Quindi in dev lo serviamo noi e in build lo emettiamo, ma solo se il binario (~1,1 MB) è davvero
+ * raggiungibile: oggi lo è solo dal worker che fa il parsing SQL (`src/io/ddl/parse.worker.ts`), mai
+ * dal bundle principale.
+ *
+ * L'hook `resolveId` dei plugin non basta a rilevarlo: sotto Vite 8 (motore rolldown) non viene mai
+ * invocato per gli specifier risolti nativamente — verificato strumentando il plugin. Il segnale
+ * affidabile è `transform`, filtrato sull'id: rolldown lo chiama comunque per ogni modulo che passa dal
+ * container dei plugin, `libpg-query` incluso. Vite compila i worker in una build a parte, con la
+ * propria lista di plugin (`worker.plugins`): ogni istanza vede quindi solo i moduli della propria
+ * build, e ciascuna emette il binario nella propria `generateBundle` solo se l'ha visto passare.
+ * Verificato che l'asset emesso dall'istanza del worker atterra comunque nel `dist/` finale, sotto
+ * `assetsDir`: non serve condividere lo stato fra le due istanze.
  */
 function libpgQueryWasm(): Plugin {
   const wasmPath = () => createRequire(import.meta.url).resolve("libpg-query/wasm/libpg-query.wasm")
   let assetsDir = "assets"
+  let used = false
   return {
     name: "libpg-query-wasm",
     configResolved(config) {
       assetsDir = config.build.assetsDir
+    },
+    transform: {
+      filter: { id: /libpg-query/ },
+      handler() {
+        used = true
+      },
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -31,6 +44,7 @@ function libpgQueryWasm(): Plugin {
       })
     },
     generateBundle() {
+      if (!used) return
       this.emitFile({ type: "asset", fileName: `${assetsDir}/libpg-query.wasm`, source: readFileSync(wasmPath()) })
     },
   }
@@ -39,6 +53,9 @@ function libpgQueryWasm(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), libpgQueryWasm()],
+  worker: {
+    plugins: () => [libpgQueryWasm()],
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

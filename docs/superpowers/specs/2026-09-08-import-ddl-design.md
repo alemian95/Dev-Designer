@@ -41,7 +41,7 @@ parse-client.ts  ──postMessage──▶  parse.worker.ts
   │                                   ├─ pg.ts     (libpg-query)
   │                                   └─ mysql.ts  (node-sql-parser)
   │                                   │ entrambi usano sql-text.ts
-  ◀──────────── ParseResult ──────────┘
+  ◀────────── DdlParseResult ─────────┘
   │
   │  scelta delle tabelle nel dialog
   ▼
@@ -114,17 +114,21 @@ export interface SqlTable {
 
 export interface ParseWarning {
   message: string
-  /** Offset nel testo, quando il parser lo dà (`sqlDetails` di libpg-query). */
+  /** Offset nel testo, quando il parser lo dà (`sqlDetails.cursorPosition` di libpg-query). */
   at?: number
 }
 
-export interface ParseResult {
+export interface DdlParseResult {
   tables: SqlTable[]
   warnings: ParseWarning[]
   /** Statement riconosciuti e non usati, contati per tipo: `{ IndexStmt: 8, CreateSeqStmt: 9 }`. */
   skipped: Record<string, number>
 }
 ```
+
+Il nome è `DdlParseResult` e non `ParseResult` perché `libpg-query` riespone i
+tipi di `@pgsql/types`, dove `ParseResult` è il risultato del parser di
+Postgres: due `ParseResult` diversi nello stesso file sarebbero una trappola.
 
 `type` è la stringa del dialetto, come `AttributeSchema.type` (`z.string()`)
 impone. Ricomposta, non normalizzata fra dialetti: da `libpg-query` si toglie il
@@ -190,6 +194,16 @@ un dump vero non decidi niente, su uno snippet incollato decidi tu.
 Entrambi hanno la stessa firma, `(ddl: string) => ParseResult`, e sono **puri**:
 nessun DOM, nessun worker, nessuna I/O. Si testano in Node.
 
+L'AST di Postgres è **tipizzato**: `libpg-query` fa `export * from "@pgsql/types"`,
+quindi `Node`, `CreateStmt`, `AlterTableStmt`, `ColumnDef`, `Constraint`,
+`TypeName` e gli enum `ConstrType` (`"CONSTR_PRIMARY"`, `"CONSTR_UNIQUE"`,
+`"CONSTR_FOREIGN"`, `"CONSTR_NOTNULL"`) e `AlterTableType`
+(`"AT_AddConstraint"`, `"AT_SetNotNull"`) si importano da `libpg-query` e non si
+scrivono a mano. `Node` è un'unione di oggetti a una sola chiave, quindi si
+restringe con `"CreateStmt" in node`. L'AST di MySQL invece è tipizzato solo in
+parte: `reference_definition` è `any`, e il tipo locale minimo per leggerlo si
+dichiara in `mysql.ts`.
+
 `pg.ts` passa il testo per `stripPsqlMeta` e poi lo dà **tutto intero** a
 `parse()` di libpg-query, che digerisce un `pg_dump` completo in un colpo: qui
 non serve spezzare gli statement. Poi due passate. Prima i `CreateStmt`, che
@@ -205,7 +219,11 @@ warning. Ogni altro tipo di nodo si conta in `skipped` sotto il proprio nome
 lista, non un dump con i suoi meta-comandi: `splitStatements`, poi
 `stripExecutableComments` su ogni chunk, poi `astify` con `database: "MySQL"`.
 Nei `mysqldump` i vincoli stanno dentro il `CREATE TABLE` e si leggono dai
-percorsi che lo spike ha verificato sull'output vero; si gestiscono anche gli
+percorsi che lo spike ha verificato sull'output vero — con un'avvertenza che i
+tipi del pacchetto rivelano e il dump dello spike non conteneva:
+`constraint_type` di un vincolo unico ha **tre grafie** (`"unique key"`,
+`"unique"`, `"unique index"`), quindi il confronto case-insensitive va fatto su
+tutte tre. Si gestiscono anche gli
 `ALTER TABLE ADD CONSTRAINT`, che alcune varianti emettono a parte. Un chunk che
 non parsa diventa un warning con il suo messaggio di sintassi, non un
 fallimento dell'intero import: è la tolleranza che la spec §4.4 chiede.
@@ -336,11 +354,11 @@ export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram): 
 ```ts
 interface ParseRequest { id: number; dialect: "postgres" | "mysql"; ddl: string }
 type ParseResponse =
-  | { id: number; ok: true; result: ParseResult }
+  | { id: number; ok: true; result: DdlParseResult }
   | { id: number; ok: false; message: string }
 ```
 
-`parse-client.ts` espone `createParser(): { parse(ddl, dialect): Promise<ParseResult>; dispose(): void }`.
+`parse-client.ts` espone `createParser(): { parse(ddl, dialect): Promise<DdlParseResult>; dispose(): void }`.
 Il worker si crea alla prima `parse` e si distrugge con `dispose`.
 
 Lo spike ha lasciato scritto che il suo worker non aveva niente di tutto questo,

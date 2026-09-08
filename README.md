@@ -24,12 +24,18 @@ C'è un editor ER funzionante, e i documenti sopravvivono alla chiusura della pa
   avviso e un pulsante "prendi il controllo" — la proprietaria fa un ultimo salvataggio prima di
   cedere, così non si perde niente.
 - **Misura di prestazioni** riproducibile su documenti sintetici fino a 600 entità.
+- **Import DDL**: incolla o carica un dump PostgreSQL o MySQL/MariaDB, si scelgono le tabelle e
+  entrano nel diagramma aperto in un solo passo annullabile, con cardinalità dedotte dalle foreign
+  key e disposizione a griglia per le entità nuove. Una tabella già presente viene sostituita
+  tenendo la sua posizione sul canvas. Limiti: nessun auto layout (i punti di piega restano quelli
+  del routing ortogonale esistente), i vincoli UNIQUE su più colonne si perdono nell'import.
 
-Quello che **non** c'è ancora: import DDL, export. Sui limiti di scala misurati — lo zoom sfonda il
-criterio già a 300 entità — vedi la misura qui sotto.
+Quello che **non** c'è ancora: export. Sui limiti di scala misurati — lo zoom sfonda il criterio già
+a 300 entità — vedi la misura qui sotto.
 
 - [Spec di design](docs/superpowers/specs/2026-09-06-dev-designer-design.md)
 - [Spec: persistenza dei documenti](docs/superpowers/specs/2026-09-07-persistenza-design.md)
+- [Spec: import DDL](docs/superpowers/specs/2026-09-08-import-ddl-design.md)
 - [Piano: persistenza](docs/superpowers/plans/2026-09-07-persistenza.md) — il piano di questo branch
 - [Piano: modello del documento ed editor ER](docs/superpowers/plans/2026-09-06-modello-documento-ed-editor-er.md)
 - [Piano: scaffold e spike](docs/superpowers/plans/2026-09-06-scaffold-e-spike.md)
@@ -60,15 +66,23 @@ pnpm test      # Vitest
 ## Test end-to-end
 
 ```bash
-pnpm e2e       # la persistenza provata in un browser vero
+pnpm e2e       # persistenza e import DDL provati in un browser vero
 ```
 
-Compila, serve la build con `vite preview` e pilota il Chrome di sistema in headless: disegna
-un'entità, ricarica e la ritrova dal buffer IndexedDB, salva come download, apre un documento nuovo,
-ricarica il file e la ritrova, rifiuta un file non valido, apre una seconda scheda in sola lettura e
-le fa prendere il controllo. Gira su `?fallback=1` perché i dialoghi nativi della File System Access
-API non sono pilotabili da automazione — quel percorso resta una prova manuale. `HEADLESS=0` per
-vedere il browser. Exit code 1 se un passo non regge.
+Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
+condivisi dai due scenari, eseguiti in sequenza (mai in parallelo: entrambi toccano il lock fra
+schede e IndexedDB sulla stessa origine, e due scenari concorrenti si disturberebbero a vicenda) —
+ciascuno nel proprio contesto di browser, per isolare l'IndexedDB dell'uno da quello dell'altro:
+
+- **Persistenza**: disegna un'entità, ricarica e la ritrova dal buffer IndexedDB, salva come
+  download, apre un documento nuovo, ricarica il file e la ritrova, rifiuta un file non valido, apre
+  una seconda scheda in sola lettura e le fa prendere il controllo. Gira su `?fallback=1` perché i
+  dialoghi nativi della File System Access API non sono pilotabili da automazione — quel percorso
+  resta una prova manuale.
+- **Import DDL**: incolla un DDL, lo analizza, importa due entità e una relazione, annulla con ⌘Z e
+  ritrova il canvas vuoto, poi re-importa due volte e verifica che la relazione non si duplichi.
+
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei due scenari non regge.
 
 ## Misura prestazioni
 

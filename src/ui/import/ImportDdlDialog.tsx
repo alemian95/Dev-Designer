@@ -12,6 +12,7 @@ import { mapToEr } from "@/io/ddl/map"
 import { createParser, type DdlParser } from "@/io/ddl/parse-client"
 import type { DdlParseResult, Dialect, SqlTable } from "@/io/ddl/schema"
 import { spawnParseWorker } from "@/io/ddl/spawn"
+import { documentSession } from "@/io/document-session"
 import { entityKey } from "@/model/document"
 
 /** Etichette per i tipi di statement più frequenti; per gli altri si mostra la chiave del parser. */
@@ -66,6 +67,9 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
   // Iscrizione e non `getState()`: il render deve essere puro, e dopo un import la lista si riaggiorna.
   const doc = useStore(documentStore, (s) => s.doc)
   const present = new Set(Object.keys(erDiagram(doc).model.entities))
+  // Iscrizione, non lettura una tantum: la sola lettura può sopravvenire mentre il dialog è aperto
+  // (un'altra scheda prende il controllo), e lo stato deve reagire, non essere letto una sola volta.
+  const readOnly = useStore(documentSession, (s) => s.readOnly)
 
   const analyse = async (ddl: string, which: Dialect) => {
     const gen = ++generation.current
@@ -104,7 +108,11 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
   }
 
   const onImport = () => {
-    if (stage.kind !== "pronto") return
+    // Guardia anche qui, non solo su `disabled` del pulsante: la sola lettura può sopravvenire fra
+    // il render e il click, ed è l'unica superficie di scrittura del progetto che altrimenti la
+    // scavalca (il dialog vive in un portale fuori dal velo di sola lettura di App.tsx, e
+    // `documentStore.dispatch` non ha guardie proprie). L'analisi resta permessa: è innocua, non scrive.
+    if (stage.kind !== "pronto" || documentSession.getState().readOnly) return
     const tables = stage.result.tables.filter((t) => chosen.has(keyOf(t)))
     const model = erDiagram(documentStore.getState().doc).model
     const { entities, relationships, warnings } = mapToEr({ tables, model })
@@ -230,9 +238,17 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
         <DialogFooter>
           {stage.kind === "pronto" && (
-            <Button onClick={onImport} disabled={chosen.size === 0}>
-              Importa {chosen.size} tabelle
-            </Button>
+            <>
+              {/* Stessa voce di NoticeBar: l'analisi resta innocua in sola lettura, solo l'import scrive. */}
+              {readOnly && (
+                <p className="mr-auto self-center text-xs text-muted-foreground" data-import-readonly>
+                  Questo documento è aperto in un&apos;altra scheda: qui è in sola lettura.
+                </p>
+              )}
+              <Button onClick={onImport} disabled={chosen.size === 0 || readOnly}>
+                Importa {chosen.size} tabelle
+              </Button>
+            </>
           )}
           <Button variant="ghost" onClick={() => close(false)}>Chiudi</Button>
         </DialogFooter>

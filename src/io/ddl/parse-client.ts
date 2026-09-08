@@ -22,6 +22,13 @@ export interface ParseWorker {
 
 /** Si chiama `DdlParser` e non `Parser` perché `Parser` è la classe di `node-sql-parser`. */
 export interface DdlParser {
+  /**
+   * Chiamare `parse` mentre una `parse` precedente non si è ancora risolta **abbandona
+   * quest'ultima**: il worker che la stava calcolando viene terminato e la sua promessa
+   * rigettata, invece di lasciarlo proseguire su un dump che non serve più a nessuno. Chi
+   * chiama non deve quindi assumere che tutte le `parse` avviate arrivino a una risposta
+   * utile — solo l'ultima lo fa.
+   */
   parse: (ddl: string, dialect: Dialect) => Promise<DdlParseResult>
   /** Termina il worker e rigetta le analisi in corso: chiudere il dialog annulla davvero. */
   dispose: () => void
@@ -39,7 +46,10 @@ interface Pending {
 /**
  * Crea il worker alla prima analisi e lo tiene per le successive. Ogni promessa ha un timeout, e un
  * fallimento del worker le rigetta tutte: senza questo un `.wasm` che non carica lascia il dialog
- * bloccato senza messaggio.
+ * bloccato senza messaggio. Una `parse` chiamata mentre la precedente è ancora in volo abbandona
+ * quest'ultima (la rigetta e termina il worker): proseguirla sarebbe lavoro sprecato su un dump
+ * che chi chiama non aspetta più, dato che nell'uso reale (il dialog di import) solo l'ultima
+ * analisi richiesta interessa.
  */
 export function createParser(spawn: () => ParseWorker, timeoutMs: number = PARSE_TIMEOUT_MS): DdlParser {
   let worker: ParseWorker | null = null
@@ -56,7 +66,7 @@ export function createParser(spawn: () => ParseWorker, timeoutMs: number = PARSE
 
   const settle = (event: MessageEvent<ParseResponse>): void => {
     const p = pending.get(event.data.id)
-    // Risposta di un'analisi scaduta o superata da un'altra: si scarta senza far niente.
+    // Risposta di un'analisi scaduta o già abbandonata (vedi sotto): si scarta senza far niente.
     if (!p) return
     pending.delete(event.data.id)
     clearTimeout(p.timer)
@@ -87,6 +97,14 @@ export function createParser(spawn: () => ParseWorker, timeoutMs: number = PARSE
   return {
     parse: (ddl, dialect) =>
       new Promise<DdlParseResult>((resolve, reject) => {
+        // Una parse ancora pendente viene abbandonata: il suo risultato non serve più a nessuno
+        // (chi chiama ne ha appena richiesta un'altra), e lasciarla finire sprecherebbe il worker
+        // sul dump sbagliato. Terminarlo interrompe davvero il calcolo in corso, non solo la promessa.
+        if (pending.size > 0) {
+          failAll("analisi abbandonata: superata da una più recente")
+          worker?.terminate()
+          worker = null
+        }
         const id = nextId++
         const timer = setTimeout(() => {
           pending.delete(id)

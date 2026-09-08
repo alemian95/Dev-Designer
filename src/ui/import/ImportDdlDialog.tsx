@@ -55,19 +55,27 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const [chosen, setChosen] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState("")
   const parser = useRef<DdlParser | null>(null)
+  // Si incrementa a ogni `analyse`: la risoluzione di un'analisi si applica solo se la generazione
+  // è ancora quella corrente. Senza questa guardia un'analisi lenta e superata da un'altra (l'utente
+  // incolla un dump grosso, poi uno piccolo prima che il primo risponda) potrebbe sovrascrivere lo
+  // stato più recente con un risultato ormai stantio.
+  const generation = useRef(0)
 
   // Iscrizione e non `getState()`: il render deve essere puro, e dopo un import la lista si riaggiorna.
   const doc = useStore(documentStore, (s) => s.doc)
   const present = new Set(Object.keys(erDiagram(doc).model.entities))
 
   const analyse = async (ddl: string, which: Dialect) => {
+    const gen = ++generation.current
     setStage({ kind: "analisi" })
     parser.current ??= createParser(spawnParseWorker)
     try {
       const result = await parser.current.parse(ddl, which)
+      if (generation.current !== gen) return // superata da un'analisi più recente
       setChosen(new Set(result.tables.map(keyOf)))
       setStage({ kind: "pronto", result })
     } catch (e) {
+      if (generation.current !== gen) return
       setStage({ kind: "errore", message: e instanceof Error ? e.message : String(e) })
     }
   }

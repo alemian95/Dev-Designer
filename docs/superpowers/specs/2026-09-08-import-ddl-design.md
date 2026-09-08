@@ -366,9 +366,13 @@ e che un fallimento di caricamento del `.wasm` lasciava la promessa appesa per
 sempre. Quindi: `onerror` e `onmessageerror` respingono la promessa con un
 messaggio leggibile; un **timeout di 30 s** la chiude (200 tabelle costano
 136 ms, il margine è tre ordini di grandezza); `dispose()` chiama `terminate()`,
-così chiudere il dialog annulla davvero e non lascia lavoro orfano; le risposte
-con `id` diverso da quello atteso si scartano, così un parse superato da un
-altro non sovrascrive il risultato buono.
+così chiudere il dialog annulla davvero e non lascia lavoro orfano; una `parse`
+chiamata mentre la precedente non si è ancora risolta **abbandona quest'ultima**
+(la rigetta e termina il worker su cui girava), così un'analisi superata da
+un'altra non sovrascrive mai il risultato buono — proseguirla sarebbe anche
+lavoro sprecato, dato che chi chiama non la aspetta più. Nel dialog, una guardia
+di generazione ignora comunque ogni risoluzione non più corrente, per lo stesso
+motivo anche a fronte di una chiusura del dialog nel frattempo (§12).
 
 Gli errori di `libpg-query` portano `sqlDetails` con posizione e messaggio dello
 statement fallito. Lo spike li collassava in `String(err)` perdendo tutto: qui

@@ -87,7 +87,7 @@ describe("createParser", () => {
     await expect(pending).resolves.toEqual(EMPTY)
   })
 
-  it("il worker si crea una volta sola e serve più analisi", async () => {
+  it("il worker si crea una volta sola e serve più analisi in sequenza", async () => {
     let spawns = 0
     const w = new FakeWorker()
     const parser = createParser(() => {
@@ -95,12 +95,34 @@ describe("createParser", () => {
       return w
     })
     const a = parser.parse("a", "postgres")
-    const b = parser.parse("b", "mysql")
     w.reply({ id: 1, ok: true, result: EMPTY })
+    await expect(a).resolves.toEqual(EMPTY)
+    const b = parser.parse("b", "mysql")
     w.reply({ id: 2, ok: true, result: EMPTY })
-    await Promise.all([a, b])
+    await expect(b).resolves.toEqual(EMPTY)
     expect(spawns).toBe(1)
     expect(w.sent.map((s) => s.id)).toEqual([1, 2])
+  })
+
+  it("una parse chiamata mentre la precedente è ancora in volo la abbandona e ne fa nascere una nuova", async () => {
+    let spawns = 0
+    const workers: FakeWorker[] = []
+    const parser = createParser(() => {
+      spawns++
+      const w = new FakeWorker()
+      workers.push(w)
+      return w
+    })
+    // Es. il dialog: si incolla un dump grosso (stale), poi uno piccolo prima che il primo risponda.
+    const stale = parser.parse("dump grosso", "postgres")
+    const fresh = parser.parse("dump piccolo", "postgres")
+    await expect(stale).rejects.toThrow(/abbandonata/)
+    expect(workers[0].terminated).toBe(true)
+    expect(spawns).toBe(2)
+    workers[1].reply({ id: 2, ok: true, result: EMPTY })
+    await expect(fresh).resolves.toEqual(EMPTY)
+    // La risposta tardiva della parse abbandonata, se mai arrivasse, non farebbe niente.
+    workers[0].reply({ id: 1, ok: true, result: EMPTY })
   })
 
   it("dopo un errore di caricamento la parse successiva fa nascere un nuovo worker", async () => {
@@ -147,20 +169,27 @@ describe("createParser", () => {
     await expect(second).resolves.toEqual(EMPTY)
   })
 
-  it("un timeout rigetta anche le altre richieste in corso sullo stesso worker, che viene terminato", async () => {
+  it("il timeout di una parse non tocca quella successiva, che gira su un worker nuovo", async () => {
     vi.useFakeTimers()
-    const w = new FakeWorker()
-    const parser = createParser(() => w, 1000)
+    const workers: FakeWorker[] = []
+    const parser = createParser(() => {
+      const w = new FakeWorker()
+      workers.push(w)
+      return w
+    }, 1000)
 
-    const late = parser.parse("a", "postgres")
+    // `abandoned` viene già rigettata subito (non dal timeout) perché `next` la abbandona.
+    const abandoned = parser.parse("a", "postgres")
     vi.advanceTimersByTime(500)
-    const early = parser.parse("b", "postgres")
-    vi.advanceTimersByTime(500)
-    await expect(late).rejects.toThrow(/in tempo/)
-    // `early` non è ancora scaduta di suo (il suo timer parte 500ms dopo), ma il worker su cui
-    // era in corso è stato terminato dal timeout di `late`: resta appesa per sempre, altrimenti.
-    await expect(early).rejects.toThrow()
-    expect(w.terminated).toBe(true)
+    const next = parser.parse("b", "postgres")
+    await expect(abandoned).rejects.toThrow(/abbandonata/)
+    expect(workers[0].terminated).toBe(true)
+
+    // Il timeout di `abandoned`, se scattasse comunque, non deve toccare `next`: il suo timer
+    // riparte da zero sul worker nuovo.
+    vi.advanceTimersByTime(1000)
+    await expect(next).rejects.toThrow(/in tempo/)
+    expect(workers[1].terminated).toBe(true)
   })
 
   it("dispose termina il worker e rigetta le analisi in corso", async () => {

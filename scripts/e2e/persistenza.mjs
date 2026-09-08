@@ -8,10 +8,11 @@
  * con lo scenario dell'import: questa funzione apre solo il proprio contesto (IndexedDB isolato
  * dagli altri scenari) e non tocca né l'uno né l'altro.
  *
- * Uso: `pnpm e2e`. `HEADLESS=0` per vedere il browser.
+ * Uso: `pnpm e2e` esegue questo scenario insieme a quello dell'import. Per lanciarlo da solo (dopo
+ * `pnpm build`): `node scripts/e2e/persistenza.mjs`. `HEADLESS=0` per vedere il browser.
  */
 import { readFile } from "node:fs/promises"
-import { expectNodes, expectText, pickFromMenu } from "./helpers.mjs"
+import { expectNodes, expectText, isMainModule, pickFromMenu, startEnv } from "./helpers.mjs"
 
 const ENTITY = "utenti"
 
@@ -131,4 +132,25 @@ export async function run(browser, base) {
   }
   console.log(failed ? "\ne2e persistenza: FAIL" : "\ne2e persistenza: PASS")
   return !failed
+}
+
+/**
+ * Guardia di esecuzione diretta: `node scripts/e2e/persistenza.mjs` esegue solo questo scenario,
+ * avviando server e browser con `startEnv` (la stessa funzione di `run.mjs`) invece di richiedere
+ * l'altro scenario per forza.
+ */
+if (isMainModule(import.meta.url)) {
+  let ok = false
+  let preview, browser
+  try {
+    let base
+    ;({ preview, browser, base } = await startEnv())
+    ok = await run(browser, base)
+  } catch (e) {
+    console.error("\nFALLITO:", e)
+  } finally {
+    await browser?.close()
+    preview?.kill()
+  }
+  process.exit(ok ? 0 : 1)
 }

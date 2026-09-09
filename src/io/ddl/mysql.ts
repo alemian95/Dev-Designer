@@ -21,6 +21,9 @@ interface Definition {
   definition?: unknown
   nullable?: { type?: string }
   reference_definition?: unknown
+  // Presente solo quando UNIQUE è scritto in linea sulla colonna (non come vincolo di tabella a
+  // parte): stesse due grafie di `constraint_type` ("unique" e "unique key"), lette da isUnique().
+  unique?: string
 }
 
 /**
@@ -112,6 +115,9 @@ function readCreate(ast: { table?: Array<{ table?: string; db?: string | null }>
       // `nullable` c'è solo quando la colonna è NOT NULL: l'assenza vuol dire nullabile.
       nullable: d.nullable?.type !== "not null",
     })
+    // UNIQUE in linea sulla colonna (es. `col int UNIQUE`) non produce un elemento a parte come il
+    // vincolo di tabella: il flag sta qui, sull'elemento colonna stesso.
+    if (isUnique(d.unique ?? "")) table.unique.push([d.column?.column ?? ""])
   }
   // I vincoli dopo le colonne: la PRIMARY KEY deve poter spegnere `nullable`.
   for (const d of defs) if (d.resource !== "column") applyDefinition(table, d)

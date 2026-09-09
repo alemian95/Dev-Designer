@@ -14,11 +14,16 @@ import { documentFileName } from "./file-name"
 
 type Format = Dialect | "mermaid"
 
-const FORMATS: { value: Format; label: string; extension: string }[] = [
-  { value: "postgres", label: "PostgreSQL", extension: "sql" },
-  { value: "mysql", label: "MySQL", extension: "sql" },
-  { value: "mermaid", label: "Mermaid", extension: "mmd" },
-]
+/**
+ * Un Record e non una lista: così `FORMATS[format]` è totale e `tsc` verifica che ogni formato
+ * dell'union abbia la sua voce, invece di affidarsi a una non-null assertion su `.find()`.
+ * L'ordine delle chiavi stringa è quello di scrittura, ed è l'ordine dei pulsanti.
+ */
+const FORMATS: Record<Format, { label: string; extension: string }> = {
+  postgres: { label: "PostgreSQL", extension: "sql" },
+  mysql: { label: "MySQL", extension: "sql" },
+  mermaid: { label: "Mermaid", extension: "mmd" },
+}
 
 /** Vale per tutti i formati: è una proprietà del modello, non del dialetto scelto. */
 const MODEL_LIMITS =
@@ -38,7 +43,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
   // battuta sul nome del documento e a ogni cambio del pallino delle modifiche, e senza questa
   // riga i tre emettitori girerebbero ogni volta a dialog chiuso.
   if (!open) return null
-  const chosen = FORMATS.find((f) => f.value === format)!
+  const chosen = FORMATS[format]
   const { text, warnings } = format === "mermaid" ? emitMermaid(model) : emitDdl(model, format)
 
   const copy = async () => {
@@ -60,16 +65,19 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
           <DialogDescription>Il DDL dello schema o il diagramma in Mermaid.</DialogDescription>
         </DialogHeader>
         <ToggleGroup type="single" value={format} onValueChange={(v) => v && setFormat(v as Format)} className="justify-start">
-          {FORMATS.map((f) => (
-            <ToggleGroupItem key={f.value} value={f.value} aria-label={f.label} className="aria-checked:bg-muted px-3">
+          {Object.entries(FORMATS).map(([value, f]) => (
+            // Nessun aria-label: sovrascriverebbe il nome accessibile che il testo visibile dà da sé.
+            <ToggleGroupItem key={value} value={value} className="aria-checked:bg-muted px-3">
               {f.label}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
         <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
           <li>{MODEL_LIMITS}</li>
-          {warnings.map((w) => (
-            <li key={w} data-export-warning className="text-foreground">{w}</li>
+          {/* La chiave è l'indice: gli avvisi sono una lista derivata e stabile, e due avvisi
+              con lo stesso testo darebbero chiavi duplicate. */}
+          {warnings.map((w, i) => (
+            <li key={i} data-export-warning className="text-foreground">{w}</li>
           ))}
         </ul>
         <pre data-export-preview className="max-h-96 overflow-auto rounded border bg-muted/40 p-3 font-mono text-xs">{text}</pre>

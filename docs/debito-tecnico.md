@@ -8,65 +8,91 @@ rinvio e il costo-se-sbagliato: qui resta la sostanza, non la cronaca.
 Ogni voce è stata **riverificata sul codice** il 2026-09-09: i riferimenti
 `file:riga` sono veri a quella data, non copiati dai ledger.
 
-Le voci in **Da correggere** sono difetti reali senza una data. Le voci in
-**Archivio** sono decisioni prese con cognizione: si riaprono solo se danno
-fastidio, e la voce esiste perché nessuno le riscopra come se fossero nuove.
+Le voci in **Da correggere** sono difetti reali senza una data. **Corretti**
+tiene quelle chiuse, con il modo in cui sono state chiuse: serve a non
+riaprire una discussione già fatta, e in un caso a ricordare che il difetto
+non era dove sembrava. Le voci in **Archivio** sono decisioni prese con
+cognizione: si riaprono solo se danno fastidio, e la voce esiste perché
+nessuno le riscopra come se fossero nuove.
 
 ---
 
 ## Da correggere
 
-### DT-1 · `entityKey` è ambigua se il nome contiene un punto
+Niente, al 2026-09-09. Le sei voci DT-1..DT-6 sono state corrette nel commit
+`eeca340`; restano qui sotto in **Corretti** perché una di esse è stata
+corretta in un posto diverso da quello che questo documento indicava, e la
+ragione vale più della voce.
 
-`src/model/document.ts:30` — la chiave è `schema.nome`, quindi un'entità
-chiamata `my.table` senza schema è indistinguibile da `table` nello schema
-`my`. Lo schema zod `Identifier` non vieta il punto.
+---
 
-Non è ipotetico: **lo stesso assunto ha prodotto un difetto reale** nel
-mapping dell'import DDL, dove una tabella `"my.table"` veniva creata e poi
-la sua stessa FK scartata con l'avviso «punta a "my.table", che non è nel
-diagramma». Là è stato corretto leggendo il nome nudo dal campo `name` della
-`SqlTable` invece di spezzare la chiave sul primo punto; nell'editor la
-chiave resta ambigua alla fonte.
+## Corretti
 
-### DT-2 · `spaceHeld` resta `true` se la finestra perde il focus
+### DT-1 · chiave ambigua → collisione silenziosa nell'import
 
-`src/ui/canvas/use-canvas-interaction.ts:97,233,243` — `spaceHeld` si
-azzera solo sul `keyup` di Space. Nel progetto **non esiste alcun listener
-`blur` o `visibilitychange`** (verificato con grep su tutto `src/`): se
-l'utente tiene premuto Space e cambia finestra, al rientro il canvas è in
-pan permanente e nulla lo sblocca fino al prossimo Space.
+**Il documento sbagliava mira.** Diceva di vietare il punto dentro un nome.
+Ma l'import DDL *sostiene* deliberatamente un nome con il punto e ne risolve
+le FK, con un test che pretende zero avvisi: vietarlo avrebbe rimosso una
+capacità aggiunta di proposito, e il primo tentativo di fix ha infatti rotto
+quel test.
 
-### DT-3 · La collisione di rename fallisce senza dirlo
+Il difetto vero era un altro: due tabelle diverse possono produrre la stessa
+chiave — `utenti` nello schema `pub` e `pub.utenti` senza schema — e la
+seconda sovrascriveva la prima **senza alcun avviso**. Corretto in `map.ts`
+con una guardia sulla collisione: si salta con un avviso e sopravvive la
+prima. La rinomina non aveva bisogno di nulla: rifiutava già una collisione
+di chiave (`er.ts`), e ora lo dice anche all'utente (DT-3).
 
-`src/ui/panels/PropertiesPanel.tsx:59-64` — `rename()` dispiega la ricetta e
-aggiorna la selezione **solo** se `dispatch` restituisce `true`. Sul `false`
-di una collisione non accade niente: nessun avviso, e `CommitInput` continua
-a mostrare il testo non salvato come se fosse stato accettato. Stesso
-comportamento in `src/ui/canvas/InlineEditor.tsx:28`.
+*Lezione per le voci future: annotare il difetto osservato, non la
+correzione immaginata.*
 
-### DT-4 · Possibile flash del tema al primo render
+### DT-2 · `spaceHeld` non si azzerava al blur
 
-`src/ui/use-theme.ts:16` applica la classe `dark` in un `useEffect`, e
-`index.html` non ha alcuno script bloccante che la imposti prima. Con
-`prefers-color-scheme: dark` il primo frame può essere chiaro.
+Listener `blur` su `window`. Il `keyup` non arriva se il fuoco lascia la
+finestra col tasto premuto, e al rientro il canvas restava in pan senza modo
+di uscirne. Nessun test unitario possibile senza jsdom: provato in un browser
+con input reale, e con la controprova (senza il blur lo stesso drag pana).
 
-### DT-5 · `removeAttribute` lascia riferimenti pendenti
+### DT-3 · la rinomina falliva in silenzio
 
-`src/editor/commands/er.ts:123` fa solo lo `splice` dell'attributo: i nomi
-rimasti in `RelationshipEnd.attributes` non vengono ripuliti.
+L'avviso passa da `NoticeBar`, e `CommitInput` ripristina il campo quando
+`onCommit` torna `false` — prima il campo continuava a mostrare il testo
+rifiutato come se fosse stato accettato. Il caso «nessun cambiamento» non è
+un fallimento e non avvisa: si riconosce dalla chiave, che resta identica
+solo se nome e schema lo sono entrambi.
 
-**Attenuante verificata:** non è una perdita silenziosa. La regola
-`dangling-relationship` in `src/model/er/validate.ts:63-66` intercetta il
-caso e lo segnala come `error` nel pannello problemi. Il fix è comunque una
-riga nel comando, e il posto giusto è lì e non nella validazione.
+### DT-4 · lampo del tema al primo render
 
-### DT-6 · Lo script di prestazione non è usabile come gate CI
+Script bloccante in `<head>`, con la stessa chiave di `use-theme.ts`.
+Provato con un `MutationObserver` installato a document-start: una sola
+mutazione della classe, con `readyState` «loading» e `#root` non ancora
+esistente.
 
-`scripts/perf/fps.mjs` non imposta `process.exitCode` su FAIL: esce 0 anche
-quando una soglia sfora, quindi in una pipeline passerebbe sempre. La label
-del verdetto ha anche `20` scritto a mano invece di interpolare
+### DT-5 · `removeAttribute` lasciava riferimenti pendenti
+
+Pota il nome dagli estremi delle relazioni, confrontando **anche l'entità**:
+due attributi omonimi di entità diverse si poterebbero a vicenda. Se
+l'estremo resta vuoto la relazione diventa «disegnata a mano» (ADR 0003) e un
+re-import non la pota più — conseguenza accettata: è preferibile a un
+riferimento pendente, e cancellare la relazione di nascosto sarebbe peggio di
+entrambi.
+
+### DT-6 · lo script di prestazione non era usabile come gate CI
+
+`process.exitCode = 1` su FAIL, e le due soglie scritte a mano interpolano
 `THRESHOLD_MS`.
+
+---
+
+## Nuove voci
+
+### DT-7 · `use-theme.ts` non protegge l'accesso a `localStorage`
+
+`initial()` in [use-theme.ts](../src/ui/use-theme.ts) chiama
+`localStorage.getItem` senza `try/catch`. Dove i dati del sito sono bloccati
+del tutto l'accesso lancia, e qui il lancio è durante il primo render:
+pagina bianca. Lo script inline aggiunto per DT-4 si protegge, l'hook no.
+Notato lavorando su DT-4, non corretto perché fuori dai sei fix chiesti.
 
 ---
 
@@ -74,7 +100,7 @@ del verdetto ha anche `20` scritto a mano invece di interpolare
 
 ### Modello ed editor ER
 
-- `entityKey` ambigua col punto → promossa a **DT-1**.
+- `entityKey` ambigua col punto → **corretta** come collisione di chiave, vedi DT-1.
 - `migrateDocument` restituisce l'alias dell'input quando non ci sono
   migrazioni da applicare (nessuna copia difensiva).
 - Round trip di serializzazione con entità qualificata da schema: non
@@ -95,8 +121,8 @@ del verdetto ha anche `20` scritto a mano invece di interpolare
   incoerenza di convenzione, nessun test la copre.
 - `documentStore` è un singleton di modulo. Una factory servirebbe solo per
   editor multipli: YAGNI.
-- `spaceHeld` che non si azzera al blur → promosso a **DT-2**.
-- `removeAttribute` che lascia riferimenti pendenti → promosso a **DT-5**.
+- `spaceHeld` che non si azzera al blur → **corretto**, vedi DT-2.
+- `removeAttribute` che lascia riferimenti pendenti → **corretto**, vedi DT-5.
 - `PointerInfo.alt` è dichiarato e popolato ma mai letto; il ramo 2 di
   `PointerInfo.button` è irraggiungibile.
 - Nessun test sul marquee additivo (shift+drag sul vuoto), sullo shift+click
@@ -117,11 +143,11 @@ del verdetto ha anche `20` scritto a mano invece di interpolare
   `rect`.
 - `render.test.tsx` non copre l'entità senza attributi né la relazione verso
   un'entità mancante.
-- Flash del tema → promosso a **DT-4**.
+- Flash del tema → **corretto**, vedi DT-4.
 - Il `data-slot` dei trigger diventa `"tooltip-trigger"` per lo spread di
   Radix; i pulsanti disabilitati non mostrano tooltip
   (`pointer-events-none`).
-- Collisione di rename silenziosa → promossa a **DT-3**.
+- Collisione di rename silenziosa → **corretta**, vedi DT-3.
 - L'helper `dispatch` di `PropertiesPanel` ignora il boolean di ritorno
   (oggi innocuo altrove, vedi DT-3).
 - Il `Flag` usa un `<label>` nativo invece del componente `Label`.
@@ -206,7 +232,7 @@ del verdetto ha anche `20` scritto a mano invece di interpolare
   Risolto lungo la strada, senza che nessuno lo registrasse.
   `no-restricted-imports` blocca anche gli `import type`: voluto.
 - `noUncheckedIndexedAccess` non è abilitato in `tsconfig` (verificato).
-- Script di prestazione → promosso a **DT-6**.
+- Script di prestazione → **corretto**, vedi DT-6.
 - Non esiste `ErrorBoundary` né un gestore di `unhandledrejection`: la
   correzione dell'avvio ha chiuso il percorso noto, non la classe.
 

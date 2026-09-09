@@ -96,7 +96,7 @@ diffare due export diventa inutile.
 ## 5. DDL: forma dell'uscita
 
 ```sql
--- Dev Designer — schema "Magazzino"
+-- Dev Designer — export PostgreSQL
 -- Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più
 -- colonne: questo DDL descrive tabelle, colonne, chiavi e riferimenti.
 
@@ -183,6 +183,19 @@ allo stesso modo, con un avviso: cambiare il nome silenziosamente è peggio.
 | Entità senza attributi | `-- tabella "x": nessuna colonna definita nel diagramma` al posto del `CREATE TABLE` | sì, con l'elenco dei nomi |
 | Relazione con `attributes: []` su un estremo | `-- relazione "a" → "b": colonne non definite nel diagramma` | sì, aggregato per numero |
 | Entità referenziata senza `primaryKey` | tabella e `ALTER TABLE` emessi comunque | sì: in MySQL l'`ALTER` fallirà, manca l'indice sulle colonne referenziate |
+| Attributo con tipo vuoto | colonna emessa con tipo `text` | sì, nominando colonna ed entità |
+
+L'intestazione del file non nomina il documento: `emitDdl(model, dialect)` riceve
+la sola `ErModel` (§4) e il nome vive sul `DevDocument`. Passarlo solo per un
+commento renderebbe impura la firma di entrambi gli emettitori.
+
+Il tipo vuoto è **l'unico posto in cui l'emettitore inventa**, e lo fa perché
+l'alternativa è una colonna senza tipo, cioè un file che non gira.
+`AttributeSchema.type` è `z.string()` senza minimo e il pannello proprietà
+permette di svuotare il campo, quindi il caso è raggiungibile e non teorico.
+In Mermaid lo stesso caso non produce SQL non valido — è solo un'etichetta — e
+si emette `_`, che la grammatica ammette: fallback diversi perché i due modi di
+rompersi sono diversi.
 
 `CREATE TABLE x ()` non è valido in nessuno dei due dialetti: un file che non
 gira è peggio di un file con un commento al posto di una tabella.

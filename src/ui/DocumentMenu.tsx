@@ -1,4 +1,4 @@
-import { ChevronDown, FileCode2, FileImage, FilePlus2, FolderOpen, Image, Save, SaveAll } from "lucide-react"
+import { ChevronDown, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, Save, SaveAll } from "lucide-react"
 import { useState, type ChangeEvent } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { documentSession } from "@/io/document-session"
 import { readFile } from "@/io/file"
 import { requestOpen, UPLOAD_INPUT_ID } from "./document-actions"
 import { exportPng, exportSvg } from "./export/lazy"
+import { TextExportDialog } from "./export/TextExportDialog"
 import { ImportDdlDialog } from "./import/ImportDdlDialog"
 
 const when = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" })
@@ -24,6 +25,7 @@ export function DocumentMenu() {
   const readOnly = useStore(documentSession, (s) => s.readOnly)
   const [recent, setRecent] = useState<RecentEntry[]>([])
   const [importOpen, setImportOpen] = useState(false)
+  const [textExportOpen, setTextExportOpen] = useState(false)
 
   // I recenti si leggono all'apertura del menu, non a ogni render.
   const onOpenChange = (open: boolean) => {
@@ -57,6 +59,7 @@ export function DocumentMenu() {
           {/* L'export è una lettura: funziona anche in sola lettura. */}
           <DropdownMenuItem onSelect={() => void exportSvg()}><FileImage /> Esporta SVG</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void exportPng()}><Image /> Esporta PNG</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setTextExportOpen(true)}><FileText /> Esporta testo…</DropdownMenuItem>
           {recent.length > 0 && (
             <>
               <DropdownMenuSeparator />
@@ -75,6 +78,7 @@ export function DocumentMenu() {
       <input id={UPLOAD_INPUT_ID} type="file" accept=".dd.json,application/json" hidden aria-label="Carica documento" onChange={(e) => void onUpload(e)} />
       {/* Fratello del DropdownMenu, non figlio: aperto dalla voce di menu, litigherebbe sul fuoco col menu che si chiude. */}
       <ImportDdlDialog open={importOpen} onOpenChange={setImportOpen} />
+      <TextExportDialog open={textExportOpen} onOpenChange={setTextExportOpen} />
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { ChevronDown, FileCode2, FilePlus2, FolderOpen, Save, SaveAll } from "lucide-react"
+import { ChevronDown, FileCode2, FileImage, FilePlus2, FolderOpen, Image, Save, SaveAll } from "lucide-react"
 import { useState, type ChangeEvent } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import type { RecentEntry } from "@/io/db"
 import { documentSession } from "@/io/document-session"
 import { readFile } from "@/io/file"
 import { requestOpen, UPLOAD_INPUT_ID } from "./document-actions"
+import { exportPng, exportSvg } from "./export/lazy"
 import { ImportDdlDialog } from "./import/ImportDdlDialog"
 
 const when = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" })
@@ -52,6 +53,10 @@ export function DocumentMenu() {
           <DropdownMenuItem disabled={readOnly} onSelect={() => setImportOpen(true)}><FileCode2 /> Importa DDL…</DropdownMenuItem>
           <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.save()}><Save /> Salva <DropdownMenuShortcut>⌘S</DropdownMenuShortcut></DropdownMenuItem>
           <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.saveAs()}><SaveAll /> Salva con nome… <DropdownMenuShortcut>⇧⌘S</DropdownMenuShortcut></DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {/* L'export è una lettura: funziona anche in sola lettura. */}
+          <DropdownMenuItem onSelect={() => void exportSvg()}><FileImage /> Esporta SVG</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void exportPng()}><Image /> Esporta PNG</DropdownMenuItem>
           {recent.length > 0 && (
             <>
               <DropdownMenuSeparator />

@@ -1214,7 +1214,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
   // battuta sul nome del documento e a ogni cambio del pallino delle modifiche, e senza questa
   // riga i tre emettitori girerebbero ogni volta a dialog chiuso.
   if (!open) return null
-  const scelto = FORMATS.find((f) => f.value === format)!
+  const chosen = FORMATS.find((f) => f.value === format)!
   const { text, warnings } = format === "mermaid" ? emitMermaid(model) : emitDdl(model, format)
 
   const copy = async () => {
@@ -1251,7 +1251,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
         <pre data-export-preview className="max-h-96 overflow-auto rounded border bg-muted/40 p-3 font-mono text-xs">{text}</pre>
         <DialogFooter>
           <Button variant="outline" onClick={() => void copy()}>Copia</Button>
-          <Button onClick={() => download(documentFileName(scelto.extension), text, "text/plain;charset=utf-8")}>Scarica</Button>
+          <Button onClick={() => download(documentFileName(chosen.extension), text, "text/plain;charset=utf-8")}>Scarica</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

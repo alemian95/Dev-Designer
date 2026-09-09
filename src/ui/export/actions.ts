@@ -2,6 +2,7 @@ import fontUrl from "@fontsource-variable/jetbrains-mono/files/jetbrains-mono-la
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { download } from "@/io/file"
+import { documentFileName } from "./file-name"
 import { svgToPng } from "./png"
 import { buildSvg } from "./svg"
 
@@ -98,12 +99,6 @@ function loadFontFace(): Promise<string | undefined> {
   return fontFacePromise
 }
 
-/** `/` in un nome di documento troncherebbe il nome del file scaricato. */
-function fileName(extension: string): string {
-  const name = documentStore.getState().doc.name.trim() || "diagramma"
-  return `${name.replaceAll(/[\\/:*?"<>|]/g, "-")}.${extension}`
-}
-
 async function currentSvg(): Promise<string | null> {
   return buildSvg(erDiagram(documentStore.getState().doc), { vars: readLightVars(), fontFace: await loadFontFace() })
 }
@@ -111,11 +106,11 @@ async function currentSvg(): Promise<string | null> {
 /** Esporta il diagramma come SVG. Non fa nulla se non c'è nessuna entità. */
 export async function exportSvg(): Promise<void> {
   const svg = await currentSvg()
-  if (svg) download(fileName("svg"), svg, "image/svg+xml")
+  if (svg) download(documentFileName("svg"), svg, "image/svg+xml")
 }
 
 /** Esporta il diagramma come PNG a 2×. Non fa nulla se non c'è nessuna entità. */
 export async function exportPng(): Promise<void> {
   const svg = await currentSvg()
-  if (svg) download(fileName("png"), await svgToPng(svg), "image/png")
+  if (svg) download(documentFileName("png"), await svgToPng(svg), "image/png")
 }

@@ -6,12 +6,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { emitDdl } from "@/io/emit/ddl"
+import type { Dialect } from "@/io/ddl/schema"
 import { emitMermaid } from "@/io/emit/mermaid"
 import { documentSession } from "@/io/document-session"
 import { download } from "@/io/file"
 import { documentFileName } from "./file-name"
 
-type Format = "postgres" | "mysql" | "mermaid"
+type Format = Dialect | "mermaid"
 
 const FORMATS: { value: Format; label: string; extension: string }[] = [
   { value: "postgres", label: "PostgreSQL", extension: "sql" },

@@ -125,6 +125,20 @@ Notato lavorando su DT-4, non corretto perché fuori dai sei fix chiesti.
 
 ### Export testo (dialog)
 
+- **`mermaid.ts` non osserva il contratto degli avvisi aggregati che
+  [result.ts:4-5](../src/io/emit/result.ts) dichiara** («aggregati … non una
+  riga per colonna»): `ddl.ts` lo rispetta, con cinque categorie riunite
+  ciascuna in un solo avviso con conteggio ed elenco, ma
+  [mermaid.ts](../src/io/emit/mermaid.ts) ne emette uno per occorrenza, in
+  tre punti — `word()` (riga 29, backtick rimossi dal tipo o dal nome di un
+  attributo), `entityName()` (riga 40, caratteri illegali nel nome di
+  un'entità) e il corpo di `emitMermaid` (riga 65, virgolette rimosse
+  dall'etichetta di una relazione). Su un diagramma con molte entità dal
+  nome anomalo il dialog mostrerebbe una riga per entità, proprio il caso
+  che il contratto vuole evitare. Non corretto in sede di revisione finale
+  del branch `feat/export-testo`: aggregare qui è un cambiamento di
+  comportamento a lavoro finito, con la sua coda di test da riscrivere —
+  scelta deliberata, non una svista.
 - `TextExportDialog.tsx`: una non-null assertion su `FORMATS.find(...)`,
   sicura perché `FORMATS` copre l'union `Format`, ma un `satisfies` la
   renderebbe verificabile da `tsc` invece che da un'assunzione umana.

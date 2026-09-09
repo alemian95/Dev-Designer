@@ -20,6 +20,8 @@ export interface DocumentSessionState {
   persistence: PersistenceStatus
   /** Avviso da mostrare nella barra; null = nessuno. */
   notice: string | null
+  /** Un layout è in corso: il pulsante «Disponi» resta premuto e disabilitato finché non finisce. */
+  layingOut: boolean
   patch: (p: Partial<Omit<DocumentSessionState, "patch">>) => void
 }
 
@@ -32,5 +34,6 @@ export const documentSession = createStore<DocumentSessionState>()((set) => ({
   lastSavedAt: null,
   persistence: "ok",
   notice: null,
+  layingOut: false,
   patch: (p) => set(p),
 }))

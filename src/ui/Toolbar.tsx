@@ -1,4 +1,4 @@
-import { Copy, Maximize2, Moon, MousePointer2, Redo2, Spline, Square, Sun, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react"
+import { Copy, LayoutGrid, Maximize2, Moon, MousePointer2, Redo2, Spline, Square, Sun, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react"
 import type { ReactNode } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { deleteSelection, duplicateSelection, fitToContent, zoomBy } from "@/edi
 import { documentStore } from "@/editor/document-store"
 import { sessionStore, type Tool } from "@/editor/session-store"
 import { DocumentMenu } from "./DocumentMenu"
+import { autoLayout, useCanAutoLayout } from "./layout-actions"
 import { useTheme } from "./use-theme"
 
 /** `TooltipTrigger asChild` sovrascrive il `data-state` del toggle: lo stato attivo si legge da `aria-checked`. */
@@ -34,6 +35,7 @@ export function Toolbar() {
   const canUndo = useStore(documentStore, (s) => s.past.length > 0)
   const canRedo = useStore(documentStore, (s) => s.future.length > 0)
   const hasSelection = useStore(sessionStore, (s) => s.selection.size > 0)
+  const canLayout = useCanAutoLayout()
   const { theme, toggle } = useTheme()
 
   return (
@@ -57,6 +59,11 @@ export function Toolbar() {
       <ZoomLabel />
       <Hint label="Ingrandisci (⌘+)"><Button variant="ghost" size="icon" aria-label="Ingrandisci zoom" onClick={() => zoomBy(1.25)}><ZoomIn /></Button></Hint>
       <Hint label="Adatta (F)"><Button variant="ghost" size="icon" aria-label="Adatta" onClick={fitToContent}><Maximize2 /></Button></Hint>
+      <Hint label="Disponi (L)">
+        <Button variant="ghost" size="icon" aria-label="Disponi" disabled={!canLayout} onClick={() => void autoLayout()}>
+          <LayoutGrid />
+        </Button>
+      </Hint>
       <div className="ml-auto" />
       <Hint label={theme === "dark" ? "Tema chiaro" : "Tema scuro"}>
         <Button variant="ghost" size="icon" aria-label={theme === "dark" ? "Tema chiaro" : "Tema scuro"} onClick={toggle}>{theme === "dark" ? <Sun /> : <Moon />}</Button>

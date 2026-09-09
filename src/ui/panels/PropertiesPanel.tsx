@@ -2,11 +2,12 @@ import { ArrowDown, ArrowUp, Plus, X } from "lucide-react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { addAttribute, moveAttribute, removeAttribute, renameEntity, setCollapsed, updateAttribute, updateRelationship } from "@/editor/commands/er"
+import { addAttribute, moveAttribute, removeAttribute, setCollapsed, updateAttribute, updateRelationship } from "@/editor/commands/er"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
-import { selId, selectedKeys, sessionStore } from "@/editor/session-store"
-import { CardinalitySchema, entityKey, type Attribute, type Cardinality } from "@/model/document"
+import { selectedKeys, sessionStore } from "@/editor/session-store"
+import { CardinalitySchema, type Attribute, type Cardinality } from "@/model/document"
+import { renameEntityWithNotice } from "../entity-rename"
 import { CommitInput } from "./CommitInput"
 
 const dispatch = (recipe: Recipe | null) => {
@@ -56,12 +57,7 @@ function EntityProperties({ entityKey: key }: { entityKey: string }) {
   const entity = useStore(documentStore, (s) => erDiagram(s.doc).model.entities[key])
   const view = useStore(documentStore, (s) => erDiagram(s.doc).view.nodes[key])
   if (!entity || !view) return null
-  const rename = (name: string, schema: string | undefined) => {
-    const recipe = renameEntity(key, name, schema)
-    if (recipe && documentStore.getState().dispatch(recipe)) {
-      sessionStore.getState().setSelection([selId("entity", entityKey({ name: name.trim(), schema: schema?.trim() || undefined }))])
-    }
-  }
+  const rename = (name: string, schema: string | undefined) => renameEntityWithNotice(key, name, schema)
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="grid gap-1">

@@ -122,7 +122,21 @@ export function updateAttribute(key: string, index: number, patch: Partial<Attri
 
 export function removeAttribute(key: string, index: number): Recipe {
   return (draft) => {
-    erDiagram(draft).model.entities[key]?.attributes.splice(index, 1)
+    const d = erDiagram(draft)
+    const [removed] = d.model.entities[key]?.attributes.splice(index, 1) ?? []
+    if (!removed) return
+    // Il nome resterebbe dentro `RelationshipEnd.attributes`, dove `validateEr` lo segnala come
+    // `dangling-relationship` di gravità error: si pota qui, dov'è che l'attributo scompare. Il
+    // confronto include l'entità, o due attributi omonimi di entità diverse si poterebbero a vicenda.
+    // Se l'estremo resta vuoto la relazione diventa «disegnata a mano» (ADR 0003) e un re-import non
+    // la poterà più: è preferibile a un riferimento pendente, e meglio che cancellarla di nascosto.
+    for (const rel of Object.values(d.model.relationships)) {
+      for (const end of [rel.source, rel.target]) {
+        if (end.entity !== key) continue
+        const at = end.attributes.indexOf(removed.name)
+        if (at >= 0) end.attributes.splice(at, 1)
+      }
+    }
   }
 }
 

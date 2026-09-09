@@ -3,8 +3,12 @@ import { Input } from "@/components/ui/input"
 
 interface Props extends Omit<ComponentProps<typeof Input>, "value" | "onChange" | "onBlur" | "onKeyDown"> {
   value: string
-  /** Chiamato su Enter e su blur, solo se il testo è cambiato. */
-  onCommit: (value: string) => void
+  /**
+   * Chiamato su Enter e su blur, solo se il testo è cambiato. Se torna `false` la modifica è stata
+   * rifiutata e il campo torna al valore precedente: `key={value}` non basta a rimontarlo, perché
+   * un rifiuto lascia il valore invariato, e il campo continuerebbe a mostrare il testo non salvato.
+   */
+  onCommit: (value: string) => boolean | void
 }
 
 /**
@@ -20,7 +24,7 @@ export function CommitInput({ value, onCommit, ...rest }: Props) {
       cancelled.current = false
       return
     }
-    if (text !== value) onCommit(text)
+    if (text !== value && onCommit(text) === false) setText(value)
   }
   return (
     <Input

@@ -110,7 +110,7 @@ CREATE TABLE "ordini" (
 
 CREATE TABLE "pub"."utenti" (
   "id" integer NOT NULL,
-  "email" character varying(255) NOT NULL UNIQUE,
+  "email" varchar(255) NOT NULL UNIQUE,
   PRIMARY KEY ("id")
 );
 
@@ -245,6 +245,15 @@ ripetuto, via le parole `unsigned` e `zerofill`, spazi interni collassati a uno.
 
 I tipi a più parole sono la ragione per cui non si tronca al primo spazio.
 
+**Attenzione a quali forme arrivano davvero nel modello.** I due adapter
+normalizzano già in import: `pg.ts` restituisce `varchar(255)` per
+`character varying(255)` e `timestamptz` per `timestamp with time zone`
+(asserito in `pg.test.ts`), `mysql.ts` ricompone `bigint(20) unsigned` e
+`bigint unsigned` (`mysql.test.ts`). Le forme con spazio che il modello contiene
+per davvero sono quindi `double precision` e i modificatori MySQL; le altre
+righe della tabella restano valide perché l'utente può digitare qualunque cosa
+nel pannello proprietà, ma non è da loro che nasce il caso.
+
 ### Insieme Postgres
 
 Da Table 8.1 di `postgresql.org/docs/current/datatype.html`, nomi e alias:
@@ -283,7 +292,8 @@ erDiagram
   }
   "pub.utenti" {
     integer id PK
-    `character varying(255)` email UK
+    varchar(255) email UK
+    `double precision` saldo
   }
 ```
 
@@ -295,13 +305,13 @@ dalla pagina di documentazione, che su due punti dice meno o dice altro:
   parentesi e parentesi quadre». `ATTRIBUTE_WORD` è
   `([\*A-Za-z_\u00C0-\uFFFF][A-Za-z0-9\-\_\[\]\(\)\.,\u00C0-\uFFFF\*]*)`: **la
   virgola e il punto ci sono**, quindi `numeric(10,2)` passa. **Lo spazio no**,
-  e questo è il caso che conta: Postgres riporta `character varying`,
-  `timestamp with time zone`, `double precision`, MySQL `bigint(20) unsigned`.
-  Emessi grezzi, metà dei dump reali produrrebbe Mermaid non valido.
+  e il caso è reale: dei tipi con spazio che arrivano davvero nel modello (§9)
+  `double precision` e `bigint(20) unsigned` sono asseriti nei test degli
+  adapter. Emessi grezzi darebbero Mermaid non valido.
 - La via d'uscita è nella grammatica e non nella prosa: dentro un blocco entità
   il lexer entra nello stato `block_bq` su un backtick (``<block>[`]``), accetta
   ``[^`]+`` come `ATTRIBUTE_WORD` e i backtick **non** entrano nel token. Quindi
-  `` `character varying(255)` `` emette esattamente quel tipo.
+  `` `bigint(20) unsigned` `` emette esattamente quel tipo.
 - L'etichetta vuota `: ""` la pagina non la mostra; la grammatica l'accetta
   (`\"[^"]*\"`).
 

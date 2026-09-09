@@ -30,7 +30,7 @@ export interface LayoutEngine {
   layout: (nodes: LayoutNode[], edges: LayoutEdge[]) => Promise<LayoutPositions>
 }
 
-/** 10 s: il massimo misurato è 316 ms su 200 tabelle (ADR 0006), quindi il margine è trenta volte. */
+/** 10 s: il massimo misurato è 157 ms su 200 tabelle con `layered DOWN` (ADR 0006), quindi il margine è sessanta volte. */
 export const LAYOUT_TIMEOUT_MS = 10_000
 
 interface Pending {

@@ -18,6 +18,15 @@ describe("baseType", () => {
   ])("normalizza %j in %j", (input, atteso) => {
     expect(baseType(input)).toBe(atteso)
   })
+
+  it("un letterale con una parentesi chiusa dentro confonde il taglio: limite noto, e tace", () => {
+    // `enum('a)b')`: il taglio delle parentesi chiude sul `)` dentro l'apice. Quel che resta non
+    // corrisponde a nessun insieme, quindi non nasce un avviso sbagliato — `enum` da solo
+    // apparterrebbe a MySQL e verrebbe segnalato su Postgres. Il docblock dichiara il limite;
+    // questo test tiene fermo il modo in cui fallisce.
+    expect(baseType("enum('a)b')")).toBe("enum b')")
+    expect(foreignTypes(["enum('a)b')"], "postgres")).toEqual([])
+  })
 })
 
 describe("foreignTypes", () => {

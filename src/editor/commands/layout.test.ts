@@ -53,8 +53,8 @@ describe("layout automatico", () => {
       documentStore.getState().dispatch((draft) => {
         erDiagram(draft).view.nodes.cliente.collapsed = true
       })
-      const nodo = layoutGraph(er()).nodes.find((n) => n.id === "cliente")
-      expect(nodo?.h).toBe(HEADER_H)
+      const node = layoutGraph(er()).nodes.find((n) => n.id === "cliente")
+      expect(node?.h).toBe(HEADER_H)
     })
 
     it("inverte gli archi: il padre è la sorgente, così con direction DOWN sta sopra", () => {
@@ -88,22 +88,22 @@ describe("layout automatico", () => {
           identifying: false,
         }
       })
-      const arco = layoutGraph(er()).edges.find((e) => e.id === "gerarchia")
-      expect(arco).toEqual({ id: "gerarchia", source: "cliente", target: "cliente" })
+      const edge = layoutGraph(er()).edges.find((e) => e.id === "gerarchia")
+      expect(edge).toEqual({ id: "gerarchia", source: "cliente", target: "cliente" })
     })
   })
 
   describe("applyLayout", () => {
-    const posizioni: LayoutPositions = { cliente: { x: 12.4, y: 7 }, ordine: { x: 212.4, y: 207 } }
+    const positions: LayoutPositions = { cliente: { x: 12.4, y: 7 }, ordine: { x: 212.4, y: 207 } }
 
     it("trasla a (40, 40) e allinea alla griglia da 10", () => {
-      expect(documentStore.getState().dispatch(applyLayout(posizioni))).toBe(true)
+      expect(documentStore.getState().dispatch(applyLayout(positions))).toBe(true)
       expect(er().view.nodes.cliente).toEqual({ x: 40, y: 40, collapsed: false })
       expect(er().view.nodes.ordine).toEqual({ x: 240, y: 240, collapsed: false })
     })
 
     it("una sola voce di undo per tutto il layout", () => {
-      documentStore.getState().dispatch(applyLayout(posizioni))
+      documentStore.getState().dispatch(applyLayout(positions))
       expect(state().past).toHaveLength(1)
       documentStore.getState().undo()
       expect(er().view.nodes.cliente).toEqual({ x: 0, y: 0, collapsed: false })
@@ -111,14 +111,14 @@ describe("layout automatico", () => {
     })
 
     it("riapplicare le stesse posizioni non produce una voce di undo fantasma", () => {
-      documentStore.getState().dispatch(applyLayout(posizioni))
-      expect(documentStore.getState().dispatch(applyLayout(posizioni))).toBe(false)
+      documentStore.getState().dispatch(applyLayout(positions))
+      expect(documentStore.getState().dispatch(applyLayout(positions))).toBe(false)
       expect(state().past).toHaveLength(1)
     })
 
     it("ignora una chiave che nel frattempo non esiste più, senza toccare le altre", () => {
-      const conFantasma: LayoutPositions = { ...posizioni, sparita: { x: 999, y: 999 } }
-      expect(documentStore.getState().dispatch(applyLayout(conFantasma))).toBe(true)
+      const withGhost: LayoutPositions = { ...positions, sparita: { x: 999, y: 999 } }
+      expect(documentStore.getState().dispatch(applyLayout(withGhost))).toBe(true)
       expect(er().view.nodes.sparita).toBeUndefined()
       expect(er().view.nodes.cliente).toEqual({ x: 40, y: 40, collapsed: false })
     })

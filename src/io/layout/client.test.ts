@@ -4,7 +4,7 @@ import { createLayoutEngine, type LayoutRequest, type LayoutResponse, type Layou
 
 const NODES: LayoutNode[] = [{ id: "a", w: 160, h: 50 }, { id: "b", w: 160, h: 50 }]
 const EDGES: LayoutEdge[] = [{ id: "e", source: "a", target: "b" }]
-const POSIZIONI = { a: { x: 0, y: 0 }, b: { x: 0, y: 110 } }
+const POSITIONS = { a: { x: 0, y: 0 }, b: { x: 0, y: 110 } }
 
 /** Worker finto: registra le richieste e lascia al test il momento in cui rispondere. */
 class FakeWorker implements LayoutWorker {
@@ -43,8 +43,8 @@ describe("createLayoutEngine", () => {
     const engine = createLayoutEngine(() => w)
     const pending = engine.layout(NODES, EDGES)
     expect(w.sent[0]).toMatchObject({ id: 1, nodes: NODES, edges: EDGES })
-    w.reply({ id: 1, ok: true, positions: POSIZIONI })
-    await expect(pending).resolves.toEqual(POSIZIONI)
+    w.reply({ id: 1, ok: true, positions: POSITIONS })
+    await expect(pending).resolves.toEqual(POSITIONS)
   })
 
   it("rigetta col messaggio quando il worker riporta un errore", async () => {
@@ -91,24 +91,24 @@ describe("createLayoutEngine", () => {
       workers.push(w)
       return w
     })
-    const primo = engine.layout(NODES, EDGES)
-    const secondo = engine.layout(NODES, [])
-    await expect(primo).rejects.toThrow(/abbandonato/)
+    const first = engine.layout(NODES, EDGES)
+    const second = engine.layout(NODES, [])
+    await expect(first).rejects.toThrow(/abbandonato/)
     expect(workers[0].terminated).toBe(true)
     // Il worker abbandonato è inutilizzabile: la seconda richiesta ne ha fatto nascere uno pulito.
     expect(workers).toHaveLength(2)
-    workers[1].reply({ id: 2, ok: true, positions: POSIZIONI })
-    await expect(secondo).resolves.toEqual(POSIZIONI)
+    workers[1].reply({ id: 2, ok: true, positions: POSITIONS })
+    await expect(second).resolves.toEqual(POSITIONS)
   })
 
   it("scarta la risposta in ritardo di una richiesta abbandonata", async () => {
     const w = new FakeWorker()
     const engine = createLayoutEngine(() => w)
     const pending = engine.layout(NODES, EDGES)
-    w.reply({ id: 1, ok: true, positions: POSIZIONI })
-    await expect(pending).resolves.toEqual(POSIZIONI)
+    w.reply({ id: 1, ok: true, positions: POSITIONS })
+    await expect(pending).resolves.toEqual(POSITIONS)
     // Nessuna richiesta in volo: una risposta che arriva ora non deve far esplodere niente.
-    expect(() => w.reply({ id: 1, ok: true, positions: POSIZIONI })).not.toThrow()
+    expect(() => w.reply({ id: 1, ok: true, positions: POSITIONS })).not.toThrow()
   })
 
   it("riusa il worker fra due layout consecutivi", async () => {
@@ -118,12 +118,12 @@ describe("createLayoutEngine", () => {
       workers.push(w)
       return w
     })
-    const primo = engine.layout(NODES, EDGES)
-    workers[0].reply({ id: 1, ok: true, positions: POSIZIONI })
-    await primo
-    const secondo = engine.layout(NODES, EDGES)
-    workers[0].reply({ id: 2, ok: true, positions: POSIZIONI })
-    await secondo
+    const first = engine.layout(NODES, EDGES)
+    workers[0].reply({ id: 1, ok: true, positions: POSITIONS })
+    await first
+    const second = engine.layout(NODES, EDGES)
+    workers[0].reply({ id: 2, ok: true, positions: POSITIONS })
+    await second
     // Avviare elkjs costa: il worker si tiene finché non fallisce.
     expect(workers).toHaveLength(1)
   })

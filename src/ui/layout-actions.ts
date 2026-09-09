@@ -39,8 +39,8 @@ export async function autoLayout(): Promise<void> {
 export function useCanAutoLayout(): boolean {
   // I selettori restituiscono booleani, non il documento: così il pulsante non si ridisegna a ogni
   // modifica del diagramma, ma solo quando la risposta cambia.
-  const abbastanzaNodi = useStore(documentStore, (s) => Object.keys(erDiagram(s.doc).view.nodes).length > 1)
+  const hasEnoughNodes = useStore(documentStore, (s) => Object.keys(erDiagram(s.doc).view.nodes).length > 1)
   const readOnly = useStore(documentSession, (s) => s.readOnly)
   const layingOut = useStore(documentSession, (s) => s.layingOut)
-  return abbastanzaNodi && !readOnly && !layingOut
+  return hasEnoughNodes && !readOnly && !layingOut
 }

@@ -84,6 +84,16 @@ rettangoli e restituisce posizioni, e ELK resta un dettaglio interno al file
 importa nulla di elkjs — il che è anche ciò che tiene 465 kB gzip fuori dal
 bundle iniziale (§8).
 
+Dentro `elk.worker.ts`, però, non si importa `elk.bundled.js`: si usa
+`elk-api.js` con una `workerFactory` che crea un worker **annidato** su
+`elk-worker.min.js`. La ragione è l'auto-rilevazione dell'ambiente di
+`elk-worker.min.js`: dentro un dedicated worker s'installa da solo su
+`self.onmessage` e non esporta la classe `Worker`, quindi `elk.bundled.js`
+eseguito già dentro il nostro worker si rompe (`new undefined(...)` in
+`main.js`, e comunque l'handler rubato). Costa un salto di messaggi in più fra
+i due worker e la dipendenza dai worker annidati di Vite, ma resta tutto
+interno a questo file: il thread principale non se ne accorge.
+
 ### Contratto del worker
 
 ```ts

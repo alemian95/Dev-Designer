@@ -1,4 +1,5 @@
-import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js"
+import ELK, { type ElkNode } from "elkjs/lib/elk-api.js"
+import ElkWorker from "elkjs/lib/elk-worker.min.js?worker"
 import type { LayoutPositions } from "@/model/layout"
 import type { LayoutRequest, LayoutResponse } from "./client"
 
@@ -25,8 +26,17 @@ const OPTIONS = {
   "elk.layered.spacing.nodeNodeBetweenLayers": "60",
 }
 
-// Una sola istanza: `new ELK()` senza `workerUrl` calcola qui dentro, che è già il worker.
-const elk = new ELK()
+/**
+ * `elk.bundled.js` non regge se eseguito già dentro un worker: il suo `elk-worker.min.js`
+ * si auto-rileva come corpo di un worker (guarda `self`/`document`) e dentro un dedicated
+ * worker s'installa da solo su `self.onmessage`, rubando il nostro protocollo, senza
+ * esportare la classe `Worker` che `elk.bundled.js` si aspetterebbe di poter istanziare.
+ * Qui invece si usa `elk-api.js` (nessun motore incluso) con una `workerFactory` che crea
+ * un worker **annidato** da `elk-worker.min.js`: caricato come script a sé, la stessa
+ * auto-rilevazione lo riconosce correttamente come corpo di worker, e la conversazione
+ * ELK-worker/ELK-api resta tutta dentro il nostro worker, invisibile al thread principale.
+ */
+const elk = new ELK({ workerFactory: () => new ElkWorker() })
 
 self.onmessage = (event) => {
   const { id, nodes, edges } = event.data

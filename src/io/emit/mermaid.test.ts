@@ -95,7 +95,7 @@ describe("emitMermaid", () => {
     ["zero-or-one", "zero-or-many", "|o--o{"],
     ["many", "zero-or-one", "}|--o|"],
     ["zero-or-many", "many", "}o--|{"],
-  ])("il marcatore sta accanto all'entità che descrive: %s/%s → %s", (target, source, atteso) => {
+  ])("il marcatore sta accanto all'entità che descrive: %s/%s → %s", (target, source, expected) => {
     const m: ErModel = {
       entities: { p: entity("p", [attr("id", "int")]), c: entity("c", [attr("p_id", "int")]) },
       relationships: {
@@ -106,7 +106,7 @@ describe("emitMermaid", () => {
         },
       },
     }
-    expect(emitMermaid(m).text).toContain(`  "p" ${atteso} "c" : ""`)
+    expect(emitMermaid(m).text).toContain(`  "p" ${expected} "c" : ""`)
   })
 
   it("identifying continuo, non identifying tratteggiato", () => {
@@ -127,11 +127,78 @@ describe("emitMermaid", () => {
     expect(emitMermaid(m).text).toBe('erDiagram\n  "vuota" {\n  }\n')
   })
 
-  it("salta la relazione con un estremo fuori dal diagramma", () => {
+  it("salta la relazione con un estremo fuori dal diagramma (target mancante)", () => {
     const m = model()
     m.relationships["r1"]!.target.entity = "inesistente"
     const { text, warnings } = emitMermaid(m)
     expect(text).not.toContain("|o..o{")
     expect(warnings).toContain('relazione "r1" saltata: un estremo non è nel diagramma')
+  })
+
+  it("salta la relazione con un estremo fuori dal diagramma (source mancante)", () => {
+    // La condizione nel codice è un OR simmetrico su source e target: il test sopra copre
+    // solo un ramo, questo copre l'altro.
+    const m = model()
+    m.relationships["r1"]!.source.entity = "inesistente"
+    const { text, warnings } = emitMermaid(m)
+    expect(text).not.toContain("|o..o{")
+    expect(warnings).toContain('relazione "r1" saltata: un estremo non è nel diagramma')
+  })
+
+  it("ordina le relazioni per chiave alfabetica, non per ordine di inserimento", () => {
+    // Le chiavi sono inserite fuori ordine (z prima di a) e i figli sono scelti così che
+    // l'ordine alfabetico delle entità non coincida con quello atteso delle relazioni: se
+    // qualcuno rompesse il `.sort()` su `Object.keys(model.relationships)`, le righe di
+    // relazione comparirebbero nell'ordine di inserimento (prima "ac", poi "zc") e questo
+    // test lo direbbe.
+    const m: ErModel = {
+      entities: {
+        p: entity("p", [attr("id", "int")]),
+        ac: entity("ac", [attr("p_id", "int")]),
+        zc: entity("zc", [attr("p_id", "int")]),
+      },
+      relationships: {
+        z: {
+          source: { entity: "ac", attributes: ["p_id"], cardinality: "zero-or-many" },
+          target: { entity: "p", attributes: ["id"], cardinality: "one" },
+          identifying: false,
+        },
+        a: {
+          source: { entity: "zc", attributes: ["p_id"], cardinality: "zero-or-many" },
+          target: { entity: "p", attributes: ["id"], cardinality: "one" },
+          identifying: false,
+        },
+      },
+    }
+    const { text } = emitMermaid(m)
+    expect(text.indexOf('"zc"')).toBeLessThan(text.indexOf('"ac"'))
+  })
+
+  it("una relazione disegnata a mano (estremi senza attributi) emette comunque la riga di cardinalità", () => {
+    // Caso degenere della spec §8 e dell'ADR 0003: `attributes: []` marca una relazione
+    // disegnata a mano. A differenza del DDL (dove diventa un commento perché una FOREIGN KEY
+    // senza colonne non si può scrivere), in Mermaid la riga si emette comunque: la relazione
+    // non ha bisogno delle colonne per essere disegnata.
+    const m: ErModel = {
+      entities: { p: entity("p", [attr("id", "int")]), c: entity("c", [attr("nome", "text")]) },
+      relationships: {
+        r: {
+          source: { entity: "c", attributes: [], cardinality: "zero-or-many" },
+          target: { entity: "p", attributes: [], cardinality: "one" },
+          identifying: false,
+        },
+      },
+    }
+    expect(emitMermaid(m).text).toContain('  "p" ||..o{ "c" : ""')
+  })
+
+  it("avvisa quando l'etichetta della relazione contiene virgolette, che vengono rimosse", () => {
+    const m = model()
+    m.relationships["r1"]!.name = 'il "migliore"'
+    const { text, warnings } = emitMermaid(m)
+    expect(text).toContain(' : "il migliore"')
+    expect(warnings).toContain(
+      'il nome della relazione "r1": le virgolette sono state rimosse, Mermaid non le sa sfuggire nell\'etichetta',
+    )
   })
 })

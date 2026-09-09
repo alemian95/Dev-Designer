@@ -59,11 +59,13 @@ export function emitMermaid(model: ErModel): EmitResult {
     }
     // Il padre (`target`, il lato referenziato) a sinistra e il figlio (`source`, il lato della FK)
     // a destra: è il verso in cui la riga si legge.
-    const linea = rel.identifying ? "--" : ".."
-    const etichetta = (rel.name ?? "").replaceAll('"', "")
+    const line = rel.identifying ? "--" : ".."
+    const rawLabel = rel.name ?? ""
+    const label = rawLabel.replaceAll('"', "")
+    if (label !== rawLabel) warnings.push(`il nome della relazione "${key}": le virgolette sono state rimosse, Mermaid non le sa sfuggire nell'etichetta`)
     out.push(
-      `  ${entityName(rel.target.entity, warnings)} ${LEFT[rel.target.cardinality]}${linea}${RIGHT[rel.source.cardinality]}` +
-        ` ${entityName(rel.source.entity, warnings)} : "${etichetta}"`,
+      `  ${entityName(rel.target.entity, warnings)} ${LEFT[rel.target.cardinality]}${line}${RIGHT[rel.source.cardinality]}` +
+        ` ${entityName(rel.source.entity, warnings)} : "${label}"`,
     )
   }
 
@@ -71,13 +73,13 @@ export function emitMermaid(model: ErModel): EmitResult {
     const e = model.entities[key]!
     out.push(`  ${entityName(key, warnings)} {`)
     for (const a of e.attributes) {
-      const chiavi: string[] = []
-      if (a.primaryKey) chiavi.push("PK")
-      if (a.foreignKey) chiavi.push("FK")
-      if (a.unique) chiavi.push("UK")
-      const tipo = word(a.type, `il tipo di ${key}.${a.name}`, warnings)
-      const nome = word(a.name, `il nome di ${key}.${a.name}`, warnings)
-      out.push(`    ${tipo} ${nome}${chiavi.length > 0 ? ` ${chiavi.join(",")}` : ""}`)
+      const keyFlags: string[] = []
+      if (a.primaryKey) keyFlags.push("PK")
+      if (a.foreignKey) keyFlags.push("FK")
+      if (a.unique) keyFlags.push("UK")
+      const type = word(a.type, `il tipo di ${key}.${a.name}`, warnings)
+      const name = word(a.name, `il nome di ${key}.${a.name}`, warnings)
+      out.push(`    ${type} ${name}${keyFlags.length > 0 ? ` ${keyFlags.join(",")}` : ""}`)
     }
     out.push("  }")
   }

@@ -65,8 +65,8 @@ fonte di verità; il testo è import ed export.
 
 1. ~~Shell + ER completo (disegno, validazione, import DDL, export DDL e
    Mermaid).~~ Fatto: import DDL, export immagini (SVG, PNG), export testo (DDL
-   PostgreSQL e MySQL, Mermaid) e copia del PNG negli appunti. Resta fuori
-   l'auto layout con ELK, che avrà spec propria.
+   PostgreSQL e MySQL, Mermaid), copia del PNG negli appunti e auto layout con
+   ELK.
 2. Class diagram.
 3. Flowchart.
 4. Sequence.
@@ -91,7 +91,7 @@ PlantUML, documento multi diagramma, backend di qualsiasi tipo.
 | UI della cornice | shadcn/ui + Tailwind | Primitive Radix accessibili, codice nel repo, solo i componenti usati |
 | Rendering | SVG scritto a mano dentro React | Hit testing dal DOM, testo nativo, export fedele |
 | Font | monospace incorporato | Dimensioni deterministiche senza misurazione |
-| Auto layout | ELK.js in worker | Problema difficile già risolto |
+| Auto layout | `layered` in worker | Il solo algoritmo misurato che non sovrappone i nodi (ADR 0006) |
 | Parser PostgreSQL | libpg-query (WASM) in worker | Il parser di Postgres stesso |
 | Parser MySQL | node-sql-parser, da verificare nello spike | Fallback: parser proprio del sottoinsieme DDL |
 | Persistenza | IndexedDB | Autosave e lista documenti |

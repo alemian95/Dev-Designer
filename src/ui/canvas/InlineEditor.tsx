@@ -1,11 +1,10 @@
 import { useStore } from "zustand"
-import { renameEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { entitySize, FONT_SIZE, HEADER_H } from "@/editor/er-geometry"
-import { selId, sessionStore } from "@/editor/session-store"
+import { sessionStore } from "@/editor/session-store"
 import { worldToScreen } from "@/editor/viewport"
-import { entityKey } from "@/model/document"
+import { renameEntityWithNotice } from "../entity-rename"
 
 /** Input HTML sovrapposto all'header dell'entità in editing. Un comando al commit; Escape annulla. */
 export function InlineEditor() {
@@ -25,10 +24,7 @@ export function InlineEditor() {
       close()
       return
     }
-    const recipe = renameEntity(editing.key, value, entity.schema)
-    if (recipe && documentStore.getState().dispatch(recipe)) {
-      sessionStore.getState().setSelection([selId("entity", entityKey({ name: value.trim(), schema: entity.schema }))])
-    }
+    renameEntityWithNotice(editing.key, value, entity.schema)
     close()
   }
 

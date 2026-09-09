@@ -36,6 +36,11 @@ function attribute(table: SqlTable, column: SqlColumn, fkColumns: ReadonlySet<st
   }
 }
 
+/** Nome qualificato leggibile, per gli avvisi. */
+function label(t: Pick<SqlTable, "name" | "schema">): string {
+  return t.schema ? `${t.schema}.${t.name}` : t.name
+}
+
 export function mapToEr({ tables, model }: MapInput): MapOutput {
   const warnings: string[] = []
   const entities: Record<string, Entity> = {}
@@ -46,7 +51,15 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
       ...(t.schema ? { schema: t.schema } : {}),
       attributes: t.columns.map((c) => attribute(t, c, fkColumns)),
     }
-    entities[entityKey(entity)] = entity
+    const key = entityKey(entity)
+    // Due tabelle diverse possono produrre la stessa chiave, perché il punto che separa schema e
+    // nome è ammesso anche dentro un nome: `utenti` nello schema `pub` e `pub.utenti` senza schema
+    // danno entrambe `pub.utenti`. Assegnare senza guardare farebbe sparire la prima in silenzio.
+    if (key in entities) {
+      warnings.push(`tabella saltata: "${label(t)}" produce la stessa chiave di "${label(entities[key]!)}"`)
+      continue
+    }
+    entities[key] = entity
   }
 
   // Le entità già sul canvas contano quanto quelle in arrivo: una FK può puntare a una di quelle.

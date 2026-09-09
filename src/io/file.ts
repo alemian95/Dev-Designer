@@ -81,9 +81,12 @@ export async function writeHandle(handle: FileSystemFileHandle, text: string): P
   await writable.close()
 }
 
-/** Fallback dove la File System Access API manca: un link `download` cliccato via script. */
-export function download(name: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: MIME }))
+/**
+ * Un link `download` cliccato via script. È il fallback dove la File System Access API manca,
+ * e la via normale per l'export di immagini, che non passa dai picker.
+ */
+export function download(name: string, data: Blob | string, mime = MIME): void {
+  const url = URL.createObjectURL(typeof data === "string" ? new Blob([data], { type: mime }) : data)
   const a = document.createElement("a")
   a.href = url
   a.download = name

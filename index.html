@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dev Designer</title>
+    <!--
+      Il tema si applica prima del primo paint. `useTheme` lo fa in un useEffect, cioè dopo, e con
+      `prefers-color-scheme: dark` il primo frame usciva chiaro. La chiave è la stessa dell'hook:
+      cambiarla in uno dei due posti riporta il lampo.
+    -->
+    <script>
+      try {
+        const saved = localStorage.getItem("dev-designer.theme")
+        const dark = saved === "dark" || (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
+        document.documentElement.classList.toggle("dark", dark)
+      } catch {
+        // localStorage negato (finestra privata, cookie di terze parti bloccati): resta il tema chiaro.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

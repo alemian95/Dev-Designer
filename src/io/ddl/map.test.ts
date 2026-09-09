@@ -207,3 +207,26 @@ describe("mapToEr — REFERENCES senza lista di colonne referenziate", () => {
     expect(r.warnings.some((w) => w.includes("broken_fk") && w.includes("PRIMARY KEY"))).toBe(true)
   })
 })
+
+describe("mapToEr — chiavi in collisione", () => {
+  it("due tabelle che producono la stessa chiave: la seconda si salta con un avviso, non sovrascrive", () => {
+    // Il punto separa schema e nome nella chiave, ma è ammesso anche dentro un nome: queste due
+    // tabelle diverse danno entrambe la chiave "pub.utenti".
+    const qualificata = table({ name: "utenti", schema: "pub", columns: [{ name: "a", type: "int", nullable: true }] })
+    const puntata = table({ name: "pub.utenti", columns: [{ name: "b", type: "int", nullable: true }] })
+
+    const out = mapToEr({ tables: [qualificata, puntata], model: EMPTY_MODEL })
+
+    expect(Object.keys(out.entities)).toEqual(["pub.utenti"])
+    // Sopravvive la prima, non l'ultima: senza la guardia era il contrario, e in silenzio.
+    expect(out.entities["pub.utenti"]?.attributes.map((a) => a.name)).toEqual(["a"])
+    expect(out.warnings).toHaveLength(1)
+    expect(out.warnings[0]).toContain("pub.utenti")
+  })
+
+  it("nomi distinti non producono avvisi di collisione", () => {
+    const out = mapToEr({ tables: [table({ name: "utenti", schema: "pub" }), table({ name: "utenti", schema: "priv" })], model: EMPTY_MODEL })
+    expect(Object.keys(out.entities).sort()).toEqual(["priv.utenti", "pub.utenti"])
+    expect(out.warnings).toEqual([])
+  })
+})

@@ -122,6 +122,32 @@ describe("comandi ER", () => {
     expect(er().model.entities.users?.attributes).toHaveLength(3)
   })
 
+  it("removeAttribute pota il nome dalle relazioni che lo citavano", () => {
+    // `posts.user_id` è l'attributo da cui `posts_users` deriva.
+    expect(er().model.entities.posts?.attributes[1]?.name).toBe("user_id")
+
+    state().dispatch(removeAttribute("posts", 1))
+
+    // Senza la potatura resterebbe un riferimento a un attributo inesistente, che `validateEr`
+    // segnala come `dangling-relationship` di gravità error.
+    expect(er().model.relationships.posts_users?.source.attributes).toEqual([])
+    // Conseguenza voluta: svuotare l'estremo rende la relazione «disegnata a mano» (ADR 0003), e un
+    // re-import del DDL non la poterà più. È preferibile a un riferimento pendente, e cancellare la
+    // relazione di nascosto sarebbe peggio di entrambi.
+    expect(er().model.relationships.posts_users?.target.attributes).toEqual(["id"])
+  })
+
+  it("removeAttribute distingue gli attributi omonimi di entità diverse", () => {
+    // `posts.id` e `users.id` hanno lo stesso nome: potare per nome senza guardare l'entità
+    // svuoterebbe anche l'estremo che punta a `users.id`.
+    expect(er().model.entities.posts?.attributes[0]?.name).toBe("id")
+
+    state().dispatch(removeAttribute("posts", 0))
+
+    expect(er().model.relationships.posts_users?.target.attributes).toEqual(["id"])
+    expect(er().model.relationships.posts_users?.source.attributes).toEqual(["user_id"])
+  })
+
   it("addRelationship con chiave derivata e default many→one", () => {
     const { key, recipe } = addRelationship(er().model.relationships, "posts", "users")
     state().dispatch(recipe)

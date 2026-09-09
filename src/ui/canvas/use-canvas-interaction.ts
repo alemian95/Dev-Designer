@@ -242,6 +242,11 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === "Space") spaceHeld = false
     }
+    // Il keyup dello Space non arriva se il fuoco lascia la finestra mentre il tasto è premuto:
+    // senza questo, al rientro il canvas resta in pan e niente lo sblocca fino al prossimo Space.
+    const onBlur = () => {
+      spaceHeld = false
+    }
     const onContextMenu = (e: MouseEvent) => e.preventDefault()
     const onPointerCancel = () => step({ type: "cancel" })
 
@@ -268,6 +273,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     svg.addEventListener("contextmenu", onContextMenu)
     window.addEventListener("keydown", onKeyDown)
     window.addEventListener("keyup", onKeyUp)
+    window.addEventListener("blur", onBlur)
     return () => {
       observer.disconnect()
       window.removeEventListener("scroll", invalidateRect, { capture: true })
@@ -280,6 +286,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       svg.removeEventListener("contextmenu", onContextMenu)
       window.removeEventListener("keydown", onKeyDown)
       window.removeEventListener("keyup", onKeyUp)
+      window.removeEventListener("blur", onBlur)
     }
   }, [svgRef])
 }

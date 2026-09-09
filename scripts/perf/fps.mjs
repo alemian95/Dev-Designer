@@ -41,7 +41,7 @@ try {
   console.log(`Ambiente: viewport ${env.w}×${env.h} CSS px · devicePixelRatio ${env.dpr} · ${env.ua}`)
   console.log(`Riposo (nessuna interazione): ${baseline.frames} frame, p95 ${baseline.p95} ms, avg ${baseline.fpsAvg} FPS — è il pavimento imposto dal display.`)
   // Una finestra coperta o minimizzata fa strozzare i rAF da Chrome: i numeri che seguirebbero non varrebbero nulla.
-  if (baseline.p95 > 20) console.warn("ATTENZIONE: a riposo i frame sono già lenti. La finestra di Chrome è coperta o l'FPS è strozzato: misura non valida.\n")
+  if (baseline.p95 > THRESHOLD_MS) console.warn("ATTENZIONE: a riposo i frame sono già lenti. La finestra di Chrome è coperta o l'FPS è strozzato: misura non valida.\n")
   else console.log("")
 
   // Giro di riscaldamento non misurato: il primo drag paga il JIT e la prima resa di ogni layer.
@@ -61,8 +61,11 @@ try {
   console.log(`\n| Scenario | FPS medio | p95 ms/frame | max ms/frame |\n|---|---|---|---|`)
   for (const [name, r] of Object.entries(results)) console.log(`| ${name} | ${r.fpsAvg} | ${r.p95} | ${r.max} |`)
   const worst = Math.max(...Object.values(results).map((r) => r.p95))
+  // Senza questo lo script esce 0 anche su FAIL, quindi in una pipeline passerebbe sempre: il
+  // criterio sarebbe scritto e misurato, e nessuno lo farebbe rispettare.
+  if (worst > THRESHOLD_MS) process.exitCode = 1
   console.log(`\nN=${N} · p95 peggiore ${worst} ms → ${worst <= THRESHOLD_MS ? "PASS" : "FAIL"} (criterio p95 ≤ ${THRESHOLD_MS} ms)`)
-  console.log("\nVerdetto per scenario (p95 ≤ 20 ms):")
+  console.log(`\nVerdetto per scenario (p95 ≤ ${THRESHOLD_MS} ms):`)
   for (const [name, r] of Object.entries(results)) console.log(`  ${name.padEnd(11)} p95 ${String(r.p95).padStart(5)} ms → ${r.p95 <= THRESHOLD_MS ? "PASS" : "FAIL"}`)
   console.log("\nProva che lo scenario ha fatto quello che dichiara:")
   for (const [name, note] of Object.entries(notes)) console.log(`  ${name.padEnd(11)} ${note}`)

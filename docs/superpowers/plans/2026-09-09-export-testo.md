@@ -1197,7 +1197,7 @@ const FORMATS: { value: Format; label: string; extension: string }[] = [
 ]
 
 /** Vale per tutti i formati: è una proprietà del modello, non del dialetto scelto. */
-const LIMITE_MODELLO =
+const MODEL_LIMITS =
   "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale."
 
 /**
@@ -1243,7 +1243,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
           ))}
         </ToggleGroup>
         <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-          <li>{LIMITE_MODELLO}</li>
+          <li>{MODEL_LIMITS}</li>
           {warnings.map((w) => (
             <li key={w} data-export-warning className="text-foreground">{w}</li>
           ))}

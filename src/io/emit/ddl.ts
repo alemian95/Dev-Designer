@@ -86,15 +86,15 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
     out.push("")
   }
 
-  const senzaColonne: string[] = []
-  const senzaTipo: string[] = []
+  const withoutColumns: string[] = []
+  const withoutType: string[] = []
   for (const key of keys) {
     const e = model.entities[key]!
-    for (const a of e.attributes) if (!a.type.trim()) senzaTipo.push(`${key}.${a.name}`)
+    for (const a of e.attributes) if (!a.type.trim()) withoutType.push(`${key}.${a.name}`)
     if (e.attributes.length === 0) {
       // `CREATE TABLE x ()` non è valido in nessuno dei due dialetti: un file che non gira è
       // peggio di un file con un commento al posto di una tabella.
-      senzaColonne.push(key)
+      withoutColumns.push(key)
       out.push(`-- tabella ${qualified(dialect, e)}: nessuna colonna definita nel diagramma`, "")
       continue
     }
@@ -102,8 +102,8 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
   }
 
   const used = new Set<string>()
-  let aMano = 0
-  const senzaPk = new Set<string>()
+  let handDrawn = 0
+  const withoutPk = new Set<string>()
   for (const key of Object.keys(model.relationships).sort()) {
     const rel = model.relationships[key]!
     const child = model.entities[rel.source.entity]
@@ -115,11 +115,11 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
     if (rel.source.attributes.length === 0 || rel.target.attributes.length === 0) {
       // Relazione disegnata a mano (ADR 0003): non ha colonne, quindi non esiste una FOREIGN KEY
       // da scrivere. Il commento resta dov'è utile, cioè nel file che un dev finisce a mano.
-      aMano++
+      handDrawn++
       out.push(`-- relazione ${qualified(dialect, child)} → ${qualified(dialect, parent)}: colonne non definite nel diagramma`, "")
       continue
     }
-    if (!parent.attributes.some((a) => a.primaryKey)) senzaPk.add(rel.target.entity)
+    if (!parent.attributes.some((a) => a.primaryKey)) withoutPk.add(rel.target.entity)
     out.push(
       `ALTER TABLE ${qualified(dialect, child)}\n  ADD CONSTRAINT ${quote(dialect, constraintName(rel, child, used, warnings))}` +
         ` FOREIGN KEY (${columns(dialect, rel.source.attributes)})` +
@@ -132,18 +132,18 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
   if (foreign.length > 0) {
     warnings.push(`${foreign.length} tipi non appartengono a ${DIALECT_LABEL[dialect]}: ${foreign.join(", ")}`)
   }
-  if (senzaTipo.length > 0) {
-    warnings.push(`${senzaTipo.length} colonne senza tipo sono state emesse come ${FALLBACK_TYPE}: ${senzaTipo.join(", ")}`)
+  if (withoutType.length > 0) {
+    warnings.push(`${withoutType.length} colonne senza tipo sono state emesse come ${FALLBACK_TYPE}: ${withoutType.join(", ")}`)
   }
-  if (senzaColonne.length > 0) {
-    warnings.push(`${senzaColonne.length} entità senza colonne non producono una tabella: ${senzaColonne.join(", ")}`)
+  if (withoutColumns.length > 0) {
+    warnings.push(`${withoutColumns.length} entità senza colonne non producono una tabella: ${withoutColumns.join(", ")}`)
   }
-  if (aMano > 0) {
-    warnings.push(`${aMano} relazioni disegnate a mano non hanno colonne: nessuna FOREIGN KEY emessa, solo un commento`)
+  if (handDrawn > 0) {
+    warnings.push(`${handDrawn} relazioni disegnate a mano non hanno colonne: nessuna FOREIGN KEY emessa, solo un commento`)
   }
-  if (senzaPk.size > 0) {
+  if (withoutPk.size > 0) {
     warnings.push(
-      `${senzaPk.size} entità referenziate non hanno PRIMARY KEY: in MySQL l'ALTER TABLE fallirà (${[...senzaPk].sort().join(", ")})`,
+      `${withoutPk.size} entità referenziate non hanno PRIMARY KEY: in MySQL l'ALTER TABLE fallirà (${[...withoutPk].sort().join(", ")})`,
     )
   }
 

@@ -149,12 +149,12 @@ ALTER TABLE "ordini"
       target: { entity: "p", attributes: ["id"], cardinality: "one" },
       identifying: false,
     })
-    const figlio = (name: string) => entity(name, [attr("p_id", "int")])
+    const childEntity = (name: string) => entity(name, [attr("p_id", "int")])
     const m: ErModel = {
       entities: {
         p: entity("p", [attr("id", "int", { primaryKey: true, nullable: false })]),
-        c1: figlio("c1"),
-        c2: figlio("c2"),
+        c1: childEntity("c1"),
+        c2: childEntity("c2"),
       },
       // Due relazioni con lo stesso nome esplicito: la seconda deve essere rinominata.
       relationships: { a: { ...rel("c1"), name: "fk_condiviso" }, b: { ...rel("c2"), name: "fk_condiviso" } },
@@ -175,5 +175,38 @@ ALTER TABLE "ordini"
 
   it("è deterministico: due chiamate danno la stessa stringa", () => {
     expect(emitDdl(model(), "postgres").text).toBe(emitDdl(model(), "postgres").text)
+  })
+
+  it("ordina le relazioni per chiave alfabetica, non per ordine di inserimento", () => {
+    // Le chiavi sono inserite fuori ordine (z prima di a): se qualcuno rompesse il
+    // `.sort()` su `Object.keys(model.relationships)`, gli ALTER TABLE comparirebbero
+    // nell'ordine di inserimento (fk_z prima di fk_a) e questo test lo direbbe.
+    const rel = (child: string): Relationship => ({
+      source: { entity: child, attributes: ["p_id"], cardinality: "zero-or-many" },
+      target: { entity: "p", attributes: ["id"], cardinality: "one" },
+      identifying: false,
+    })
+    const childEntity = (name: string) => entity(name, [attr("p_id", "int")])
+    const m: ErModel = {
+      entities: {
+        p: entity("p", [attr("id", "int", { primaryKey: true, nullable: false })]),
+        c1: childEntity("c1"),
+        c2: childEntity("c2"),
+      },
+      relationships: { z: { ...rel("c2"), name: "fk_z" }, a: { ...rel("c1"), name: "fk_a" } },
+    }
+    const { text } = emitDdl(m, "postgres")
+    expect(text.indexOf('ADD CONSTRAINT "fk_a"')).toBeLessThan(text.indexOf('ADD CONSTRAINT "fk_z"'))
+  })
+
+  it("non sopprime UNIQUE sulla colonna PRIMARY KEY: il round-trip del Task 4 lo richiede", () => {
+    // Chiarimento esplicito del brief: UNIQUE e PRIMARY KEY non si escludono a vicenda.
+    // È l'ottimizzazione che un futuro lettore sarebbe tentato di "correggere" come ridondante.
+    const m: ErModel = {
+      entities: { t: entity("t", [attr("id", "int", { primaryKey: true, nullable: false, unique: true })]) },
+      relationships: {},
+    }
+    const { text } = emitDdl(m, "postgres")
+    expect(text).toContain('  "id" int NOT NULL UNIQUE')
   })
 })

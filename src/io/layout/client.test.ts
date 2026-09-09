@@ -73,6 +73,17 @@ describe("createLayoutEngine", () => {
     expect(w.terminated).toBe(true)
   })
 
+  it("un messaggio illeggibile rigetta ma il worker resta valido", async () => {
+    const w = new FakeWorker()
+    const engine = createLayoutEngine(() => w)
+    const pending = engine.layout(NODES, EDGES)
+    w.emit("messageerror", new Event("messageerror"))
+    await expect(pending).rejects.toThrow(/illeggibile/)
+    // A differenza di un errore di caricamento o di un timeout, un singolo messaggio
+    // non deserializzabile non condanna il worker: si tiene per il prossimo layout.
+    expect(w.terminated).toBe(false)
+  })
+
   it("una seconda richiesta abbandona la prima: una voce di undo per gesto, non due", async () => {
     const workers: FakeWorker[] = []
     const engine = createLayoutEngine(() => {

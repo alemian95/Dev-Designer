@@ -94,6 +94,54 @@ del tutto l'accesso lancia, e qui il lancio è durante il primo render:
 pagina bianca. Lo script inline aggiunto per DT-4 si protegge, l'hook no.
 Notato lavorando su DT-4, non corretto perché fuori dai sei fix chiesti.
 
+### Import DDL
+
+- **`mysql.ts` può far accumulare un duplicato in `table.unique`**: succede
+  quando una colonna ha `UNIQUE` scritto in linea *e* un vincolo di tabella
+  che la nomina (`col int UNIQUE, ..., UNIQUE KEY nome (col)` — ridondante ma
+  sintatticamente valido). Oggi l'effetto è **inerte**: per il caso a colonna
+  singola l'unico consumatore è [map.ts:35](../src/io/ddl/map.ts), che
+  collassa i duplicati in un booleano con `.some()`, e il conteggio dei
+  compositi a `map.ts:98` filtra `length > 1`. Il varco resta nell'array
+  grezzo, per un eventuale consumatore futuro che lo leggesse senza passare
+  da `.some()`.
+- Il test dell'`UNIQUE` in linea in `mysql.test.ts` non asserisce
+  `r.warnings` né `r.skipped`, a differenza del suo gemello immediatamente
+  sopra, che li verifica entrambi.
+- `mysql.test.ts:58`: refuso cosmetico in un commento — un doppio apice
+  dritto al posto del backtick di chiusura.
+
+### Export DDL
+
+- **`serial` non produce avviso** pur avendo semantiche diverse nei due
+  dialetti (in MySQL è `BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`): appartiene
+  a entrambi gli insiemi in [sql-types.ts](../src/io/emit/sql-types.ts).
+  Deciso così per non tradurre la semantica.
+- **`baseType` si confonde su un letterale con una parentesi chiusa dentro**,
+  come `enum('a)b')`: il risultato non corrisponde a nessun insieme e quindi
+  non produce alcun avviso. Il docblock lo dichiara già come limite noto —
+  fallire in silenzio è il modo giusto di sbagliare, qui — ma nessun test lo
+  esercita.
+
+### Export testo (dialog)
+
+- `TextExportDialog.tsx`: una non-null assertion su `FORMATS.find(...)`,
+  sicura perché `FORMATS` copre l'union `Format`, ma un `satisfies` la
+  renderebbe verificabile da `tsc` invece che da un'assunzione umana.
+- `TextExportDialog.tsx`: il testo dell'avviso è usato come `key` React: due
+  avvisi con testo identico darebbero chiavi duplicate.
+- `TextExportDialog.tsx`: un `aria-label` ridondante su un `ToggleGroupItem`
+  che ha già il testo visibile come figlio — l'`aria-label` sovrascrive il
+  nome accessibile che il testo darebbe da sé.
+
+### Tooling
+
+- `scripts/e2e/export-testo.mjs`: il blocco che importa il DDL duplica quasi
+  verbatim quello di `export.mjs`. Non è un difetto introdotto da questo
+  lavoro: è la prassi esistente — anche `export.mjs` duplica invece di
+  riusare un aiutante di `import.mjs`. Da estrarre in un `helpers.mjs`
+  condiviso, quando servirà un terzo scenario.
+
 ---
 
 ## Archivio

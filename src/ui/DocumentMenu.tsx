@@ -1,4 +1,4 @@
-import { ChevronDown, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, Save, SaveAll } from "lucide-react"
+import { ChevronDown, ClipboardCopy, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, Save, SaveAll } from "lucide-react"
 import { useState, type ChangeEvent } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import type { RecentEntry } from "@/io/db"
 import { documentSession } from "@/io/document-session"
 import { readFile } from "@/io/file"
 import { requestOpen, UPLOAD_INPUT_ID } from "./document-actions"
-import { exportPng, exportSvg } from "./export/lazy"
+import { copyPng, exportPng, exportSvg } from "./export/lazy"
 import { TextExportDialog } from "./export/TextExportDialog"
 import { ImportDdlDialog } from "./import/ImportDdlDialog"
 
@@ -59,6 +59,7 @@ export function DocumentMenu() {
           {/* L'export è una lettura: funziona anche in sola lettura. */}
           <DropdownMenuItem onSelect={() => void exportSvg()}><FileImage /> Esporta SVG</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void exportPng()}><Image /> Esporta PNG</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void copyPng()}><ClipboardCopy /> Copia PNG</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setTextExportOpen(true)}><FileText /> Esporta testo…</DropdownMenuItem>
           {recent.length > 0 && (
             <>

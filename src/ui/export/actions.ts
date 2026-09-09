@@ -114,3 +114,27 @@ export async function exportPng(): Promise<void> {
   const svg = await currentSvg()
   if (svg) download(documentFileName("png"), await svgToPng(svg), "image/png")
 }
+
+/**
+ * Copia il diagramma come PNG negli appunti. Non fa nulla se non c'è nessuna entità.
+ *
+ * Dove `ClipboardItem` non esiste (contesto non sicuro, browser vecchi) si ricade sul download:
+ * l'immagine si ottiene comunque, in un passo in più.
+ */
+export function copyPng(): Promise<void> {
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") return exportPng()
+
+  // Il diagramma vuoto si riconosce qui, sincrono di proposito: sotto non si può attendere niente
+  // prima di `write`. Il caso più fine — entità senza posizione — resta al null di buildSvg.
+  const { entities } = erDiagram(documentStore.getState().doc).model
+  if (Object.keys(entities).length === 0) return Promise.resolve()
+
+  // Dentro `ClipboardItem` va la promise, non il blob: Safari annulla la scrittura se il gesto
+  // dell'utente è già finito quando `write` parte, e così font e rasterizzazione restano dentro il
+  // gesto. Chrome accetta entrambe le forme.
+  const png = currentSvg().then((svg) => {
+    if (!svg) throw new Error("PNG non generato: nessuna entità con una posizione")
+    return svgToPng(svg)
+  })
+  return navigator.clipboard.write([new ClipboardItem({ "image/png": png })])
+}

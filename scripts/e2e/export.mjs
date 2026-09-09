@@ -1,5 +1,6 @@
 /**
- * End-to-end dell'export immagini: importa un DDL → seleziona un'entità → esporta SVG → esporta PNG.
+ * End-to-end dell'export immagini: importa un DDL → seleziona un'entità → esporta SVG → esporta PNG →
+ * copia il PNG negli appunti.
  *
  * Copre le tre cose che nessun test unitario può provare, perché non esistono senza un browser vero:
  * il woff2 scaricato e incorporato come `data:` URI, i colori del tema letti con `getComputedStyle`
@@ -42,7 +43,12 @@ export async function run(browser, base) {
     process.stdout.write("ok\n")
   }
 
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  // I permessi degli appunti servono al passo della copia: la scrittura senza permesso fallirebbe,
+  // e la rilettura che la verifica non è nemmeno possibile senza `clipboard-read`.
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    permissions: ["clipboard-read", "clipboard-write"],
+  })
   const page = await context.newPage()
   page.on("pageerror", (e) => pageErrors.push(String(e)))
   page.on("console", (m) => m.type() === "error" && pageErrors.push(m.text()))
@@ -86,6 +92,7 @@ export async function run(browser, base) {
     })
 
     let svg
+    let atteso
     await step("esporta un SVG autoconsistente, in chiaro e senza la selezione", async () => {
       const download = page.waitForEvent("download", { timeout: 30_000 })
       await pickFromMenu(page, page.getByRole("menuitem", { name: "Esporta SVG" }))
@@ -129,8 +136,31 @@ export async function run(browser, base) {
 
       // Le misure si confrontano con quelle che l'SVG dichiara per sé: è la catena intera, non una
       // costante scritta due volte.
-      const atteso = { w: Number(/ width="(\d+)"/.exec(svg)[1]) * 2, h: Number(/ height="(\d+)"/.exec(svg)[1]) * 2 }
+      atteso = { w: Number(/ width="(\d+)"/.exec(svg)[1]) * 2, h: Number(/ height="(\d+)"/.exec(svg)[1]) * 2 }
       if (w !== atteso.w || h !== atteso.h) throw new Error(`PNG ${w}×${h}, atteso ${atteso.w}×${atteso.h}`)
+    })
+
+    await step("copia negli appunti lo stesso PNG, senza scaricare niente", async () => {
+      await pickFromMenu(page, page.getByRole("menuitem", { name: "Copia PNG" }))
+
+      // La scrittura parte col click e finisce dopo: si riprova finché l'immagine non c'è. Non con
+      // `waitForFunction`, che sul valore nullo del predicato asincrono qui restituiva null invece
+      // di riprovare. Tornano solo i primi 24 byte, quanti bastano all'IHDR: il PNG intero
+      // passerebbe per JSON byte per byte.
+      let bytes = null
+      for (let i = 0; i < 60 && !bytes; i++) {
+        if (i > 0) await page.waitForTimeout(250)
+        bytes = await page.evaluate(async () => {
+          const item = (await navigator.clipboard.read()).find((i) => i.types.includes("image/png"))
+          if (!item) return null
+          const blob = await item.getType("image/png")
+          return [...new Uint8Array(await blob.arrayBuffer()).slice(0, 24)]
+        })
+      }
+      if (!bytes) throw new Error("nessuna immagine negli appunti dopo 15 s")
+
+      const { w, h } = pngSize(Buffer.from(bytes))
+      if (w !== atteso.w || h !== atteso.h) throw new Error(`PNG negli appunti ${w}×${h}, atteso ${atteso.w}×${atteso.h}`)
     })
 
     await context.close()

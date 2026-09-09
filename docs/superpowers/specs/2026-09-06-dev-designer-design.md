@@ -64,9 +64,9 @@ fonte di verità; il testo è import ed export.
 ### Ordine di consegna
 
 1. ~~Shell + ER completo (disegno, validazione, import DDL, export DDL e
-   Mermaid).~~ Fatto: import DDL, export immagini (SVG, PNG) ed export testo
-   (DDL PostgreSQL e MySQL, Mermaid). Restano fuori l'auto layout con ELK e la
-   copia dell'immagine negli appunti, che hanno spec proprie.
+   Mermaid).~~ Fatto: import DDL, export immagini (SVG, PNG), export testo (DDL
+   PostgreSQL e MySQL, Mermaid) e copia del PNG negli appunti. Resta fuori
+   l'auto layout con ELK, che avrà spec propria.
 2. Class diagram.
 3. Flowchart.
 4. Sequence.

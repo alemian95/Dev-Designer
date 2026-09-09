@@ -4,3 +4,4 @@
  */
 export const exportSvg = (): Promise<void> => import("./actions").then((m) => m.exportSvg())
 export const exportPng = (): Promise<void> => import("./actions").then((m) => m.exportPng())
+export const copyPng = (): Promise<void> => import("./actions").then((m) => m.copyPng())

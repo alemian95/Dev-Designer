@@ -53,11 +53,11 @@ function createTable(dialect: Dialect, e: Entity): string {
  * I nomi si deduplicano perché MySQL li pretende unici per **database**, non per tabella: due
  * tabelle con la stessa colonna FK verso la stessa destinazione collidono.
  */
-function constraintName(rel: Relationship, child: Entity, used: Set<string>, warnings: string[]): string {
+function constraintName(rel: Relationship, child: Entity, used: Set<string>, renamed: string[]): string {
   const base = rel.name?.trim() || `${child.name}_${rel.source.attributes.join("_")}_fkey`
   let name = base
   for (let i = 2; used.has(name); i++) name = `${base}_${i}`
-  if (name !== base) warnings.push(`il nome di vincolo "${base}" era già usato: emesso come "${name}"`)
+  if (name !== base) renamed.push(`"${base}" → "${name}"`)
   used.add(name)
   return name
 }
@@ -102,6 +102,8 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
   }
 
   const used = new Set<string>()
+  const renamed: string[] = []
+  const skipped: string[] = []
   let handDrawn = 0
   const withoutPk = new Set<string>()
   for (const key of Object.keys(model.relationships).sort()) {
@@ -109,7 +111,7 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
     const child = model.entities[rel.source.entity]
     const parent = model.entities[rel.target.entity]
     if (!child || !parent) {
-      warnings.push(`relazione "${key}" saltata: un estremo non è nel diagramma`)
+      skipped.push(key)
       continue
     }
     if (rel.source.attributes.length === 0 || rel.target.attributes.length === 0) {
@@ -121,7 +123,7 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
     }
     if (!parent.attributes.some((a) => a.primaryKey)) withoutPk.add(rel.target.entity)
     out.push(
-      `ALTER TABLE ${qualified(dialect, child)}\n  ADD CONSTRAINT ${quote(dialect, constraintName(rel, child, used, warnings))}` +
+      `ALTER TABLE ${qualified(dialect, child)}\n  ADD CONSTRAINT ${quote(dialect, constraintName(rel, child, used, renamed))}` +
         ` FOREIGN KEY (${columns(dialect, rel.source.attributes)})` +
         ` REFERENCES ${qualified(dialect, parent)} (${columns(dialect, rel.target.attributes)});`,
       "",
@@ -145,6 +147,12 @@ export function emitDdl(model: ErModel, dialect: Dialect): EmitResult {
     warnings.push(
       `${withoutPk.size} entità referenziate non hanno PRIMARY KEY: in MySQL l'ALTER TABLE fallirà (${[...withoutPk].sort().join(", ")})`,
     )
+  }
+  if (skipped.length > 0) {
+    warnings.push(`${skipped.length} relazioni saltate, un estremo non è nel diagramma: ${skipped.join(", ")}`)
+  }
+  if (renamed.length > 0) {
+    warnings.push(`${renamed.length} nomi di vincolo erano già usati: ${renamed.join(", ")}`)
   }
 
   return { text: `${out.join("\n").trimEnd()}\n`, warnings }

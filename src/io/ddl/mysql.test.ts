@@ -55,7 +55,7 @@ describe("parseMysql", () => {
   it("riconosce l'UNIQUE scritto in linea sulla colonna, in entrambe le grafie", () => {
     // A differenza del vincolo di tabella, quando UNIQUE è scritto in linea sulla colonna
     // `node-sql-parser` non produce un elemento a parte con `resource: "constraint"`: mette il
-    // flag direttamente sull'elemento colonna (`resource: "column"`), come `unique` o `unique key".
+    // flag direttamente sull'elemento colonna (`resource: "column"`), come `unique` o `unique key`.
     const r = parseMysql(`CREATE TABLE \`t\` (
       \`a\` int UNIQUE,
       \`b\` int UNIQUE KEY,
@@ -63,6 +63,15 @@ describe("parseMysql", () => {
     );`)
     const t = find(r, "t")
     expect(t.unique).toEqual([["a"], ["b"]])
+    expect(r.warnings).toEqual([])
+    expect(r.skipped).toEqual({})
+  })
+
+  it("l'UNIQUE scritto due volte sulla stessa colonna non la duplica in table.unique", () => {
+    // Ridondante ma sintatticamente valido. I due percorsi che riempiono `unique` sono distinti —
+    // l'elemento colonna e l'elemento vincolo — e nessuno dei due sa dell'altro.
+    const r = parseMysql("CREATE TABLE `t` (`a` int UNIQUE, UNIQUE KEY `t_a_unique` (`a`));")
+    expect(find(r, "t").unique).toEqual([["a"]])
   })
 
   it("la PRIMARY KEY spegne nullable anche senza NOT NULL scritto", () => {

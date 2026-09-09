@@ -133,7 +133,7 @@ ALTER TABLE "ordini"
     m.relationships["r1"]!.target.entity = "inesistente"
     const { text, warnings } = emitDdl(m, "postgres")
     expect(text).not.toContain("ADD CONSTRAINT")
-    expect(warnings).toContain('relazione "r1" saltata: un estremo non è nel diagramma')
+    expect(warnings).toContain("1 relazioni saltate, un estremo non è nel diagramma: r1")
   })
 
   it("emette il tipo vuoto come text e lo dice", () => {
@@ -162,7 +162,7 @@ ALTER TABLE "ordini"
     const { text, warnings } = emitDdl(m, "postgres")
     expect(text).toContain('ADD CONSTRAINT "fk_condiviso"')
     expect(text).toContain('ADD CONSTRAINT "fk_condiviso_2"')
-    expect(warnings).toContain('il nome di vincolo "fk_condiviso" era già usato: emesso come "fk_condiviso_2"')
+    expect(warnings).toContain('1 nomi di vincolo erano già usati: "fk_condiviso" → "fk_condiviso_2"')
   })
 
   it("avvisa sui tipi estranei al dialetto senza tradurli", () => {

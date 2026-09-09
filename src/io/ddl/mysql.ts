@@ -121,6 +121,9 @@ function readCreate(ast: { table?: Array<{ table?: string; db?: string | null }>
   }
   // I vincoli dopo le colonne: la PRIMARY KEY deve poter spegnere `nullable`.
   for (const d of defs) if (d.resource !== "column") applyDefinition(table, d)
+  // Una colonna può avere UNIQUE in linea **e** un vincolo di tabella che la nomina: ridondante ma
+  // valido, e senza questo la stessa colonna finirebbe due volte nell'array.
+  table.unique = [...new Map(table.unique.map((cols) => [JSON.stringify(cols), cols])).values()]
   return table
 }
 

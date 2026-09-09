@@ -19,10 +19,11 @@ nessuno le riscopra come se fossero nuove.
 
 ## Da correggere
 
-Niente, al 2026-09-09. Le sei voci DT-1..DT-6 sono state corrette nel commit
-`eeca340`; restano qui sotto in **Corretti** perché una di esse è stata
-corretta in un posto diverso da quello che questo documento indicava, e la
-ragione vale più della voce.
+Niente, al 2026-09-09. DT-1..DT-6 sono state corrette nel commit `eeca340`,
+DT-7 e le minori aperte dalla revisione di `feat/export-testo` subito dopo;
+restano qui sotto in **Corretti** perché due di esse sono state corrette in un
+posto diverso da quello che questo documento indicava, e la ragione vale più
+della voce.
 
 ---
 
@@ -82,79 +83,39 @@ entrambi.
 `process.exitCode = 1` su FAIL, e le due soglie scritte a mano interpolano
 `THRESHOLD_MS`.
 
----
-
-## Nuove voci
-
 ### DT-7 · `use-theme.ts` non protegge l'accesso a `localStorage`
 
-`initial()` in [use-theme.ts](../src/ui/use-theme.ts) chiama
-`localStorage.getItem` senza `try/catch`. Dove i dati del sito sono bloccati
-del tutto l'accesso lancia, e qui il lancio è durante il primo render:
-pagina bianca. Lo script inline aggiunto per DT-4 si protegge, l'hook no.
-Notato lavorando su DT-4, non corretto perché fuori dai sei fix chiesti.
+`try/catch` su entrambi gli accessi in [use-theme.ts](../src/ui/use-theme.ts),
+non solo su `getItem` come diceva la voce: dove i dati del sito sono bloccati
+anche `setItem` lancia, e lì il lancio è dentro l'effect — stessa pagina
+bianca per una strada diversa. Senza jsdom non c'è dove eseguire un test:
+simulare lo storage bloccato in Playwright costa più del difetto.
 
-### Import DDL
+### Minori chiuse il 2026-09-09
 
-- **`mysql.ts` può far accumulare un duplicato in `table.unique`**: succede
-  quando una colonna ha `UNIQUE` scritto in linea *e* un vincolo di tabella
-  che la nomina (`col int UNIQUE, ..., UNIQUE KEY nome (col)` — ridondante ma
-  sintatticamente valido). Oggi l'effetto è **inerte**: per il caso a colonna
-  singola l'unico consumatore è [map.ts:35](../src/io/ddl/map.ts), che
-  collassa i duplicati in un booleano con `.some()`, e il conteggio dei
-  compositi a `map.ts:98` filtra `length > 1`. Il varco resta nell'array
-  grezzo, per un eventuale consumatore futuro che lo leggesse senza passare
-  da `.some()`.
-- Il test dell'`UNIQUE` in linea in `mysql.test.ts` non asserisce
-  `r.warnings` né `r.skipped`, a differenza del suo gemello immediatamente
-  sopra, che li verifica entrambi.
-- `mysql.test.ts:58`: refuso cosmetico in un commento — un doppio apice
-  dritto al posto del backtick di chiusura.
+Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 
-### Export DDL
-
-- **`serial` non produce avviso** pur avendo semantiche diverse nei due
-  dialetti (in MySQL è `BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`): appartiene
-  a entrambi gli insiemi in [sql-types.ts](../src/io/emit/sql-types.ts).
-  Deciso così per non tradurre la semantica.
-- **`baseType` si confonde su un letterale con una parentesi chiusa dentro**,
-  come `enum('a)b')`: il risultato non corrisponde a nessun insieme e quindi
-  non produce alcun avviso. Il docblock lo dichiara già come limite noto —
-  fallire in silenzio è il modo giusto di sbagliare, qui — ma nessun test lo
-  esercita.
-
-### Export testo (dialog)
-
-- **`mermaid.ts` non osserva il contratto degli avvisi aggregati che
-  [result.ts:4-5](../src/io/emit/result.ts) dichiara** («aggregati … non una
-  riga per colonna»): `ddl.ts` lo rispetta, con cinque categorie riunite
-  ciascuna in un solo avviso con conteggio ed elenco, ma
-  [mermaid.ts](../src/io/emit/mermaid.ts) ne emette uno per occorrenza, in
-  tre punti — `word()` (riga 29, backtick rimossi dal tipo o dal nome di un
-  attributo), `entityName()` (riga 40, caratteri illegali nel nome di
-  un'entità) e il corpo di `emitMermaid` (riga 65, virgolette rimosse
-  dall'etichetta di una relazione). Su un diagramma con molte entità dal
-  nome anomalo il dialog mostrerebbe una riga per entità, proprio il caso
-  che il contratto vuole evitare. Non corretto in sede di revisione finale
-  del branch `feat/export-testo`: aggregare qui è un cambiamento di
-  comportamento a lavoro finito, con la sua coda di test da riscrivere —
-  scelta deliberata, non una svista.
-- `TextExportDialog.tsx`: una non-null assertion su `FORMATS.find(...)`,
-  sicura perché `FORMATS` copre l'union `Format`, ma un `satisfies` la
-  renderebbe verificabile da `tsc` invece che da un'assunzione umana.
-- `TextExportDialog.tsx`: il testo dell'avviso è usato come `key` React: due
-  avvisi con testo identico darebbero chiavi duplicate.
-- `TextExportDialog.tsx`: un `aria-label` ridondante su un `ToggleGroupItem`
-  che ha già il testo visibile come figlio — l'`aria-label` sovrascrive il
-  nome accessibile che il testo darebbe da sé.
-
-### Tooling
-
-- `scripts/e2e/export-testo.mjs`: il blocco che importa il DDL duplica quasi
-  verbatim quello di `export.mjs`. Non è un difetto introdotto da questo
-  lavoro: è la prassi esistente — anche `export.mjs` duplica invece di
-  riusare un aiutante di `import.mjs`. Da estrarre in un `helpers.mjs`
-  condiviso, quando servirà un terzo scenario.
+- **Avvisi aggregati**: `mermaid.ts` emetteva un avviso per occorrenza in tre
+  punti, contro il contratto di [result.ts](../src/io/emit/result.ts).
+  Aggregati per categoria, con conteggio ed elenco. Toccato anche `ddl.ts`,
+  che la voce dava per conforme: i suoi avvisi «relazione saltata» e «nome di
+  vincolo già usato» erano anch'essi per occorrenza e scalano col numero di
+  relazioni. Chiudere la voce lasciandoli lì avrebbe dichiarato onorato un
+  contratto ancora rotto. Un test in `mermaid.test.ts` tiene fermo il
+  comportamento: tre nomi anomali, tre backtick e due relazioni saltate
+  devono dare tre avvisi, non otto.
+- **`table.unique` duplicato** in `mysql.ts`: deduplicato in coda a
+  `readCreate`, invece di coordinare i due percorsi che lo riempiono.
+- **`baseType` su `enum('a)b')`**: il limite resta — tradurre il taglio delle
+  parentesi in un vero parser di letterali non vale il prezzo — ma ora un
+  test lo esercita e fissa il modo in cui fallisce, cioè in silenzio.
+- **`TextExportDialog.tsx`**: `FORMATS` è un `Record<Format, …>`, quindi
+  `FORMATS[format]` è totale e la non-null assertion è sparita; la chiave
+  React degli avvisi è l'indice; l'`aria-label` ridondante sui
+  `ToggleGroupItem` è stato tolto (l'e2e seleziona per testo visibile, che dà
+  lo stesso nome accessibile).
+- **`mysql.test.ts`**: il test dell'`UNIQUE` in linea asserisce `warnings` e
+  `skipped` come il suo gemello, e il refuso nel commento è corretto.
 
 ---
 
@@ -286,6 +247,14 @@ Notato lavorando su DT-4, non corretto perché fuori dai sei fix chiesti.
   importa. Il ramo MySQL è coperto end-to-end nel browser; **non** sono
   coperti il caricamento da file e il toggle manuale del dialetto.
 
+### Export testo
+
+- **`serial` non produce avviso** pur avendo semantiche diverse nei due
+  dialetti (in MySQL è `BIGINT UNSIGNED NOT NULL AUTO_INCREMENT`): appartiene
+  a entrambi gli insiemi in [sql-types.ts](../src/io/emit/sql-types.ts).
+  Deciso così per non tradurre la semantica — è il confine dell'emettitore,
+  non un difetto.
+
 ### Tooling
 
 - ~~La regola ESLint di layering è su `**/*.ts` e non copre i `.tsx` in
@@ -297,6 +266,10 @@ Notato lavorando su DT-4, non corretto perché fuori dai sei fix chiesti.
 - Script di prestazione → **corretto**, vedi DT-6.
 - Non esiste `ErrorBoundary` né un gestore di `unhandledrejection`: la
   correzione dell'avvio ha chiuso il percorso noto, non la classe.
+- Il blocco che importa un DDL è duplicato quasi verbatim fra
+  `scripts/e2e/export-testo.mjs` e `export.mjs`, che a sua volta duplica
+  invece di riusare un aiutante di `import.mjs`. Da estrarre in un
+  `helpers.mjs` condiviso quando servirà un terzo scenario: ce ne sono due.
 
 ---
 

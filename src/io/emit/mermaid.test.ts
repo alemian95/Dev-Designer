@@ -67,14 +67,14 @@ describe("emitMermaid", () => {
     const m: ErModel = { entities: { 'a"b%c': entity('a"b%c', [attr("x", "int")]) }, relationships: {} }
     const { text, warnings } = emitMermaid(m)
     expect(text).toContain('"a_b_c" {')
-    expect(warnings).toContain('il nome "a"b%c" contiene caratteri che Mermaid non ammette: emesso come "a_b_c"')
+    expect(warnings).toContain('1 nomi di entità contengono caratteri che Mermaid non ammette: "a"b%c" → "a_b_c"')
   })
 
   it("rimuove i backtick dal tipo: dentro block_bq non c'è modo di sfuggirli", () => {
     const m: ErModel = { entities: { t: entity("t", [attr("a", "int`x y")]) }, relationships: {} }
     const { text, warnings } = emitMermaid(m)
     expect(text).toContain("    `intx y` a")
-    expect(warnings).toContain("il tipo di t.a: i backtick sono stati rimossi, Mermaid non li sa sfuggire")
+    expect(warnings).toContain("1 valori avevano backtick, rimossi perché Mermaid non li sa sfuggire: il tipo di t.a")
   })
 
   it("emette `_` per il tipo vuoto: in Mermaid è un'etichetta, non SQL", () => {
@@ -132,7 +132,7 @@ describe("emitMermaid", () => {
     m.relationships["r1"]!.target.entity = "inesistente"
     const { text, warnings } = emitMermaid(m)
     expect(text).not.toContain("|o..o{")
-    expect(warnings).toContain('relazione "r1" saltata: un estremo non è nel diagramma')
+    expect(warnings).toContain("1 relazioni saltate, un estremo non è nel diagramma: r1")
   })
 
   it("salta la relazione con un estremo fuori dal diagramma (source mancante)", () => {
@@ -142,7 +142,7 @@ describe("emitMermaid", () => {
     m.relationships["r1"]!.source.entity = "inesistente"
     const { text, warnings } = emitMermaid(m)
     expect(text).not.toContain("|o..o{")
-    expect(warnings).toContain('relazione "r1" saltata: un estremo non è nel diagramma')
+    expect(warnings).toContain("1 relazioni saltate, un estremo non è nel diagramma: r1")
   })
 
   it("ordina le relazioni per chiave alfabetica, non per ordine di inserimento", () => {
@@ -198,7 +198,38 @@ describe("emitMermaid", () => {
     const { text, warnings } = emitMermaid(m)
     expect(text).toContain(' : "il migliore"')
     expect(warnings).toContain(
-      'il nome della relazione "r1": le virgolette sono state rimosse, Mermaid non le sa sfuggire nell\'etichetta',
+      "1 etichette di relazione avevano virgolette, rimosse perché Mermaid non le sa sfuggire nell'etichetta: r1",
+    )
+  })
+  it("aggrega gli avvisi per categoria: un diagramma con tre nomi anomali ne produce uno solo", () => {
+    // È il contratto di result.ts: su un diagramma grande una riga per occorrenza è illeggibile,
+    // ed è il caso in cui questo emettitore sbagliava. Tre entità dal nome illegale, tre attributi
+    // col backtick e due relazioni saltate devono dare tre avvisi in tutto, non otto.
+    const m: ErModel = {
+      entities: {
+        'a"1': entity('a"1', [attr("x", "int`a")]),
+        'a"2': entity('a"2', [attr("x", "int`b")]),
+        'a"3': entity('a"3', [attr("x", "int`c")]),
+      },
+      relationships: {
+        r1: {
+          source: { entity: "assente", attributes: ["x"], cardinality: "one" },
+          target: { entity: 'a"1', attributes: ["x"], cardinality: "one" },
+          identifying: false,
+        },
+        r2: {
+          source: { entity: "assente", attributes: ["x"], cardinality: "one" },
+          target: { entity: 'a"2', attributes: ["x"], cardinality: "one" },
+          identifying: false,
+        },
+      },
+    }
+    const { warnings } = emitMermaid(m)
+    expect(warnings).toHaveLength(3)
+    expect(warnings).toContain("2 relazioni saltate, un estremo non è nel diagramma: r1, r2")
+    expect(warnings).toContain('3 nomi di entità contengono caratteri che Mermaid non ammette: "a"1" → "a_1", "a"2" → "a_2", "a"3" → "a_3"')
+    expect(warnings).toContain(
+      "3 valori avevano backtick, rimossi perché Mermaid non li sa sfuggire: il tipo di a\"1.x, il tipo di a\"2.x, il tipo di a\"3.x",
     )
   })
 })

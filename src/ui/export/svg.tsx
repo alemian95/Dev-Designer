@@ -77,11 +77,22 @@ export function buildSvg(diagram: ErDiagram, { vars, fontFace }: BuildSvgOptions
   return resolveVars(svg, vars)
 }
 
-/** Sostituisce ogni `var(--x)` col valore letterale. Quello che manca resta com'è, visibile. */
+/**
+ * Sostituisce ogni `var(--x)` col valore letterale. Quello che manca resta com'è, visibile.
+ *
+ * I valori vanno **sempre** dentro un attributo, quindi vanno sfuggiti: `--font-mono` in
+ * produzione arriva come `"JetBrains Mono Variable", monospace` — con le doppie, perché è così
+ * che il CSS minificato normalizza il quoting — e infilato grezzo chiuderebbe l'attributo,
+ * rendendo l'SVG malformato e impossibile da aprire o rasterizzare.
+ */
 function resolveVars(svg: string, vars: Record<string, string>): string {
   let out = svg
   for (const [name, value] of Object.entries(vars)) {
-    out = out.replaceAll(`var(${name})`, value)
+    out = out.replaceAll(`var(${name})`, xmlAttr(value))
   }
   return out
+}
+
+function xmlAttr(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;")
 }

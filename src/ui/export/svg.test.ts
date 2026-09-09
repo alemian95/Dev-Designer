@@ -36,7 +36,9 @@ const vars = {
   "--muted": "#f4f4f5",
   "--muted-foreground": "#71717a",
   "--primary": "#18181b",
-  "--font-mono": "'JetBrains Mono Variable', monospace",
+  // Le doppie non sono un capriccio: è la forma in cui il CSS minificato restituisce il valore
+  // in produzione, ed è quella che rompeva l'SVG infilata grezza in un attributo.
+  "--font-mono": '"JetBrains Mono Variable", monospace',
 }
 
 describe("buildSvg", () => {
@@ -117,6 +119,20 @@ describe("buildSvg", () => {
   it("dichiara il namespace SVG, altrimenti il file non si apre da solo", () => {
     const svg = buildSvg(diagram(), { vars })!
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
+  })
+
+  it("sfugge le virgolette dei valori sostituiti, o l'SVG è malformato", () => {
+    const svg = buildSvg(diagram(), { vars })!
+    expect(svg).toContain('font-family="&quot;JetBrains Mono Variable&quot;, monospace"')
+    // Nessun attributo può contenere una doppia virgoletta grezza: chiuderebbe l'attributo e il
+    // file non si aprirebbe né si rasterizzerebbe. Si controlla ogni valore fra virgolette.
+    for (const [, value] of svg.matchAll(/="([^"]*)"/g)) expect(value).not.toContain('"')
+    expect(svg).not.toMatch(/=""[^ >]/)
+  })
+
+  it("sfugge anche & e < in un valore, non solo le virgolette", () => {
+    const svg = buildSvg(diagram(), { vars: { ...vars, "--card": 'a&b<c"d' } })!
+    expect(svg).toContain('fill="a&amp;b&lt;c&quot;d"')
   })
 
   it("restituisce null su un diagramma senza entità: non c'è niente da esportare", () => {

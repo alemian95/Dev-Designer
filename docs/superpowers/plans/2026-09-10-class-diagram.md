@@ -1124,14 +1124,29 @@ Algoritmo per riga, nell'ordine:
    `trim()`ato, deve essere `static` o `abstract`, altrimenti errore
    «modificatore sconosciuto: "…"». Un `{` senza `}` è errore.
 4. Cerca la prima `(`. Se non c'è, è un **attributo**: il tipo è ciò che segue
-   l'ultimo `:`, il nome è ciò che precede. Se `isAbstract` era stato letto,
-   errore «un attributo non può essere abstract». Nome vuoto → errore.
+   l'ultimo `:` **al livello zero di parentesi** — tonde, angolari, quadre e
+   graffe — e il nome è ciò che precede. Il «fuori dalle parentesi» è la regola
+   4 della §5 della spec e **non** va perso: `+ x: { a: int }` e
+   `+ m: Map<K, V>` sono input plausibili per chi scrive TypeScript, e un
+   `lastIndexOf(":")` nudo li spezza nel punto sbagliato. È la stessa scansione
+   a livello zero che serve ai parametri: una primitiva, due usi.
+   Se `isAbstract` era stato letto, errore «un attributo non può essere
+   abstract». Nome vuoto → errore. **Il nome va validato:** se contiene un
+   carattere strutturale (`(`, `)`, `{`, `}`, `<`, `>`, `:`, `,`) è un errore
+   con la sua riga, non un nome da accettare — altrimenti `+ f)(x: int)`
+   produce un membro di nome `f)` senza che nessuno protesti, e lo schema lo
+   rifiuta molto più tardi, con la riga sbagliata.
 5. Se c'è: trova la `)` che la chiude **contando le parentesi** (i tipi generici
    con virgole non hanno parentesi, ma un tipo come `(int) => void` sì, e il
    conteggio è tre righe contro un `lastIndexOf` che sbaglia). Nessuna
    chiusura → errore «parentesi non bilanciate». Il nome è ciò che precede la
    `(`; i parametri sono l'interno diviso per virgola **al livello zero di
-   parentesi e di parentesi angolari** — è quello che fa passare il test su
+   parentesi e di parentesi angolari**, con **contatori separati per i due
+   tipi**: con un contatore unico una `<` mai chiusa tiene la profondità sopra
+   zero per tutto il resto della riga, e da lì in poi nessuna virgola viene più
+   riconosciuta — i parametri successivi spariscono dentro il tipo del primo, in
+   silenzio. Una parentesi mai chiusa dentro i parametri è un **errore con la
+   sua riga**, non un parametro da assorbire. È quello che fa passare il test su
    `Map<K, V>`. Dopo la `)`, un `:` opzionale introduce il tipo di ritorno; se
    manca, il tipo è `""`.
 

@@ -5,7 +5,7 @@ import { IDENTITY, type Viewport } from "./viewport"
 export type Tool = "select" | "node" | "edge"
 export type SelectionKind = "node" | "edge"
 
-/** Gli id di selezione hanno un prefisso di tipo: entità e relazioni possono avere la stessa chiave. */
+/** Gli id di selezione hanno un prefisso di tipo: nodi e archi possono avere la stessa chiave. */
 export const selId = (kind: SelectionKind, key: string): string => `${kind}:${key}`
 
 export function parseSelId(id: string): { kind: SelectionKind; key: string } {

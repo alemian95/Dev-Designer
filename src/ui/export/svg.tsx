@@ -1,8 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server"
+import { classRect } from "@/editor/class/geometry"
 import { entityRect } from "@/editor/er/geometry"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
+import type { ClassDiagram } from "@/model/class/schema"
 import type { Diagram } from "@/model/document"
 import type { ErDiagram } from "@/model/er/schema"
+import { ClassEdgeView } from "@/ui/canvas/ClassEdge"
+import { ClassNodeView } from "@/ui/canvas/ClassNode"
 import { EntityNodeView } from "@/ui/canvas/EntityNode"
 import { RelationshipEdgeView } from "@/ui/canvas/RelationshipEdge"
 
@@ -26,16 +30,15 @@ export interface BuildSvgOptions {
  * Uno switch sul tipo e non due componenti in più su `DiagramView` (`@/ui/canvas/kinds`):
  * `renderToStaticMarkup` costruisce l'albero fuori dal DOM di React, in un contesto senza uno
  * store da cui i layer del canvas potrebbero leggere. Ogni tipo vuole quindi le proprie viste
- * a prop — qui `EntityNodeView`/`RelationshipEdgeView` — non i layer sottoscritti che il canvas
- * usa. Il Task 12 aggiunge il ramo delle classi a questo switch.
+ * a prop — `EntityNodeView`/`RelationshipEdgeView` per l'ER, `ClassNodeView`/`ClassEdgeView`
+ * per le classi — non i layer sottoscritti che il canvas usa.
  */
 export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions): string | null {
   switch (diagram.type) {
     case "er":
       return buildErSvg(diagram, { vars, fontFace })
     case "class":
-      // Il Task 12 aggiunge questo ramo: qui c'è solo lo schema (Task 7).
-      throw new Error("Export SVG per il class diagram non è ancora implementato")
+      return buildClassSvg(diagram, { vars, fontFace })
   }
 }
 
@@ -83,6 +86,61 @@ function buildErSvg(diagram: ErDiagram, { vars, fontFace }: BuildSvgOptions): st
           const view = nodes[key]
           if (!view) return null
           return <EntityNodeView key={key} nodeKey={key} entity={entity} view={view} selected={false} />
+        })}
+      </g>
+    </>,
+  )
+
+  const style = fontFace ? `<style>${fontFace}</style>` : ""
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}"` +
+    ` font-family="var(--font-mono)" font-size="${FONT_SIZE}">${style}${body}</svg>`
+
+  return resolveVars(svg, vars)
+}
+
+/**
+ * Ri-renderizza il modello delle classi con le stesse viste del canvas, esattamente come
+ * `buildErSvg` fa per l'ER: stesso schema di bounds, sfondo e risoluzione delle variabili, solo
+ * `ClassNodeView`/`ClassEdgeView` al posto di `EntityNodeView`/`RelationshipEdgeView`.
+ *
+ * `null` se non c'è nessuna classe: non c'è niente da esportare.
+ */
+function buildClassSvg(diagram: ClassDiagram, { vars, fontFace }: BuildSvgOptions): string | null {
+  const { classes, relations } = diagram.model
+  const { nodes } = diagram.view
+
+  const rects = new Map<string, Rect>()
+  for (const [key, cls] of Object.entries(classes)) {
+    const view = nodes[key]
+    if (view) rects.set(key, classRect(cls, view))
+  }
+
+  const bounds = rectsBounds([...rects.values()])
+  if (!bounds) return null
+
+  const x = bounds.x - EXPORT_PADDING
+  const y = bounds.y - EXPORT_PADDING
+  const w = bounds.w + 2 * EXPORT_PADDING
+  const h = bounds.h + 2 * EXPORT_PADDING
+
+  // Gli archi sotto i nodi, come nel canvas e come in `buildErSvg`.
+  const body = renderToStaticMarkup(
+    <>
+      <rect data-background x={x} y={y} width={w} height={h} fill="var(--background)" />
+      <g data-layer="edges">
+        {Object.entries(relations).map(([key, relation]) => {
+          const source = rects.get(relation.source.class)
+          const target = rects.get(relation.target.class)
+          if (!source || !target) return null
+          return <ClassEdgeView key={key} edgeKey={key} relation={relation} source={source} target={target} selected={false} />
+        })}
+      </g>
+      <g data-layer="nodes">
+        {Object.entries(classes).map(([key, cls]) => {
+          const view = nodes[key]
+          if (!view) return null
+          return <ClassNodeView key={key} nodeKey={key} node={cls} view={view} selected={false} />
         })}
       </g>
     </>,

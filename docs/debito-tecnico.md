@@ -271,6 +271,43 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   invece di riusare un aiutante di `import.mjs`. Da estrarre in un
   `helpers.mjs` condiviso quando servirà un terzo scenario: ce ne sono due.
 
+### Class diagram
+
+- `IssuesPanel` ricalcola la validazione a ogni dispatch sul documento, non
+  solo ai cambi del modello: il selettore Zustand si è allargato da
+  `erDiagram(s.doc).model` a `s.doc` nel Task 6. Fix noto e di una riga:
+  selezionare `s.doc.diagram.model`, campo comune alla union e neutro per
+  tipo. Costo-se-sbagliato: basso — l'anteprima del drag è locale (non passa
+  dal document store) e il documento cambia una volta per commit.
+- `lastTopLevelColon` in `src/model/class/members.ts` non segnala le
+  parentesi sbilanciate, mentre `splitTopLevel` — nata dalla stessa
+  primitiva — sì: due funzioni con comportamenti diversi sullo stesso input
+  malformato. Costo-se-sbagliato: teorico — l'input che le distingue
+  (`+ x: a > b: int`) non è un tipo legittimo in nessun linguaggio.
+- `parseMembers` non valida i nomi contro `Identifier` dello schema: produce
+  oggetti strutturalmente tipizzati ma mai passati per `.parse()`. Un nome
+  che lo schema rifiuterebbe viene preso dal validatore molto più tardi, con
+  una riga di errore diversa da quella dove l'utente ha sbagliato.
+- Il calcolo della perpendicolare in `src/editor/class/geometry.ts`
+  (`umlMarkerPath`) duplica in forma le tre righe equivalenti di
+  `crowsFootPath` in `edge-routing.ts`. Con due soli consumatori resta dentro
+  la regola «tre righe simili valgono più di un'astrazione prematura»; al
+  terzo consumatore vale un `perpOf(dir)` condiviso.
+- Buchi di copertura, in una voce sola: lo stereotipo `enum` non è provato
+  nei tre punti che lo trattano — `hasStereotypeLine` (il test in
+  `geometry.test.ts` si intitola «interface ed enum» ma nel corpo asserisce
+  solo `interface` e `abstract`), il metodo astratto dentro un `enum`, e il
+  suo render; `renameClass` è provato solo sul `source` di una relazione
+  (`commands.test.ts`), mai sul `target` né con un'autorelazione;
+  `addRelation` col `kind` di default (`association`) e
+  `END_LABEL_OFFSET = 14` non sono fissati da nessun test; il ramo di
+  `safeName` che prefissa `_` ai nomi che iniziano con una cifra non ha
+  fixture. Tutti verificati a mano: comportamento corretto, prova assente.
+- Le variabili locali `entities`/`relationships` nella `Properties()` di
+  `src/ui/canvas/kinds/er.tsx` tengono il nome vecchio pur contenendo le
+  chiavi filtrate per `"node"`/`"edge"` (`selectedKeys`). Non esportate,
+  nessun effetto osservabile.
+
 ---
 
 ## Perduto

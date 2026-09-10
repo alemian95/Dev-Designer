@@ -5,7 +5,8 @@ Nessun backend, nessun account: il documento vive nel browser e si importa/espor
 
 ## Stato
 
-C'è un editor ER funzionante, e i documenti sopravvivono alla chiusura della pagina. Quello che c'è:
+Ci sono due editor funzionanti — ER e class diagram — e i documenti sopravvivono alla chiusura della
+pagina. Quello che c'è, condiviso da entrambi i tipi di diagramma salvo dove specificato:
 
 - **Modello del documento** validato con Zod e **undo/redo a patch** (Immer `produceWithPatches`: la
   storia non tiene snapshot del documento, tiene le patch e le loro inverse).
@@ -38,10 +39,19 @@ C'è un editor ER funzionante, e i documenti sopravvivono alla chiusura della pa
   tema chiaro qualunque sia quello attivo — finiscono in README e PR, che hanno fondo chiaro — e col
   font incorporato nel file come `data:` URI, perché la rasterizzazione avviene in un contesto che
   non ha i font della pagina.
-- **Export testo**: DDL PostgreSQL, DDL MySQL e Mermaid, da copiare negli appunti o scaricare.
+- **Export testo**: DDL PostgreSQL, DDL MySQL e Mermaid, da copiare negli appunti o scaricare (per l'ER).
+- **Class diagram**: classi con stereotipo (`class`, `interface`, `abstract`, `enum`), attributi e
+  metodi scritti come testo in un editor dedicato — non una riga di form per membro — con le stesse
+  regole di visibilità e modificatori dell'UML. Le sei relazioni (associazione, generalizzazione,
+  realizzazione, composizione, aggregazione, dipendenza), ciascuna con la punta e il tratto giusti.
+  Validazione live, auto layout ed export immagini condivisi con l'ER, più l'export testo in Mermaid
+  (`classDiagram`). Fuori scope, dichiarato: generici, package, note, classi di associazione, classi
+  annidate, visibilità sui pacchetti, una riga di form per membro nel pannello, PlantUML, generazione
+  di codice, import da Mermaid o da codice sorgente, documenti multi-diagramma, conversione di un ER
+  esistente in class diagram (§16 della [spec](docs/superpowers/specs/2026-09-10-class-diagram-design.md)).
 
-Quello che **non** c'è ancora: gli altri tre tipi di diagramma — class, flowchart e sequence. Sui
-limiti di scala misurati — lo zoom sfonda il criterio già a 300 entità — vedi la misura qui sotto.
+Quello che **non** c'è ancora: gli altri due tipi di diagramma — flowchart e sequence. Sui limiti di
+scala misurati — lo zoom sfonda il criterio già a 300 entità — vedi la misura qui sotto.
 
 - [Spec di design](docs/superpowers/specs/2026-09-06-dev-designer-design.md) — architettura, stack e
   ordine di consegna
@@ -50,6 +60,7 @@ limiti di scala misurati — lo zoom sfonda il criterio già a 300 entità — v
 - [Spec: auto layout](docs/superpowers/specs/2026-09-09-auto-layout-design.md) — il §3 va letto prima
   di toccare `src/io/layout/`
 - [Spec: export testo](docs/superpowers/specs/2026-09-09-export-testo-design.md)
+- [Spec: class diagram](docs/superpowers/specs/2026-09-10-class-diagram-design.md)
 - [Piani di implementazione](docs/superpowers/plans/)
 - [Decisioni di architettura](docs/adr/) — sei ADR
 - [Debito tecnico](docs/debito-tecnico.md) — difetti noti e semplificazioni accettate
@@ -81,11 +92,11 @@ pnpm test      # Vitest
 ## Test end-to-end
 
 ```bash
-pnpm e2e       # cinque scenari provati in un browser vero
+pnpm e2e       # sei scenari provati in un browser vero
 ```
 
 Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
-condivisi dai cinque scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock
+condivisi dai sei scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock
 fra schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a vicenda) —
 ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
 
@@ -106,10 +117,17 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   posizioni cambino e che nessuna coppia di nodi si sovrapponga, poi annulla con ⌘Z. È il solo
   collaudo che prova che **elkjs si carica davvero**: i test unitari usano un worker finto, quindi un
   bundle che non si risolve nel worker passerebbe tutta la suite e fallirebbe solo qui.
+- **Class diagram**: crea due classi, apre l'editor dei membri con un doppio click sul corpo e ne
+  verifica il commit sul blur (geometria compresa), scrive un testo non valido e verifica che
+  l'editor resti aperto col testo intatto, collega le due classi con una generalizzazione e verifica
+  che «Disponi» metta il padre sopra il figlio, poi esporta in Mermaid e verifica l'ordine dei lati
+  nell'arco. Sono le cose che senza un browser vero non esistono: il fuoco e il commit sulla
+  `textarea`, il rifiuto che non perde il testo, e l'inversione degli archi nel grafo di layout
+  (`elkjs`, di nuovo un worker finto nei test unitari).
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei cinque scenari non regge.
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei sei scenari non regge.
 
 ## Misura prestazioni
 

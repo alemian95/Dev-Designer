@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { memberLines } from "@/model/class/members"
-import type { ClassNode } from "@/model/class/schema"
-import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H } from "../geometry"
+import type { ClassNode, ClassRelation } from "@/model/class/schema"
+import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Rect } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
-import { classSize, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
+import { classEdgeGeometry, classSize, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
 
 // Annotazione esplicita `ClassNode` sulle fixture, non `as const`: il brief le
 // scriveva `as const`, ma un `ClassNode` ha array mutabili e `as const` li
@@ -109,5 +109,34 @@ describe("punte e linee", () => {
     for (const dir of [UP, DOWN, LEFT, RIGHT]) {
       expect(umlMarkerPath({ x: 40, y: 50 }, dir, "generalization")).toContain("40")
     }
+  })
+})
+
+describe("classEdgeGeometry", () => {
+  const source: Rect = { x: 0, y: 0, w: 100, h: 60 }
+  const target: Rect = { x: 240, y: 0, w: 100, h: 60 }
+  const relazione: ClassRelation = {
+    kind: "association",
+    source: { class: "A", multiplicity: "", role: "" },
+    target: { class: "B", multiplicity: "", role: "" },
+  }
+
+  it("il marker cade sempre sul target: sourceMarker resta vuoto, contratto di umlMarkerPath", () => {
+    const geo = classEdgeGeometry(source, target, { ...relazione, kind: "composition" })
+    expect(geo.sourceMarker).toBe("")
+    expect(geo.targetMarker.length).toBeGreaterThan(0)
+  })
+
+  it("sourceEnd/targetEnd assenti quando entrambe le molteplicità sono vuote", () => {
+    const geo = classEdgeGeometry(source, target, relazione)
+    expect(geo.sourceEnd).toBeUndefined()
+    expect(geo.targetEnd).toBeUndefined()
+  })
+
+  it("sourceEnd/targetEnd presenti quando almeno una molteplicità c'è, anche se asimmetrica", () => {
+    const asimmetrica: ClassRelation = { ...relazione, source: { ...relazione.source, multiplicity: "1" } }
+    const geo = classEdgeGeometry(source, target, asimmetrica)
+    expect(geo.sourceEnd).toBeDefined()
+    expect(geo.targetEnd).toBeDefined()
   })
 })

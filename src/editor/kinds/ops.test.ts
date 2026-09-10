@@ -36,6 +36,18 @@ export function verificaContrattoOps(nome: string, docConDueNodiEUnArco: () => D
       expect(opsFor(docConDueNodiEUnArco()).edgesTouching(new Set(["inesistente"]))).toHaveLength(0)
     })
 
+    it("edgeGeometry torna null per una chiave d'arco inesistente, un d non vuoto per una valida", () => {
+      const ops = opsFor(docConDueNodiEUnArco())
+      const [a] = ops.nodeKeys()
+      const [arco] = ops.edgesTouching(new Set([a!]))
+      const rectA = ops.rectOf(arco!.source)!
+      const rectB = ops.rectOf(arco!.target)!
+      expect(ops.edgeGeometry("inesistente", rectA, rectB)).toBeNull()
+      const geo = ops.edgeGeometry(arco!.key, rectA, rectB)
+      expect(geo).not.toBeNull()
+      expect(geo!.d.length).toBeGreaterThan(0)
+    })
+
     it("addNode produce una chiave nuova e un recipe che la crea", () => {
       const doc = docConDueNodiEUnArco()
       const { key, recipe } = opsFor(doc).addNode({ x: 40, y: 40 })

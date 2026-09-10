@@ -107,8 +107,12 @@ const END_LABEL_OFFSET = 14
  * arco, quindi la composizione vive qui una volta sola.
  *
  * Un solo marker per arco, e cade sempre sul `target` — contratto di `umlMarkerPath`: il `source`
- * resta nudo. Le etichette di molteplicità si calcolano solo se almeno un estremo ne ha una, per non
- * far inseguire a `setEdgeGeometry` un elemento che potrebbe non esistere nel DOM.
+ * resta nudo. `sourceEnd`/`targetEnd` si calcolano *in coppia*: se almeno un estremo ha una
+ * molteplicità, li popola entrambi, anche quando l'altro estremo è vuoto e quindi `ClassEdgeView`
+ * non renderà mai la sua etichetta (rende ciascuna solo se la propria molteplicità non è vuota).
+ * Non è un problema: `setEdgeGeometry`/`positionLabel` (`dom-registry.ts`) aggiornano solo
+ * l'elemento che trovano nel DOM e non fanno nulla se manca, quindi il capo senza etichetta non
+ * viene mai toccato davvero — il calcolo in più è innocuo, non un bug da evitare.
  */
 export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRelation): EdgeGeometry {
   const route = routeEdge(source, target)

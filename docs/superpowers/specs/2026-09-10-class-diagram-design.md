@@ -447,6 +447,18 @@ normativa:
 | `dependency` | `Dipendente ..> Dipendenza` | il **source** |
 | `association` | `A -- B` | il **source** |
 
+**Perché `--` e non `-->`.** La documentazione di Mermaid chiama «Association»
+il token `-->` ed elenca `--` come «Link (Solid)». Emettiamo comunque `--`, e la
+ragione è semantica e non stilistica: in UML un'associazione nuda è una linea
+piena **senza direzione**, mentre `-->` rende una punta aperta, che in UML
+significa navigabilità in un verso solo. Il nostro `ClassRelation` non registra
+la navigabilità: `source` e `target` su un'associazione sono la convenzione con
+cui teniamo i due estremi, non l'affermazione che si navighi da uno all'altro.
+Emettere `-->` farebbe inventare all'emettitore un'informazione che il modello
+non ha. `--` è un costrutto documentato e rende esattamente ciò che il modello
+dice. I due nomi della tabella di Mermaid sono etichette dei loro token, non
+un'equivalenza con UML.
+
 Le molteplicità si scrivono fra apici **ai lati dell'arco**
 (`Padre "1" <|-- "0..*" Figlio`), quindi l'emettitore deve appiccicarle al lato
 dove quella classe è finita, riga per riga. **Invertirle su tre righe su sei è

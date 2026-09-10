@@ -65,8 +65,8 @@ fonte di verità; il testo è import ed export.
 
 1. ~~Shell + ER completo (disegno, validazione, import DDL, export DDL e
    Mermaid).~~ Fatto: import DDL, export immagini (SVG, PNG), export testo (DDL
-   PostgreSQL e MySQL, Mermaid) e copia del PNG negli appunti. Resta fuori
-   l'auto layout con ELK, che avrà spec propria.
+   PostgreSQL e MySQL, Mermaid), copia del PNG negli appunti e auto layout con
+   ELK.
 2. Class diagram.
 3. Flowchart.
 4. Sequence.
@@ -91,7 +91,7 @@ PlantUML, documento multi diagramma, backend di qualsiasi tipo.
 | UI della cornice | shadcn/ui + Tailwind | Primitive Radix accessibili, codice nel repo, solo i componenti usati |
 | Rendering | SVG scritto a mano dentro React | Hit testing dal DOM, testo nativo, export fedele |
 | Font | monospace incorporato | Dimensioni deterministiche senza misurazione |
-| Auto layout | ELK.js in worker | Problema difficile già risolto |
+| Auto layout | `layered` in worker | Senza sovrapposizioni, veloce e con pochi incroci: le altre misurate perdono su almeno uno dei tre (ADR 0006) |
 | Parser PostgreSQL | libpg-query (WASM) in worker | Il parser di Postgres stesso |
 | Parser MySQL | node-sql-parser, da verificare nello spike | Fallback: parser proprio del sottoinsieme DDL |
 | Persistenza | IndexedDB | Autosave e lista documenti |
@@ -159,8 +159,9 @@ WASM: solo dentro i worker, solo libpg-query.
   discriminated union sul tipo: `er`, `flowchart`, `class`, `sequence`.
 - Ogni tipo ha due rami: **`model`** (semantica) e **`view`** (presentazione:
   posizioni, dimensioni, collassato, punti di piega degli edge). Il `view` è
-  indicizzato per chiave dell'elemento semantico, così un import può riempire
-  il `model` e lasciare il `view` vuoto; l'auto layout completa i buchi.
+  indicizzato per chiave dell'elemento semantico, così un import popola
+  `model` e `view` insieme e un auto layout successivo ridispone solo le
+  entità già presenti, senza crearne di nuove.
 - **Identità per chiave naturale** sugli elementi importati: la tabella è
   `schema.nome`, la relazione è il nome del constraint o, in assenza, derivata
   da tabella e colonne. Nel class diagram il nome qualificato. Flowchart e
@@ -203,8 +204,9 @@ nodi a posizione libera.
   rettangolo, connessione, editing testo. Pointer events con capture, hit
   testing tramite `data-node-id` sul target.
 - Edge: ancore sui lati del bounding box, routing ortogonale con una o due
-  pieghe, senza evitamento ostacoli. Dopo l'auto layout si usano i punti di
-  piega restituiti da ELK.
+  pieghe, senza evitamento ostacoli. Le rotte di ELK si scartano: il router
+  le ricalcola dai rettangoli a ogni render, e al worker si chiedono solo le
+  posizioni dei nodi.
 - Sequence: funzione pura dal `model` alla geometria (x per partecipante, y per
   messaggio, altezza frammenti); il renderer disegna la geometria.
 - Font monospace incorporato: larghezza testo = caratteri × larghezza
@@ -229,7 +231,9 @@ Dettagli di realizzazione nella spec dedicata:
 - MySQL: node-sql-parser, verificato nello spike su un dump reale. Fallback:
   parser a discesa ricorsiva sul sottoinsieme DDL di `mysqldump`.
 - Entrambi in worker, caricati solo all'apertura del dialog di import.
-- L'import produce solo il `model`; il `view` lo completa ELK.
+- L'import produce `model` e `view` insieme, con una disposizione a griglia
+  (non ELK); l'auto layout resta un'azione separata e manuale, che ridispone
+  solo le entità già in `view`.
 
 ### 4.5 Test
 

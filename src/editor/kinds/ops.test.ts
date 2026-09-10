@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { DevDocument } from "@/model/document"
+import { createClassDocument } from "@/model/class/schema"
 import { createErDocument } from "@/model/er/schema"
 import { opsFor } from "./ops"
 
@@ -110,3 +111,20 @@ function docEr(): DevDocument {
 }
 
 verificaContrattoOps("er", docEr)
+
+/** Documento classe con due classi e una generalizzazione. Nomi inventati. */
+function docClass(): DevDocument {
+  const doc = createClassDocument("prova")
+  doc.diagram.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+  doc.diagram.model.classes["Persona"] = { name: "Persona", stereotype: "abstract", attributes: [], methods: [] }
+  doc.diagram.view.nodes["Cliente"] = { x: 0, y: 100, collapsed: false }
+  doc.diagram.view.nodes["Persona"] = { x: 0, y: 0, collapsed: false }
+  doc.diagram.model.relations["r1"] = {
+    kind: "generalization",
+    source: { class: "Cliente", multiplicity: "", role: "" },
+    target: { class: "Persona", multiplicity: "", role: "" },
+  }
+  return doc
+}
+
+verificaContrattoOps("class", docClass)

@@ -4,6 +4,7 @@ import type { LayoutGraph } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import type { EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
+import { classOps } from "./class"
 import { erOps } from "./er"
 
 export interface EdgeEnds {
@@ -36,7 +37,6 @@ export function opsFor(doc: DevDocument): DiagramOps {
     case "er":
       return erOps(doc)
     case "class":
-      // Il Task 11 aggiunge classOps: qui c'è solo lo schema (Task 7).
-      throw new Error("DiagramOps per il class diagram non è ancora implementato")
+      return classOps(doc)
   }
 }

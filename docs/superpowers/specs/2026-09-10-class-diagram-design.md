@@ -72,9 +72,10 @@ export interface DiagramOps {
   rectOf(key: string, at?: Point): Rect | null
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
   edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
-  moveNodes(keys: readonly string[], dx: number, dy: number): Recipe | null
   addNode(at: Point): { key: string; recipe: Recipe }
   addEdge(source: string, target: string): { key: string; recipe: Recipe }
+  deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
+  duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
   layoutGraph(): LayoutGraph
   validate(): Issue[]
 }
@@ -84,11 +85,25 @@ export interface DiagramOps {
 export function opsFor(doc: DevDocument): DiagramOps
 ```
 
-I nove metodi non sono inventati: sono i sette punti in cui
-`use-canvas-interaction.ts` sa cos'è un'entità (`collectDragTargets`,
-`previewDrag`, `entityCenter`, `entitiesIn`, e i tre effetti che chiamano i
-comandi ER), più il grafo di layout e la validazione, che sono le altre due
-funzioni per tipo già esistenti.
+I dieci metodi non sono inventati. Otto vengono dai punti in cui il codice
+esistente sa cos'è un'entità: i sette di `use-canvas-interaction.ts`
+(`collectDragTargets`, `previewDrag`, `entityCenter`, `entitiesIn`, e i tre
+effetti che chiamano i comandi ER) più `deleteSelection` e `duplicateSelection`
+in `actions.ts`. Gli altri due, `layoutGraph` e `validate`, sono le funzioni per
+tipo che già esistono.
+
+`selectAllNodes` e `fitToContent` **non** sono nell'interfaccia: si scrivono
+sopra `nodeKeys()` e `rectOf()` senza aggiungere superficie.
+
+### Tre comandi che non sono per tipo
+
+`moveNodes`, `setCollapsed` e `applyLayout` toccano **soltanto `view.nodes`**, e
+quella forma è identica nei due tipi di diagramma: chiamano `erDiagram()` solo
+per restringere la union, non perché guardino il modello. Diventano quindi
+codice condiviso in `src/editor/commands/view.ts`, sopra un accessore
+`diagramView(draft)` che legge la proprietà comune della union, e escono dalla
+superficie per tipo. Tre implementazioni in meno da scrivere due volte, e il
+drag e l'auto layout restano un solo pezzo di codice per entrambi i tipi.
 
 `opsFor` è chiuso sul documento invece di ricevere il diagramma a ogni metodo
 perché l'hook rilegge già `documentStore.getState().doc` a ogni `pointermove`:
@@ -504,9 +519,14 @@ fatto che il file in questione mescolerebbe due tipi di diagramma:
 
 ## 13. Test
 
-Il progetto non ha jsdom: non esistono test unitari di componenti, e la prova
-nel browser arriva dagli e2e sulla build di produzione. La ripartizione è quindi
-forzata.
+Il progetto non ha jsdom, ma questo **non** significa che i componenti non si
+testino: `src/ui/canvas/render.test.tsx` rende le viste guidate dalle prop con
+`renderToStaticMarkup` di `react-dom/server` e asserisce sul markup — nessun DOM
+richiesto. Quello che jsdom impedirebbe sono i test di *interazione*: eventi,
+hook, fuoco, clipboard. Quelli vanno negli e2e sulla build di produzione.
+
+La ripartizione segue quella linea: le viste pure si testano unitariamente, le
+interazioni no.
 
 **Unitari:**
 
@@ -520,16 +540,21 @@ forzata.
   molteplicità asimmetriche** (`"1"` da un lato, `"0..*"` dall'altro). È il solo
   modo di far fallire uno scambio dei lati: con molteplicità uguali il test
   passerebbe anche invertite.
-- `DiagramOps` delle classi, tutti e nove i metodi — **e la stessa batteria
+- `DiagramOps` delle classi, tutti e dieci i metodi — **e la stessa batteria
   eseguita contro le ops dell'ER**, che è ciò che dimostra che la giuntura non ha
   cambiato il comportamento esistente.
+- `ClassNodeView` e `ClassEdgeView` con `renderToStaticMarkup`, come già fa
+  `render.test.tsx` per l'ER: tre scomparti, scomparto vuoto non disegnato,
+  stereotipo con e senza riga propria, e i sei tipi di arco con il tratteggio e
+  il riempimento giusti.
 
 **Regressione del refactoring:** i 332 test esistenti devono restare verdi
 attraverso i tre spostamenti di §12. Se uno si rompe, la rinomina ha cambiato
 semantica.
 
-**Sesta scena e2e**, `scripts/e2e/class.mjs`, perché la `textarea` dei membri
-senza jsdom non è provabile altrove: crea un documento classe, due classi,
+**Sesta scena e2e**, `scripts/e2e/class.mjs`, perché la `textarea` dei membri è
+interazione — fuoco, digitazione, commit sul blur — e quella è esattamente la
+categoria che senza jsdom non si prova altrove: crea un documento classe, due classi,
 scrive i membri nel corpo, collega, cambia il tipo in generalizzazione dal
 pannello, clicca «Disponi» e verifica che **il padre stia sopra il figlio**,
 poi esporta Mermaid e controlla che la riga contenga `<|--` **con il padre a

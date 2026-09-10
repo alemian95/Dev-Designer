@@ -1941,16 +1941,43 @@ documentati, e il padre non sta sempre dallo stesso lato:
 
 ```ts
 import { describe, expect, it } from "vitest"
+import { parseMembers } from "@/model/class/members"
+import type { ClassModel, ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import { emitClassMermaid } from "./class-mermaid"
 
 /** Padre e figlio con molteplicità DIVERSE fra i due lati: con molteplicità
  *  uguali il test passerebbe anche a lati invertiti, che è il difetto che
  *  questi casi esistono per prendere. */
-const relazione = (kind) => ({
+const relazione = (kind: RelationKind): ClassRelation => ({
   kind,
   source: { class: "Figlio", multiplicity: "0..*", role: "" },
   target: { class: "Padre", multiplicity: "1", role: "" },
 })
+
+const classe = (name: string, over: Partial<ClassNode> = {}): ClassNode =>
+  ({ name, stereotype: "class", attributes: [], methods: [], ...over })
+
+/** Un modello con le due classi che la relazione nomina, e la relazione. */
+function modello(rel: ClassRelation): ClassModel {
+  return {
+    classes: { [rel.source.class]: classe(rel.source.class), [rel.target.class]: classe(rel.target.class) },
+    relations: { r1: rel },
+  }
+}
+
+/** Un modello con una sola classe dal nome dato. */
+function modelloCon(name: string, over: Partial<ClassNode> = {}): ClassModel {
+  return { classes: { [name]: classe(name, over) }, relations: {} }
+}
+
+/** Emette una classe i cui membri vengono dal testo, e torna il Mermaid.
+ *  Passa dal parser del Task 8 invece di costruire i membri a mano: così il
+ *  test prova la catena che l'utente percorre davvero. */
+function emitten(testoMembri: string): string {
+  const r = parseMembers(testoMembri)
+  if (!r.ok) throw new Error(`la fixture non si legge: riga ${r.line}: ${r.message}`)
+  return emitClassMermaid(modelloCon("Cliente", r.value)).text
+}
 
 describe("emitClassMermaid: i sei tipi e i loro lati", () => {
   it("generalizzazione: il padre a sinistra, con la sua molteplicità", () => {
@@ -1968,16 +1995,33 @@ describe("emitClassMermaid: i sei tipi e i loro lati", () => {
       .toContain('Padre "1" *-- "0..*" Figlio')
   })
 
-  it("aggregazione: il tutto a sinistra", () => { /* o-- */ })
-  it("dipendenza: il dipendente a sinistra", () => { /* Figlio ..> Padre */ })
-  it("associazione: source a sinistra, link solido", () => { /* -- */ })
+  it("aggregazione: il tutto a sinistra", () => {
+    expect(emitClassMermaid(modello(relazione("aggregation"))).text)
+      .toContain('Padre "1" o-- "0..*" Figlio')
+  })
+
+  it("dipendenza: il dipendente a sinistra", () => {
+    // Qui il padre passa a destra: i token documentati non lo mettono tutti
+    // dallo stesso lato, ed è la cosa che questa tabella esiste per fissare.
+    expect(emitClassMermaid(modello(relazione("dependency"))).text)
+      .toContain('Figlio "0..*" ..> "1" Padre')
+  })
+
+  it("associazione: source a sinistra, link solido", () => {
+    expect(emitClassMermaid(modello(relazione("association"))).text)
+      .toContain('Figlio "0..*" -- "1" Padre')
+  })
 
   it("molteplicità vuote non producono apici vuoti", () => {
     const senza = { ...relazione("association"), source: { class: "A", multiplicity: "", role: "" }, target: { class: "B", multiplicity: "", role: "" } }
     expect(emitClassMermaid(modello(senza)).text).not.toContain('""')
   })
 
-  it("il nome della relazione va in coda dopo i due punti", () => { /* : possiede */ })
+  it("il nome della relazione va in coda dopo i due punti", () => {
+    const conNome: ClassRelation = { ...relazione("association"), name: "possiede" }
+    expect(emitClassMermaid(modello(conNome)).text)
+      .toContain('Figlio "0..*" -- "1" Padre : possiede')
+  })
 })
 
 describe("emitClassMermaid: i membri", () => {
@@ -2000,7 +2044,12 @@ describe("emitClassMermaid: i membri", () => {
   it("un costruttore non emette tipo di ritorno", () => {
     expect(emitten("+ Persona(nome: string)")).toContain("+Persona(string nome)")
   })
-  it("enum diventa enumeration, class non emette annotazione", () => { /* <<enumeration>> */ })
+  it("enum diventa enumeration, class non emette annotazione", () => {
+    // Il caso della parola dentro «<< >>» è cosmetico — Mermaid rende quello che
+    // trova — quindi il test fissa il comportamento e non la capitalizzazione.
+    expect(emitClassMermaid(modelloCon("Stato", { stereotype: "enum" })).text).toMatch(/<<enumeration>>/i)
+    expect(emitClassMermaid(modelloCon("Cliente")).text).not.toContain("<<")
+  })
 })
 
 describe("emitClassMermaid: nomi che Mermaid non prende nudi", () => {

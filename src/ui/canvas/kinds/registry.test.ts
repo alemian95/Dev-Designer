@@ -24,6 +24,11 @@ describe("viewFor", () => {
     // cabli componenti diversi, non solo un contenitore diverso attorno agli stessi.
     expect(er.NodesLayer).not.toBe(cls.NodesLayer)
     expect(er.Properties).not.toBe(cls.Properties)
+    // `NodeView`/`EdgeView`: le viste pure che `buildSvg` (@/ui/export/svg.tsx) monta senza
+    // store. Stessa ragione delle due sopra: un terzo tipo futuro non deve poter far tornare a
+    // `viewFor` la vista sbagliata qui, silenziosamente.
+    expect(er.NodeView).not.toBe(cls.NodeView)
+    expect(er.EdgeView).not.toBe(cls.EdgeView)
     expect(er.tools).toEqual({
       node: { label: "Entità", key: "e", Icon: Square },
       edge: { label: "Relazione", key: "r", Icon: Spline },

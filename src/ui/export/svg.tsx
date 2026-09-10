@@ -1,14 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server"
-import { classRect } from "@/editor/class/geometry"
-import { entityRect } from "@/editor/er/geometry"
+import { opsFor } from "@/editor/kinds/ops"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
-import type { ClassDiagram } from "@/model/class/schema"
 import type { Diagram } from "@/model/document"
-import type { ErDiagram } from "@/model/er/schema"
-import { ClassEdgeView } from "@/ui/canvas/ClassEdge"
-import { ClassNodeView } from "@/ui/canvas/ClassNode"
-import { EntityNodeView } from "@/ui/canvas/EntityNode"
-import { RelationshipEdgeView } from "@/ui/canvas/RelationshipEdge"
+import { SCHEMA_VERSION } from "@/model/shared"
+import { viewFor } from "@/ui/canvas/kinds/registry"
 
 /**
  * Margine attorno al contenuto, in unità mondo. I bounds vengono dai rettangoli delle entità:
@@ -25,38 +20,41 @@ export interface BuildSvgOptions {
 }
 
 /**
- * Serializza il diagramma come SVG autoconsistente.
- *
- * Uno switch sul tipo e non due componenti in più su `DiagramView` (`@/ui/canvas/kinds`):
- * `renderToStaticMarkup` costruisce l'albero fuori dal DOM di React, in un contesto senza uno
- * store da cui i layer del canvas potrebbero leggere. Ogni tipo vuole quindi le proprie viste
- * a prop — `EntityNodeView`/`RelationshipEdgeView` per l'ER, `ClassNodeView`/`ClassEdgeView`
- * per le classi — non i layer sottoscritti che il canvas usa.
+ * `opsFor` vuole un `DevDocument` intero, ma `erOps`/`classOps` (`@/editor/kinds/*.ts`) leggono
+ * solo `.diagram`: nessuno dei due tocca `id`, `name` o `schemaVersion`. L'export non ha né gli
+ * serve un documento intero: bastano segnaposto per i tre campi che `opsFor` non guarda.
  */
-export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions): string | null {
-  switch (diagram.type) {
-    case "er":
-      return buildErSvg(diagram, { vars, fontFace })
-    case "class":
-      return buildClassSvg(diagram, { vars, fontFace })
-  }
+function opsForDiagram(diagram: Diagram) {
+  return opsFor({ schemaVersion: SCHEMA_VERSION, id: "export", name: "export", diagram })
 }
 
 /**
- * Ri-renderizza il modello ER con le stesse viste del canvas invece di clonare il DOM: griglia,
- * overlay e bordi di selezione non ci sono perché non vengono disegnati, non perché siano stati
- * spenti dopo. Un renderer solo, due uscite, nessuna deriva fra ciò che si vede e ciò che si esporta.
+ * Serializza il diagramma come SVG autoconsistente. Un renderer solo per entrambi i tipi di
+ * diagramma, sopra la giuntura: `nodeKeys`/`rectOf`/`edgesTouching`/`edgeGeometry` di
+ * `DiagramOps` (`@/editor/kinds/ops.ts`) danno chiavi, geometria e bounds senza sapere se il
+ * modello si chiama `entities`/`classes` o `relationships`/`relations`; `NodeView`/`EdgeView` di
+ * `DiagramView` (`@/ui/canvas/kinds`) sono le stesse viste pure che il canvas monta, guidate
+ * dalle prop e non dallo store — `renderToStaticMarkup` costruisce l'albero fuori dal DOM di
+ * React, in un contesto senza store da cui i layer sottoscritti potrebbero leggere.
  *
- * `null` se non c'è nessuna entità: non c'è niente da esportare.
+ * Resta un solo punto dove i nomi dei campi del modello contano — `nodeModels`/`edgeModels` qui
+ * sotto — perché `DiagramOps` non espone i record grezzi (non è il suo lavoro: geometria e
+ * comandi, non lettura del modello). `diagram.view.nodes` invece è già uniforme fra i due tipi
+ * (`NodeViewSchema` condiviso, `model/shared.ts`), quindi non serve distinguerlo.
+ *
+ * `null` se non c'è nessun nodo con una view: non c'è niente da esportare.
  */
-function buildErSvg(diagram: ErDiagram, { vars, fontFace }: BuildSvgOptions): string | null {
-  const { entities, relationships } = diagram.model
-  const { nodes } = diagram.view
+export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions): string | null {
+  const ops = opsForDiagram(diagram)
+  const { NodeView, EdgeView } = viewFor(diagram.type)
+  const nodeModels: Record<string, unknown> = diagram.type === "er" ? diagram.model.entities : diagram.model.classes
+  const edgeModels: Record<string, unknown> = diagram.type === "er" ? diagram.model.relationships : diagram.model.relations
 
+  const keys = ops.nodeKeys()
   const rects = new Map<string, Rect>()
-  for (const [key, entity] of Object.entries(entities)) {
-    const view = nodes[key]
-    if (view) rects.set(key, entityRect(entity, view))
+  for (const key of keys) {
+    const rect = ops.rectOf(key)
+    if (rect) rects.set(key, rect)
   }
 
   const bounds = rectsBounds([...rects.values()])
@@ -74,73 +72,24 @@ function buildErSvg(diagram: ErDiagram, { vars, fontFace }: BuildSvgOptions): st
     <>
       <rect data-background x={x} y={y} width={w} height={h} fill="var(--background)" />
       <g data-layer="edges">
-        {Object.entries(relationships).map(([key, relationship]) => {
-          const source = rects.get(relationship.source.entity)
-          const target = rects.get(relationship.target.entity)
-          if (!source || !target) return null
-          return <RelationshipEdgeView key={key} edgeKey={key} relationship={relationship} source={source} target={target} selected={false} />
+        {ops.edgesTouching(new Set(keys)).map((edge) => {
+          const source = rects.get(edge.source)
+          const target = rects.get(edge.target)
+          const relation = edgeModels[edge.key]
+          // `edgeGeometry` verifica che l'arco esista davvero nel modello (torna null altrimenti,
+          // stessa guardia di `relation` qui sotto): la vista ricalcola comunque la propria
+          // geometria dalle prop, come già fa nel canvas.
+          if (!source || !target || !relation || !ops.edgeGeometry(edge.key, source, target)) return null
+          return <EdgeView key={edge.key} edgeKey={edge.key} relation={relation} source={source} target={target} selected={false} />
         })}
       </g>
       <g data-layer="nodes">
-        {Object.entries(entities).map(([key, entity]) => {
-          const view = nodes[key]
-          if (!view) return null
-          return <EntityNodeView key={key} nodeKey={key} entity={entity} view={view} selected={false} />
-        })}
-      </g>
-    </>,
-  )
-
-  const style = fontFace ? `<style>${fontFace}</style>` : ""
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}"` +
-    ` font-family="var(--font-mono)" font-size="${FONT_SIZE}">${style}${body}</svg>`
-
-  return resolveVars(svg, vars)
-}
-
-/**
- * Ri-renderizza il modello delle classi con le stesse viste del canvas, esattamente come
- * `buildErSvg` fa per l'ER: stesso schema di bounds, sfondo e risoluzione delle variabili, solo
- * `ClassNodeView`/`ClassEdgeView` al posto di `EntityNodeView`/`RelationshipEdgeView`.
- *
- * `null` se non c'è nessuna classe: non c'è niente da esportare.
- */
-function buildClassSvg(diagram: ClassDiagram, { vars, fontFace }: BuildSvgOptions): string | null {
-  const { classes, relations } = diagram.model
-  const { nodes } = diagram.view
-
-  const rects = new Map<string, Rect>()
-  for (const [key, cls] of Object.entries(classes)) {
-    const view = nodes[key]
-    if (view) rects.set(key, classRect(cls, view))
-  }
-
-  const bounds = rectsBounds([...rects.values()])
-  if (!bounds) return null
-
-  const x = bounds.x - EXPORT_PADDING
-  const y = bounds.y - EXPORT_PADDING
-  const w = bounds.w + 2 * EXPORT_PADDING
-  const h = bounds.h + 2 * EXPORT_PADDING
-
-  // Gli archi sotto i nodi, come nel canvas e come in `buildErSvg`.
-  const body = renderToStaticMarkup(
-    <>
-      <rect data-background x={x} y={y} width={w} height={h} fill="var(--background)" />
-      <g data-layer="edges">
-        {Object.entries(relations).map(([key, relation]) => {
-          const source = rects.get(relation.source.class)
-          const target = rects.get(relation.target.class)
-          if (!source || !target) return null
-          return <ClassEdgeView key={key} edgeKey={key} relation={relation} source={source} target={target} selected={false} />
-        })}
-      </g>
-      <g data-layer="nodes">
-        {Object.entries(classes).map(([key, cls]) => {
-          const view = nodes[key]
-          if (!view) return null
-          return <ClassNodeView key={key} nodeKey={key} node={cls} view={view} selected={false} />
+        {keys.map((key) => {
+          const rect = rects.get(key)
+          const view = diagram.view.nodes[key]
+          const node = nodeModels[key]
+          if (!rect || !view || !node) return null
+          return <NodeView key={key} nodeKey={key} node={node} view={view} selected={false} />
         })}
       </g>
     </>,

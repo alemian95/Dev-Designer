@@ -3,10 +3,11 @@ import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
+import type { ClassNode as ClassNodeModel, ClassRelation } from "@/model/class/schema"
 import { ClassProperties } from "@/ui/panels/ClassProperties"
-import { ClassEdge } from "../ClassEdge"
-import { ClassNode } from "../ClassNode"
-import type { DiagramView } from "./registry"
+import { ClassEdge, ClassEdgeView } from "../ClassEdge"
+import { ClassNode, ClassNodeView } from "../ClassNode"
+import type { DiagramView, EdgeViewProps, NodeViewProps } from "./registry"
 
 /**
  * `NodesLayer`/`EdgesLayer` per il class diagram: stesso ruolo di quelli in `../layers.tsx` per
@@ -31,11 +32,27 @@ function EdgesLayer() {
   )
 }
 
+/**
+ * Adattatori verso le viste pure delle classi (`ClassNodeView`/`ClassEdgeView`), dietro la forma
+ * generica di `DiagramView.NodeView`/`EdgeView`: stessa ragione di `NodeView`/`EdgeView` in
+ * `kinds/er.tsx` — `node`/`relation` arrivano come `unknown` e si restringono qui, l'unico punto
+ * che conosce il tipo concreto.
+ */
+function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
+  return <ClassNodeView nodeKey={nodeKey} node={node as ClassNodeModel} view={view} selected={selected} />
+}
+
+function EdgeView({ edgeKey, relation, source, target, selected }: EdgeViewProps) {
+  return <ClassEdgeView edgeKey={edgeKey} relation={relation as ClassRelation} source={source} target={target} selected={selected} />
+}
+
 /** `DiagramView` per il class diagram: cablaggio verso i componenti già scritti nei Task 11-12,
  *  più il pannello (`ClassProperties.tsx`) e gli strumenti di questo task. Nessuna logica nuova qui. */
 export const classView: DiagramView = {
   NodesLayer,
   EdgesLayer,
+  NodeView,
+  EdgeView,
   Properties: ClassProperties,
   tools: {
     node: { label: "Classe", key: "c", Icon: Box },

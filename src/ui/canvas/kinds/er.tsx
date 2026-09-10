@@ -7,11 +7,13 @@ import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { CardinalitySchema, type Attribute, type Cardinality } from "@/model/er/schema"
+import { CardinalitySchema, type Attribute, type Cardinality, type Entity, type Relationship } from "@/model/er/schema"
 import { renameEntityWithNotice } from "@/ui/entity-rename"
+import { EntityNodeView } from "@/ui/canvas/EntityNode"
+import { RelationshipEdgeView } from "@/ui/canvas/RelationshipEdge"
 import { CommitInput } from "@/ui/panels/CommitInput"
 import { EdgesLayer, NodesLayer } from "../layers"
-import type { DiagramView } from "./registry"
+import type { DiagramView, EdgeViewProps, NodeViewProps } from "./registry"
 
 const dispatch = (recipe: Recipe | null) => {
   if (recipe) documentStore.getState().dispatch(recipe)
@@ -131,10 +133,26 @@ function Properties() {
   return <RelationshipProperties key={relationships[0]} relationshipKey={relationships[0]!} />
 }
 
+/**
+ * Adattatori verso le viste pure dell'ER (`EntityNodeView`/`RelationshipEdgeView`), dietro la
+ * forma generica di `DiagramView.NodeView`/`EdgeView`: `buildSvg` (`@/ui/export/svg.tsx`) le
+ * chiama senza sapere se il diagramma è ER o classi, qui — l'unico punto che lo sa — `node`/
+ * `relation` si restringono con un cast esplicito.
+ */
+function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
+  return <EntityNodeView nodeKey={nodeKey} entity={node as Entity} view={view} selected={selected} />
+}
+
+function EdgeView({ edgeKey, relation, source, target, selected }: EdgeViewProps) {
+  return <RelationshipEdgeView edgeKey={edgeKey} relationship={relation as Relationship} source={source} target={target} selected={selected} />
+}
+
 /** `DiagramView` per l'ER: cablaggio verso i componenti che esistono già, nessuna logica nuova. */
 export const erView: DiagramView = {
   NodesLayer,
   EdgesLayer,
+  NodeView,
+  EdgeView,
   Properties,
   tools: {
     node: { label: "Entità", key: "e", Icon: Square },

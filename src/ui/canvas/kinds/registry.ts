@@ -2,7 +2,9 @@ import type { ComponentType } from "react"
 import type { LucideIcon } from "lucide-react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
+import type { Rect } from "@/editor/geometry"
 import type { Diagram } from "@/model/document"
+import type { NodeView as NodeViewModel } from "@/model/shared"
 import { classView } from "./class"
 import { erView } from "./er"
 
@@ -14,13 +16,41 @@ import { erView } from "./er"
 export type TextFormat = "postgres" | "mysql" | "mermaid" | "class-mermaid"
 
 /**
+ * Props di `DiagramView.NodeView`: `node` arriva come `unknown` perché il registro è lo stesso
+ * per ogni tipo di diagramma — il tipo concreto (`Entity`, `ClassNode`, ...) si restringe con un
+ * cast esplicito nel modulo `kinds/*.tsx` che cabla la vista, l'unico punto che lo conosce.
+ */
+export interface NodeViewProps {
+  nodeKey: string
+  node: unknown
+  view: NodeViewModel
+  selected: boolean
+}
+
+/** Props di `DiagramView.EdgeView`: stessa ragione di `NodeViewProps` per `relation`. */
+export interface EdgeViewProps {
+  edgeKey: string
+  relation: unknown
+  source: Rect
+  target: Rect
+  selected: boolean
+}
+
+/**
  * Il lato «componenti» della giuntura fra tipi di diagramma: `DiagramOps` (in
  * `@/editor/kinds/ops.ts`) copre dati e comandi, questa copre React. Divisa in due oggetti
  * perché `src/editor` non può importare React (vedi `eslint.config.js`).
+ *
+ * `NodesLayer`/`EdgesLayer` sono i layer sottoscritti che il canvas monta (leggono lo store da
+ * sé). `NodeView`/`EdgeView` sono le viste pure guidate dalle prop, senza store: le usa
+ * `buildSvg` (`@/ui/export/svg.tsx`), che gira dentro `renderToStaticMarkup` e uno store non ce
+ * l'ha.
  */
 export interface DiagramView {
   NodesLayer: ComponentType
   EdgesLayer: ComponentType
+  NodeView: ComponentType<NodeViewProps>
+  EdgeView: ComponentType<EdgeViewProps>
   Properties: ComponentType
   tools: {
     node: { label: string; key: string; Icon: LucideIcon }

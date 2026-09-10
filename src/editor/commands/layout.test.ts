@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { createErDocument, type Attribute } from "@/model/er/schema"
-import type { LayoutPositions } from "@/model/layout"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import { HEADER_H, ROW_H } from "../geometry"
-import { applyLayout, layoutGraph } from "./layout"
+import { layoutGraph } from "./layout"
 
 const state = () => documentStore.getState()
 const er = () => erDiagram(state().doc)
@@ -90,41 +89,6 @@ describe("layout automatico", () => {
       })
       const edge = layoutGraph(er()).edges.find((e) => e.id === "gerarchia")
       expect(edge).toEqual({ id: "gerarchia", source: "cliente", target: "cliente" })
-    })
-  })
-
-  describe("applyLayout", () => {
-    const positions: LayoutPositions = { cliente: { x: 12.4, y: 7 }, ordine: { x: 212.4, y: 207 } }
-
-    it("trasla a (40, 40) e allinea alla griglia da 10", () => {
-      expect(documentStore.getState().dispatch(applyLayout(positions))).toBe(true)
-      expect(er().view.nodes.cliente).toEqual({ x: 40, y: 40, collapsed: false })
-      expect(er().view.nodes.ordine).toEqual({ x: 240, y: 240, collapsed: false })
-    })
-
-    it("una sola voce di undo per tutto il layout", () => {
-      documentStore.getState().dispatch(applyLayout(positions))
-      expect(state().past).toHaveLength(1)
-      documentStore.getState().undo()
-      expect(er().view.nodes.cliente).toEqual({ x: 0, y: 0, collapsed: false })
-      expect(er().view.nodes.ordine).toEqual({ x: 500, y: 500, collapsed: false })
-    })
-
-    it("riapplicare le stesse posizioni non produce una voce di undo fantasma", () => {
-      documentStore.getState().dispatch(applyLayout(positions))
-      expect(documentStore.getState().dispatch(applyLayout(positions))).toBe(false)
-      expect(state().past).toHaveLength(1)
-    })
-
-    it("ignora una chiave che nel frattempo non esiste più, senza toccare le altre", () => {
-      const withGhost: LayoutPositions = { ...positions, sparita: { x: 999, y: 999 } }
-      expect(documentStore.getState().dispatch(applyLayout(withGhost))).toBe(true)
-      expect(er().view.nodes.sparita).toBeUndefined()
-      expect(er().view.nodes.cliente).toEqual({ x: 40, y: 40, collapsed: false })
-    })
-
-    it("nessuna posizione applicabile: nessuna modifica", () => {
-      expect(documentStore.getState().dispatch(applyLayout({ sparita: { x: 1, y: 2 } }))).toBe(false)
     })
   })
 })

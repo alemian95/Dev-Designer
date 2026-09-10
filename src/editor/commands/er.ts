@@ -79,26 +79,6 @@ export function renameEntity(key: string, name: string, schema?: string): Recipe
   }
 }
 
-export function moveNodes(keys: readonly string[], dx: number, dy: number): Recipe | null {
-  if (dx === 0 && dy === 0) return null
-  return (draft) => {
-    const d = erDiagram(draft)
-    for (const key of keys) {
-      const node = d.view.nodes[key]
-      if (!node) continue
-      node.x = snap(node.x + dx)
-      node.y = snap(node.y + dy)
-    }
-  }
-}
-
-export function setCollapsed(key: string, collapsed: boolean): Recipe {
-  return (draft) => {
-    const node = erDiagram(draft).view.nodes[key]
-    if (node) node.collapsed = collapsed
-  }
-}
-
 export function addAttribute(key: string): Recipe {
   return (draft) => {
     const entity = erDiagram(draft).model.entities[key]

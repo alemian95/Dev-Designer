@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from "react"
 import { flushSync } from "react-dom"
-import { addEntity, addRelationship, moveNodes } from "@/editor/commands/er"
+import { addEntity, addRelationship } from "@/editor/commands/er"
+import { moveNodes } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
 import { edgeGeometry } from "@/editor/edge-routing"
 import { erDiagram } from "@/editor/er-access"

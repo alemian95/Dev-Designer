@@ -1,6 +1,7 @@
 import { useStore } from "zustand"
 import { fitToContent } from "@/editor/actions"
-import { applyLayout, layoutGraph } from "@/editor/commands/layout"
+import { layoutGraph } from "@/editor/commands/layout"
+import { applyLayout } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { layoutEngine } from "@/io/app-io"

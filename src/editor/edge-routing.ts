@@ -84,6 +84,9 @@ export interface EdgeGeometry {
   targetMarker: string
   /** Punto medio del segmento centrale, per l'etichetta. */
   label: Point
+  /** Capi per le molteplicità testuali: solo nei class diagram, l'ER non li popola. */
+  sourceEnd?: Point
+  targetEnd?: Point
 }
 
 /** Tutta la geometria di un edge da due rettangoli e la relazione. Usata sia da React sia dagli aggiornamenti imperativi. */

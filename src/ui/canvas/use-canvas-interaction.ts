@@ -1,13 +1,10 @@
 import { useEffect, type RefObject } from "react"
 import { flushSync } from "react-dom"
-import { addEntity, addRelationship } from "@/editor/commands/er"
 import { moveNodes } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
-import { edgeGeometry } from "@/editor/edge-routing"
-import { erDiagram } from "@/editor/er-access"
-import { entityRect } from "@/editor/er/geometry"
 import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
 import { IDLE, reduce, type Effect, type Hit, type InteractionEvent, type Mode, type PointerInfo } from "@/editor/interaction"
+import { opsFor, type EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import { panBy, screenToWorld, zoomAt } from "@/editor/viewport"
 import { setEdgeGeometry, setNodePosition, showConnect, showMarquee } from "./dom-registry"
@@ -16,7 +13,7 @@ const ZOOM_WHEEL_FACTOR = 0.01
 
 interface DragTargets {
   nodes: { key: string; x: number; y: number }[]
-  edges: { key: string; source: string; target: string }[]
+  edges: EdgeEnds[]
 }
 
 /**
@@ -40,55 +37,40 @@ function isTextInput(target: EventTarget | null): target is HTMLElement {
 }
 
 function collectDragTargets(keys: readonly string[]): DragTargets {
-  const d = erDiagram(documentStore.getState().doc)
-  const set = new Set(keys)
+  const ops = opsFor(documentStore.getState().doc)
   return {
     nodes: keys.flatMap((key) => {
-      const v = d.view.nodes[key]
-      return v ? [{ key, x: v.x, y: v.y }] : []
+      const r = ops.rectOf(key)
+      return r ? [{ key, x: r.x, y: r.y }] : []
     }),
-    edges: Object.entries(d.model.relationships)
-      .filter(([, r]) => set.has(r.source.entity) || set.has(r.target.entity))
-      .map(([key, r]) => ({ key, source: r.source.entity, target: r.target.entity })),
+    edges: ops.edgesTouching(new Set(keys)),
   }
 }
 
 /** Anteprima del drag: posizioni snappate sui nodi e geometria ricalcolata sugli edge toccati, tutto sul DOM. */
 function previewDrag(targets: DragTargets, dx: number, dy: number): void {
-  const d = erDiagram(documentStore.getState().doc)
+  const ops = opsFor(documentStore.getState().doc)
   const moved = new Map(targets.nodes.map((n) => [n.key, { x: snap(n.x + dx), y: snap(n.y + dy) }]))
   for (const [key, p] of moved) setNodePosition(key, p.x, p.y)
-  const rectOf = (key: string): Rect | null => {
-    const entity = d.model.entities[key]
-    const view = d.view.nodes[key]
-    if (!entity || !view) return null
-    return entityRect(entity, { ...view, ...moved.get(key) })
-  }
   for (const edge of targets.edges) {
-    const rel = d.model.relationships[edge.key]
-    const a = rectOf(edge.source)
-    const b = rectOf(edge.target)
-    if (rel && a && b) setEdgeGeometry(edge.key, edgeGeometry(a, b, rel))
+    const a = ops.rectOf(edge.source, moved.get(edge.source))
+    const b = ops.rectOf(edge.target, moved.get(edge.target))
+    const geo = a && b ? ops.edgeGeometry(edge.key, a, b) : null
+    if (geo) setEdgeGeometry(edge.key, geo)
   }
 }
 
-function entityCenter(key: string): Point | null {
-  const d = erDiagram(documentStore.getState().doc)
-  const entity = d.model.entities[key]
-  const view = d.view.nodes[key]
-  if (!entity || !view) return null
-  const r = entityRect(entity, view)
-  return { x: r.x + r.w / 2, y: r.y + r.h / 2 }
+function nodeCenter(key: string): Point | null {
+  const r = opsFor(documentStore.getState().doc).rectOf(key)
+  return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : null
 }
 
-function entitiesIn(rect: Rect): string[] {
-  const d = erDiagram(documentStore.getState().doc)
-  return Object.entries(d.model.entities)
-    .filter(([key, entity]) => {
-      const view = d.view.nodes[key]
-      return view && rectsIntersect(entityRect(entity, view), rect)
-    })
-    .map(([key]) => key)
+function nodesIn(rect: Rect): string[] {
+  const ops = opsFor(documentStore.getState().doc)
+  return ops.nodeKeys().filter((key) => {
+    const r = ops.rectOf(key)
+    return r !== null && rectsIntersect(r, rect)
+  })
 }
 
 export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): void {
@@ -155,22 +137,22 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
           showMarquee(fx.rect)
           break
         case "commit-marquee": {
-          const ids = entitiesIn(fx.rect).map((k) => selId("node", k))
+          const ids = nodesIn(fx.rect).map((k) => selId("node", k))
           session().setSelection(fx.additive ? [...session().selection, ...ids] : ids)
           break
         }
         case "preview-connect":
-          showConnect(fx.to ? entityCenter(fx.source) : null, fx.to)
+          showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
           break
         case "commit-connect": {
-          const { key, recipe } = addRelationship(erDiagram(documentStore.getState().doc).model.relationships, fx.source, fx.target)
+          const { key, recipe } = opsFor(documentStore.getState().doc).addEdge(fx.source, fx.target)
           documentStore.getState().dispatch(recipe)
           session().setSelection([selId("edge", key)])
           session().setTool("select")
           break
         }
         case "create-node": {
-          const { key, recipe } = addEntity(erDiagram(documentStore.getState().doc).model.entities, fx.at)
+          const { key, recipe } = opsFor(documentStore.getState().doc).addNode(fx.at)
           documentStore.getState().dispatch(recipe)
           session().setSelection([selId("node", key)])
           session().setTool("select")

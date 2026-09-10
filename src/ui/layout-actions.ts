@@ -1,9 +1,8 @@
 import { useStore } from "zustand"
 import { fitToContent } from "@/editor/actions"
-import { layoutGraph } from "@/editor/commands/layout"
 import { applyLayout } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
-import { erDiagram } from "@/editor/er-access"
+import { opsFor } from "@/editor/kinds/ops"
 import { layoutEngine } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
 
@@ -17,7 +16,7 @@ import { documentSession } from "@/io/document-session"
 export async function autoLayout(): Promise<void> {
   const session = documentSession.getState()
   if (session.layingOut || session.readOnly) return
-  const graph = layoutGraph(erDiagram(documentStore.getState().doc))
+  const graph = opsFor(documentStore.getState().doc).layoutGraph()
   // Con meno di due nodi non c'è niente da disporre, e il pulsante è già disabilitato: questa è la
   // guardia per la scorciatoia da tastiera, che non ha uno stato disabilitato.
   if (graph.nodes.length < 2) return
@@ -40,7 +39,7 @@ export async function autoLayout(): Promise<void> {
 export function useCanAutoLayout(): boolean {
   // I selettori restituiscono booleani, non il documento: così il pulsante non si ridisegna a ogni
   // modifica del diagramma, ma solo quando la risposta cambia.
-  const hasEnoughNodes = useStore(documentStore, (s) => Object.keys(erDiagram(s.doc).view.nodes).length > 1)
+  const hasEnoughNodes = useStore(documentStore, (s) => opsFor(s.doc).nodeKeys().length > 1)
   const readOnly = useStore(documentSession, (s) => s.readOnly)
   const layingOut = useStore(documentSession, (s) => s.layingOut)
   return hasEnoughNodes && !readOnly && !layingOut

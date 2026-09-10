@@ -1,8 +1,6 @@
-import { deleteItems, duplicateEntities } from "./commands/er"
 import { documentStore } from "./document-store"
-import { erDiagram } from "./er-access"
-import { entityRect } from "./er/geometry"
 import { rectsBounds } from "./geometry"
+import { opsFor } from "./kinds/ops"
 import { selId, selectedKeys, sessionStore } from "./session-store"
 import { fitToRect, IDENTITY, zoomAt } from "./viewport"
 
@@ -10,29 +8,27 @@ import { fitToRect, IDENTITY, zoomAt } from "./viewport"
 
 export function deleteSelection(): void {
   const session = sessionStore.getState()
-  const recipe = deleteItems(selectedKeys(session.selection, "node"), selectedKeys(session.selection, "edge"))
+  const ops = opsFor(documentStore.getState().doc)
+  const recipe = ops.deleteItems(selectedKeys(session.selection, "node"), selectedKeys(session.selection, "edge"))
   if (recipe && documentStore.getState().dispatch(recipe)) session.setSelection([])
 }
 
 export function duplicateSelection(): void {
   const session = sessionStore.getState()
-  const entities = selectedKeys(session.selection, "node")
-  if (entities.length === 0) return
-  const { keys, recipe } = duplicateEntities(erDiagram(documentStore.getState().doc).model, entities)
+  const nodes = selectedKeys(session.selection, "node")
+  if (nodes.length === 0) return
+  const { keys, recipe } = opsFor(documentStore.getState().doc).duplicateNodes(nodes)
   if (documentStore.getState().dispatch(recipe)) session.setSelection(keys.map((k) => selId("node", k)))
 }
 
 export function selectAllNodes(): void {
-  const keys = Object.keys(erDiagram(documentStore.getState().doc).model.entities)
+  const keys = opsFor(documentStore.getState().doc).nodeKeys()
   sessionStore.getState().setSelection(keys.map((k) => selId("node", k)))
 }
 
 export function fitToContent(): void {
-  const d = erDiagram(documentStore.getState().doc)
-  const rects = Object.entries(d.model.entities).flatMap(([key, entity]) => {
-    const view = d.view.nodes[key]
-    return view ? [entityRect(entity, view)] : []
-  })
+  const ops = opsFor(documentStore.getState().doc)
+  const rects = ops.nodeKeys().flatMap((key) => ops.rectOf(key) ?? [])
   const session = sessionStore.getState()
   session.setViewport(fitToRect(rectsBounds(rects), session.canvasSize))
 }

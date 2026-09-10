@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { entityRect } from "@/editor/er/geometry"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
+import type { Diagram } from "@/model/document"
 import type { ErDiagram } from "@/model/er/schema"
 import { EntityNodeView } from "@/ui/canvas/EntityNode"
 import { RelationshipEdgeView } from "@/ui/canvas/RelationshipEdge"
@@ -22,13 +23,27 @@ export interface BuildSvgOptions {
 /**
  * Serializza il diagramma come SVG autoconsistente.
  *
- * Ri-renderizza il modello con le stesse viste del canvas invece di clonare il DOM: griglia,
+ * Uno switch sul tipo e non due componenti in più su `DiagramView` (`@/ui/canvas/kinds`):
+ * `renderToStaticMarkup` costruisce l'albero fuori dal DOM di React, in un contesto senza uno
+ * store da cui i layer del canvas potrebbero leggere. Ogni tipo vuole quindi le proprie viste
+ * a prop — qui `EntityNodeView`/`RelationshipEdgeView` — non i layer sottoscritti che il canvas
+ * usa. Il Task 12 aggiunge il ramo delle classi a questo switch.
+ */
+export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions): string | null {
+  switch (diagram.type) {
+    case "er":
+      return buildErSvg(diagram, { vars, fontFace })
+  }
+}
+
+/**
+ * Ri-renderizza il modello ER con le stesse viste del canvas invece di clonare il DOM: griglia,
  * overlay e bordi di selezione non ci sono perché non vengono disegnati, non perché siano stati
  * spenti dopo. Un renderer solo, due uscite, nessuna deriva fra ciò che si vede e ciò che si esporta.
  *
  * `null` se non c'è nessuna entità: non c'è niente da esportare.
  */
-export function buildSvg(diagram: ErDiagram, { vars, fontFace }: BuildSvgOptions): string | null {
+function buildErSvg(diagram: ErDiagram, { vars, fontFace }: BuildSvgOptions): string | null {
   const { entities, relationships } = diagram.model
   const { nodes } = diagram.view
 

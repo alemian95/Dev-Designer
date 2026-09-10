@@ -1,9 +1,8 @@
 import { useMemo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
-import { erDiagram } from "@/editor/er-access"
+import { opsFor } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
-import { validateEr } from "@/model/er/validate"
 import type { Issue } from "@/model/issue"
 
 function select(issue: Issue) {
@@ -11,10 +10,10 @@ function select(issue: Issue) {
   else if (issue.edge) sessionStore.getState().setSelection([selId("edge", issue.edge)])
 }
 
-/** Validazione live: ricalcolata quando cambia il model, non a ogni render. */
+/** Validazione live: ricalcolata quando cambia il documento, non a ogni render. */
 export function IssuesPanel() {
-  const model = useStore(documentStore, (s) => erDiagram(s.doc).model)
-  const issues = useMemo(() => validateEr(model), [model])
+  const doc = useStore(documentStore, (s) => s.doc)
+  const issues = useMemo(() => opsFor(doc).validate(), [doc])
   return (
     <section className="border-t">
       <h2 className="px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">Problemi ({issues.length})</h2>

@@ -100,7 +100,8 @@ function loadFontFace(): Promise<string | undefined> {
 }
 
 async function currentSvg(): Promise<string | null> {
-  return buildSvg(erDiagram(documentStore.getState().doc), { vars: readLightVars(), fontFace: await loadFontFace() })
+  // `buildSvg` fa il proprio switch sul tipo: non serve più narrowing qui, solo il documento.
+  return buildSvg(documentStore.getState().doc.diagram, { vars: readLightVars(), fontFace: await loadFontFace() })
 }
 
 /** Esporta il diagramma come SVG. Non fa nulla se non c'è nessuna entità. */

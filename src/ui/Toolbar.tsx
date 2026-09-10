@@ -1,4 +1,4 @@
-import { Copy, LayoutGrid, Maximize2, Moon, MousePointer2, Redo2, Spline, Square, Sun, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react"
+import { Copy, LayoutGrid, Maximize2, Moon, MousePointer2, Redo2, Sun, Trash2, Undo2, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { deleteSelection, duplicateSelection, fitToContent, zoomBy } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore, type Tool } from "@/editor/session-store"
+import { useDiagramView } from "./canvas/kinds/registry"
 import { DocumentMenu } from "./DocumentMenu"
 import { autoLayout, useCanAutoLayout } from "./layout-actions"
 import { useTheme } from "./use-theme"
@@ -29,6 +30,15 @@ function ZoomLabel() {
   return <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">{Math.round(scale * 100)}%</span>
 }
 
+/** Un pulsante di `view.tools`: il tooltip compone `label` e `key`, come faceva il testo cablato. */
+function ToolItem({ value, def }: { value: Tool; def: { label: string; key: string; Icon: LucideIcon } }) {
+  return (
+    <Hint label={`${def.label} (${def.key.toUpperCase()})`}>
+      <ToggleGroupItem value={value} aria-label={def.label} className={TOOL_ITEM}><def.Icon /></ToggleGroupItem>
+    </Hint>
+  )
+}
+
 export function Toolbar() {
   const tool = useStore(sessionStore, (s) => s.tool)
   const setTool = useStore(sessionStore, (s) => s.setTool)
@@ -37,6 +47,7 @@ export function Toolbar() {
   const hasSelection = useStore(sessionStore, (s) => s.selection.size > 0)
   const canLayout = useCanAutoLayout()
   const { theme, toggle } = useTheme()
+  const view = useDiagramView()
 
   return (
     <header className="flex h-12 items-center gap-2 border-b px-3">
@@ -45,8 +56,8 @@ export function Toolbar() {
       <Separator orientation="vertical" className="h-6" />
       <ToggleGroup type="single" value={tool} onValueChange={(v) => v && setTool(v as Tool)}>
         <Hint label="Seleziona (V)"><ToggleGroupItem value="select" aria-label="Seleziona" className={TOOL_ITEM}><MousePointer2 /></ToggleGroupItem></Hint>
-        <Hint label="Entità (E)"><ToggleGroupItem value="node" aria-label="Entità" className={TOOL_ITEM}><Square /></ToggleGroupItem></Hint>
-        <Hint label="Relazione (R)"><ToggleGroupItem value="edge" aria-label="Relazione" className={TOOL_ITEM}><Spline /></ToggleGroupItem></Hint>
+        <ToolItem value="node" def={view.tools.node} />
+        <ToolItem value="edge" def={view.tools.edge} />
       </ToggleGroup>
       <Separator orientation="vertical" className="h-6" />
       <Hint label="Annulla (⌘Z)"><Button variant="ghost" size="icon" aria-label="Annulla" disabled={!canUndo} onClick={() => documentStore.getState().undo()}><Undo2 /></Button></Hint>

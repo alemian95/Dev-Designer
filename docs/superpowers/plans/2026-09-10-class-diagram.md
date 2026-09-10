@@ -2153,8 +2153,19 @@ Expected: 6 scenari PASS, exit 0.
 - [ ] **Step 4: Misurare le prestazioni e riportare la tabella**
 
 Run: `pnpm perf 300`
-Expected: p95 ≤ 20 ms. **Metti la tabella nel report**, e confrontala con quella
-del Task 5.
+
+**Controllo di non-regressione, non traguardo assoluto** — vale qui la stessa
+correzione dello Step 7 del Task 5: il criterio `p95 ≤ 20 ms` **non è
+soddisfatto oggi**, lo zoom è un FAIL documentato a 33,5–41,7 ms secondo il
+display (`docs/perf/2026-09-06-fps-frame-dipinti.md`, §3 e §3bis). Il confronto
+utile è con **la tabella del Task 5**, che è nel suo rapporto: gli scenari
+misurati sono documenti ER sintetici (`?stress=N` costruisce entità), quindi la
+misura dice se la fase B ha peggiorato il percorso dell'ER — che è esattamente
+la domanda giusta, perché la fase B non doveva toccarlo.
+
+**Metti la tabella nel report**, colonne del profiler comprese: su un display a
+60 Hz il p95 è cieco, perché ogni scenario tranne lo zoom sta già sul pavimento
+di 17,4 ms.
 
 - [ ] **Step 5: Aggiornare la documentazione**
 

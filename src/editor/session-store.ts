@@ -1,5 +1,5 @@
 import { createStore } from "zustand/vanilla"
-import type { Size } from "./er-geometry"
+import type { Size } from "./geometry"
 import { IDENTITY, type Viewport } from "./viewport"
 
 export type Tool = "select" | "entity" | "relation"

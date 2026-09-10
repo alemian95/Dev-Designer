@@ -1,5 +1,5 @@
 import type { Cardinality, Relationship } from "@/model/er/schema"
-import type { Point, Rect } from "./er-geometry"
+import type { Point, Rect } from "./geometry"
 
 export interface Dir { x: -1 | 0 | 1; y: -1 | 0 | 1 }
 export interface EdgeRoute { points: Point[]; sourceDir: Dir; targetDir: Dir }

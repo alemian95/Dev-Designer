@@ -1,7 +1,8 @@
 import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
-import { entityRect, entitySize, rectsBounds, snap, type Point, type Rect } from "../er-geometry"
+import { entityRect, entitySize } from "../er/geometry"
+import { rectsBounds, snap, type Point, type Rect } from "../geometry"
 import { uniqueKey } from "./er"
 
 /** Spazio fra le celle della griglia e fra l'import e ciò che c'è già. */

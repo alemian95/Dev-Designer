@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from "react"
-import { FONT_SIZE, GRID } from "@/editor/er-geometry"
+import { FONT_SIZE, GRID } from "@/editor/geometry"
 import { InlineEditor } from "./InlineEditor"
 import { EdgesLayer, NodesLayer } from "./layers"
 import { Overlay } from "./Overlay"

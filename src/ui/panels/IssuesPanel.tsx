@@ -3,11 +3,12 @@ import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { selId, sessionStore } from "@/editor/session-store"
-import { validateEr, type Issue } from "@/model/er/validate"
+import { validateEr } from "@/model/er/validate"
+import type { Issue } from "@/model/issue"
 
 function select(issue: Issue) {
-  if (issue.entity) sessionStore.getState().setSelection([selId("entity", issue.entity)])
-  else if (issue.relationship) sessionStore.getState().setSelection([selId("relationship", issue.relationship)])
+  if (issue.node) sessionStore.getState().setSelection([selId("entity", issue.node)])
+  else if (issue.edge) sessionStore.getState().setSelection([selId("relationship", issue.edge)])
 }
 
 /** Validazione live: ricalcolata quando cambia il model, non a ogni render. */

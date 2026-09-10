@@ -28,17 +28,17 @@ describe("validateEr", () => {
 
   it("segnala entità senza PK", () => {
     const issues = validateEr(model({ entities: { t: { name: "t", attributes: [attr("a")] } } }))
-    expect(issues).toContainEqual(expect.objectContaining({ code: "entity-without-pk", entity: "t", severity: "warning" }))
+    expect(issues).toContainEqual(expect.objectContaining({ code: "entity-without-pk", node: "t", severity: "warning" }))
   })
 
   it("segnala attributi duplicati come errore", () => {
     const issues = validateEr(model({ entities: { t: { name: "t", attributes: [attr("a", { primaryKey: true }), attr("a")] } } }))
-    expect(issues).toContainEqual(expect.objectContaining({ code: "duplicate-attribute", entity: "t", severity: "error" }))
+    expect(issues).toContainEqual(expect.objectContaining({ code: "duplicate-attribute", node: "t", severity: "error" }))
   })
 
   it("segnala FK senza relazione in uscita", () => {
     const issues = validateEr(model({ entities: { t: { name: "t", attributes: [attr("id", { primaryKey: true }), attr("x_id", { foreignKey: true })] } } }))
-    expect(issues).toContainEqual(expect.objectContaining({ code: "fk-without-relationship", entity: "t" }))
+    expect(issues).toContainEqual(expect.objectContaining({ code: "fk-without-relationship", node: "t" }))
   })
 
   it("segnala relazioni verso entità o attributi inesistenti", () => {
@@ -52,7 +52,7 @@ describe("validateEr", () => {
         },
       },
     }))
-    const dangling = issues.filter((i) => i.code === "dangling-relationship" && i.relationship === "r")
+    const dangling = issues.filter((i) => i.code === "dangling-relationship" && i.edge === "r")
     expect(dangling).toHaveLength(2)
   })
 

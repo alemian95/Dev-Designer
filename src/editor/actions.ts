@@ -1,7 +1,8 @@
 import { deleteItems, duplicateEntities } from "./commands/er"
 import { documentStore } from "./document-store"
 import { erDiagram } from "./er-access"
-import { entityRect, rectsBounds } from "./er-geometry"
+import { entityRect } from "./er/geometry"
+import { rectsBounds } from "./geometry"
 import { selId, selectedKeys, sessionStore } from "./session-store"
 import { fitToRect, IDENTITY, zoomAt } from "./viewport"
 

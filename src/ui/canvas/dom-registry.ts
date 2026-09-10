@@ -1,5 +1,5 @@
 import type { EdgeGeometry } from "@/editor/edge-routing"
-import type { Point, Rect } from "@/editor/er-geometry"
+import type { Point, Rect } from "@/editor/geometry"
 
 /**
  * Elementi SVG per chiave. Serve al drag: le posizioni si scrivono sul DOM senza passare da React,

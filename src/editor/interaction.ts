@@ -1,4 +1,4 @@
-import type { Point, Rect } from "./er-geometry"
+import type { Point, Rect } from "./geometry"
 import { selId, selectedKeys, type Tool } from "./session-store"
 
 export type Hit = { kind: "entity"; key: string } | { kind: "relationship"; key: string } | { kind: "canvas" }

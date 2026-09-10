@@ -2,7 +2,8 @@ import type { ErDiagram } from "@/model/er/schema"
 import type { LayoutEdge, LayoutGraph, LayoutNode, LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
-import { entitySize, snap } from "../er-geometry"
+import { entitySize } from "../er/geometry"
+import { snap } from "../geometry"
 
 /** Distanza dall'origine del risultato: un diagramma appiccicato al bordo (0, 0) si legge male. */
 const MARGIN = 40

@@ -3,7 +3,7 @@ import { createErDocument, type Attribute } from "@/model/er/schema"
 import type { LayoutPositions } from "@/model/layout"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
-import { HEADER_H, ROW_H } from "../er-geometry"
+import { HEADER_H, ROW_H } from "../geometry"
 import { applyLayout, layoutGraph } from "./layout"
 
 const state = () => documentStore.getState()

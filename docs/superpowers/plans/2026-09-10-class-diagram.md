@@ -525,8 +525,9 @@ lo rieseguirà sulle ops delle classi. Struttura:
 
 ```ts
 import { describe, expect, it } from "vitest"
+import type { DevDocument } from "@/model/document"
 import { createErDocument } from "@/model/er/schema"
-import { opsFor, type DiagramOps } from "./ops"
+import { opsFor } from "./ops"
 
 /** Contratto che ogni tipo di diagramma deve rispettare. Il Task 11 richiama
  *  questa funzione con un documento di classi. */
@@ -556,7 +557,7 @@ export function verificaContrattoOps(nome: string, docConDueNodiEUnArco: () => D
       expect(ops.edgesTouching(new Set([primo!]))).toHaveLength(1)
     })
 
-    it("edgesTouching non trova nulla per una chiave che non tocca archi", () => {
+    it("edgesTouching non trova nulla per una chiave che non esiste", () => {
       expect(opsFor(docConDueNodiEUnArco()).edgesTouching(new Set(["inesistente"]))).toHaveLength(0)
     })
 
@@ -612,7 +613,27 @@ export function verificaContrattoOps(nome: string, docConDueNodiEUnArco: () => D
 }
 
 /** Documento ER con due entità e una relazione fra loro. Nomi inventati. */
-function docEr(): DevDocument { /* … */ }
+function docEr(): DevDocument {
+  const doc = createErDocument("prova")
+  const d = doc.diagram
+  const pk = { type: "int", primaryKey: true, foreignKey: false, nullable: false, unique: false }
+  d.model.entities["cliente"] = { name: "cliente", attributes: [{ name: "id", ...pk }] }
+  d.model.entities["ordine"] = {
+    name: "ordine",
+    attributes: [
+      { name: "id", ...pk },
+      { name: "cliente_id", type: "int", primaryKey: false, foreignKey: true, nullable: false, unique: false },
+    ],
+  }
+  d.model.relationships["ordine_cliente"] = {
+    source: { entity: "ordine", attributes: ["cliente_id"], cardinality: "many" },
+    target: { entity: "cliente", attributes: ["id"], cardinality: "one" },
+    identifying: false,
+  }
+  d.view.nodes["cliente"] = { x: 0, y: 0, collapsed: false }
+  d.view.nodes["ordine"] = { x: 200, y: 0, collapsed: false }
+  return doc
+}
 
 verificaContrattoOps("er", docEr)
 ```
@@ -673,13 +694,37 @@ Expected: tutti i test verdi e 5 scenari e2e PASS.
 - [ ] **Step 7: Misurare le prestazioni e riportare i numeri**
 
 Run: `pnpm perf 300`
-Expected: p95 ≤ 20 ms in tutti gli scenari. **Riporta la tabella nel report**,
-non un giudizio: questo task riscrive il percorso del drag e aggiunge due
-`querySelector` per arco toccato, e il numero è l'unica prova. Se il p95 sfonda,
-non passare avanti: dillo nel report con la tabella.
+
+**Questo è un controllo di non-regressione, non un traguardo assoluto**, e la
+differenza è sostanziale: il criterio `p95 ≤ 20 ms` **non è soddisfatto oggi**.
+Lo zoom è un FAIL documentato — 33,5–41,7 ms secondo il display — registrato in
+`docs/perf/2026-09-06-fps-frame-dipinti.md` e dichiarato nel README. Chiedere un
+PASS assoluto qui vorrebbe dire chiedere di sistemare lo zoom, che è un altro
+lavoro (è layout-bound: 1.716 ms su 2.439 dello scenario sono layout, e la
+rotella non passa dal codice che questo task riscrive).
+
+Quello che il task deve dimostrare è di **non peggiorare** i quattro scenari che
+riscrive — `drag`, `dragAll`, `marquee`, `marqueeAll` — più `pan` come controllo.
+
+**Riporta la tabella nel report, non un giudizio.** E riporta anche le colonne
+del profiler (script, stile, layout), perché il p95 può essere cieco: su un
+display a 60 Hz ogni scenario tranne lo zoom sta già sul pavimento di 17,4 ms, e
+il p95 non ha risoluzione per mostrare né un miglioramento né un peggioramento
+moderato. Su ProMotion a 120 Hz il pavimento è 9,3 ms e la risoluzione c'è.
+
+Se uno dei cinque scenari peggiora, **rimisura il commit precedente nella stessa
+sessione e sullo stesso display** prima di concludere: è il metodo che il §3bis
+di quel documento ha già usato con `git stash`, e serve perché i p95 assoluti fra
+sessioni e display diversi non sono confrontabili. Due misure concordi sono un
+segnale; una sola non lo è.
+
+Baseline di riferimento a 300 entità (§3, ProMotion 120 Hz, pavimento 9,3 ms):
+drag 10,4 · dragAll 18,0 · pan 10,3 · marquee 10,3 · zoom **41,7** ·
+marqueeAll 10,3.
 
 Nota: `pnpm perf` guida un Chrome **visibile** e la finestra non va toccata né
-coperta durante la misura.
+coperta durante la misura. Se non puoi garantirlo, dillo nel report: una misura
+disturbata va dichiarata, non presentata come risultato.
 
 - [ ] **Step 8: Commit**
 

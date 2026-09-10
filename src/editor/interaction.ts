@@ -1,7 +1,7 @@
 import type { Point, Rect } from "./geometry"
 import { selId, selectedKeys, type Tool } from "./session-store"
 
-export type Hit = { kind: "entity"; key: string } | { kind: "relationship"; key: string } | { kind: "canvas" }
+export type Hit = { kind: "node"; key: string } | { kind: "edge"; key: string } | { kind: "canvas" }
 
 /** Stato della macchina: uno solo alla volta sul root SVG (spec §4.3). */
 export type Mode =
@@ -38,7 +38,7 @@ export type Effect =
   | { type: "commit-marquee"; rect: Rect; additive: boolean }
   | { type: "preview-connect"; source: string; to: Point | null }
   | { type: "commit-connect"; source: string; target: string }
-  | { type: "create-entity"; at: Point }
+  | { type: "create-node"; at: Point }
 
 export interface Context {
   tool: Tool
@@ -70,31 +70,31 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
   if (info.button === 1 || spaceHeld) return { mode: { type: "pan", last: info.screen }, effects: [] }
   if (info.button !== 0) return { mode: IDLE, effects: [] }
 
-  if (ctx.tool === "entity") {
-    if (info.hit.kind === "canvas") return { mode: IDLE, effects: [{ type: "create-entity", at: info.world }] }
+  if (ctx.tool === "node") {
+    if (info.hit.kind === "canvas") return { mode: IDLE, effects: [{ type: "create-node", at: info.world }] }
   }
-  if (ctx.tool === "relation") {
-    if (info.hit.kind === "entity") {
+  if (ctx.tool === "edge") {
+    if (info.hit.kind === "node") {
       return { mode: { type: "connect", source: info.hit.key }, effects: [{ type: "preview-connect", source: info.hit.key, to: info.world }] }
     }
     return { mode: IDLE, effects: [] }
   }
 
   switch (info.hit.kind) {
-    case "entity": {
-      const id = selId("entity", info.hit.key)
+    case "node": {
+      const id = selId("node", info.hit.key)
       if (ctx.selection.has(id)) {
         if (info.shift) return { mode: IDLE, effects: [{ type: "select", ids: [...ctx.selection].filter((s) => s !== id) }] }
-        return { mode: { type: "drag", keys: selectedKeys(ctx.selection, "entity"), start: info.world, moved: false }, effects: [] }
+        return { mode: { type: "drag", keys: selectedKeys(ctx.selection, "node"), start: info.world, moved: false }, effects: [] }
       }
       const ids = info.shift ? [...ctx.selection, id] : [id]
       return {
-        mode: { type: "drag", keys: selectedKeys(new Set(ids), "entity"), start: info.world, moved: false },
+        mode: { type: "drag", keys: selectedKeys(new Set(ids), "node"), start: info.world, moved: false },
         effects: [{ type: "select", ids }],
       }
     }
-    case "relationship": {
-      const id = selId("relationship", info.hit.key)
+    case "edge": {
+      const id = selId("edge", info.hit.key)
       const ids = info.shift
         ? ctx.selection.has(id) ? [...ctx.selection].filter((s) => s !== id) : [...ctx.selection, id]
         : [id]
@@ -148,7 +148,7 @@ function onUp(mode: Mode, info: PointerInfo): Step {
     }
     case "connect": {
       const effects: Effect[] = [{ type: "preview-connect", source: mode.source, to: null }]
-      if (info.hit.kind === "entity") effects.push({ type: "commit-connect", source: mode.source, target: info.hit.key })
+      if (info.hit.kind === "node") effects.push({ type: "commit-connect", source: mode.source, target: info.hit.key })
       return { mode: IDLE, effects }
     }
   }

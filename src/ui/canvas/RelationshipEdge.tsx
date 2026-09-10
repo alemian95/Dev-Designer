@@ -60,7 +60,7 @@ export function RelationshipEdge({ edgeKey }: { edgeKey: string }) {
   const relationship = useStore(documentStore, (s) => erDiagram(s.doc).model.relationships[edgeKey])
   const source = useEntityRect(relationship?.source.entity)
   const target = useEntityRect(relationship?.target.entity)
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("relationship", edgeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
   if (!relationship || !source || !target) return null
   return <RelationshipEdgeView edgeKey={edgeKey} relationship={relationship} source={source} target={target} selected={selected} />
 }

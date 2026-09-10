@@ -2,8 +2,8 @@ import { createStore } from "zustand/vanilla"
 import type { Size } from "./geometry"
 import { IDENTITY, type Viewport } from "./viewport"
 
-export type Tool = "select" | "entity" | "relation"
-export type SelectionKind = "entity" | "relationship"
+export type Tool = "select" | "node" | "edge"
+export type SelectionKind = "node" | "edge"
 
 /** Gli id di selezione hanno un prefisso di tipo: entità e relazioni possono avere la stessa chiave. */
 export const selId = (kind: SelectionKind, key: string): string => `${kind}:${key}`
@@ -22,13 +22,13 @@ export interface SessionState {
   viewport: Viewport
   selection: ReadonlySet<string>
   tool: Tool
-  /** Entità con il nome in editing inline. */
-  editing: { key: string } | null
+  /** `name` = rinomina inline dell'header; `body` = editor dei membri (solo classi). */
+  editing: { key: string; target: "name" | "body" } | null
   canvasSize: Size
   setViewport: (viewport: Viewport) => void
   setSelection: (ids: Iterable<string>) => void
   setTool: (tool: Tool) => void
-  setEditing: (editing: { key: string } | null) => void
+  setEditing: (editing: { key: string; target: "name" | "body" } | null) => void
   setCanvasSize: (size: Size) => void
 }
 

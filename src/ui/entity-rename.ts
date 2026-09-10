@@ -30,7 +30,7 @@ export function renameEntityWithNotice(key: string, name: string, schema?: strin
   if (newKey === key) return true
 
   if (documentStore.getState().dispatch(recipe)) {
-    sessionStore.getState().setSelection([selId("entity", newKey)])
+    sessionStore.getState().setSelection([selId("node", newKey)])
     return true
   }
   documentSession.getState().patch({ notice: `Esiste già un'entità "${newKey}": il nome non è stato cambiato.` })

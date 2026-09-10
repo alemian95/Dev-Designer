@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { deleteSelection, duplicateSelection, fitToContent, resetView, selectAllEntities, zoomBy } from "@/editor/actions"
+import { deleteSelection, duplicateSelection, fitToContent, resetView, selectAllNodes, zoomBy } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore } from "@/editor/session-store"
 import { documentIo } from "@/io/app-io"
@@ -37,14 +37,14 @@ function onKeyDown(e: KeyboardEvent): void {
   else if (mod && key === "z") doc.undo()
   else if (mod && key === "y") doc.redo()
   else if (mod && key === "d") duplicateSelection()
-  else if (mod && key === "a") selectAllEntities()
+  else if (mod && key === "a") selectAllNodes()
   else if (mod && (key === "=" || key === "+")) zoomBy(1.25)
   else if (mod && key === "-") zoomBy(0.8)
   else if (mod && key === "0") resetView()
   else if (!mod && (e.key === "Delete" || e.key === "Backspace")) deleteSelection()
   else if (!mod && key === "v") session.setTool("select")
-  else if (!mod && key === "e") session.setTool("entity")
-  else if (!mod && key === "r") session.setTool("relation")
+  else if (!mod && key === "e") session.setTool("node")
+  else if (!mod && key === "r") session.setTool("edge")
   else if (!mod && key === "f") fitToContent()
   else if (!mod && key === "l") void autoLayout()
   else if (e.key === "Escape") {

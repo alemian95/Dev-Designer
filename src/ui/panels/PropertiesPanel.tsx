@@ -115,8 +115,8 @@ function RelationshipProperties({ relationshipKey: key }: { relationshipKey: str
 
 export function PropertiesPanel() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const entities = selectedKeys(selection, "entity")
-  const relationships = selectedKeys(selection, "relationship")
+  const entities = selectedKeys(selection, "node")
+  const relationships = selectedKeys(selection, "edge")
   if (entities.length === 1 && relationships.length === 0) return <EntityProperties key={entities[0]} entityKey={entities[0]!} />
   if (relationships.length === 1 && entities.length === 0) return <RelationshipProperties key={relationships[0]} relationshipKey={relationships[0]!} />
   return (

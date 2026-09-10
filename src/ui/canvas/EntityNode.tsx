@@ -48,7 +48,7 @@ export const EntityNodeView = memo(function EntityNodeView({ nodeKey, entity, vi
 export function EntityNode({ nodeKey }: { nodeKey: string }) {
   const entity = useStore(documentStore, (s) => erDiagram(s.doc).model.entities[nodeKey])
   const view = useStore(documentStore, (s) => erDiagram(s.doc).view.nodes[nodeKey])
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("entity", nodeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", nodeKey)))
   if (!entity || !view) return null
   return <EntityNodeView nodeKey={nodeKey} entity={entity} view={view} selected={selected} />
 }

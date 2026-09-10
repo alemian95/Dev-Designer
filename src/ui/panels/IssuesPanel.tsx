@@ -7,8 +7,8 @@ import { validateEr } from "@/model/er/validate"
 import type { Issue } from "@/model/issue"
 
 function select(issue: Issue) {
-  if (issue.node) sessionStore.getState().setSelection([selId("entity", issue.node)])
-  else if (issue.edge) sessionStore.getState().setSelection([selId("relationship", issue.edge)])
+  if (issue.node) sessionStore.getState().setSelection([selId("node", issue.node)])
+  else if (issue.edge) sessionStore.getState().setSelection([selId("edge", issue.edge)])
 }
 
 /** Validazione live: ricalcolata quando cambia il model, non a ogni render. */

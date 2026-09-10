@@ -28,9 +28,9 @@ function elementAt(e: MouseEvent): Element | null {
 
 function hitTest(el: Element | null): Hit {
   const node = el?.closest("[data-node-id]")
-  if (node) return { kind: "entity", key: node.getAttribute("data-node-id")! }
+  if (node) return { kind: "node", key: node.getAttribute("data-node-id")! }
   const edge = el?.closest("[data-edge-id]")
-  if (edge) return { kind: "relationship", key: edge.getAttribute("data-edge-id")! }
+  if (edge) return { kind: "edge", key: edge.getAttribute("data-edge-id")! }
   return { kind: "canvas" }
 }
 
@@ -154,7 +154,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
           showMarquee(fx.rect)
           break
         case "commit-marquee": {
-          const ids = entitiesIn(fx.rect).map((k) => selId("entity", k))
+          const ids = entitiesIn(fx.rect).map((k) => selId("node", k))
           session().setSelection(fx.additive ? [...session().selection, ...ids] : ids)
           break
         }
@@ -164,16 +164,16 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
         case "commit-connect": {
           const { key, recipe } = addRelationship(erDiagram(documentStore.getState().doc).model.relationships, fx.source, fx.target)
           documentStore.getState().dispatch(recipe)
-          session().setSelection([selId("relationship", key)])
+          session().setSelection([selId("edge", key)])
           session().setTool("select")
           break
         }
-        case "create-entity": {
+        case "create-node": {
           const { key, recipe } = addEntity(erDiagram(documentStore.getState().doc).model.entities, fx.at)
           documentStore.getState().dispatch(recipe)
-          session().setSelection([selId("entity", key)])
+          session().setSelection([selId("node", key)])
           session().setTool("select")
-          session().setEditing({ key })
+          session().setEditing({ key, target: "name" })
           break
         }
       }
@@ -200,7 +200,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       svg.setPointerCapture(e.pointerId)
       // Lo strumento entità apre l'editor inline già nel down: senza annullare il default il
       // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.
-      if (e.button === 1 || session().tool === "entity") e.preventDefault()
+      if (e.button === 1 || session().tool === "node") e.preventDefault()
       step({ type: "down", info: info(e), spaceHeld })
     }
     const onPointerMove = (e: PointerEvent) => {
@@ -226,7 +226,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
       const hit = hitTest(el)
-      if (el?.closest("[data-node-header]") && hit.kind === "entity") session().setEditing({ key: hit.key })
+      if (el?.closest("[data-node-header]") && hit.kind === "node") session().setEditing({ key: hit.key, target: "name" })
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTextInput(e.target)) return

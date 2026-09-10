@@ -45,8 +45,8 @@ export function Toolbar() {
       <Separator orientation="vertical" className="h-6" />
       <ToggleGroup type="single" value={tool} onValueChange={(v) => v && setTool(v as Tool)}>
         <Hint label="Seleziona (V)"><ToggleGroupItem value="select" aria-label="Seleziona" className={TOOL_ITEM}><MousePointer2 /></ToggleGroupItem></Hint>
-        <Hint label="Entità (E)"><ToggleGroupItem value="entity" aria-label="Entità" className={TOOL_ITEM}><Square /></ToggleGroupItem></Hint>
-        <Hint label="Relazione (R)"><ToggleGroupItem value="relation" aria-label="Relazione" className={TOOL_ITEM}><Spline /></ToggleGroupItem></Hint>
+        <Hint label="Entità (E)"><ToggleGroupItem value="node" aria-label="Entità" className={TOOL_ITEM}><Square /></ToggleGroupItem></Hint>
+        <Hint label="Relazione (R)"><ToggleGroupItem value="edge" aria-label="Relazione" className={TOOL_ITEM}><Spline /></ToggleGroupItem></Hint>
       </ToggleGroup>
       <Separator orientation="vertical" className="h-6" />
       <Hint label="Annulla (⌘Z)"><Button variant="ghost" size="icon" aria-label="Annulla" disabled={!canUndo} onClick={() => documentStore.getState().undo()}><Undo2 /></Button></Hint>

@@ -30,7 +30,7 @@
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/class.mjs`. `HEADLESS=0` per vedere.
  */
-import { expectMenu, expectNodes, isMainModule, startEnv } from "./helpers.mjs"
+import { expectMenu, expectNodes, isMainModule, signature, startEnv } from "./helpers.mjs"
 
 /** Rettangolo del nodo il cui testo contiene `name`, in coordinate schermo — stesso approccio di
  *  `layout.mjs#rects`: niente parsing del `transform`, che è un dettaglio del renderer. */
@@ -42,16 +42,6 @@ async function rectByName(page, name) {
     const r = g.querySelector("rect").getBoundingClientRect()
     return { x: r.x, y: r.y, w: r.width, h: r.height }
   }, name)
-}
-
-/** Firma delle posizioni lette dal DOM, per aspettare che «Disponi» abbia davvero fatto qualcosa. */
-async function signature(page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll("[data-node-id]")]
-      .map((g) => `${g.getAttribute("data-node-id")}@${g.getAttribute("transform")}`)
-      .sort()
-      .join("|"),
-  )
 }
 
 /** Esegue lo scenario in un proprio contesto del browser condiviso. `true` se tutti i passi passano. */

@@ -10,7 +10,7 @@ ER, flowchart, UML class diagram, UML sequence diagram.
 
 Non compete con gli editor generici. I nodi conoscono il dominio (un'entità ha
 attributi tipizzati e chiavi, una classe ha visibilità e metodi) e il disegno
-produce artefatti utili a un dev: DDL, Mermaid, PlantUML, SVG, PNG.
+produce artefatti utili a un dev: DDL, Mermaid, SVG, PNG.
 
 Applicazione **solo frontend**: file statici, nessun server. Il canvas è la
 fonte di verità; il testo è import ed export.

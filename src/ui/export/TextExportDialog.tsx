@@ -3,29 +3,53 @@ import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { emitDdl } from "@/io/emit/ddl"
 import type { Dialect } from "@/io/ddl/schema"
-import { emitMermaid } from "@/io/emit/mermaid"
+import { emitClassMermaid } from "@/io/emit/class-mermaid"
+import { emitMermaid } from "@/io/emit/er-mermaid"
+import type { EmitResult } from "@/io/emit/result"
 import { documentSession } from "@/io/document-session"
 import { download } from "@/io/file"
+import type { ClassModel } from "@/model/class/schema"
+import type { ErModel } from "@/model/er/schema"
 import { useDiagramView, type TextFormat } from "@/ui/canvas/kinds/registry"
 import { documentFileName } from "./file-name"
 
-type Format = Dialect | "mermaid"
+type Format = Dialect | "mermaid" | "class-mermaid"
+
+/** Il modello del documento aperto, marcato col tipo di diagramma: due `Record` diversi
+ *  (`ErModel`/`ClassModel`) non si distinguono da soli, e `emit` sotto ne ha bisogno per scegliere
+ *  l'emettitore senza un cast. */
+type ModelState = { kind: "er"; model: ErModel } | { kind: "class"; model: ClassModel } | null
+
+/**
+ * Sceglie l'emettitore in base al tipo di modello e, per l'ER, al formato scelto. Il ramo finale
+ * (`class-mermaid` su un modello ER) non può accadere — `erView.textFormats` non lo elenca mai fra
+ * le opzioni — ma resta per rendere la funzione totale senza un cast su `format`.
+ */
+function emit(state: ModelState, format: Format): EmitResult {
+  if (!state) return { text: "", warnings: [] }
+  if (state.kind === "class") return emitClassMermaid(state.model)
+  if (format === "mermaid") return emitMermaid(state.model)
+  if (format === "postgres" || format === "mysql") return emitDdl(state.model, format)
+  return { text: "", warnings: [] }
+}
 
 /**
  * Un Record e non una lista: così `FORMATS[format]` è totale e `tsc` verifica che ogni formato
  * dell'union abbia la sua voce, invece di affidarsi a una non-null assertion su `.find()`.
  * L'ordine delle chiavi stringa è quello di scrittura, ed è l'ordine dei pulsanti di default:
  * quello vero, per diagramma, è `view.textFormats` — questa tabella resta ferma anche quando
- * un tipo (il Task 14, con `class-mermaid`) userà un sottoinsieme diverso.
+ * un tipo usa un sottoinsieme diverso.
  */
 const FORMATS: Record<Format, { label: string; extension: string }> = {
   postgres: { label: "PostgreSQL", extension: "sql" },
   mysql: { label: "MySQL", extension: "sql" },
   mermaid: { label: "Mermaid", extension: "mmd" },
+  "class-mermaid": { label: "Mermaid", extension: "mmd" },
 }
 
 /** `view.textFormats` è tipato su tutta la union: qui si mostra solo chi ha un emettitore. */
@@ -46,18 +70,28 @@ const MODEL_LIMITS =
  */
 export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [format, setFormat] = useState<Format>("postgres")
-  // `erDiagram` solleva su un documento di classi: qui i tre formati sono tutti ER (Task 14
-  // aggiungerà l'emettitore Mermaid delle classi), quindi il modello si legge solo per quel tipo.
-  // `null` sugli altri: `view.textFormats.filter(hasEmitter)` è già vuoto per loro, quindi il
-  // dialog non mostra alcun formato da scegliere, senza bisogno di leggere un modello che non c'è.
-  const model = useStore(documentStore, (s) => (s.doc.diagram.type === "er" ? erDiagram(s.doc).model : null))
+  // Si seleziona `doc`, non un oggetto calcolato: `useStore` (`useSyncExternalStore` sotto) confronta
+  // gli snapshot per riferimento, e un selettore che costruisce un `ModelState` nuovo ad ogni
+  // chiamata ne restituirebbe uno diverso ad ogni notifica dello store, anche quando il documento
+  // non è cambiato — il tipo di ciclo di re-render che React segnala come snapshot instabile.
+  // `doc` invece è la stessa referenza finché Immer non produce patch (vedi `documentStore`).
+  const doc = useStore(documentStore, (s) => s.doc)
+  const modelState: ModelState =
+    doc.diagram.type === "er" ? { kind: "er", model: erDiagram(doc).model } :
+    doc.diagram.type === "class" ? { kind: "class", model: classDiagram(doc).model } :
+    null
   const view = useDiagramView()
   // Gli hook stanno sopra, l'uscita anticipata sotto: `DocumentMenu` si ri-renderizza a ogni
   // battuta sul nome del documento e a ogni cambio del pallino delle modifiche, e senza questa
-  // riga i tre emettitori girerebbero ogni volta a dialog chiuso.
+  // riga gli emettitori girerebbero ogni volta a dialog chiuso.
   if (!open) return null
-  const chosen = FORMATS[format]
-  const { text, warnings } = model ? (format === "mermaid" ? emitMermaid(model) : emitDdl(model, format)) : { text: "", warnings: [] }
+  const formats = view.textFormats.filter(hasEmitter)
+  // `format` (lo stato) può restare su un formato dell'altro tipo di diagramma — es. si apre il
+  // dialog su un ER, si cambia documento, si riapre su un class diagram: `formats` cambia ma lo
+  // stato no. Una funzione pura sul render, non un `useEffect` che lo risincronizza.
+  const effectiveFormat = formats.includes(format) ? format : (formats[0] ?? format)
+  const chosen = FORMATS[effectiveFormat]
+  const { text, warnings } = emit(modelState, effectiveFormat)
 
   const copy = async () => {
     const patch = documentSession.getState().patch
@@ -77,14 +111,18 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
           <DialogTitle>Esporta testo</DialogTitle>
           <DialogDescription>Il DDL dello schema o il diagramma in Mermaid.</DialogDescription>
         </DialogHeader>
-        <ToggleGroup type="single" value={format} onValueChange={(v) => v && setFormat(v as Format)} className="justify-start">
-          {view.textFormats.filter(hasEmitter).map((value) => (
-            // Nessun aria-label: sovrascriverebbe il nome accessibile che il testo visibile dà da sé.
-            <ToggleGroupItem key={value} value={value} className="aria-checked:bg-muted px-3">
-              {FORMATS[value].label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        {/* Con un solo formato (i class diagram hanno solo `class-mermaid`) non c'è nulla da
+            scegliere: il gruppo non si mostra. */}
+        {formats.length > 1 && (
+          <ToggleGroup type="single" value={effectiveFormat} onValueChange={(v) => v && setFormat(v as Format)} className="justify-start">
+            {formats.map((value) => (
+              // Nessun aria-label: sovrascriverebbe il nome accessibile che il testo visibile dà da sé.
+              <ToggleGroupItem key={value} value={value} className="aria-checked:bg-muted px-3">
+                {FORMATS[value].label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        )}
         <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
           <li>{MODEL_LIMITS}</li>
           {/* La chiave è l'indice: gli avvisi sono una lista derivata e stabile, e due avvisi

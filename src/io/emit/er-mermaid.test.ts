@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Attribute, Cardinality, Entity, ErModel } from "@/model/er/schema"
-import { emitMermaid } from "./mermaid"
+import { emitMermaid } from "./er-mermaid"
 
 const attr = (name: string, type: string, p: Partial<Attribute> = {}): Attribute => ({
   name, type, primaryKey: false, foreignKey: false, nullable: true, unique: false, ...p,

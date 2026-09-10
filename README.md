@@ -27,18 +27,32 @@ C'è un editor ER funzionante, e i documenti sopravvivono alla chiusura della pa
 - **Import DDL**: incolla o carica un dump PostgreSQL o MySQL/MariaDB, si scelgono le tabelle e
   entrano nel diagramma aperto in un solo passo annullabile, con cardinalità dedotte dalle foreign
   key e disposizione a griglia per le entità nuove. Una tabella già presente viene sostituita
-  tenendo la sua posizione sul canvas. Limiti: nessun auto layout (i punti di piega restano quelli
-  del routing ortogonale esistente), i vincoli UNIQUE su più colonne si perdono nell'import.
+  tenendo la sua posizione sul canvas. La griglia è tutto quello che fa: l'auto layout è un'azione
+  a parte, non un effetto dell'import. Limite: un vincolo UNIQUE su più colonne non è
+  rappresentabile su un attributo, quindi viene ignorato — con un avviso che dice quanti.
+- **Auto layout**: «Disponi» (`L`) ridispone tutto il diagramma con ELK (`layered`, dall'alto in
+  basso) in un worker, in un solo passo annullabile. Le rotte degli archi non vengono da ELK: il
+  router ortogonale le ricalcola dai rettangoli a ogni render, al worker si chiedono solo le
+  posizioni dei nodi.
+- **Export immagini**: SVG e PNG del diagramma intero, più «Copia PNG» negli appunti. Escono col
+  tema chiaro qualunque sia quello attivo — finiscono in README e PR, che hanno fondo chiaro — e col
+  font incorporato nel file come `data:` URI, perché la rasterizzazione avviene in un contesto che
+  non ha i font della pagina.
+- **Export testo**: DDL PostgreSQL, DDL MySQL e Mermaid, da copiare negli appunti o scaricare.
 
-Quello che **non** c'è ancora: export. Sui limiti di scala misurati — lo zoom sfonda il criterio già
-a 300 entità — vedi la misura qui sotto.
+Quello che **non** c'è ancora: gli altri tre tipi di diagramma — class, flowchart e sequence. Sui
+limiti di scala misurati — lo zoom sfonda il criterio già a 300 entità — vedi la misura qui sotto.
 
-- [Spec di design](docs/superpowers/specs/2026-09-06-dev-designer-design.md)
+- [Spec di design](docs/superpowers/specs/2026-09-06-dev-designer-design.md) — architettura, stack e
+  ordine di consegna
 - [Spec: persistenza dei documenti](docs/superpowers/specs/2026-09-07-persistenza-design.md)
 - [Spec: import DDL](docs/superpowers/specs/2026-09-08-import-ddl-design.md)
-- [Piano: persistenza](docs/superpowers/plans/2026-09-07-persistenza.md) — il piano di questo branch
-- [Piano: modello del documento ed editor ER](docs/superpowers/plans/2026-09-06-modello-documento-ed-editor-er.md)
-- [Piano: scaffold e spike](docs/superpowers/plans/2026-09-06-scaffold-e-spike.md)
+- [Spec: auto layout](docs/superpowers/specs/2026-09-09-auto-layout-design.md) — il §3 va letto prima
+  di toccare `src/io/layout/`
+- [Spec: export testo](docs/superpowers/specs/2026-09-09-export-testo-design.md)
+- [Piani di implementazione](docs/superpowers/plans/)
+- [Decisioni di architettura](docs/adr/) — sei ADR
+- [Debito tecnico](docs/debito-tecnico.md) — difetti noti e semplificazioni accettate
 - [Risultati dello spike](docs/superpowers/spikes/2026-09-06-spike-results.md)
 
 ## Stack
@@ -49,6 +63,7 @@ a 300 entità — vedi la misura qui sotto.
 - Tailwind CSS 4 con shadcn/ui e Radix per la cornice dell'interfaccia.
 - Canvas SVG scritto a mano, un componente React per nodo.
 - Import DDL: `libpg-query` (WASM) per PostgreSQL, `node-sql-parser` per MySQL/MariaDB, entrambi in worker.
+- Auto layout: `elkjs` in un worker.
 - Test con Vitest, lint con ESLint 10.
 
 ## Comandi
@@ -66,13 +81,13 @@ pnpm test      # Vitest
 ## Test end-to-end
 
 ```bash
-pnpm e2e       # persistenza e import DDL provati in un browser vero
+pnpm e2e       # cinque scenari provati in un browser vero
 ```
 
 Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
-condivisi dai due scenari, eseguiti in sequenza (mai in parallelo: entrambi toccano il lock fra
-schede e IndexedDB sulla stessa origine, e due scenari concorrenti si disturberebbero a vicenda) —
-ciascuno nel proprio contesto di browser, per isolare l'IndexedDB dell'uno da quello dell'altro:
+condivisi dai cinque scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock
+fra schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a vicenda) —
+ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
 
 - **Persistenza**: disegna un'entità, ricarica e la ritrova dal buffer IndexedDB, salva come
   download, apre un documento nuovo, ricarica il file e la ritrova, rifiuta un file non valido, apre
@@ -81,8 +96,20 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB dell'uno da qu
   resta una prova manuale.
 - **Import DDL**: incolla un DDL, lo analizza, importa due entità e una relazione, annulla con ⌘Z e
   ritrova il canvas vuoto, poi re-importa due volte e verifica che la relazione non si duplichi.
+- **Export immagini**: esporta SVG e PNG e copia il PNG negli appunti, col tema scuro attivo per
+  provare che l'immagine esca comunque in chiaro. Sono le tre cose che senza un browser vero non
+  esistono: il woff2 incorporato, i colori del tema letti con `getComputedStyle`, e la
+  rasterizzazione dentro un `<img>`.
+- **Export testo**: apre il dialog dalla voce di menu, controlla i tre formati, copia negli appunti e
+  scarica.
+- **Auto layout**: sposta un nodo dove il layout non lo metterebbe, clicca «Disponi», verifica che le
+  posizioni cambino e che nessuna coppia di nodi si sovrapponga, poi annulla con ⌘Z. È il solo
+  collaudo che prova che **elkjs si carica davvero**: i test unitari usano un worker finto, quindi un
+  bundle che non si risolve nel worker passerebbe tutta la suite e fallirebbe solo qui.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei due scenari non regge.
+Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
+
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei cinque scenari non regge.
 
 ## Misura prestazioni
 

@@ -10,10 +10,18 @@ function select(issue: Issue) {
   else if (issue.edge) sessionStore.getState().setSelection([selId("edge", issue.edge)])
 }
 
-/** Validazione live: ricalcolata quando cambia il documento, non a ogni render. */
 export function IssuesPanel() {
   const doc = useStore(documentStore, (s) => s.doc)
-  const issues = useMemo(() => opsFor(doc).validate(), [doc])
+  // La dipendenza è ristretta al modello di proposito: un commit di drag riscrive `view.nodes` e
+  // cambia la referenza di `doc`, lasciando `doc.diagram.model` (campo comune della union, neutro
+  // per tipo) uguale a prima. Rivalidare in quel caso non troverebbe niente di diverso —
+  // `validateEr` costa un giro su tutte le relazioni per ogni entità — quindi il ricalcolo resta
+  // legato al solo modello, non a ogni dispatch sul documento.
+  const issues = useMemo(
+    () => opsFor(doc).validate(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `doc` è usato sopra di proposito senza essere qui: vedi il commento prima di `useMemo`.
+    [doc.diagram.model],
+  )
   return (
     <section className="border-t">
       <h2 className="px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">Problemi ({issues.length})</h2>

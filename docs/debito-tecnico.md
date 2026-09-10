@@ -273,12 +273,19 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 
 ### Class diagram
 
-- `IssuesPanel` ricalcola la validazione a ogni dispatch sul documento, non
-  solo ai cambi del modello: il selettore Zustand si è allargato da
-  `erDiagram(s.doc).model` a `s.doc` nel Task 6. Fix noto e di una riga:
-  selezionare `s.doc.diagram.model`, campo comune alla union e neutro per
-  tipo. Costo-se-sbagliato: basso — l'anteprima del drag è locale (non passa
-  dal document store) e il documento cambia una volta per commit.
+- ~~`IssuesPanel` ricalcola la validazione a ogni dispatch sul documento, non
+  solo ai cambi del modello.~~ **Risolto:** il selettore resta su `s.doc`
+  (allargato lì nel Task 6, per restare neutro rispetto al tipo), ma
+  `opsFor(doc).validate()` ora vive in uno `useMemo` la cui dipendenza è
+  ristretta a `doc.diagram.model` — campo comune della union — invece che a
+  `doc` intero: un commit di drag cambia `view.nodes` e lascia il modello
+  com'era, quindi il ricalcolo non riparte. La dipendenza ristretta costa un
+  `eslint-disable-next-line react-hooks/exhaustive-deps` puntuale, commentato
+  sul posto; preferito a una cache mutabile a livello di modulo, che avrebbe
+  risolto lo stesso problema introducendo stato globale dentro un file di
+  componente senza bisogno reale. `TextExportDialog`, che aveva la stessa
+  forma e non era registrata qui, è stata chiusa insieme: il suo `ModelState`
+  viene dal selettore, con `useShallow`.
 - `lastTopLevelColon` in `src/model/class/members.ts` non segnala le
   parentesi sbilanciate, mentre `splitTopLevel` — nata dalla stessa
   primitiva — sì: due funzioni con comportamenti diversi sullo stesso input

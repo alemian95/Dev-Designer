@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useStore } from "zustand"
+import { useShallow } from "zustand/react/shallow"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -70,16 +71,18 @@ const MODEL_LIMITS =
  */
 export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [format, setFormat] = useState<Format>("postgres")
-  // Si seleziona `doc`, non un oggetto calcolato: `useStore` (`useSyncExternalStore` sotto) confronta
-  // gli snapshot per riferimento, e un selettore che costruisce un `ModelState` nuovo ad ogni
-  // chiamata ne restituirebbe uno diverso ad ogni notifica dello store, anche quando il documento
-  // non è cambiato — il tipo di ciclo di re-render che React segnala come snapshot instabile.
-  // `doc` invece è la stessa referenza finché Immer non produce patch (vedi `documentStore`).
-  const doc = useStore(documentStore, (s) => s.doc)
-  const modelState: ModelState =
-    doc.diagram.type === "er" ? { kind: "er", model: erDiagram(doc).model } :
-    doc.diagram.type === "class" ? { kind: "class", model: classDiagram(doc).model } :
-    null
+  // Il `ModelState` è costruito dal selettore, non derivato da `s.doc`: gli emettitori leggono il
+  // solo modello, e un commit di drag cambia `view.nodes` lasciando il modello com'era — con
+  // `s.doc` il dialogo aperto ri-emetterebbe tutto il DDL a ogni spostamento. Il selettore
+  // costruisce un oggetto nuovo ad ogni chiamata, e `useStore` (`useSyncExternalStore` sotto)
+  // confronta gli snapshot per riferimento: senza `useShallow` sarebbe uno snapshot instabile.
+  const modelState = useStore(
+    documentStore,
+    useShallow((s): ModelState =>
+      s.doc.diagram.type === "er" ? { kind: "er", model: erDiagram(s.doc).model } :
+      s.doc.diagram.type === "class" ? { kind: "class", model: classDiagram(s.doc).model } :
+      null),
+  )
   const view = useDiagramView()
   // Gli hook stanno sopra, l'uscita anticipata sotto: `DocumentMenu` si ri-renderizza a ogni
   // battuta sul nome del documento e a ogni cambio del pallino delle modifiche, e senza questa

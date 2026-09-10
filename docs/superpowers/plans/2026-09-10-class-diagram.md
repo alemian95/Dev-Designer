@@ -138,10 +138,15 @@ cambiato semantica, e va capito prima di andare avanti.
   `RelationshipEndSchema`, `RelationshipEnd`, `RelationshipSchema`,
   `Relationship`, `ErModelSchema`, `ErModel`, `ErViewSchema`, `ErView`,
   `ErDiagramSchema`, `ErDiagram`, `createErDocument`, `ErDocument`.
-  `src/model/shared.ts` esporta `Identifier`, `NodeViewSchema`, `NodeView` — non
-  importa nulla, e `document.ts` non li riesporta: chi li usa importa da lì.
-  `src/model/document.ts` resta con `SCHEMA_VERSION`, `DiagramSchema`,
-  `Diagram`, `DocumentSchema`, `DevDocument`.
+  `src/model/shared.ts` esporta `SCHEMA_VERSION`, `Identifier`,
+  `NodeViewSchema`, `NodeView` — non importa nessun altro modulo del progetto, e
+  `document.ts` non li riesporta: chi li usa importa da lì. `SCHEMA_VERSION` sta
+  qui e non in `document.ts` perché `createErDocument` lo legge come **valore**:
+  lasciarlo in `document.ts` chiude un ciclo di valori con la union, e il ciclo
+  non è teorico (vedi lo Step 2). Gli altri tre lettori — `migrations.ts`,
+  `serialize.test.ts`, `document.test.ts` — passano a `./shared`.
+  `src/model/document.ts` resta con `DiagramSchema`, `Diagram`, `DocumentSchema`,
+  `DevDocument`.
 
 - [ ] **Step 1: Leggere il file da dividere**
 
@@ -153,13 +158,26 @@ Lasciarla in `er/schema.ts` comunque — il tipo `ErDiagram` la nomina.
 - [ ] **Step 2: Creare `src/model/er/schema.ts`**
 
 Spostare, non riscrivere: taglia e incolla i blocchi ER, con i loro commenti.
-L'import diventa `import { Identifier, NodeViewSchema, SCHEMA_VERSION, type DevDocument } from "../document"`.
-Attenzione al ciclo: `document.ts` importerà `ErDiagramSchema` da
-`er/schema.ts` per la union, e `er/schema.ts` importa `Identifier` da
-`document.ts`. Un ciclo di soli tipi e costanti che ES module regge, ma è
-fragile. **Rompilo:** sposta `Identifier` e `NodeViewSchema` in
-`src/model/shared.ts`, che non importa nulla; `document.ts` e `er/schema.ts`
-importano entrambi da lì.
+**Il ciclo va rotto, non tollerato.** `document.ts` importa `ErDiagramSchema` da
+`er/schema.ts` per la union, e `er/schema.ts` ha bisogno di `SCHEMA_VERSION`,
+`Identifier` e `NodeViewSchema`. Se questi restano in `document.ts` il ciclo è di
+**valori**, non di tipi: chi vince la corsa dipende dal grafo di import del file
+che entra per primo, e l'altro verso vede `undefined` — misurato, non temuto:
+`TypeError: Cannot read properties of undefined (reading '_zod')` su 12 file di
+test su 30.
+
+**Rompilo:** sposta `SCHEMA_VERSION`, `Identifier` e `NodeViewSchema` in
+`src/model/shared.ts`, che non importa nessun altro modulo del progetto. Il grafo
+diventa un albero: `document.ts` → `er/schema.ts` → `shared.ts`, e
+`document.ts` → `shared.ts`. L'import in cima a `er/schema.ts` diventa
+
+```ts
+import { Identifier, NodeViewSchema, SCHEMA_VERSION } from "../shared"
+import type { DevDocument } from "../document"
+```
+
+`import type` sulla seconda riga non è cosmetico: è ciò che la cancella a
+runtime, e senza cancellazione il ciclo torna.
 
 - [ ] **Step 3: Aggiornare gli import**
 
@@ -184,9 +202,10 @@ esisteva. Con due tipi diventerebbe duecento righe di due cose diverse:
 gli schemi ER vanno in model/er/schema.ts accanto alla loro validazione,
 e in document.ts resta il condiviso.
 
-Identifier e NodeViewSchema scendono in model/shared.ts per rompere il
-ciclo fra document.ts, che nomina ErDiagramSchema nella union, ed
-er/schema.ts, che nomina Identifier."
+SCHEMA_VERSION, Identifier e NodeViewSchema scendono in model/shared.ts per
+rompere il ciclo di valori fra document.ts, che nomina ErDiagramSchema nella
+union, ed er/schema.ts, che li legge: un ciclo di soli tipi si cancella a
+runtime, uno di valori lascia undefined a chi perde la corsa."
 ```
 
 ## Task 2: La geometria si divide, e `Issue` diventa condivisa
@@ -772,7 +791,9 @@ Da qui il lavoro è additivo: la fase A ha lasciato un posto dove metterlo.
 
 **Interfaces:**
 - Consumes: `Identifier`, `NodeViewSchema` da `@/model/shared`;
-  `SCHEMA_VERSION`, `DevDocument` da `@/model/document`.
+  `SCHEMA_VERSION` da `@/model/shared`; `DevDocument` da `@/model/document`, con
+  `import type` — `createClassDocument` chiuderebbe lo stesso ciclo di valori che
+  il Task 1 ha rotto.
 - Produces: `VisibilitySchema`, `Visibility`, `StereotypeSchema`, `Stereotype`,
   `ClassAttributeSchema`, `ClassAttribute`, `ParameterSchema`, `Parameter`,
   `ClassMethodSchema`, `ClassMethod`, `ClassNodeSchema`, `ClassNode`,

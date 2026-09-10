@@ -508,9 +508,12 @@ fatto che il file in questione mescolerebbe due tipi di diagramma:
 1. **Schemi del modello.** Gli schemi ER escono da `src/model/document.ts` (98
    righe, che diventerebbero ~200 con due tipi dentro) verso
    `src/model/er/schema.ts`; le classi in `src/model/class/schema.ts`. In
-   `document.ts` resta il condiviso: `SCHEMA_VERSION`, `Identifier`,
-   `NodeView`, la union, `DocumentSchema`. Precedente: `src/model/er/validate.ts`
-   esiste già.
+   `document.ts` restano la union e `DocumentSchema`; `SCHEMA_VERSION`,
+   `Identifier` e `NodeView` scendono in `src/model/shared.ts`, che non importa
+   nessun altro modulo. Non è pignoleria: i due `createXDocument` leggono
+   `SCHEMA_VERSION` come valore, e tenerlo in `document.ts` chiude con la union un
+   ciclo di **valori** — misurato in fase di implementazione, rompeva 12 file di
+   test su 30. Precedente: `src/model/er/validate.ts` esiste già.
 2. **Geometria.** `src/editor/er-geometry.ts` ha 18 importatori, e sei vogliono
    solo la metà condivisa. Diventa `src/editor/geometry.ts` (costanti, `snap`,
    `Point`/`Rect`/`Size`, `rectsBounds`, `rectsIntersect`) più

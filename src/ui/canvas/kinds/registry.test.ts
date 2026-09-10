@@ -20,7 +20,10 @@ describe("viewFor", () => {
   it("torna viste distinte per ER e per classi, coi tools e i textFormats giusti", () => {
     const er = viewFor("er")
     const cls = viewFor("class")
-    expect(er).not.toBe(cls)
+    // Due object literal distinti lo sono per costruzione: l'asserzione che conta è che il dispatch
+    // cabli componenti diversi, non solo un contenitore diverso attorno agli stessi.
+    expect(er.NodesLayer).not.toBe(cls.NodesLayer)
+    expect(er.Properties).not.toBe(cls.Properties)
     expect(er.tools).toEqual({
       node: { label: "Entità", key: "e", Icon: Square },
       edge: { label: "Relazione", key: "r", Icon: Spline },

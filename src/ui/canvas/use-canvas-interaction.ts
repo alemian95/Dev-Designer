@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from "react"
 import { flushSync } from "react-dom"
+import { classDiagram } from "@/editor/class-access"
 import { moveNodes } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
 import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
@@ -30,6 +31,23 @@ function hitTest(el: Element | null): Hit {
   const edge = el?.closest("[data-edge-id]")
   if (edge) return { kind: "edge", key: edge.getAttribute("data-edge-id")! }
   return { kind: "canvas" }
+}
+
+/**
+ * Nome o corpo, per il doppio click su una classe: il contratto DOM (`data-node-header`) non basta
+ * da solo. Una classe senza membri non ha pixel di "corpo" distinti dall'header — l'header copre
+ * l'intero nodo (`classSize`, §6 della spec) — ma deve comunque poter aprire `MembersEditor`,
+ * altrimenti non riceverebbe mai il suo primo membro: niente import, niente riga di form la
+ * popolano. La decisione è quindi presa a partire dal modello, non solo dal DOM: una classe vuota
+ * ed espansa risolve sempre a "body", anche quando il click cade geometricamente sull'header.
+ */
+function classEditTarget(key: string, headerHit: boolean): "name" | "body" {
+  const diagram = classDiagram(documentStore.getState().doc)
+  const cls = diagram.model.classes[key]
+  const view = diagram.view.nodes[key]
+  const emptyExpanded = !!cls && !view?.collapsed && cls.attributes.length === 0 && cls.methods.length === 0
+  if (emptyExpanded) return "body"
+  return headerHit ? "name" : "body"
 }
 
 function isTextInput(target: EventTarget | null): target is HTMLElement {
@@ -210,13 +228,15 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const el = elementAt(e)
       const hit = hitTest(el)
       if (hit.kind !== "node") return
-      if (el?.closest("[data-node-header]")) {
-        session().setEditing({ key: hit.key, target: "name" })
+      const headerHit = !!el?.closest("[data-node-header]")
+      // Il corpo si apre come testo solo nelle classi: nell'ER non esiste un formato di testo per
+      // gli attributi, e aprire una textarea sarebbe una feature non chiesta — lì il contratto DOM
+      // basta da solo, il doppio click rinomina solo quando cade sull'header.
+      if (documentStore.getState().doc.diagram.type !== "class") {
+        if (headerHit) session().setEditing({ key: hit.key, target: "name" })
         return
       }
-      // Il corpo si apre come testo solo nelle classi: nell'ER non esiste un formato di
-      // testo per gli attributi, e aprire una textarea sarebbe una feature non chiesta.
-      if (documentStore.getState().doc.diagram.type === "class") session().setEditing({ key: hit.key, target: "body" })
+      session().setEditing({ key: hit.key, target: classEditTarget(hit.key, headerHit) })
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTextInput(e.target)) return

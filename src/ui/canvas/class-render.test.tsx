@@ -61,6 +61,23 @@ describe("ClassNodeView", () => {
     expect(html).not.toContain("+ id: int")
     expect(html).toContain(`height="${HEADER_H}"`)
   })
+
+  /**
+   * `data-node-header` è incondizionato, come in `EntityNode`: il renderer non decide più da solo
+   * se il doppio click rinomina o modifica i membri, quella scelta è di `use-canvas-interaction.ts`
+   * (a partire dal modello — una classe senza membri risolve sempre a "body", anche quando il click
+   * cade sull'header). Il contratto che il renderer garantisce è solo che l'header porta sempre
+   * l'attributo: con membri, senza, e collassata.
+   */
+  it("data-node-header è sempre presente sull'header, con o senza membri", () => {
+    const conMembri = renderToStaticMarkup(<ClassNodeView nodeKey="Cliente" node={cliente} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
+    expect(conMembri).toContain("data-node-header")
+    const senzaMembri = { ...cliente, attributes: [], methods: [] }
+    const vuota = renderToStaticMarkup(<ClassNodeView nodeKey="Cliente" node={senzaMembri} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
+    expect(vuota).toContain("data-node-header")
+    const collassata = renderToStaticMarkup(<ClassNodeView nodeKey="Cliente" node={cliente} view={{ x: 0, y: 0, collapsed: true }} selected={false} />)
+    expect(collassata).toContain("data-node-header")
+  })
 })
 
 describe("ClassEdgeView", () => {

@@ -852,7 +852,32 @@ Da qui il lavoro è additivo: la fase A ha lasciato un posto dove metterlo.
 ```ts
 import { describe, expect, it } from "vitest"
 import { DocumentSchema } from "../document"
+import { createErDocument } from "../er/schema"
+import { SCHEMA_VERSION } from "../shared"
 import { ClassDiagramSchema, createClassDocument } from "./schema"
+
+/** Un diagramma di classi minimo con due classi e una relazione fra loro.
+ *  `patch` sovrascrive campi della relazione, per provare i casi rifiutati. */
+function diagrammaConRelazione(patch: Record<string, unknown>) {
+  return {
+    type: "class",
+    model: {
+      classes: {
+        Ordine: { name: "Ordine", stereotype: "class", attributes: [], methods: [] },
+        Cliente: { name: "Cliente", stereotype: "class", attributes: [], methods: [] },
+      },
+      relations: {
+        r1: {
+          kind: "association",
+          source: { class: "Ordine", multiplicity: "*", role: "" },
+          target: { class: "Cliente", multiplicity: "1", role: "cliente" },
+          ...patch,
+        },
+      },
+    },
+    view: { nodes: {} },
+  }
+}
 
 describe("schema del class diagram", () => {
   it("un documento classe appena creato valida contro DocumentSchema", () => {
@@ -874,7 +899,12 @@ describe("schema del class diagram", () => {
     expect(r.success).toBe(false)
   })
 
-  it("un tipo di relazione fuori dai sei è rifiutato", () => { /* come sopra, kind: "friendship" */ })
+  it("un tipo di relazione fuori dai sei è rifiutato, e uno dei sei è accettato", () => {
+    // Il verso positivo non è ridondante: un negativo da solo passerebbe anche se
+    // fosse la forma dell'oggetto a essere sbagliata, non l'enum a rifiutare.
+    expect(ClassDiagramSchema.safeParse(diagrammaConRelazione({})).success).toBe(true)
+    expect(ClassDiagramSchema.safeParse(diagrammaConRelazione({ kind: "friendship" })).success).toBe(false)
+  })
 
   it("un attributo con tipo vuoto è legale: è così che si scrive un valore di enum", () => {
     const doc = createClassDocument("prova")
@@ -887,7 +917,11 @@ describe("schema del class diagram", () => {
   })
 
   it("i documenti ER continuano a validare: la union è allargata, non cambiata", () => {
-    // createErDocument passa ancora da DocumentSchema, e SCHEMA_VERSION resta 1
+    const er = createErDocument("prova")
+    expect(DocumentSchema.safeParse(er).success).toBe(true)
+    // Nessuna migrazione: se questa riga cambia, ogni file già salvato va migrato.
+    expect(SCHEMA_VERSION).toBe(1)
+    expect(er.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })
 ```

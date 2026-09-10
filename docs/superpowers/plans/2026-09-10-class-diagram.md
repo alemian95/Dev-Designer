@@ -1342,13 +1342,20 @@ path."
 ```ts
 import { describe, expect, it } from "vitest"
 import { validateClass } from "./validate"
-import type { ClassModel } from "./schema"
+import type { ClassMethod, ClassModel, ClassNode, ClassRelation } from "./schema"
 
 const classe = (name: string, extra: Partial<ClassNode> = {}): ClassNode =>
   ({ name, stereotype: "class", attributes: [], methods: [], ...extra })
 
-/** Un modello con le classi date e le relazioni date. Nomi inventati. */
-function modello(classi: ClassNode[], relazioni: ClassRelation[] = []): ClassModel { /* … */ }
+/** Un modello con le classi date e le relazioni date. Nomi inventati.
+ *  La chiave di una classe è il suo nome (§4); le relazioni prendono chiavi
+ *  progressive, che nessuna regola guarda. */
+function modello(classi: ClassNode[], relazioni: ClassRelation[] = []): ClassModel {
+  return {
+    classes: Object.fromEntries(classi.map((c) => [c.name, c])),
+    relations: Object.fromEntries(relazioni.map((r, i) => [`r${i}`, r])),
+  }
+}
 
 const end = (c: string) => ({ class: c, multiplicity: "", role: "" })
 const gen = (figlio: string, padre: string): ClassRelation =>
@@ -1381,7 +1388,15 @@ describe("validateClass", () => {
     expect(validateClass(modello([c]))).toEqual([])
   })
 
-  it("due metodi con nome e tipi dei parametri identici: errore", () => { /* parametri con nomi diversi, tipi uguali */ })
+  it("due metodi con nome e tipi dei parametri identici: errore", () => {
+    // I nomi dei parametri differiscono, i tipi no: non è un overload, è un duplicato.
+    // Se il confronto guardasse anche i nomi, questo caso passerebbe per buono.
+    const c = classe("Cliente", { methods: [
+      { name: "trova", type: "void", visibility: "public", isStatic: false, isAbstract: false, parameters: [{ name: "a", type: "int" }] },
+      { name: "trova", type: "void", visibility: "public", isStatic: false, isAbstract: false, parameters: [{ name: "b", type: "int" }] },
+    ] })
+    expect(validateClass(modello([c]))[0]).toMatchObject({ code: "duplicate-member", severity: "error", node: "Cliente" })
+  })
 
   it("una relazione verso una classe inesistente: errore", () => {
     const issues = validateClass(modello([classe("Cliente")], [gen("Cliente", "Fantasma")]))
@@ -1411,7 +1426,12 @@ describe("validateClass", () => {
     expect(validateClass(modello([c]))[0]).toMatchObject({ code: "abstract-method-in-concrete-class", severity: "warning" })
   })
 
-  it("lo stesso metodo in una classe abstract o interface non è un problema", () => { /* stereotype: "abstract" e "interface" */ })
+  it("lo stesso metodo in una classe abstract o interface non è un problema", () => {
+    const f: ClassMethod = { name: "f", type: "void", visibility: "public", isStatic: false, isAbstract: true, parameters: [] }
+    // `toEqual([])` e non un filtro sul codice: qui non deve scattare nessuna regola.
+    expect(validateClass(modello([classe("A", { stereotype: "abstract", methods: [f] })]))).toEqual([])
+    expect(validateClass(modello([classe("B", { stereotype: "interface", methods: [f] })]))).toEqual([])
+  })
 })
 ```
 

@@ -1,9 +1,10 @@
 import * as z from "zod"
 import { Identifier, SCHEMA_VERSION } from "./shared"
 import { ErDiagramSchema } from "./er/schema"
+import { ClassDiagramSchema } from "./class/schema"
 
-/** Flowchart, class e sequence si aggiungono qui nei piani successivi. */
-export const DiagramSchema = z.discriminatedUnion("type", [ErDiagramSchema])
+/** Flowchart e sequence si aggiungono qui nei piani successivi. */
+export const DiagramSchema = z.discriminatedUnion("type", [ErDiagramSchema, ClassDiagramSchema])
 export type Diagram = z.infer<typeof DiagramSchema>
 
 export const DocumentSchema = z.object({

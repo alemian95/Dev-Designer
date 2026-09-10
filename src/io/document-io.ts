@@ -53,6 +53,8 @@ function hasContent(doc: DevDocument): boolean {
   switch (doc.diagram.type) {
     case "er":
       return Object.keys(doc.diagram.model.entities).length > 0
+    case "class":
+      return Object.keys(doc.diagram.model.classes).length > 0
   }
 }
 

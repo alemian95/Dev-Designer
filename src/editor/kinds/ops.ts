@@ -35,5 +35,8 @@ export function opsFor(doc: DevDocument): DiagramOps {
   switch (doc.diagram.type) {
     case "er":
       return erOps(doc)
+    case "class":
+      // Il Task 11 aggiunge classOps: qui c'è solo lo schema (Task 7).
+      throw new Error("DiagramOps per il class diagram non è ancora implementato")
   }
 }

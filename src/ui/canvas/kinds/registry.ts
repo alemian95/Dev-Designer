@@ -33,6 +33,9 @@ export function viewFor(type: Diagram["type"]): DiagramView {
   switch (type) {
     case "er":
       return erView
+    case "class":
+      // Il Task 13 aggiunge classView: qui c'è solo lo schema (Task 7).
+      throw new Error("DiagramView per il class diagram non è ancora implementato")
   }
 }
 

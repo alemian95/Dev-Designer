@@ -33,6 +33,9 @@ export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions):
   switch (diagram.type) {
     case "er":
       return buildErSvg(diagram, { vars, fontFace })
+    case "class":
+      // Il Task 12 aggiunge questo ramo: qui c'è solo lo schema (Task 7).
+      throw new Error("Export SVG per il class diagram non è ancora implementato")
   }
 }
 

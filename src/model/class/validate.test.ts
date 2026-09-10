@@ -18,6 +18,8 @@ function modello(classi: ClassNode[], relazioni: ClassRelation[] = []): ClassMod
 const end = (c: string) => ({ class: c, multiplicity: "", role: "" })
 const gen = (figlio: string, padre: string): ClassRelation =>
   ({ kind: "generalization", source: end(figlio), target: end(padre) })
+const real = (figlio: string, padre: string): ClassRelation =>
+  ({ kind: "realization", source: end(figlio), target: end(padre) })
 
 describe("validateClass", () => {
   it("un modello vuoto non ha problemi", () => {
@@ -75,6 +77,30 @@ describe("validateClass", () => {
     const m = modello([classe("A"), classe("B"), classe("C"), classe("D")],
       [gen("B", "A"), gen("C", "A"), gen("D", "B"), gen("D", "C")])
     expect(validateClass(m).filter((i) => i.code === "generalization-cycle")).toHaveLength(0)
+  })
+
+  it("un ciclo di generalizzazione punta a una classe del ciclo, per essere navigabile dal pannello", () => {
+    // IssuesPanel seleziona cliccando su issue.node/issue.edge (src/ui/panels/IssuesPanel.tsx):
+    // senza uno dei due, il click su questo issue non porta l'utente da nessuna parte.
+    const issues = validateClass(modello([classe("A"), classe("B")], [gen("A", "B"), gen("B", "A")]))
+    const cycle = issues.find((i) => i.code === "generalization-cycle")
+    expect(cycle).toMatchObject({ node: "A" })
+  })
+
+  it("una classe che eredita da sé stessa: ciclo di lunghezza uno", () => {
+    const issues = validateClass(modello([classe("A")], [gen("A", "A")]))
+    expect(issues.filter((i) => i.code === "generalization-cycle")).toHaveLength(1)
+  })
+
+  it("due cicli disgiunti nello stesso modello: due issue, non una", () => {
+    const m = modello([classe("A"), classe("B"), classe("C"), classe("D")],
+      [gen("A", "B"), gen("B", "A"), gen("C", "D"), gen("D", "C")])
+    expect(validateClass(m).filter((i) => i.code === "generalization-cycle")).toHaveLength(2)
+  })
+
+  it("un ciclo misto generalization/realization è rilevato come qualunque altro ciclo", () => {
+    const m = modello([classe("A"), classe("B")], [gen("A", "B"), real("B", "A")])
+    expect(validateClass(m).filter((i) => i.code === "generalization-cycle")).toHaveLength(1)
   })
 
   it("un metodo abstract in una classe concreta: avviso", () => {

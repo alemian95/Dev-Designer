@@ -101,7 +101,11 @@ export function validateClass(model: ClassModel): Issue[] {
   }
 
   for (const cycle of findGeneralizationCycles(model)) {
-    issues.push({ code: "generalization-cycle", severity: "error", message: `ciclo di generalizzazione: ${cycle.join(" -> ")} -> ${cycle[0]}` })
+    // `node: cycle[0]` rende l'issue navigabile da IssuesPanel (che seleziona
+    // leggendo issue.node/issue.edge): un ciclo si rompe togliendo un arco, ma
+    // nessun arco del ciclo è più colpevole degli altri, mentre una classe del
+    // ciclo è un punto d'ingresso stabile per capirlo.
+    issues.push({ code: "generalization-cycle", severity: "error", node: cycle[0], message: `ciclo di generalizzazione: ${cycle.join(" -> ")} -> ${cycle[0]}` })
   }
 
   return issues

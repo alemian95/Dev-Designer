@@ -1,4 +1,4 @@
-import type { ErDiagram } from "@/model/document"
+import type { ErDiagram } from "@/model/er/schema"
 import type { LayoutEdge, LayoutGraph, LayoutNode, LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"

@@ -4,7 +4,8 @@ import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { attributeLines, entitySize, HEADER_H, PAD_X, ROW_H } from "@/editor/er-geometry"
 import { selId, sessionStore } from "@/editor/session-store"
-import { entityKey, type Entity, type NodeView } from "@/model/document"
+import { entityKey, type Entity } from "@/model/er/schema"
+import type { NodeView } from "@/model/shared"
 import { registerNode } from "./dom-registry"
 
 interface Props {

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { entityRect, rectsBounds, FONT_SIZE, type Rect } from "@/editor/er-geometry"
-import type { ErDiagram } from "@/model/document"
+import type { ErDiagram } from "@/model/er/schema"
 import { EntityNodeView } from "@/ui/canvas/EntityNode"
 import { RelationshipEdgeView } from "@/ui/canvas/RelationshipEdge"
 

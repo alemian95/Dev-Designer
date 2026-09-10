@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { createErDocument, SCHEMA_VERSION } from "./document"
+import { SCHEMA_VERSION } from "./shared"
+import { createErDocument } from "./er/schema"
 import { runMigrations, migrateDocument, type Migration } from "./migrations"
 import { parseDocument, toJson } from "./serialize"
 

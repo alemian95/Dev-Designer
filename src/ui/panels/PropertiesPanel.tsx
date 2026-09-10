@@ -6,7 +6,7 @@ import { addAttribute, moveAttribute, removeAttribute, setCollapsed, updateAttri
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { CardinalitySchema, type Attribute, type Cardinality } from "@/model/document"
+import { CardinalitySchema, type Attribute, type Cardinality } from "@/model/er/schema"
 import { renameEntityWithNotice } from "../entity-rename"
 import { CommitInput } from "./CommitInput"
 

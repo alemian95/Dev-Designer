@@ -1,4 +1,4 @@
-import type { ErModel } from "../document"
+import type { ErModel } from "./schema"
 
 export type IssueCode =
   | "entity-without-pk"

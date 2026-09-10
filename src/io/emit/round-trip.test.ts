@@ -5,7 +5,7 @@ import { mapToEr } from "@/io/ddl/map"
 import { parseMysql } from "@/io/ddl/mysql"
 import { parsePostgres } from "@/io/ddl/pg"
 import type { DdlParseResult, SqlTable } from "@/io/ddl/schema"
-import type { ErModel } from "@/model/document"
+import type { ErModel } from "@/model/er/schema"
 import { emitDdl } from "./ddl"
 
 /**

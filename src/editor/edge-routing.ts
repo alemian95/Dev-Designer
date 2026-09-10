@@ -1,4 +1,4 @@
-import type { Cardinality, Relationship } from "@/model/document"
+import type { Cardinality, Relationship } from "@/model/er/schema"
 import type { Point, Rect } from "./er-geometry"
 
 export interface Dir { x: -1 | 0 | 1; y: -1 | 0 | 1 }

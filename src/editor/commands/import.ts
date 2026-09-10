@@ -1,4 +1,4 @@
-import type { Entity, ErDiagram, Relationship } from "@/model/document"
+import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
 import { entityRect, entitySize, rectsBounds, snap, type Point, type Rect } from "../er-geometry"

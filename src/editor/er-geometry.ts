@@ -1,4 +1,5 @@
-import { entityKey, type Attribute, type Entity, type NodeView } from "@/model/document"
+import { entityKey, type Attribute, type Entity } from "@/model/er/schema"
+import type { NodeView } from "@/model/shared"
 
 export const FONT_SIZE = 13
 /** JetBrains Mono ha avanzamento 600/1000 em: larghezza carattere = 0,6 × font size. Nessuna misura nel DOM. */

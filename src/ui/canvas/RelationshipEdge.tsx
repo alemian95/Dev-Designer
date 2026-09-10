@@ -6,7 +6,7 @@ import { edgeGeometry } from "@/editor/edge-routing"
 import { erDiagram } from "@/editor/er-access"
 import { entityRect, type Rect } from "@/editor/er-geometry"
 import { selId, sessionStore } from "@/editor/session-store"
-import type { Relationship } from "@/model/document"
+import type { Relationship } from "@/model/er/schema"
 import { registerEdge } from "./dom-registry"
 
 interface Props {

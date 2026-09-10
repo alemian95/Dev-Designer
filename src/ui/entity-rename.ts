@@ -2,7 +2,7 @@ import { renameEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
 import { selId, sessionStore } from "@/editor/session-store"
 import { documentSession } from "@/io/document-session"
-import { entityKey } from "@/model/document"
+import { entityKey } from "@/model/er/schema"
 
 /**
  * Rinomina un'entità e, se non riesce, lo dice.

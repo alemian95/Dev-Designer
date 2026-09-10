@@ -13,7 +13,7 @@ import { createParser, type DdlParser } from "@/io/ddl/parse-client"
 import type { DdlParseResult, Dialect, SqlTable } from "@/io/ddl/schema"
 import { spawnParseWorker } from "@/io/ddl/spawn"
 import { documentSession } from "@/io/document-session"
-import { entityKey } from "@/model/document"
+import { entityKey } from "@/model/er/schema"
 
 /** Etichette per i tipi di statement più frequenti; per gli altri si ricava un'etichetta leggibile. */
 const SKIPPED_LABELS: Record<string, string> = {

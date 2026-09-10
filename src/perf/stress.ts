@@ -1,4 +1,4 @@
-import { createErDocument, type Attribute, type ErDocument } from "@/model/document"
+import { createErDocument, type Attribute, type ErDocument } from "@/model/er/schema"
 
 const ATTRIBUTES_PER_ENTITY = 12
 const COL_GAP = 260

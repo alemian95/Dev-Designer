@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Attribute, Entity } from "@/model/document"
+import type { Attribute, Entity } from "@/model/er/schema"
 import { attributeLines, CHAR_W, entityRect, entitySize, HEADER_H, MIN_W, PAD_X, rectsBounds, rectsIntersect, ROW_H, snap } from "./er-geometry"
 
 const attr = (name: string, type: string, over: Partial<Attribute> = {}): Attribute => ({

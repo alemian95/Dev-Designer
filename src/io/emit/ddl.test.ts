@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Attribute, Entity, ErModel, Relationship } from "@/model/document"
+import type { Attribute, Entity, ErModel, Relationship } from "@/model/er/schema"
 import { emitDdl } from "./ddl"
 
 const attr = (name: string, type: string, p: Partial<Attribute> = {}): Attribute => ({

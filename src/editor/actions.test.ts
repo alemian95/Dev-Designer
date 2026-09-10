@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/document"
+import { createErDocument } from "@/model/er/schema"
 import { deleteSelection, duplicateSelection, fitToContent, selectAllEntities, zoomBy } from "./actions"
 import { documentStore } from "./document-store"
 import { erDiagram } from "./er-access"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Attribute, ErModel } from "../document"
+import type { Attribute, ErModel } from "./schema"
 import { validateEr } from "./validate"
 
 const attr = (name: string, over: Partial<Attribute> = {}): Attribute => ({

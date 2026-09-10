@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { createErDocument, DocumentSchema, entityKey, ErModelSchema, SCHEMA_VERSION } from "./document"
+import { DocumentSchema } from "./document"
+import { SCHEMA_VERSION } from "./shared"
+import { createErDocument, entityKey, ErModelSchema } from "./er/schema"
 
 describe("document schema", () => {
   it("un documento ER nuovo è valido", () => {

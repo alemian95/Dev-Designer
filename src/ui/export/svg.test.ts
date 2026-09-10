@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { ErDiagram } from "@/model/document"
+import type { ErDiagram } from "@/model/er/schema"
 import { buildSvg, EXPORT_PADDING } from "./svg"
 
 /** Diagramma minimo: due entità distanti, una relazione fra loro. */

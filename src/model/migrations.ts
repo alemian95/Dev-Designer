@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION } from "./document"
+import { SCHEMA_VERSION } from "./shared"
 
 type RawDocument = Record<string, unknown>
 export type Migration = (raw: RawDocument) => RawDocument

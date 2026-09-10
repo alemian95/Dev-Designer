@@ -1,4 +1,5 @@
-import { createErDocument, type DevDocument } from "@/model/document"
+import type { DevDocument } from "@/model/document"
+import { createErDocument } from "@/model/er/schema"
 import { parseDocument, toJson } from "@/model/serialize"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore } from "@/editor/session-store"

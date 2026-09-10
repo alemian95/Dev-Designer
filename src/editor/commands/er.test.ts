@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument, type Attribute } from "@/model/document"
+import { createErDocument, type Attribute } from "@/model/er/schema"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import {

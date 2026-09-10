@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { Relationship } from "@/model/document"
+import type { Relationship } from "@/model/er/schema"
 import { crowsFootPath, edgeGeometry, pathFromPoints, routeEdge } from "./edge-routing"
 
 const rel: Relationship = {

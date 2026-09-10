@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
+import { memberLines } from "@/model/class/members"
 import type { ClassNode } from "@/model/class/schema"
-import { GRID, HEADER_H, MIN_W, ROW_H } from "../geometry"
+import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
 import { classSize, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
 
@@ -50,6 +51,34 @@ describe("classSize", () => {
     expect(w % GRID).toBe(0)
     // Il nome della classe è corto: la larghezza viene dal membro, non dall'header.
     expect(w).toBeGreaterThan(classSize(vuota, false).w)
+  })
+
+  it("combacia con la riga più lunga che il renderer produce davvero: due scomparti allineati separatamente, non uno solo", () => {
+    // Stessa coppia di membri della revisione: un attributo dal nome corto e
+    // un metodo dal nome lungo. `ClassNodeView` (ui/canvas/ClassNode.tsx)
+    // allinea i due punti dentro ciascun scomparto con due chiamate separate
+    // a `memberLines`, non una sola sull'intera classe — altrimenti il nome
+    // lungo del metodo farebbe slittare la colonna dei due punti anche fra
+    // gli attributi, che non lo vedono mai renderizzato.
+    const node: ClassNode = {
+      ...vuota,
+      attributes: [{ name: "x", type: "int", visibility: "public", isStatic: false }],
+      methods: [
+        { name: "unMetodoDalNomeLungo", type: "", visibility: "public", isStatic: false, isAbstract: false, parameters: [] },
+      ],
+    }
+    const attrLines = memberLines({ attributes: node.attributes, methods: [] })
+    const methodLines = memberLines({ attributes: [], methods: node.methods })
+    const renderedChars = Math.max(node.name.length, ...attrLines.map((l) => l.length), ...methodLines.map((l) => l.length))
+    const expectedW = Math.max(MIN_W, Math.ceil((renderedChars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
+
+    expect(classSize(node, false).w).toBe(expectedW)
+
+    // La misura a passata unica (quella che il difetto usava) sovrastima:
+    // la colonna dei due punti del metodo lungo si trascina anche sull'attributo,
+    // e la riga combinata più lunga eccede quella che va davvero sullo schermo.
+    const combinedChars = Math.max(node.name.length, ...memberLines(node).map((l) => l.length))
+    expect(combinedChars).toBeGreaterThan(renderedChars)
   })
 })
 

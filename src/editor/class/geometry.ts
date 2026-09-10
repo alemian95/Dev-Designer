@@ -18,12 +18,24 @@ function stereotypeText(node: ClassNode): string {
 }
 
 export function classSize(node: ClassNode, collapsed: boolean): Size {
-  const lines = collapsed ? [] : memberLines(node)
+  // Due chiamate separate a `memberLines`, una per scomparto — non una sola
+  // sull'intera classe. È la stessa scelta di `ClassNodeView`
+  // (ui/canvas/ClassNode.tsx): allineano i due punti dentro ciascun
+  // compartimento, altrimenti il nome più lungo di un compartimento farebbe
+  // slittare la colonna dei due punti anche nell'altro, e la larghezza qui
+  // misurata supererebbe quella che il renderer produce davvero.
+  const attrLines = collapsed ? [] : memberLines({ attributes: node.attributes, methods: [] })
+  const methodLines = collapsed ? [] : memberLines({ attributes: [], methods: node.methods })
   const attrCount = collapsed ? 0 : node.attributes.length
   const methodCount = collapsed ? 0 : node.methods.length
   const stereo = hasStereotypeLine(node)
 
-  const chars = Math.max(node.name.length, stereo ? stereotypeText(node).length : 0, ...lines.map((l) => l.length))
+  const chars = Math.max(
+    node.name.length,
+    stereo ? stereotypeText(node).length : 0,
+    ...attrLines.map((l) => l.length),
+    ...methodLines.map((l) => l.length),
+  )
   const w = Math.max(MIN_W, Math.ceil((chars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
   const h =
     HEADER_H +

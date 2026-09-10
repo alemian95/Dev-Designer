@@ -1,7 +1,7 @@
 import { memberLines } from "@/model/class/members"
-import type { ClassNode, RelationKind } from "@/model/class/schema"
+import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import type { NodeView } from "@/model/shared"
-import { pathFromPoints, type Dir } from "../edge-routing"
+import { pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Point, type Rect, type Size } from "../geometry"
 
 /** Altezza della riga «stereotipo» dentro l'header, per interface ed enum. */
@@ -82,4 +82,39 @@ export function isDashed(kind: RelationKind): boolean {
 /** `true` se la punta va riempita: solo la composizione. */
 export function isFilled(kind: RelationKind): boolean {
   return kind === "composition"
+}
+
+/** Distanza lungo l'edge a cui piazzare l'etichetta di molteplicità, sullo stesso lato del marker. */
+const END_LABEL_OFFSET = 14
+
+/**
+ * Tutta la geometria di un arco fra classi, da due rettangoli e la relazione — stesso ruolo di
+ * `edgeGeometry` in `edge-routing.ts` per l'ER. Un solo chiamante di ciascuno dei due livelli sotto
+ * (`routeEdge`, `umlMarkerPath`) non basta: sia il render statico (`ClassEdgeView`) sia l'anteprima
+ * del drag (`classOps.edgeGeometry`, via `dom-registry.setEdgeGeometry`) devono disegnare lo stesso
+ * arco, quindi la composizione vive qui una volta sola.
+ *
+ * Un solo marker per arco, e cade sempre sul `target` — contratto di `umlMarkerPath`: il `source`
+ * resta nudo. Le etichette di molteplicità si calcolano solo se almeno un estremo ne ha una, per non
+ * far inseguire a `setEdgeGeometry` un elemento che potrebbe non esistere nel DOM.
+ */
+export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRelation): EdgeGeometry {
+  const route = routeEdge(source, target)
+  const pts = route.points
+  const mid = Math.floor((pts.length - 1) / 2)
+  const p1 = pts[mid]!
+  const p2 = pts[mid + 1]!
+  const from = pts[0]!
+  const to = pts[pts.length - 1]!
+  const geo: EdgeGeometry = {
+    d: pathFromPoints(pts),
+    sourceMarker: "",
+    targetMarker: umlMarkerPath(to, route.targetDir, relation.kind),
+    label: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
+  }
+  if (relation.source.multiplicity || relation.target.multiplicity) {
+    geo.sourceEnd = { x: from.x + route.sourceDir.x * END_LABEL_OFFSET, y: from.y + route.sourceDir.y * END_LABEL_OFFSET }
+    geo.targetEnd = { x: to.x + route.targetDir.x * END_LABEL_OFFSET, y: to.y + route.targetDir.y * END_LABEL_OFFSET }
+  }
+  return geo
 }

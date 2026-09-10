@@ -2,9 +2,8 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
-import { classRect, isDashed, isFilled, umlMarkerPath } from "@/editor/class/geometry"
+import { classEdgeGeometry, classRect, isDashed, isFilled } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
-import { pathFromPoints, routeEdge, type EdgeGeometry } from "@/editor/edge-routing"
 import type { Rect } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { ClassRelation } from "@/model/class/schema"
@@ -16,38 +15,6 @@ interface Props {
   source: Rect
   target: Rect
   selected: boolean
-}
-
-/** Distanza lungo l'edge a cui piazzare l'etichetta di molteplicità, sullo stesso lato del
- *  marker — stessa costante di `classOps.edgeGeometry` (`editor/kinds/class.ts`). */
-const END_LABEL_OFFSET = 14
-
-/**
- * Geometria dell'arco per una relazione di classe, da due rettangoli e il modello: un solo
- * marker per arco, e cade sempre sul `target` — contratto di `umlMarkerPath`
- * (`editor/class/geometry.ts`) — il `source` resta nudo. Le etichette di molteplicità si
- * calcolano solo se almeno un estremo ne ha una, per non far inseguire a `setEdgeGeometry`
- * (dom-registry) un elemento che potrebbe non esistere nel DOM.
- */
-function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRelation): EdgeGeometry {
-  const route = routeEdge(source, target)
-  const pts = route.points
-  const mid = Math.floor((pts.length - 1) / 2)
-  const p1 = pts[mid]!
-  const p2 = pts[mid + 1]!
-  const from = pts[0]!
-  const to = pts[pts.length - 1]!
-  const geo: EdgeGeometry = {
-    d: pathFromPoints(pts),
-    sourceMarker: "",
-    targetMarker: umlMarkerPath(to, route.targetDir, relation.kind),
-    label: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
-  }
-  if (relation.source.multiplicity || relation.target.multiplicity) {
-    geo.sourceEnd = { x: from.x + route.sourceDir.x * END_LABEL_OFFSET, y: from.y + route.sourceDir.y * END_LABEL_OFFSET }
-    geo.targetEnd = { x: to.x + route.targetDir.x * END_LABEL_OFFSET, y: to.y + route.targetDir.y * END_LABEL_OFFSET }
-  }
-  return geo
 }
 
 export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, source, target, selected }: Props) {

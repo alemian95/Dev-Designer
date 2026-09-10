@@ -10,18 +10,15 @@ import {
   deleteClassItems,
   duplicateClasses,
 } from "../class/commands"
-import { classRect, umlMarkerPath } from "../class/geometry"
-import { pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
+import { classEdgeGeometry, classRect } from "../class/geometry"
+import type { EdgeGeometry } from "../edge-routing"
 import type { DiagramOps, EdgeEnds } from "./ops"
-
-/** Offset dal bordo lungo l'edge a cui piazzare l'etichetta di molteplicità, sullo stesso lato del marker. */
-const END_LABEL_OFFSET = 14
 
 /**
  * `DiagramOps` per il diagramma di classi: cablaggio verso i comandi in `class/commands.ts` e la
- * geometria in `class/geometry.ts`. L'unica logica scritta qui è `edgeGeometry`, perché per l'ER
- * quella composizione vive già in `edge-routing.ts` (crow's foot) e qui serve una punta diversa
- * (`umlMarkerPath`) più le etichette di molteplicità, che l'ER non ha.
+ * geometria in `class/geometry.ts`. Nessuna logica nuova qui: anche `edgeGeometry` è solo un
+ * passamano verso `classEdgeGeometry` (`class/geometry.ts`), che compone la stessa geometria usata
+ * dal render statico in `ClassEdgeView`.
  */
 export function classOps(doc: DevDocument): DiagramOps {
   const diagram = () => classDiagram(doc)
@@ -43,28 +40,7 @@ export function classOps(doc: DevDocument): DiagramOps {
 
     edgeGeometry: (key, a, b): EdgeGeometry | null => {
       const rel = diagram().model.relations[key]
-      if (!rel) return null
-      const route = routeEdge(a, b)
-      const pts = route.points
-      const mid = Math.floor((pts.length - 1) / 2)
-      const p1 = pts[mid]!
-      const p2 = pts[mid + 1]!
-      const source = pts[0]!
-      const target = pts[pts.length - 1]!
-      const geo: EdgeGeometry = {
-        d: pathFromPoints(pts),
-        // Un solo marker per arco, e cade sempre sul target (schema.ts): la sorgente non ne ha.
-        sourceMarker: "",
-        targetMarker: umlMarkerPath(target, route.targetDir, rel.kind),
-        label: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
-      }
-      // Solo se almeno una molteplicità non è vuota: altrimenti un'etichetta invisibile finirebbe
-      // per essere inseguita a ogni frame del drag da `setEdgeGeometry` (dom-registry) senza motivo.
-      if (rel.source.multiplicity || rel.target.multiplicity) {
-        geo.sourceEnd = { x: source.x + route.sourceDir.x * END_LABEL_OFFSET, y: source.y + route.sourceDir.y * END_LABEL_OFFSET }
-        geo.targetEnd = { x: target.x + route.targetDir.x * END_LABEL_OFFSET, y: target.y + route.targetDir.y * END_LABEL_OFFSET }
-      }
-      return geo
+      return rel ? classEdgeGeometry(a, b, rel) : null
     },
 
     addNode: (at) => addClass(diagram().model.classes, at),

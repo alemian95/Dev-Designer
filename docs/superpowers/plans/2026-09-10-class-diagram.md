@@ -1213,7 +1213,7 @@ export function isFilled(kind: RelationKind): boolean
 
 ```ts
 import { describe, expect, it } from "vitest"
-import { HEADER_H, MIN_W, ROW_H } from "../geometry"
+import { GRID, HEADER_H, MIN_W, ROW_H } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
 import { classSize, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
 
@@ -1229,7 +1229,15 @@ describe("classSize", () => {
     expect(classSize(soloAttributi, false).h).toBe(HEADER_H + ROW_H + 6)
   })
 
-  it("due scomparti pieni sommano due volte il margine", () => { /* attributi e metodi insieme */ })
+  it("due scomparti pieni sommano due volte il margine", () => {
+    const piena = {
+      ...vuota,
+      attributes: [{ name: "id", type: "int", visibility: "public", isStatic: false }],
+      methods: [{ name: "salva", type: "void", visibility: "public", isStatic: false, isAbstract: false, parameters: [] }],
+    }
+    // Il margine di 6 px sta sotto ogni scomparto che ha righe, quindi due volte.
+    expect(classSize(piena, false).h).toBe(HEADER_H + ROW_H + 6 + ROW_H + 6)
+  })
 
   it("interface ed enum aggiungono la riga dello stereotipo, class e abstract no", () => {
     expect(classSize({ ...vuota, stereotype: "interface" }, false).h).toBe(HEADER_H + STEREO_H)
@@ -1241,7 +1249,17 @@ describe("classSize", () => {
     expect(classSize(piena, true).h).toBe(HEADER_H + STEREO_H)
   })
 
-  it("la larghezza cresce col membro più lungo e resta multipla di GRID", () => { /* … */ })
+  it("la larghezza cresce col membro più lungo e resta multipla di GRID", () => {
+    const lungo = {
+      ...vuota,
+      attributes: [{ name: "unAttributoDalNomeMoltoLungo", type: "Dictionary<string, int>", visibility: "public", isStatic: false }],
+    }
+    const w = classSize(lungo, false).w
+    expect(w).toBeGreaterThan(MIN_W)
+    expect(w % GRID).toBe(0)
+    // Il nome della classe è corto: la larghezza viene dal membro, non dall'header.
+    expect(w).toBeGreaterThan(classSize(vuota, false).w)
+  })
 })
 
 describe("punte e linee", () => {

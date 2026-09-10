@@ -127,7 +127,7 @@ cambiato semantica, e va capito prima di andare avanti.
 ## Task 1: Gli schemi ER escono da `document.ts`
 
 **Files:**
-- Create: `src/model/er/schema.ts`
+- Create: `src/model/er/schema.ts`, `src/model/shared.ts`
 - Modify: `src/model/document.ts` (98 righe → ~35)
 - Modify: ogni file che importa i tipi ER da `@/model/document` (39 importatori
   di `document`, non tutti toccati: solo quelli che usano nomi ER)
@@ -138,9 +138,10 @@ cambiato semantica, e va capito prima di andare avanti.
   `RelationshipEndSchema`, `RelationshipEnd`, `RelationshipSchema`,
   `Relationship`, `ErModelSchema`, `ErModel`, `ErViewSchema`, `ErView`,
   `ErDiagramSchema`, `ErDiagram`, `createErDocument`, `ErDocument`.
-  `src/model/document.ts` resta con `SCHEMA_VERSION`, `Identifier` (esportato,
-  serve agli altri schemi), `NodeViewSchema`, `NodeView`, `DiagramSchema`,
-  `DocumentSchema`, `DevDocument`.
+  `src/model/shared.ts` esporta `Identifier`, `NodeViewSchema`, `NodeView` — non
+  importa nulla, e `document.ts` non li riesporta: chi li usa importa da lì.
+  `src/model/document.ts` resta con `SCHEMA_VERSION`, `DiagramSchema`,
+  `Diagram`, `DocumentSchema`, `DevDocument`.
 
 - [ ] **Step 1: Leggere il file da dividere**
 
@@ -196,6 +197,7 @@ er/schema.ts, che nomina Identifier."
 - Delete: `src/editor/er-geometry.ts` (il suo test si divide in due)
 - Modify: `src/model/er/validate.ts`, `src/ui/panels/IssuesPanel.tsx`, e i 18
   importatori di `er-geometry`
+- Delete: `src/editor/er-geometry.test.ts` (si divide nei due test qui sotto)
 - Test: `src/editor/geometry.test.ts`, `src/editor/er/geometry.test.ts` (dal
   vecchio `er-geometry.test.ts`)
 

@@ -45,26 +45,93 @@ function findClosingParen(text: string, open: number): number {
   return -1
 }
 
+/** Le parentesi tonde da sole: contano per il loro contatore di profondità. */
+const PAREN_BRACKETS: ReadonlyArray<readonly [string, string]> = [["(", ")"]]
+
+/** Le parentesi angolari da sole: contano per il loro contatore di profondità. */
+const ANGLE_BRACKETS: ReadonlyArray<readonly [string, string]> = [["<", ">"]]
+
+/** Tonde, angolari, quadre e graffe insieme: quelle che contano per il tipo di un attributo. */
+const TYPE_BRACKETS: ReadonlyArray<readonly [string, string]> = [
+  ...PAREN_BRACKETS,
+  ...ANGLE_BRACKETS,
+  ["[", "]"],
+  ["{", "}"],
+]
+
 /**
- * Divide `inside` per virgola al livello zero di parentesi tonde e angolari:
- * è quello che fa passare `Map<K, V>` come un solo parametro invece di due.
+ * +1/-1/0 di profondità per il carattere in posizione `i` di `text`, secondo
+ * le coppie in `pairs`. Un '>' preceduto da '=' è la freccia di un tipo
+ * funzione (`(int) => void`), non la chiusura di un generico: non conta.
+ * Una primitiva, due usi: la usano sia `splitTopLevel` (dividere per
+ * virgola, un contatore per coppia) sia `lastTopLevelColon` (trovare il ':'
+ * di tipo, un contatore unico) — stessa scansione a livello zero, bracket
+ * diversi.
  */
-function splitTopLevel(inside: string): string[] {
+function depthDelta(text: string, i: number, pairs: readonly (readonly [string, string])[]): number {
+  const c = text[i]
+  for (const [open, close] of pairs) {
+    if (c === open) return 1
+    if (c === close) return c === ">" && text[i - 1] === "=" ? 0 : -1
+  }
+  return 0
+}
+
+/**
+ * Divide `inside` per virgola al livello zero di parentesi tonde e di
+ * parentesi angolari, con **contatori separati** per i due tipi: è quello
+ * che fa passare `Map<K, V>` come un solo parametro invece di due. Una `(` o
+ * una `<` mai richiusa non deve far sparire in silenzio i parametri
+ * successivi dentro il tipo del primo: se a fine stringa un contatore non è
+ * tornato a zero, è un errore con la sua riga.
+ */
+function splitTopLevel(inside: string, line: number): string[] | ParseResult {
   if (inside.trim() === "") return []
   const parts: string[] = []
-  let depth = 0
+  let depthParen = 0
+  let depthAngle = 0
   let start = 0
   for (let i = 0; i < inside.length; i++) {
-    const c = inside[i]
-    if (c === "(" || c === "<") depth++
-    else if (c === ")" || c === ">") depth--
-    else if (c === "," && depth === 0) {
+    depthParen += depthDelta(inside, i, PAREN_BRACKETS)
+    depthAngle += depthDelta(inside, i, ANGLE_BRACKETS)
+    if (inside[i] === "," && depthParen === 0 && depthAngle === 0) {
       parts.push(inside.slice(start, i))
       start = i + 1
     }
   }
+  if (depthParen !== 0 || depthAngle !== 0) {
+    return fail(line, `parentesi non bilanciate nei parametri: "${inside}"`)
+  }
   parts.push(inside.slice(start))
   return parts
+}
+
+/**
+ * L'indice dell'ultimo ':' al livello zero di parentesi — tonde, angolari,
+ * quadre e graffe — o -1 se non ce n'è uno a livello zero. Regola 4 della §5
+ * della spec: il tipo di un attributo è ciò che segue quel ':', non
+ * l'ultimo in assoluto — altrimenti `+ x: { a: int }` e `+ m: Map<K, V>` si
+ * spezzano nel punto sbagliato.
+ */
+function lastTopLevelColon(text: string): number {
+  let depth = 0
+  let last = -1
+  for (let i = 0; i < text.length; i++) {
+    depth += depthDelta(text, i, TYPE_BRACKETS)
+    if (text[i] === ":" && depth === 0) last = i
+  }
+  return last
+}
+
+/**
+ * Il nome non può contenere un carattere strutturale: altrimenti un `)`
+ * estraneo prima della `(` finisce silenziosamente nel nome (`+ f)(x: int)`
+ * → nome `"f)"`, nessun errore) invece di essere rifiutato con la sua riga.
+ */
+function validateMemberName(name: string, line: number): ParseResult | null {
+  const structural = name.match(/[(){}<>:,]/)
+  if (structural) return fail(line, `nome non valido, contiene "${structural[0]}": "${name}"`)
+  return null
 }
 
 function parseParameter(text: string, line: number): Parameter | ParseResult {
@@ -80,8 +147,8 @@ function parseParameter(text: string, line: number): Parameter | ParseResult {
   return { name, type }
 }
 
-function isParseResult(v: Parameter | ParseResult): v is ParseResult {
-  return "ok" in v
+function isParseResult<T>(v: T | ParseResult): v is ParseResult {
+  return typeof v === "object" && v !== null && "ok" in v
 }
 
 /** Testo → membri. `line` nell'errore è 1-based, per dirlo all'utente. */
@@ -118,12 +185,14 @@ export function parseMembers(text: string): ParseResult {
     const openParen = rest.indexOf("(")
 
     if (openParen === -1) {
-      // Attributo: il tipo è ciò che segue l'ultimo ':', il nome ciò che precede.
+      // Attributo: il tipo è ciò che segue l'ultimo ':' al livello zero di parentesi.
       if (isAbstract) return fail(lineNumber, `un attributo non può essere abstract`)
-      const colon = rest.lastIndexOf(":")
+      const colon = lastTopLevelColon(rest)
       const name = (colon === -1 ? rest : rest.slice(0, colon)).trim()
       const type = colon === -1 ? "" : rest.slice(colon + 1).trim()
       if (name === "") return fail(lineNumber, `nome di attributo vuoto`)
+      const invalid = validateMemberName(name, lineNumber)
+      if (invalid) return invalid
       attributes.push({ name, type, visibility, isStatic })
       continue
     }
@@ -134,10 +203,14 @@ export function parseMembers(text: string): ParseResult {
 
     const name = rest.slice(0, openParen).trim()
     if (name === "") return fail(lineNumber, `nome di metodo vuoto`)
+    const invalidName = validateMemberName(name, lineNumber)
+    if (invalidName) return invalidName
 
     const inside = rest.slice(openParen + 1, closeParen)
+    const split = splitTopLevel(inside, lineNumber)
+    if (isParseResult(split)) return split
     const parameters: Parameter[] = []
-    for (const raw of splitTopLevel(inside)) {
+    for (const raw of split) {
       const parsed = parseParameter(raw, lineNumber)
       if (isParseResult(parsed)) return parsed
       parameters.push(parsed)

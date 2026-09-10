@@ -77,6 +77,40 @@ describe("parseMembers", () => {
     expect(r).toMatchObject({ ok: false, line: 1 })
     expect(r.ok === false && r.message).toMatch(/attributo/i)
   })
+
+  it("rifiuta un ')' estraneo prima della '(' del metodo, invece di metterlo nel nome", () => {
+    const r = parseMembers("+ f)(x: int): void")
+    expect(r).toMatchObject({ ok: false, line: 1 })
+    expect(r.ok === false && r.message).toMatch(/nome/i)
+  })
+
+  it("rifiuta un ')' estraneo nel nome di un attributo senza parentesi", () => {
+    const r = parseMembers("+ x): int")
+    expect(r).toMatchObject({ ok: false, line: 1 })
+    expect(r.ok === false && r.message).toMatch(/nome/i)
+  })
+
+  it("rifiuta un '<' mai richiuso nei parametri, invece di far sparire il parametro dopo", () => {
+    const r = parseMembers("+ f(x: Map<K, y: int): void")
+    expect(r).toMatchObject({ ok: false, line: 1 })
+    expect(r.ok === false && r.message).toMatch(/parentesi/i)
+  })
+
+  it("il tipo di un attributo si divide sull'ultimo ':' fuori dalle parentesi angolari", () => {
+    const m = parsa("+ a: Map<K: V>")
+    expect(m.attributes[0]).toEqual({ name: "a", type: "Map<K: V>", visibility: "public", isStatic: false })
+  })
+
+  it("il tipo di un attributo si divide sull'ultimo ':' fuori dalle parentesi graffe", () => {
+    const m = parsa("+ x: { a: int }")
+    expect(m.attributes[0]).toEqual({ name: "x", type: "{ a: int }", visibility: "public", isStatic: false })
+  })
+
+  it("un tipo di parametro a funzione con parentesi tonde non rompe il conteggio", () => {
+    const m = parsa("+ f(cb: (int) => void): void")
+    expect(m.methods[0]!.parameters).toEqual([{ name: "cb", type: "(int) => void" }])
+    expect(m.methods[0]!.type).toBe("void")
+  })
 })
 
 describe("round trip", () => {
@@ -91,6 +125,10 @@ describe("round trip", () => {
 
   it("memberText porta lo spazio dietro il modificatore, non attaccato al simbolo", () => {
     expect(memberText(parsa("+ {static} conta(): int"))).toBe("+ {static} conta(): int")
+  })
+
+  it("la forma canonica ordina i modificatori static poi abstract, qualunque sia l'ordine in ingresso", () => {
+    expect(memberText(parsa("+ {abstract} {static} f(): void"))).toBe("+ {static} {abstract} f(): void")
   })
 })
 

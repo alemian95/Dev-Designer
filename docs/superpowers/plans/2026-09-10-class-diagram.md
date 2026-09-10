@@ -1686,13 +1686,28 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { classSize, STEREO_H } from "@/editor/class/geometry"
 import { HEADER_H } from "@/editor/geometry"
+import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import { ClassNodeView } from "./ClassNode"
 import { ClassEdgeView } from "./ClassEdge"
 
-const cliente = {
-  name: "Cliente", stereotype: "class" as const,
-  attributes: [{ name: "id", type: "int", visibility: "public" as const, isStatic: false }],
-  methods: [{ name: "salva", type: "void", visibility: "private" as const, isStatic: false, isAbstract: false, parameters: [] }],
+const cliente: ClassNode = {
+  name: "Cliente", stereotype: "class",
+  attributes: [{ name: "id", type: "int", visibility: "public", isStatic: false }],
+  methods: [{ name: "salva", type: "void", visibility: "private", isStatic: false, isAbstract: false, parameters: [] }],
+}
+
+/** Una relazione fra due classi. `sourceMult` e `targetMult` sono comodità del
+ *  test: nel modello vivono dentro i due estremi. */
+function relazione(
+  kind: RelationKind,
+  over: { name?: string; sourceMult?: string; targetMult?: string } = {},
+): ClassRelation {
+  return {
+    kind,
+    ...(over.name === undefined ? {} : { name: over.name }),
+    source: { class: "Cliente", multiplicity: over.sourceMult ?? "", role: "" },
+    target: { class: "Persona", multiplicity: over.targetMult ?? "", role: "" },
+  }
 }
 
 describe("ClassNodeView", () => {
@@ -1742,7 +1757,18 @@ describe("ClassEdgeView", () => {
     expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("generalization")} {...rects} selected={false} />)).not.toContain("stroke-dasharray")
   })
 
-  it("la composizione ha la punta piena, l'aggregazione vuota", () => { /* fill sul data-edge-target */ })
+  it("la composizione ha la punta piena, l'aggregazione vuota", () => {
+    // Il fill cade sul marker del target: è lì che UML distingue i due rombi, e
+    // se `isFilled` fosse cablato al contrario questi due sarebbero scambiati.
+    const punta = (kind: RelationKind) => {
+      const html = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione(kind)} {...rects} selected={false} />)
+      return html.slice(html.indexOf("data-edge-target"))
+    }
+    expect(punta("composition")).toContain('fill="var(--muted-foreground)"')
+    expect(punta("aggregation")).toContain('fill="none"')
+    // La generalizzazione ha il triangolo vuoto: solo la composizione è piena.
+    expect(punta("generalization")).toContain('fill="none"')
+  })
 
   it("le molteplicità compaiono solo quando non sono vuote", () => {
     expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} {...rects} selected={false} />))
@@ -1753,7 +1779,15 @@ describe("ClassEdgeView", () => {
     expect(html).toContain(">0..*<")
   })
 
-  it("l'etichetta del nome compare solo se il nome c'è", () => { /* come RelationshipEdgeView */ })
+  it("l'etichetta del nome compare solo se il nome c'è", () => {
+    // Come RelationshipEdgeView: il testo sta dentro un `&&`, quindi senza nome
+    // l'elemento non esiste — non è un elemento vuoto da nascondere.
+    expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} {...rects} selected={false} />))
+      .not.toContain("data-edge-label")
+    const con = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association", { name: "possiede" })} {...rects} selected={false} />)
+    expect(con).toContain("data-edge-label")
+    expect(con).toContain(">possiede<")
+  })
 })
 ```
 

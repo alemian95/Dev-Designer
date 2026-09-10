@@ -58,9 +58,22 @@ function hasEmitter(format: TextFormat): format is Format {
   return format in FORMATS
 }
 
-/** Vale per tutti i formati: è una proprietà del modello, non del dialetto scelto. */
-const MODEL_LIMITS =
-  "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale."
+/**
+ * Vale per tutti i formati di un dato tipo: è una proprietà del modello, non del dialetto scelto.
+ * Testo diverso per tipo di diagramma — quello ER parla del round trip col dump SQL, quello class
+ * elenca gli elementi UML che §16 della spec mette fuori scopo (non se ne inventano altri).
+ */
+const MODEL_LIMITS: Record<"er" | "class", string> = {
+  er: "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale.",
+  class: "Il modello non rappresenta generici, package, note, classi di associazione, classi annidate e visibilità di pacchetto.",
+}
+
+/** Stessa idea di `MODEL_LIMITS`, per la descrizione del dialogo: menziona il DDL solo quando è
+ *  davvero fra i formati offerti (`erView.textFormats`), non su ogni tipo di diagramma. */
+const DIALOG_DESCRIPTION: Record<"er" | "class", string> = {
+  er: "Il DDL dello schema o il diagramma in Mermaid.",
+  class: "Il diagramma in Mermaid.",
+}
 
 /**
  * Anteprima e consegna dell'export testo.
@@ -112,7 +125,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
       <DialogContent data-text-export-dialog className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Esporta testo</DialogTitle>
-          <DialogDescription>Il DDL dello schema o il diagramma in Mermaid.</DialogDescription>
+          <DialogDescription>{modelState ? DIALOG_DESCRIPTION[modelState.kind] : ""}</DialogDescription>
         </DialogHeader>
         {/* Con un solo formato (i class diagram hanno solo `class-mermaid`) non c'è nulla da
             scegliere: il gruppo non si mostra. */}
@@ -127,7 +140,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
           </ToggleGroup>
         )}
         <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-          <li>{MODEL_LIMITS}</li>
+          {modelState && <li>{MODEL_LIMITS[modelState.kind]}</li>}
           {/* La chiave è l'indice: gli avvisi sono una lista derivata e stabile, e due avvisi
               con lo stesso testo darebbero chiavi duplicate. */}
           {warnings.map((w, i) => (

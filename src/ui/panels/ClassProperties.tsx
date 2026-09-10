@@ -2,6 +2,7 @@ import { useStore } from "zustand"
 import { Label } from "@/components/ui/label"
 import { setStereotype, updateRelation } from "@/editor/class/commands"
 import { classDiagram } from "@/editor/class-access"
+import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
 import { RelationKindSchema, StereotypeSchema, type RelationKind, type Stereotype } from "@/model/class/schema"
@@ -10,6 +11,16 @@ import { CommitInput } from "@/ui/panels/CommitInput"
 
 const dispatch = (recipe: Recipe | null) => {
   if (recipe) documentStore.getState().dispatch(recipe)
+}
+
+/** Stessa forma del `Flag` di `kinds/er.tsx`: un checkbox con etichetta, niente di più. */
+function Flag({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-1 text-xs" title={label}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      {label}
+    </label>
+  )
 }
 
 const STEREOTYPE_LABEL: Record<Stereotype, string> = {
@@ -46,7 +57,8 @@ function RelationKindSelect({ id, value, onChange }: { id: string; value: Relati
 
 function ClassNodeProperties({ classKey: key }: { classKey: string }) {
   const cls = useStore(documentStore, (s) => classDiagram(s.doc).model.classes[key])
-  if (!cls) return null
+  const view = useStore(documentStore, (s) => classDiagram(s.doc).view.nodes[key])
+  if (!cls || !view) return null
   const count = cls.attributes.length + cls.methods.length
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -58,6 +70,7 @@ function ClassNodeProperties({ classKey: key }: { classKey: string }) {
         <Label htmlFor="class-stereotype">Stereotipo</Label>
         <StereotypeSelect id="class-stereotype" value={cls.stereotype} onChange={(stereotype) => dispatch(setStereotype(key, stereotype))} />
       </div>
+      <Flag label="Collassata" checked={view.collapsed} onChange={(v) => dispatch(setCollapsed(key, v))} />
       <div className="grid gap-1">
         <Label>Membri</Label>
         {/* Sola lettura, deliberatamente: nessuna riga di form per membro (§10 della spec). */}

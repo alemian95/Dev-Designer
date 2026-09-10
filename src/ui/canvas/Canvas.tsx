@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/geometry"
 import { InlineEditor } from "./InlineEditor"
 import { useDiagramView } from "./kinds/registry"
+import { MembersEditor } from "./MembersEditor"
 import { Overlay } from "./Overlay"
 import { useCanvasInteraction } from "./use-canvas-interaction"
 import { ViewportGroup } from "./ViewportGroup"
@@ -34,6 +35,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
         </ViewportGroup>
       </svg>
       <InlineEditor />
+      <MembersEditor />
     </div>
   )
 }

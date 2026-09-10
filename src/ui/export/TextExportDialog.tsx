@@ -46,14 +46,18 @@ const MODEL_LIMITS =
  */
 export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [format, setFormat] = useState<Format>("postgres")
-  const model = useStore(documentStore, (s) => erDiagram(s.doc).model)
+  // `erDiagram` solleva su un documento di classi: qui i tre formati sono tutti ER (Task 14
+  // aggiungerà l'emettitore Mermaid delle classi), quindi il modello si legge solo per quel tipo.
+  // `null` sugli altri: `view.textFormats.filter(hasEmitter)` è già vuoto per loro, quindi il
+  // dialog non mostra alcun formato da scegliere, senza bisogno di leggere un modello che non c'è.
+  const model = useStore(documentStore, (s) => (s.doc.diagram.type === "er" ? erDiagram(s.doc).model : null))
   const view = useDiagramView()
   // Gli hook stanno sopra, l'uscita anticipata sotto: `DocumentMenu` si ri-renderizza a ogni
   // battuta sul nome del documento e a ogni cambio del pallino delle modifiche, e senza questa
   // riga i tre emettitori girerebbero ogni volta a dialog chiuso.
   if (!open) return null
   const chosen = FORMATS[format]
-  const { text, warnings } = format === "mermaid" ? emitMermaid(model) : emitDdl(model, format)
+  const { text, warnings } = model ? (format === "mermaid" ? emitMermaid(model) : emitDdl(model, format)) : { text: "", warnings: [] }
 
   const copy = async () => {
     const patch = documentSession.getState().patch

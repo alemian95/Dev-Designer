@@ -1,9 +1,10 @@
-import { ChevronDown, ClipboardCopy, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, Save, SaveAll } from "lucide-react"
+import { Box, ChevronDown, ClipboardCopy, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, Save, SaveAll, Square } from "lucide-react"
 import { useState, type ChangeEvent } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { documentStore } from "@/editor/document-store"
 import { documentDb, documentIo } from "@/io/app-io"
@@ -20,6 +21,9 @@ const when = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "
 /** Nome del documento, pallino delle modifiche non salvate, e il menu: nuovo, apri, salva, salva con nome, recenti. */
 export function DocumentMenu() {
   const name = useStore(documentStore, (s) => s.doc.name)
+  // L'import DDL è un'entrata solo ER (§2 della spec del class diagram): sulle classi la voce
+  // resta ma non fa niente di sensato, quindi si disabilita come già succede in sola lettura.
+  const isEr = useStore(documentStore, (s) => s.doc.diagram.type === "er")
   const docId = useStore(documentSession, (s) => s.docId)
   const dirty = useStore(documentSession, (s) => s.dirty)
   const readOnly = useStore(documentSession, (s) => s.readOnly)
@@ -50,9 +54,15 @@ export function DocumentMenu() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-72">
-          <DropdownMenuItem onSelect={() => void documentIo.newDocument()}><FilePlus2 /> Nuovo</DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger><FilePlus2 /> Nuovo</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onSelect={() => void documentIo.newDocument("er")}><Square /> Diagramma ER</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void documentIo.newDocument("class")}><Box /> Class diagram</DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuItem onSelect={requestOpen}><FolderOpen /> Apri… <DropdownMenuShortcut>⌘O</DropdownMenuShortcut></DropdownMenuItem>
-          <DropdownMenuItem disabled={readOnly} onSelect={() => setImportOpen(true)}><FileCode2 /> Importa DDL…</DropdownMenuItem>
+          <DropdownMenuItem disabled={readOnly || !isEr} onSelect={() => setImportOpen(true)}><FileCode2 /> Importa DDL…</DropdownMenuItem>
           <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.save()}><Save /> Salva <DropdownMenuShortcut>⌘S</DropdownMenuShortcut></DropdownMenuItem>
           <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.saveAs()}><SaveAll /> Salva con nome… <DropdownMenuShortcut>⇧⌘S</DropdownMenuShortcut></DropdownMenuItem>
           <DropdownMenuSeparator />

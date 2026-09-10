@@ -209,7 +209,14 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
       const hit = hitTest(el)
-      if (el?.closest("[data-node-header]") && hit.kind === "node") session().setEditing({ key: hit.key, target: "name" })
+      if (hit.kind !== "node") return
+      if (el?.closest("[data-node-header]")) {
+        session().setEditing({ key: hit.key, target: "name" })
+        return
+      }
+      // Il corpo si apre come testo solo nelle classi: nell'ER non esiste un formato di
+      // testo per gli attributi, e aprire una textarea sarebbe una feature non chiesta.
+      if (documentStore.getState().doc.diagram.type === "class") session().setEditing({ key: hit.key, target: "body" })
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTextInput(e.target)) return

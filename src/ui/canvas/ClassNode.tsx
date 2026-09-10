@@ -37,6 +37,12 @@ export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, 
   const methodLines = view.collapsed ? [] : memberLines({ attributes: [], methods: node.methods })
   const attrTop = headerH
   const methodTop = attrTop + (attrLines.length ? attrLines.length * ROW_H + COMPARTMENT_MARGIN : 0)
+  // Senza scomparti visibili l'header coincide col nodo intero (Task 13, `use-canvas-interaction.ts`):
+  // `data-node-header` non si applica in quel caso, altrimenti un doppio click non avrebbe mai un
+  // pixel di "corpo" su cui cadere e una classe appena creata non potrebbe mai ricevere il suo primo
+  // membro — il nome resta comunque raggiungibile dal pannello (`CommitInput`).
+  const hasBody = attrLines.length > 0 || methodLines.length > 0
+  const headerHit = hasBody || undefined
 
   return (
     <g
@@ -48,14 +54,14 @@ export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, 
       }}
     >
       <rect width={w} height={h} rx={4} fill="var(--card)" stroke={selected ? "var(--primary)" : "var(--border)"} strokeWidth={selected ? 2 : 1} />
-      <rect data-node-header width={w} height={headerH} rx={4} fill="var(--muted)" />
+      <rect data-node-header={headerHit} width={w} height={headerH} rx={4} fill="var(--muted)" />
       {stereo && (
-        <text data-node-header x={w / 2} y={STEREO_H / 2} textAnchor="middle" dominantBaseline="central" fontSize={11} fill="var(--muted-foreground)">
+        <text data-node-header={headerHit} x={w / 2} y={STEREO_H / 2} textAnchor="middle" dominantBaseline="central" fontSize={11} fill="var(--muted-foreground)">
           {`«${node.stereotype}»`}
         </text>
       )}
       <text
-        data-node-header
+        data-node-header={headerHit}
         x={w / 2}
         y={stereo ? STEREO_H + HEADER_H / 2 : HEADER_H / 2}
         textAnchor="middle"

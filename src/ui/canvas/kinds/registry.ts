@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import type { Diagram } from "@/model/document"
+import { classView } from "./class"
 import { erView } from "./er"
 
 /**
@@ -34,8 +35,7 @@ export function viewFor(type: Diagram["type"]): DiagramView {
     case "er":
       return erView
     case "class":
-      // Il Task 13 aggiunge classView: qui c'è solo lo schema (Task 7).
-      throw new Error("DiagramView per il class diagram non è ancora implementato")
+      return classView
   }
 }
 

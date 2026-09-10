@@ -17,7 +17,7 @@ export function PropertiesPanel() {
   if (single) return <view.Properties />
   return (
     <p className="p-3 text-sm text-muted-foreground">
-      {selection.size === 0 ? "Seleziona un'entità o una relazione." : `${selection.size} elementi selezionati`}
+      {selection.size === 0 ? "Seleziona un nodo o un arco." : `${selection.size} elementi selezionati`}
     </p>
   )
 }

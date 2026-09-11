@@ -135,10 +135,50 @@ describe("round trip", () => {
 describe("memberLines", () => {
   it("allinea i nomi con spazi, perché il font è monospace", () => {
     const righe = memberLines(parsa("+ id: int\n- descrizione: string"))
-    expect(righe[0]!.indexOf("int")).toBe(righe[1]!.indexOf("string"))
+    expect(righe[0]!.text.indexOf("int")).toBe(righe[1]!.text.indexOf("string"))
   })
 
   it("un tipo vuoto non lascia due punti pendenti", () => {
-    expect(memberLines(parsa("IN_CORSO"))[0]!).not.toContain(":")
+    expect(memberLines(parsa("IN_CORSO"))[0]!.text).not.toContain(":")
+  })
+})
+
+describe("memberLines e lo statico", () => {
+  const attributo = (name: string, isStatic: boolean) => ({ name, type: "int", visibility: "public" as const, isStatic })
+
+  it("la riga resa non contiene più {static}: al suo posto il nome va sottolineato", () => {
+    const [riga] = memberLines({ attributes: [attributo("contatore", true)], methods: [] })
+    expect(riga!.text).not.toContain("{static}")
+    expect(riga!.underline).not.toBeNull()
+  })
+
+  it("gli estremi del sottolineato ritagliano esattamente il nome", () => {
+    const [riga] = memberLines({ attributes: [attributo("contatore", true)], methods: [] })
+    const { from, to } = riga!.underline!
+    expect(riga!.text.slice(from, to)).toBe("contatore")
+  })
+
+  it("un membro non statico non ha sottolineato", () => {
+    const [riga] = memberLines({ attributes: [attributo("id", false)], methods: [] })
+    expect(riga!.underline).toBeNull()
+  })
+
+  it("{abstract} resta nel testo: è notazione UML legittima", () => {
+    const metodo = { name: "render", type: "string", visibility: "public" as const, isStatic: false, isAbstract: true, parameters: [] }
+    const [riga] = memberLines({ attributes: [], methods: [metodo] })
+    expect(riga!.text).toContain("{abstract}")
+  })
+
+  it("memberText non cambia: {static} resta nella sintassi che il parser rilegge", () => {
+    const testo = memberText({ attributes: [attributo("contatore", true)], methods: [] })
+    expect(testo).toContain("{static}")
+    const round = parseMembers(testo)
+    expect(round.ok && round.value.attributes[0]!.isStatic).toBe(true)
+  })
+
+  it("le colonne restano allineate sulle righe rese, non su quelle canoniche", () => {
+    const righe = memberLines({ attributes: [attributo("a", true), attributo("bbbbbb", false)], methods: [] })
+    const colonne = righe.map((r) => r.text.indexOf(":"))
+    expect(new Set(colonne).size).toBe(1)
   })
 })

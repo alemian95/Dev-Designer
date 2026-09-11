@@ -5,7 +5,7 @@ import { classSize, hasStereotypeLine, STEREO_H } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import { HEADER_H, PAD_X, ROW_H } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
-import { memberLines } from "@/model/class/members"
+import { memberLines, type MemberLine } from "@/model/class/members"
 import type { ClassNode as ClassNodeModel } from "@/model/class/schema"
 import type { NodeView } from "@/model/shared"
 import { registerNode } from "./dom-registry"
@@ -19,6 +19,30 @@ interface Props {
 
 /** Margine sotto un compartimento con righe: la stessa costante di `classSize` (`editor/class/geometry.ts`). */
 const COMPARTMENT_MARGIN = 6
+
+/**
+ * Una riga di membro come UML la disegna: se `underline` è `null` è un `<text>` unico, come prima
+ * di questo task. Un membro statico invece spezza il testo in tre `<tspan>` — prefisso, nome, resto
+ * — perché solo il nome va sottolineato: `{static}` non compare mai in chiaro, quella sintassi resta
+ * nella textarea (`memberText`/`parseMembers`), non nel disegno.
+ */
+function MemberRow({ line, y }: { line: MemberLine; y: number }) {
+  if (!line.underline) {
+    return (
+      <text x={PAD_X} y={y} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
+        {line.text}
+      </text>
+    )
+  }
+  const { from, to } = line.underline
+  return (
+    <text x={PAD_X} y={y} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
+      <tspan>{line.text.slice(0, from)}</tspan>
+      <tspan style={{ textDecoration: "underline" }}>{line.text.slice(from, to)}</tspan>
+      <tspan>{line.text.slice(to)}</tspan>
+    </text>
+  )
+}
 
 /**
  * Vista pura e memoizzata: tre scomparti — header, attributi, metodi — come UML li disegna. Un
@@ -68,15 +92,11 @@ export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, 
       </text>
       {attrLines.length > 0 && <line data-compartment-rule x1={0} y1={attrTop} x2={w} y2={attrTop} stroke="var(--border)" />}
       {attrLines.map((line, i) => (
-        <text key={`a${i}`} x={PAD_X} y={attrTop + 3 + ROW_H * i + ROW_H / 2} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
-          {line}
-        </text>
+        <MemberRow key={`a${i}`} line={line} y={attrTop + 3 + ROW_H * i + ROW_H / 2} />
       ))}
       {methodLines.length > 0 && <line data-compartment-rule x1={0} y1={methodTop} x2={w} y2={methodTop} stroke="var(--border)" />}
       {methodLines.map((line, i) => (
-        <text key={`m${i}`} x={PAD_X} y={methodTop + 3 + ROW_H * i + ROW_H / 2} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
-          {line}
-        </text>
+        <MemberRow key={`m${i}`} line={line} y={methodTop + 3 + ROW_H * i + ROW_H / 2} />
       ))}
     </g>
   )

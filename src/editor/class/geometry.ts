@@ -33,8 +33,8 @@ export function classSize(node: ClassNode, collapsed: boolean): Size {
   const chars = Math.max(
     node.name.length,
     stereo ? stereotypeText(node).length : 0,
-    ...attrLines.map((l) => l.length),
-    ...methodLines.map((l) => l.length),
+    ...attrLines.map((l) => l.text.length),
+    ...methodLines.map((l) => l.text.length),
   )
   const w = Math.max(MIN_W, Math.ceil((chars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
   const h =

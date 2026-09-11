@@ -79,6 +79,30 @@ describe("ClassNodeView", () => {
     const collassata = renderToStaticMarkup(<ClassNodeView nodeKey="Cliente" node={cliente} view={{ x: 0, y: 0, collapsed: true }} selected={false} />)
     expect(collassata).toContain("data-node-header")
   })
+
+  it("una riga statica esce in tspan col sottolineato, le altre restano un testo solo", () => {
+    const conStatico: ClassNode = {
+      name: "Contatore", stereotype: "class",
+      attributes: [{ name: "totale", type: "int", visibility: "public", isStatic: true }, { name: "id", type: "int", visibility: "public", isStatic: false }],
+      methods: [],
+    }
+    const html = renderToStaticMarkup(<ClassNodeView nodeKey="Contatore" node={conStatico} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
+    expect(html).toContain("text-decoration")
+    expect(html).not.toContain("{static}")
+  })
+
+  it("la larghezza calcolata corrisponde alla riga resa, non a quella canonica", () => {
+    // È il difetto del fix I2 del piano precedente, in un'altra forma: `classSize` misura le righe
+    // per decidere la larghezza del nodo, e se misurasse `{static}` — che il renderer non disegna —
+    // il nodo sarebbe largo quanto una riga che nessuno vede.
+    const conStatico: ClassNode = {
+      name: "C", stereotype: "class",
+      attributes: [{ name: "totale", type: "int", visibility: "public", isStatic: true }],
+      methods: [],
+    }
+    const senza: ClassNode = { ...conStatico, attributes: [{ ...conStatico.attributes[0]!, isStatic: false }] }
+    expect(classSize(conStatico, false).w).toBe(classSize(senza, false).w)
+  })
 })
 
 describe("ClassEdgeView", () => {

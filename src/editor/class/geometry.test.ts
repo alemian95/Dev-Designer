@@ -69,7 +69,7 @@ describe("classSize", () => {
     }
     const attrLines = memberLines({ attributes: node.attributes, methods: [] })
     const methodLines = memberLines({ attributes: [], methods: node.methods })
-    const renderedChars = Math.max(node.name.length, ...attrLines.map((l) => l.length), ...methodLines.map((l) => l.length))
+    const renderedChars = Math.max(node.name.length, ...attrLines.map((l) => l.text.length), ...methodLines.map((l) => l.text.length))
     const expectedW = Math.max(MIN_W, Math.ceil((renderedChars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
 
     expect(classSize(node, false).w).toBe(expectedW)
@@ -77,7 +77,7 @@ describe("classSize", () => {
     // La misura a passata unica (quella che il difetto usava) sovrastima:
     // la colonna dei due punti del metodo lungo si trascina anche sull'attributo,
     // e la riga combinata più lunga eccede quella che va davvero sullo schermo.
-    const combinedChars = Math.max(node.name.length, ...memberLines(node).map((l) => l.length))
+    const combinedChars = Math.max(node.name.length, ...memberLines(node).map((l) => l.text.length))
     expect(combinedChars).toBeGreaterThan(renderedChars)
   })
 })

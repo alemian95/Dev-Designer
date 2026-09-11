@@ -250,22 +250,45 @@ export function memberText(m: Members): string {
   return [...attributeLines, ...methodLines].join("\n")
 }
 
-/** Membri → righe rese sul nodo, colonne allineate con spazi: il font è monospace. */
-export function memberLines(m: Members): string[] {
-  const attributeNames = m.attributes.map(
-    (a) => `${SYMBOL_BY_VISIBILITY[a.visibility]}${modifiersText(a.isStatic, false)} ${a.name}`,
-  )
-  const methodNames = m.methods.map(
-    (fn) =>
-      `${SYMBOL_BY_VISIBILITY[fn.visibility]}${modifiersText(fn.isStatic, fn.isAbstract)} ${fn.name}(${parametersText(fn.parameters)})`,
-  )
+export interface MemberLine {
+  /** Riga come va disegnata: senza `{static}`, già allineata a colonne. */
+  text: string
+  /** Estremi del nome dentro `text`, o `null` se il membro non è statico. */
+  underline: { from: number; to: number } | null
+}
+
+/** Il pezzo `{abstract}` da solo, con lo spazio davanti; stringa vuota se assente. A differenza di
+ *  `modifiersText` non porta `{static}`: nella riga disegnata lo statico si sottolinea sul nome,
+ *  non si scrive fra graffe — quella sintassi resta solo nella forma canonica di `memberText`. */
+function renderedModifiersText(isAbstract: boolean): string {
+  return isAbstract ? " {abstract}" : ""
+}
+
+/** Estremi del nome dentro la riga resa, o `null` se il membro non è statico. */
+function underlineFor(isStatic: boolean, prefixLength: number, name: string): { from: number; to: number } | null {
+  return isStatic ? { from: prefixLength, to: prefixLength + name.length } : null
+}
+
+/**
+ * Membri → righe rese sul nodo, colonne allineate con spazi: il font è monospace. Lo statico non
+ * compare come `{static}` in chiaro — quella è la sintassi che `memberText` scrive e `parseMembers`
+ * rilegge — ma come sottolineato UML sul nome, per questo ogni riga porta anche gli estremi da
+ * sottolineare invece della sola stringa.
+ */
+export function memberLines(m: Members): MemberLine[] {
+  const attributePrefixes = m.attributes.map((a) => `${SYMBOL_BY_VISIBILITY[a.visibility]} `)
+  const methodPrefixes = m.methods.map((fn) => `${SYMBOL_BY_VISIBILITY[fn.visibility]}${renderedModifiersText(fn.isAbstract)} `)
+  const attributeNames = m.attributes.map((a, i) => `${attributePrefixes[i]}${a.name}`)
+  const methodNames = m.methods.map((fn, i) => `${methodPrefixes[i]}${fn.name}(${parametersText(fn.parameters)})`)
   const nameW = Math.max(0, ...attributeNames.map((n) => n.length), ...methodNames.map((n) => n.length))
 
-  const attributeLines = m.attributes.map((a, i) =>
-    a.type ? `${attributeNames[i]!.padEnd(nameW)}: ${a.type}` : attributeNames[i]!,
-  )
-  const methodLines = m.methods.map((fn, i) =>
-    fn.type ? `${methodNames[i]!.padEnd(nameW)}: ${fn.type}` : methodNames[i]!,
-  )
+  const attributeLines: MemberLine[] = m.attributes.map((a, i) => ({
+    text: a.type ? `${attributeNames[i]!.padEnd(nameW)}: ${a.type}` : attributeNames[i]!,
+    underline: underlineFor(a.isStatic, attributePrefixes[i]!.length, a.name),
+  }))
+  const methodLines: MemberLine[] = m.methods.map((fn, i) => ({
+    text: fn.type ? `${methodNames[i]!.padEnd(nameW)}: ${fn.type}` : methodNames[i]!,
+    underline: underlineFor(fn.isStatic, methodPrefixes[i]!.length, fn.name),
+  }))
   return [...attributeLines, ...methodLines]
 }

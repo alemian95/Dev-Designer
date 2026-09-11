@@ -353,7 +353,7 @@ dell'entità senza attributi.
 
 | tipo | linea | punta |
 |---|---|---|
-| associazione | continua | nessuna |
+| associazione | continua | nessuna, o freccia aperta se `navigable` (§9) |
 | generalizzazione | continua | triangolo vuoto sulla superclasse |
 | realizzazione | tratteggiata | triangolo vuoto sull'interfaccia |
 | composizione | continua | rombo **pieno** sul tutto |
@@ -473,19 +473,24 @@ normativa:
 | `composition` | `Tutto *-- Parte` | il **target** (tutto) |
 | `aggregation` | `Tutto o-- Parte` | il **target** |
 | `dependency` | `Dipendente ..> Dipendenza` | il **source** |
-| `association` | `A -- B` | il **source** |
+| `association` | `A -- B` (`A --> B` se navigabile) | il **source** |
 
-**Perché `--` e non `-->`.** La documentazione di Mermaid chiama «Association»
-il token `-->` ed elenca `--` come «Link (Solid)». Emettiamo comunque `--`, e la
-ragione è semantica e non stilistica: in UML un'associazione nuda è una linea
-piena **senza direzione**, mentre `-->` rende una punta aperta, che in UML
-significa navigabilità in un verso solo. Il nostro `ClassRelation` non registra
-la navigabilità: `source` e `target` su un'associazione sono la convenzione con
-cui teniamo i due estremi, non l'affermazione che si navighi da uno all'altro.
-Emettere `-->` farebbe inventare all'emettitore un'informazione che il modello
-non ha. `--` è un costrutto documentato e rende esattamente ciò che il modello
-dice. I due nomi della tabella di Mermaid sono etichette dei loro token, non
-un'equivalenza con UML.
+**Perché `--` e non `-->`, e quando invece `-->`.** La documentazione di Mermaid
+chiama «Association» il token `-->` ed elenca `--` come «Link (Solid)».
+Emettiamo `--` per default, e la ragione è semantica e non stilistica: in UML
+un'associazione nuda è una linea piena **senza direzione**, mentre `-->` rende
+una punta aperta, che in UML significa navigabilità in un verso solo. Finché
+`ClassRelation` non registrava la navigabilità, emettere `-->` avrebbe fatto
+inventare all'emettitore un'informazione che il modello non aveva — `source` e
+`target` su un'associazione sono solo la convenzione con cui teniamo i due
+estremi, non di per sé un'affermazione di verso.
+
+Ora `ClassRelation.navigable` registra esplicitamente quell'affermazione
+(Task 1 del giro di ampiezza): quando un'associazione la porta a `true`,
+l'emettitore scrive `-->` invece di `--`, perché a quel punto il modello dice
+davvero ciò che la freccia renderebbe. Campo assente o `false` restano `--`: è
+la stessa linea nuda di prima, non un cambio di default. I due nomi della
+tabella di Mermaid sono etichette dei loro token, non un'equivalenza con UML.
 
 Le molteplicità si scrivono fra apici **ai lati dell'arco**
 (`Padre "1" <|-- "0..*" Figlio`), quindi l'emettitore deve appiccicarle al lato

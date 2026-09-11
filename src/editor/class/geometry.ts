@@ -98,14 +98,24 @@ const DIAMOND_HALF_W = 5
 const ARROW_LEN = 10
 const ARROW_HALF_W = 5
 
+/** Freccia aperta: due segmenti che convergono su `at`. La usano la dipendenza e l'associazione navigabile. */
+function openArrowPath(at: Point, dir: Dir): string {
+  const px = -dir.y
+  const py = dir.x
+  const p = (d: number, s: number): Point => ({ x: at.x + dir.x * d + px * s, y: at.y + dir.y * d + py * s })
+  return `${pathFromPoints([p(ARROW_LEN, -ARROW_HALF_W), at])} ${pathFromPoints([at, p(ARROW_LEN, ARROW_HALF_W)])}`
+}
+
 /**
  * Punta UML sul capo dell'arco. Un solo marker per arco: cade sempre sul
  * target. `at` sta sul bordo del target, `dir` è il versore che ne esce
  * lungo l'edge — stessa convenzione di `crowsFootPath`: l'apice della punta
  * tocca `at` (d=0) e il resto si allunga lungo `dir`, verso il source.
  */
-export function umlMarkerPath(at: Point, dir: Dir, kind: RelationKind): string {
-  if (kind === "association") return ""
+export function umlMarkerPath(at: Point, dir: Dir, kind: RelationKind, navigable = false): string {
+  // L'associazione è l'unico tipo il cui marker dipende dal modello e non solo dal `kind`: la
+  // navigabilità è un'affermazione che il diagramma fa, non una proprietà della specie di arco.
+  if (kind === "association") return navigable ? openArrowPath(at, dir) : ""
 
   const px = -dir.y
   const py = dir.x
@@ -119,8 +129,7 @@ export function umlMarkerPath(at: Point, dir: Dir, kind: RelationKind): string {
     return `${pathFromPoints([at, p(DIAMOND_LEN / 2, -DIAMOND_HALF_W), p(DIAMOND_LEN, 0), p(DIAMOND_LEN / 2, DIAMOND_HALF_W)])} Z`
   }
 
-  // dependency: freccia aperta, due segmenti che convergono su `at`.
-  return `${pathFromPoints([p(ARROW_LEN, -ARROW_HALF_W), at])} ${pathFromPoints([at, p(ARROW_LEN, ARROW_HALF_W)])}`
+  return openArrowPath(at, dir)
 }
 
 /** `true` se la linea dell'arco va tratteggiata: realizzazione e dipendenza. */
@@ -215,7 +224,7 @@ export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRel
   const geo: EdgeGeometry = {
     d: pathFromPoints(pts),
     sourceMarker: "",
-    targetMarker: umlMarkerPath(to, route.targetDir, relation.kind),
+    targetMarker: umlMarkerPath(to, route.targetDir, relation.kind, relation.navigable),
     label: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
   }
   const sourceLabel = endLabel(relation.source)

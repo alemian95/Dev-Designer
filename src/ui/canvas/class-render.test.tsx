@@ -104,6 +104,13 @@ describe("ClassEdgeView", () => {
     expect(punta("generalization")).toContain('fill="none"')
   })
 
+  it("l'associazione navigabile disegna la freccia sul target, quella nuda no", () => {
+    const nuda = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} {...rects} selected={false} />)
+    expect(nuda).toContain('data-edge-target="true" d=""')
+    const navigabile = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={{ ...relazione("association"), navigable: true }} {...rects} selected={false} />)
+    expect(navigabile).not.toContain('data-edge-target="true" d=""')
+  })
+
   it("le molteplicità compaiono solo quando non sono vuote", () => {
     expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} {...rects} selected={false} />))
       .not.toContain("data-edge-source-label")

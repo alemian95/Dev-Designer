@@ -112,6 +112,30 @@ describe("punte e linee", () => {
   })
 })
 
+describe("associazione navigabile", () => {
+  it("l'associazione non navigabile resta nuda, quella navigabile prende la freccia", () => {
+    expect(umlMarkerPath({ x: 0, y: 0 }, UP, "association")).toBe("")
+    expect(umlMarkerPath({ x: 0, y: 0 }, UP, "association", true).length).toBeGreaterThan(0)
+  })
+
+  it("la freccia dell'associazione navigabile è la stessa della dipendenza", () => {
+    const dip = umlMarkerPath({ x: 10, y: 10 }, RIGHT, "dependency")
+    expect(umlMarkerPath({ x: 10, y: 10 }, RIGHT, "association", true)).toBe(dip)
+  })
+
+  it("navigable non tocca gli altri tipi: hanno già la loro punta", () => {
+    const gen = umlMarkerPath({ x: 0, y: 0 }, UP, "generalization")
+    expect(umlMarkerPath({ x: 0, y: 0 }, UP, "generalization", true)).toBe(gen)
+  })
+
+  it("classEdgeGeometry passa navigable al marker", () => {
+    const source: Rect = { x: 0, y: 0, w: 100, h: 60 }
+    const target: Rect = { x: 240, y: 0, w: 100, h: 60 }
+    const rel: ClassRelation = { kind: "association", navigable: true, source: { class: "A", multiplicity: "", role: "" }, target: { class: "B", multiplicity: "", role: "" } }
+    expect(classEdgeGeometry(source, target, rel).targetMarker.length).toBeGreaterThan(0)
+  })
+})
+
 describe("classEdgeGeometry", () => {
   const source: Rect = { x: 0, y: 0, w: 100, h: 60 }
   const target: Rect = { x: 240, y: 0, w: 100, h: 60 }

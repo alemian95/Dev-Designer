@@ -88,6 +88,19 @@ describe("emitClassMermaid: i sei tipi e i loro lati", () => {
   })
 })
 
+describe("emitClassMermaid: navigabilità", () => {
+  it("l'associazione navigabile esce con -->, quella nuda con --", () => {
+    const rel = (navigable?: boolean) => ({
+      classes: { A: { name: "A", stereotype: "class" as const, attributes: [], methods: [] }, B: { name: "B", stereotype: "class" as const, attributes: [], methods: [] } },
+      relations: { r: { kind: "association" as const, ...(navigable === undefined ? {} : { navigable }), source: { class: "A", multiplicity: "", role: "" }, target: { class: "B", multiplicity: "", role: "" } } },
+      notes: {},
+    })
+    expect(emitClassMermaid(rel(true)).text).toContain("A --> B")
+    expect(emitClassMermaid(rel(false)).text).toContain("A -- B")
+    expect(emitClassMermaid(rel()).text).toContain("A -- B")
+  })
+})
+
 describe("emitClassMermaid: i membri", () => {
   it("il tipo precede il nome nei campi", () => {
     expect(emitten("+ id: int")).toContain("+int id")

@@ -115,6 +115,9 @@ function RelationProperties({ relationKey: key }: { relationKey: string }) {
         <Label htmlFor="rel-kind">Tipo</Label>
         <RelationKindSelect id="rel-kind" value={rel.kind} onChange={(kind) => dispatch(updateRelation(key, (r) => { r.kind = kind }))} />
       </div>
+      {rel.kind === "association" && (
+        <Flag label="Navigabile" checked={rel.navigable ?? false} onChange={(v) => dispatch(updateRelation(key, (r) => { r.navigable = v || undefined }))} />
+      )}
       <div className="grid gap-1">
         <Label htmlFor="rel-name">Nome</Label>
         <CommitInput key={rel.name ?? ""} id="rel-name" value={rel.name ?? ""} onCommit={(name) => dispatch(updateRelation(key, (r) => { r.name = name.trim() || undefined }))} />

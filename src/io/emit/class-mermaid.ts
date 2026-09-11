@@ -89,10 +89,14 @@ function quotedMultiplicity(m: string): string {
 function relationLine(rel: ClassRelation, renamed: Map<string, string>): string {
   const left: ClassEnd = TARGET_LEFT.has(rel.kind) ? rel.target : rel.source
   const right: ClassEnd = TARGET_LEFT.has(rel.kind) ? rel.source : rel.target
+  // `-->` solo quando il modello registra la navigabilità. Finché non la registrava, `--` era la
+  // scelta corretta perché `-->` avrebbe affermato un verso che nessuno aveva dichiarato (§5 della
+  // spec di ampiezza, che completa il Ruling 16 invece di contraddirlo).
+  const token = rel.kind === "association" && rel.navigable ? "-->" : RELATION_TOKEN[rel.kind]
   const parts = [
     safeName(left.class, renamed),
     quotedMultiplicity(left.multiplicity),
-    RELATION_TOKEN[rel.kind],
+    token,
     quotedMultiplicity(right.multiplicity),
     safeName(right.class, renamed),
   ].filter(Boolean)
@@ -124,9 +128,9 @@ function classBlock(node: ClassNode, name: string): string[] {
 /**
  * Serializza il modello come `classDiagram`.
  *
- * La navigabilità non si emette mai come freccia: `ClassRelation` non la registra (`source`/
- * `target` sono la convenzione con cui teniamo gli estremi, non un'affermazione di verso), quindi
- * un'associazione nuda esce come `--` (Link solido, senza direzione), non `-->` — vedi §9 della
+ * La navigabilità si emette come freccia solo quando il modello la registra: `rel.navigable` è
+ * `true` per un'associazione che il diagramma dichiara esplicitamente navigabile, ed esce `-->`;
+ * altrimenti (campo assente o `false`) esce `--` (link solido, senza direzione) — vedi §9 della
  * spec per il perché.
  */
 export function emitClassMermaid(model: ClassModel): EmitResult {

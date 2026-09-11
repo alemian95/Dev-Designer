@@ -3,7 +3,7 @@ import { memberLines } from "@/model/class/members"
 import type { ClassNode, ClassRelation } from "@/model/class/schema"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Rect } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
-import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
+import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, notePath, noteSize, NOTE_FOLD, STEREO_H, umlMarkerPath } from "./geometry"
 
 // Annotazione esplicita `ClassNode` sulle fixture, non `as const`: il brief le
 // scriveva `as const`, ma un `ClassNode` ha array mutabili e `as const` li
@@ -215,5 +215,35 @@ describe("endLabel", () => {
 
   it("vuota quando il capo non ha né molteplicità né ruolo: è la condizione che usa chi la chiama", () => {
     expect(endLabel(capo("", ""))).toBe("")
+  })
+})
+
+describe("noteSize", () => {
+  it("larghezza dalla riga più lunga, altezza dal numero di righe", () => {
+    const corta = noteSize({ text: "ok" })
+    const lunga = noteSize({ text: "una riga molto più lunga della precedente" })
+    expect(lunga.w).toBeGreaterThan(corta.w)
+    expect(noteSize({ text: "a\nb\nc" }).h).toBeGreaterThan(noteSize({ text: "a" }).h)
+  })
+
+  it("una nota vuota ha comunque una dimensione cliccabile", () => {
+    const { w, h } = noteSize({ text: "" })
+    expect(w).toBeGreaterThanOrEqual(MIN_W / 2)
+    expect(h).toBeGreaterThan(0)
+  })
+
+  it("la larghezza è arrotondata alla griglia, come le classi", () => {
+    expect(noteSize({ text: "abcdefghijklmnopqrstuvwxyz" }).w % GRID).toBe(0)
+  })
+})
+
+describe("notePath", () => {
+  it("il corpo salta l'angolo in alto a destra e la piega lo chiude", () => {
+    const { body, fold } = notePath(200, 80)
+    // Il corpo non passa per (200, 0): quell'angolo è tagliato dalla piega.
+    expect(body).not.toContain("M200 0")
+    expect(body).toContain(`${200 - NOTE_FOLD} 0`)
+    // La piega è un triangolo chiuso.
+    expect(fold.trim().endsWith("Z")).toBe(true)
   })
 })

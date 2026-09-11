@@ -1,5 +1,5 @@
 import { memberLines } from "@/model/class/members"
-import type { ClassEnd, ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
+import type { ClassEnd, ClassNode, ClassNote, ClassRelation, RelationKind } from "@/model/class/schema"
 import type { NodeView } from "@/model/shared"
 import { pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Point, type Rect, type Size } from "../geometry"
@@ -47,6 +47,41 @@ export function classSize(node: ClassNode, collapsed: boolean): Size {
 
 export function classRect(node: ClassNode, view: NodeView): Rect {
   return { x: view.x, y: view.y, ...classSize(node, view.collapsed) }
+}
+
+/** Lato del triangolo piegato nell'angolo in alto a destra della nota. */
+export const NOTE_FOLD = 12
+
+/** Margine interno verticale della nota, sopra e sotto il blocco di righe. */
+const NOTE_PAD_Y = 6
+
+/**
+ * Dimensione di una nota, con la stessa formula di `classSize` (§6 del documento madre): larghezza
+ * dal carattere più lungo arrotondata alla griglia, altezza dal numero di righe. Il minimo è metà
+ * di quello di una classe — una nota vuota deve restare cliccabile, non larga quanto una classe.
+ */
+export function noteSize(note: ClassNote): Size {
+  const lines = note.text.split("\n")
+  const chars = Math.max(0, ...lines.map((l) => l.length))
+  const w = Math.max(MIN_W / 2, Math.ceil((chars * CHAR_W + 2 * PAD_X + NOTE_FOLD) / GRID) * GRID)
+  return { w, h: lines.length * ROW_H + 2 * NOTE_PAD_Y }
+}
+
+export function noteRect(note: ClassNote, view: NodeView): Rect {
+  return { x: view.x, y: view.y, ...noteSize(note) }
+}
+
+/**
+ * I due path della forma UML della nota: `body` è il contorno con l'angolo in alto a destra
+ * tagliato, `fold` il triangolino che lo chiude. Due path e non uno perché il triangolo va
+ * riempito di un colore diverso dal corpo, e un path solo non può avere due riempimenti.
+ */
+export function notePath(w: number, h: number): { body: string; fold: string } {
+  const f = NOTE_FOLD
+  return {
+    body: `M0 0 L${w - f} 0 L${w} ${f} L${w} ${h} L0 ${h} Z`,
+    fold: `M${w - f} 0 L${w} ${f} L${w - f} ${f} Z`,
+  }
 }
 
 /** Lunghezza e semi-larghezza del triangolo vuoto (generalizzazione, realizzazione). */

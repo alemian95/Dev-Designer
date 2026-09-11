@@ -89,6 +89,12 @@ describe("reduce", () => {
     expect(r.mode).toEqual(IDLE)
   })
 
+  it("tool note: click sul canvas crea la nota", () => {
+    const r = run([down({ world: { x: 12, y: 8 } })], ctx({ tool: "note" }))
+    expect(r.effects).toEqual([{ type: "create-note", at: { x: 12, y: 8 } }])
+    expect(r.mode).toEqual(IDLE)
+  })
+
   it("tool edge: da nodo a nodo committa la connessione", () => {
     const r = run([
       down({ hit: { kind: "node", key: "a" }, world: { x: 0, y: 0 } }),

@@ -171,6 +171,15 @@ describe("classOps e le note", () => {
     expect(opsFor(docConNota()).edgesTouching(new Set(["n-1"]))).toEqual([])
   })
 
+  it("addNote produce una chiave nuova e un recipe che la crea", () => {
+    const doc = docConNota()
+    const { key, recipe } = opsFor(doc).addNote!({ x: 40, y: 40 })
+    recipe(doc)
+    const ops = opsFor(doc)
+    expect(ops.nodeKeys()).toContain(key)
+    expect(doc.diagram.model.notes[key]).toBeDefined()
+  })
+
   it("layoutGraph esclude le note: senza archi ELK le piazzerebbe dove capita", () => {
     const g = opsFor(docConNota()).layoutGraph()
     expect(g.nodes.map((n) => n.id)).toEqual(["Cliente"])

@@ -34,13 +34,22 @@ export function routeEdge(a: Rect, b: Rect): EdgeRoute {
   return { points, sourceDir: dy >= 0 ? DOWN : UP, targetDir: dy >= 0 ? UP : DOWN }
 }
 
+/**
+ * Il cappio di una relazione su se stessa: esce dal lato destro, gira sopra il nodo e rientra
+ * dall'alto.
+ *
+ * **Gli attacchi sono spostati verso l'angolo in alto a destra, non al centro dei due lati.** Il
+ * centro è dove attacca ogni altro arco che tocca il nodo — `routeEdge` qui sopra esce sempre da
+ * metà lato — quindi un cappio ancorato lì si sovrapporrebbe esattamente a quell'arco e alla sua
+ * punta, e nel class diagram anche alle due etichette dei capi.
+ */
 function selfLoop(a: Rect): EdgeRoute {
   const o = SELF_LOOP_OFFSET
   const right = a.x + a.w
-  const midY = a.y + a.h / 2
-  const midX = a.x + a.w / 2
+  const y = a.y + a.h / 4
+  const x = a.x + (a.w * 3) / 4
   return {
-    points: [{ x: right, y: midY }, { x: right + o, y: midY }, { x: right + o, y: a.y - o }, { x: midX, y: a.y - o }, { x: midX, y: a.y }],
+    points: [{ x: right, y }, { x: right + o, y }, { x: right + o, y: a.y - o }, { x, y: a.y - o }, { x, y: a.y }],
     sourceDir: RIGHT,
     targetDir: UP,
   }

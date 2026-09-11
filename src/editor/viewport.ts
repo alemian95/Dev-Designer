@@ -1,4 +1,4 @@
-import type { Point, Rect, Size } from "./er-geometry"
+import type { Point, Rect, Size } from "./geometry"
 
 /** screen = world × scale + (x, y). */
 export interface Viewport { x: number; y: number; scale: number }

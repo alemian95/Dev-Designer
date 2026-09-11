@@ -1,4 +1,4 @@
-import type { Cardinality, ErModel } from "@/model/document"
+import type { Cardinality, ErModel } from "@/model/er/schema"
 import type { EmitResult } from "./result"
 
 /**

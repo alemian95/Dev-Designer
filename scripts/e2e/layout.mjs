@@ -12,21 +12,11 @@
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/layout.mjs`. `HEADLESS=0` per vedere.
  */
-import { expectMenu, expectNodes, isMainModule, startEnv } from "./helpers.mjs"
+import { expectMenu, expectNodes, isMainModule, signature, startEnv } from "./helpers.mjs"
 
 const DDL = `CREATE TABLE mittente (id bigint PRIMARY KEY, etichetta text NOT NULL);
 CREATE TABLE recapito (id bigint PRIMARY KEY, mittente_id bigint NOT NULL REFERENCES mittente(id));
 CREATE TABLE nota (id bigint PRIMARY KEY, recapito_id bigint NOT NULL REFERENCES recapito(id));`
-
-/** Firma delle posizioni letta dal DOM: chiave e attributo `transform`, ordinati. */
-async function signature(page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll("[data-node-id]")]
-      .map((g) => `${g.getAttribute("data-node-id")}@${g.getAttribute("transform")}`)
-      .sort()
-      .join("|"),
-  )
-}
 
 /**
  * Rettangoli dei nodi in coordinate schermo, letti da `getBoundingClientRect` sul `<rect>`.

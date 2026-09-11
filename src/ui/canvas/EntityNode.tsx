@@ -2,9 +2,11 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
-import { attributeLines, entitySize, HEADER_H, PAD_X, ROW_H } from "@/editor/er-geometry"
+import { attributeLines, entitySize } from "@/editor/er/geometry"
+import { HEADER_H, PAD_X, ROW_H } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
-import { entityKey, type Entity, type NodeView } from "@/model/document"
+import { entityKey, type Entity } from "@/model/er/schema"
+import type { NodeView } from "@/model/shared"
 import { registerNode } from "./dom-registry"
 
 interface Props {
@@ -46,7 +48,7 @@ export const EntityNodeView = memo(function EntityNodeView({ nodeKey, entity, vi
 export function EntityNode({ nodeKey }: { nodeKey: string }) {
   const entity = useStore(documentStore, (s) => erDiagram(s.doc).model.entities[nodeKey])
   const view = useStore(documentStore, (s) => erDiagram(s.doc).view.nodes[nodeKey])
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("entity", nodeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", nodeKey)))
   if (!entity || !view) return null
   return <EntityNodeView nodeKey={nodeKey} entity={entity} view={view} selected={selected} />
 }

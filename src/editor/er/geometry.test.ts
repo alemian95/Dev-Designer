@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
-import type { Attribute, Entity } from "@/model/document"
-import { attributeLines, CHAR_W, entityRect, entitySize, HEADER_H, MIN_W, PAD_X, rectsBounds, rectsIntersect, ROW_H, snap } from "./er-geometry"
+import type { Attribute, Entity } from "@/model/er/schema"
+import { CHAR_W, HEADER_H, MIN_W, PAD_X, ROW_H } from "../geometry"
+import { attributeLines, entityRect, entitySize } from "./geometry"
 
 const attr = (name: string, type: string, over: Partial<Attribute> = {}): Attribute => ({
   name, type, primaryKey: false, foreignKey: false, nullable: false, unique: false, ...over,
@@ -34,20 +35,5 @@ describe("entitySize", () => {
 
   it("entityRect combina view e dimensioni", () => {
     expect(entityRect(entity, { x: 10, y: 20, collapsed: true })).toEqual({ x: 10, y: 20, w: MIN_W, h: HEADER_H })
-  })
-})
-
-describe("rect helpers", () => {
-  it("snap arrotonda alla griglia", () => {
-    expect(snap(14)).toBe(10)
-    expect(snap(15)).toBe(20)
-  })
-  it("rectsBounds racchiude tutti i rettangoli e null se vuoto", () => {
-    expect(rectsBounds([])).toBeNull()
-    expect(rectsBounds([{ x: 0, y: 0, w: 10, h: 10 }, { x: 20, y: -5, w: 10, h: 10 }])).toEqual({ x: 0, y: -5, w: 30, h: 15 })
-  })
-  it("rectsIntersect", () => {
-    expect(rectsIntersect({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 })).toBe(true)
-    expect(rectsIntersect({ x: 0, y: 0, w: 10, h: 10 }, { x: 11, y: 0, w: 10, h: 10 })).toBe(false)
   })
 })

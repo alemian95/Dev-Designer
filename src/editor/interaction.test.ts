@@ -29,43 +29,43 @@ describe("reduce", () => {
     expect(run([down({}, true)]).mode.type).toBe("pan")
   })
 
-  it("click su entità la seleziona e avvia il drag; il rilascio senza movimento non committa", () => {
-    const r = run([down({ hit: { kind: "entity", key: "a" }, world: { x: 5, y: 5 } }), up({ world: { x: 5, y: 5 } })])
-    expect(r.effects).toEqual([{ type: "select", ids: [selId("entity", "a")] }])
+  it("click su nodo lo seleziona e avvia il drag; il rilascio senza movimento non committa", () => {
+    const r = run([down({ hit: { kind: "node", key: "a" }, world: { x: 5, y: 5 } }), up({ world: { x: 5, y: 5 } })])
+    expect(r.effects).toEqual([{ type: "select", ids: [selId("node", "a")] }])
   })
 
-  it("drag di un'entità: anteprima a ogni move, un solo commit al rilascio", () => {
+  it("drag di un nodo: anteprima a ogni move, un solo commit al rilascio", () => {
     const r = run([
-      down({ hit: { kind: "entity", key: "a" }, world: { x: 0, y: 0 } }),
+      down({ hit: { kind: "node", key: "a" }, world: { x: 0, y: 0 } }),
       move({ world: { x: 10, y: 5 } }),
       move({ world: { x: 30, y: 15 } }),
       up({ world: { x: 30, y: 15 } }),
     ])
     expect(r.effects).toEqual([
-      { type: "select", ids: [selId("entity", "a")] },
+      { type: "select", ids: [selId("node", "a")] },
       { type: "preview-drag", keys: ["a"], dx: 10, dy: 5 },
       { type: "preview-drag", keys: ["a"], dx: 30, dy: 15 },
       { type: "commit-drag", keys: ["a"], dx: 30, dy: 15 },
     ])
   })
 
-  it("drag di un'entità già selezionata trascina tutta la selezione senza riselezionare", () => {
-    const selection = new Set([selId("entity", "a"), selId("entity", "b"), selId("relationship", "r")])
-    const r = run([down({ hit: { kind: "entity", key: "a" } }), move({ world: { x: 1, y: 0 } })], ctx({ selection }))
+  it("drag di un nodo già selezionato trascina tutta la selezione senza riselezionare", () => {
+    const selection = new Set([selId("node", "a"), selId("node", "b"), selId("edge", "r")])
+    const r = run([down({ hit: { kind: "node", key: "a" } }), move({ world: { x: 1, y: 0 } })], ctx({ selection }))
     expect(r.effects).toEqual([{ type: "preview-drag", keys: ["a", "b"], dx: 1, dy: 0 }])
   })
 
   it("shift+click aggiunge o toglie dalla selezione", () => {
-    const selection = new Set([selId("entity", "a")])
-    expect(run([down({ hit: { kind: "entity", key: "b" }, shift: true })], ctx({ selection })).effects[0])
-      .toEqual({ type: "select", ids: [selId("entity", "a"), selId("entity", "b")] })
-    const r = run([down({ hit: { kind: "entity", key: "a" }, shift: true })], ctx({ selection }))
+    const selection = new Set([selId("node", "a")])
+    expect(run([down({ hit: { kind: "node", key: "b" }, shift: true })], ctx({ selection })).effects[0])
+      .toEqual({ type: "select", ids: [selId("node", "a"), selId("node", "b")] })
+    const r = run([down({ hit: { kind: "node", key: "a" }, shift: true })], ctx({ selection }))
     expect(r.effects).toEqual([{ type: "select", ids: [] }])
     expect(r.mode).toEqual(IDLE)
   })
 
-  it("click su relazione la seleziona", () => {
-    expect(run([down({ hit: { kind: "relationship", key: "r" } })]).effects).toEqual([{ type: "select", ids: [selId("relationship", "r")] }])
+  it("click su arco lo seleziona", () => {
+    expect(run([down({ hit: { kind: "edge", key: "r" } })]).effects).toEqual([{ type: "select", ids: [selId("edge", "r")] }])
   })
 
   it("marquee sul canvas: svuota la selezione, anteprima, commit con rettangolo normalizzato", () => {
@@ -83,18 +83,18 @@ describe("reduce", () => {
     expect(r.effects.filter((e) => e.type === "commit-marquee")).toEqual([])
   })
 
-  it("tool entity: click sul canvas crea l'entità", () => {
-    const r = run([down({ world: { x: 12, y: 8 } })], ctx({ tool: "entity" }))
-    expect(r.effects).toEqual([{ type: "create-entity", at: { x: 12, y: 8 } }])
+  it("tool node: click sul canvas crea il nodo", () => {
+    const r = run([down({ world: { x: 12, y: 8 } })], ctx({ tool: "node" }))
+    expect(r.effects).toEqual([{ type: "create-node", at: { x: 12, y: 8 } }])
     expect(r.mode).toEqual(IDLE)
   })
 
-  it("tool relation: da entità a entità committa la connessione", () => {
+  it("tool edge: da nodo a nodo committa la connessione", () => {
     const r = run([
-      down({ hit: { kind: "entity", key: "a" }, world: { x: 0, y: 0 } }),
+      down({ hit: { kind: "node", key: "a" }, world: { x: 0, y: 0 } }),
       move({ world: { x: 50, y: 50 } }),
-      up({ hit: { kind: "entity", key: "b" }, world: { x: 50, y: 50 } }),
-    ], ctx({ tool: "relation" }))
+      up({ hit: { kind: "node", key: "b" }, world: { x: 50, y: 50 } }),
+    ], ctx({ tool: "edge" }))
     expect(r.effects).toEqual([
       { type: "preview-connect", source: "a", to: { x: 0, y: 0 } },
       { type: "preview-connect", source: "a", to: { x: 50, y: 50 } },
@@ -103,13 +103,13 @@ describe("reduce", () => {
     ])
   })
 
-  it("tool relation rilasciato sul canvas: solo pulizia dell'anteprima", () => {
-    const r = run([down({ hit: { kind: "entity", key: "a" } }), up({})], ctx({ tool: "relation" }))
+  it("tool edge rilasciato sul canvas: solo pulizia dell'anteprima", () => {
+    const r = run([down({ hit: { kind: "node", key: "a" } }), up({})], ctx({ tool: "edge" }))
     expect(r.effects.at(-1)).toEqual({ type: "preview-connect", source: "a", to: null })
   })
 
   it("cancel durante il drag riporta i nodi a zero", () => {
-    const r = run([down({ hit: { kind: "entity", key: "a" } }), move({ world: { x: 9, y: 9 } }), { type: "cancel" }])
+    const r = run([down({ hit: { kind: "node", key: "a" } }), move({ world: { x: 9, y: 9 } }), { type: "cancel" }])
     expect(r.effects.at(-1)).toEqual({ type: "preview-drag", keys: ["a"], dx: 0, dy: 0 })
     expect(r.mode).toEqual(IDLE)
   })

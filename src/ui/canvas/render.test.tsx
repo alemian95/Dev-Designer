@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import { entitySize, HEADER_H, MIN_W } from "@/editor/er-geometry"
-import type { Entity, Relationship } from "@/model/document"
+import { entitySize } from "@/editor/er/geometry"
+import { HEADER_H, MIN_W } from "@/editor/geometry"
+import type { Entity, Relationship } from "@/model/er/schema"
 import { EntityNodeView } from "./EntityNode"
 import { RelationshipEdgeView } from "./RelationshipEdge"
 

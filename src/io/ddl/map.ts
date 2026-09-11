@@ -1,4 +1,4 @@
-import { entityKey, type Attribute, type Cardinality, type Entity, type ErModel, type Relationship } from "@/model/document"
+import { entityKey, type Attribute, type Cardinality, type Entity, type ErModel, type Relationship } from "@/model/er/schema"
 import type { SqlColumn, SqlForeignKey, SqlTable } from "./schema"
 
 export interface MapInput {

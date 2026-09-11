@@ -28,6 +28,14 @@ export default defineConfig([
     },
   },
   {
+    // Ogni file di `kinds` esporta una `DiagramView`, un oggetto e non un componente, accanto
+    // ai renderer interni che quell'oggetto raccoglie: stessa ragione dell'override sopra.
+    files: ['src/ui/canvas/kinds/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     // Strato model: TypeScript puro. Solo zod.
     files: ['src/model/**/*.{ts,tsx}'],
     rules: {

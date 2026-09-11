@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { createErDocument, type DevDocument } from "@/model/document"
+import type { DevDocument } from "@/model/document"
+import { createErDocument } from "@/model/er/schema"
 import { parseDocument, toJson } from "@/model/serialize"
 import { addEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"

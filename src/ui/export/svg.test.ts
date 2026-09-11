@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { ErDiagram } from "@/model/document"
+import type { ClassDiagram } from "@/model/class/schema"
+import type { ErDiagram } from "@/model/er/schema"
 import { buildSvg, EXPORT_PADDING } from "./svg"
 
 /** Diagramma minimo: due entità distanti, una relazione fra loro. */
@@ -157,6 +158,158 @@ describe("buildSvg", () => {
     d.view.nodes["ordini"]!.collapsed = true
     const collassato = buildSvg(d, { vars })!
     const aperto = buildSvg(diagram(), { vars })!
+    const hOf = (svg: string) => Number(/viewBox="[^ ]+ [^ ]+ [^ ]+ ([^"]+)"/.exec(svg)![1])
+    expect(hOf(collassato)).toBeLessThan(hOf(aperto))
+  })
+})
+
+/** Diagramma minimo di classi: due classi distanti, una generalizzazione fra loro. Nomi inventati. */
+function classDiagram(): ClassDiagram {
+  return {
+    type: "class",
+    model: {
+      classes: {
+        Cliente: {
+          name: "Cliente",
+          stereotype: "class",
+          attributes: [{ name: "id", type: "int", visibility: "public", isStatic: false }],
+          methods: [],
+        },
+        Persona: {
+          name: "Persona",
+          stereotype: "abstract",
+          attributes: [{ name: "nome", type: "string", visibility: "protected", isStatic: false }],
+          methods: [],
+        },
+      },
+      relations: {
+        cliente_persona: {
+          kind: "generalization",
+          source: { class: "Cliente", multiplicity: "", role: "" },
+          target: { class: "Persona", multiplicity: "", role: "" },
+        },
+      },
+    },
+    view: {
+      nodes: {
+        Cliente: { x: 100, y: 200, collapsed: false },
+        Persona: { x: 500, y: 600, collapsed: false },
+      },
+    },
+  } as ClassDiagram
+}
+
+// Stessa batteria di `buildSvg` sopra, sul modello di classi: `buildClassSvg` non aveva nessun
+// test prima di questo (i 18 casi ER erano gli unici), e un export rotto ci sarebbe passato
+// attraverso senza che nessuno se ne accorgesse — la scena e2e delle classi non esporta immagini.
+describe("buildSvg (class diagram)", () => {
+  it("inquadra tutte le classi con il padding, non il viewport", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    const [x, y, w, h] = /viewBox="([^"]+)"/.exec(svg)![1]!.split(" ").map(Number) as [number, number, number, number]
+    expect(x).toBe(100 - EXPORT_PADDING)
+    expect(y).toBe(200 - EXPORT_PADDING)
+    expect(x + w).toBeGreaterThan(500)
+    expect(y + h).toBeGreaterThan(600)
+  })
+
+  it("dichiara larghezza e altezza coerenti col viewBox", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    const [, , w, h] = /viewBox="([^"]+)"/.exec(svg)![1]!.split(" ").map(Number) as [number, number, number, number]
+    expect(svg).toContain(`width="${w}"`)
+    expect(svg).toContain(`height="${h}"`)
+  })
+
+  it("dipinge un fondo opaco che copre tutto il viewBox", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    const [x, y, w, h] = /viewBox="([^"]+)"/.exec(svg)![1]!.split(" ").map(Number) as [number, number, number, number]
+    const bg = /<rect data-background[^>]*>/.exec(svg)?.[0]
+    expect(bg).toBeDefined()
+    expect(bg).toContain(`x="${x}"`)
+    expect(bg).toContain(`y="${y}"`)
+    expect(bg).toContain(`width="${w}"`)
+    expect(bg).toContain(`height="${h}"`)
+    expect(bg).toContain(`fill="${vars["--background"]}"`)
+  })
+
+  it("risolve le variabili CSS in valori letterali", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    expect(svg).not.toContain("var(--")
+    expect(svg).toContain("#ffffff")
+    expect(svg).toContain("#e4e4e7")
+  })
+
+  it("non esporta griglia, overlay e riquadro di selezione", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    expect(svg).not.toContain("data-canvas")
+    expect(svg).not.toContain("data-marquee")
+    expect(svg).not.toContain("dd-grid")
+  })
+
+  it("non evidenzia nulla come selezionato", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    expect(svg).not.toContain('stroke-width="2"')
+    expect(svg).toContain(vars["--border"])
+  })
+
+  it("disegna classi e relazioni", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    expect(svg).toContain('data-node-id="Cliente"')
+    expect(svg).toContain('data-node-id="Persona"')
+    expect(svg).toContain('data-edge-id="cliente_persona"')
+  })
+
+  it("incorpora il font quando gli viene dato", () => {
+    const fontFace = "@font-face{font-family:'JetBrains Mono Variable';src:url(data:font/woff2;base64,AAAA)}"
+    const svg = buildSvg(classDiagram(), { vars, fontFace })!
+    expect(svg).toContain(fontFace)
+    expect(svg).toContain("<style>")
+  })
+
+  it("resta valido senza font, senza lasciare uno style vuoto a metà", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    expect(svg).not.toContain("@font-face")
+    expect(svg).toContain("<svg")
+  })
+
+  it("dichiara il namespace SVG, altrimenti il file non si apre da solo", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
+  })
+
+  it("sfugge le virgolette dei valori sostituiti, o l'SVG è malformato", () => {
+    const svg = buildSvg(classDiagram(), { vars })!
+    expect(svg).toContain('font-family="&quot;JetBrains Mono Variable&quot;, monospace"')
+    for (const [, value] of svg.matchAll(/="([^"]*)"/g)) expect(value).not.toContain('"')
+    expect(svg).not.toMatch(/=""[^ >]/)
+  })
+
+  it("sfugge anche & e < in un valore, non solo le virgolette", () => {
+    const svg = buildSvg(classDiagram(), { vars: { ...vars, "--card": 'a&b<c"d' } })!
+    expect(svg).toContain('fill="a&amp;b&lt;c&quot;d"')
+  })
+
+  it("restituisce null su un diagramma senza classi: non c'è niente da esportare", () => {
+    const empty = { type: "class", model: { classes: {}, relations: {} }, view: { nodes: {} } } as ClassDiagram
+    expect(buildSvg(empty, { vars })).toBeNull()
+  })
+
+  it("salta le relazioni con un estremo mancante invece di rompersi", () => {
+    const d = classDiagram()
+    d.model.relations["rotta"] = {
+      kind: "association",
+      source: { class: "Cliente", multiplicity: "", role: "" },
+      target: { class: "inesistente", multiplicity: "", role: "" },
+    }
+    const svg = buildSvg(d, { vars })!
+    expect(svg).toContain('data-edge-id="cliente_persona"')
+    expect(svg).not.toContain('data-edge-id="rotta"')
+  })
+
+  it("include una classe collassata nei bounds con la sua altezza ridotta", () => {
+    const d = classDiagram()
+    d.view.nodes["Persona"]!.collapsed = true
+    const collassato = buildSvg(d, { vars })!
+    const aperto = buildSvg(classDiagram(), { vars })!
     const hOf = (svg: string) => Number(/viewBox="[^ ]+ [^ ]+ [^ ]+ ([^"]+)"/.exec(svg)![1])
     expect(hOf(collassato)).toBeLessThan(hOf(aperto))
   })

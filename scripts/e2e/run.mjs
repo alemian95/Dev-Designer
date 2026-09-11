@@ -3,15 +3,17 @@
  * build già fatta) e una sola istanza di browser, poi esegue in sequenza — mai in parallelo, perché
  * l'e2e della persistenza esercita il lock fra schede e IndexedDB sulla stessa origine, e due
  * scenari concorrenti se li disturberebbero a vicenda — gli scenari della persistenza, dell'import,
- * dell'export immagini, dell'export testo e dell'auto layout. Ognuno apre il proprio contesto di
- * browser, cosa che isola l'IndexedDB fra loro senza pagare due volte il costo fisso di build,
- * server e avvio del browser (avvio condiviso con `helpers.mjs#startEnv`, la stessa funzione usata
- * dalla guardia di esecuzione diretta di ciascuno scenario). Per lanciare un solo scenario in
- * isolamento, dopo `pnpm build`: `node scripts/e2e/import.mjs`, `node scripts/e2e/persistenza.mjs`,
- * `node scripts/e2e/export.mjs`, `node scripts/e2e/export-testo.mjs` o `node scripts/e2e/layout.mjs`.
+ * dell'export immagini, dell'export testo, dell'auto layout e del class diagram. Ognuno apre il
+ * proprio contesto di browser, cosa che isola l'IndexedDB fra loro senza pagare due volte il costo
+ * fisso di build, server e avvio del browser (avvio condiviso con `helpers.mjs#startEnv`, la stessa
+ * funzione usata dalla guardia di esecuzione diretta di ciascuno scenario). Per lanciare un solo
+ * scenario in isolamento, dopo `pnpm build`: `node scripts/e2e/import.mjs`,
+ * `node scripts/e2e/persistenza.mjs`, `node scripts/e2e/export.mjs`,
+ * `node scripts/e2e/export-testo.mjs`, `node scripts/e2e/layout.mjs` o `node scripts/e2e/class.mjs`.
  *
  * Uso: `pnpm e2e`. `HEADLESS=0` per vedere il browser.
  */
+import { run as runClass } from "./class.mjs"
 import { run as runExport } from "./export.mjs"
 import { run as runExportTesto } from "./export-testo.mjs"
 import { startEnv } from "./helpers.mjs"
@@ -29,7 +31,8 @@ try {
   const exportOk = await runExport(browser, base)
   const exportTestoOk = await runExportTesto(browser, base)
   const layoutOk = await runLayout(browser, base)
-  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk
+  const classOk = await runClass(browser, base)
+  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk
 } catch (e) {
   console.error("\nFALLITO:", e)
 } finally {

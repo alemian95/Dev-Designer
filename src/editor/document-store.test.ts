@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/document"
+import { createErDocument } from "@/model/er/schema"
 import { documentStore, HISTORY_LIMIT } from "./document-store"
 import { erDiagram } from "./er-access"
 

@@ -72,9 +72,10 @@ export interface DiagramOps {
   rectOf(key: string, at?: Point): Rect | null
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
   edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
-  moveNodes(keys: readonly string[], dx: number, dy: number): Recipe | null
   addNode(at: Point): { key: string; recipe: Recipe }
   addEdge(source: string, target: string): { key: string; recipe: Recipe }
+  deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
+  duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
   layoutGraph(): LayoutGraph
   validate(): Issue[]
 }
@@ -84,11 +85,25 @@ export interface DiagramOps {
 export function opsFor(doc: DevDocument): DiagramOps
 ```
 
-I nove metodi non sono inventati: sono i sette punti in cui
-`use-canvas-interaction.ts` sa cos'è un'entità (`collectDragTargets`,
-`previewDrag`, `entityCenter`, `entitiesIn`, e i tre effetti che chiamano i
-comandi ER), più il grafo di layout e la validazione, che sono le altre due
-funzioni per tipo già esistenti.
+I dieci metodi non sono inventati. Otto vengono dai punti in cui il codice
+esistente sa cos'è un'entità: i sette di `use-canvas-interaction.ts`
+(`collectDragTargets`, `previewDrag`, `entityCenter`, `entitiesIn`, e i tre
+effetti che chiamano i comandi ER) più `deleteSelection` e `duplicateSelection`
+in `actions.ts`. Gli altri due, `layoutGraph` e `validate`, sono le funzioni per
+tipo che già esistono.
+
+`selectAllNodes` e `fitToContent` **non** sono nell'interfaccia: si scrivono
+sopra `nodeKeys()` e `rectOf()` senza aggiungere superficie.
+
+### Tre comandi che non sono per tipo
+
+`moveNodes`, `setCollapsed` e `applyLayout` toccano **soltanto `view.nodes`**, e
+quella forma è identica nei due tipi di diagramma: chiamano `erDiagram()` solo
+per restringere la union, non perché guardino il modello. Diventano quindi
+codice condiviso in `src/editor/commands/view.ts`, sopra un accessore
+`diagramView(draft)` che legge la proprietà comune della union, e escono dalla
+superficie per tipo. Tre implementazioni in meno da scrivere due volte, e il
+drag e l'auto layout restano un solo pezzo di codice per entrambi i tipi.
 
 `opsFor` è chiuso sul documento invece di ricevere il diagramma a ogni metodo
 perché l'hook rilegge già `documentStore.getState().doc` a ogni `pointermove`:
@@ -432,6 +447,18 @@ normativa:
 | `dependency` | `Dipendente ..> Dipendenza` | il **source** |
 | `association` | `A -- B` | il **source** |
 
+**Perché `--` e non `-->`.** La documentazione di Mermaid chiama «Association»
+il token `-->` ed elenca `--` come «Link (Solid)». Emettiamo comunque `--`, e la
+ragione è semantica e non stilistica: in UML un'associazione nuda è una linea
+piena **senza direzione**, mentre `-->` rende una punta aperta, che in UML
+significa navigabilità in un verso solo. Il nostro `ClassRelation` non registra
+la navigabilità: `source` e `target` su un'associazione sono la convenzione con
+cui teniamo i due estremi, non l'affermazione che si navighi da uno all'altro.
+Emettere `-->` farebbe inventare all'emettitore un'informazione che il modello
+non ha. `--` è un costrutto documentato e rende esattamente ciò che il modello
+dice. I due nomi della tabella di Mermaid sono etichette dei loro token, non
+un'equivalenza con UML.
+
 Le molteplicità si scrivono fra apici **ai lati dell'arco**
 (`Padre "1" <|-- "0..*" Figlio`), quindi l'emettitore deve appiccicarle al lato
 dove quella classe è finita, riga per riga. **Invertirle su tre righe su sei è
@@ -493,9 +520,12 @@ fatto che il file in questione mescolerebbe due tipi di diagramma:
 1. **Schemi del modello.** Gli schemi ER escono da `src/model/document.ts` (98
    righe, che diventerebbero ~200 con due tipi dentro) verso
    `src/model/er/schema.ts`; le classi in `src/model/class/schema.ts`. In
-   `document.ts` resta il condiviso: `SCHEMA_VERSION`, `Identifier`,
-   `NodeView`, la union, `DocumentSchema`. Precedente: `src/model/er/validate.ts`
-   esiste già.
+   `document.ts` restano la union e `DocumentSchema`; `SCHEMA_VERSION`,
+   `Identifier` e `NodeView` scendono in `src/model/shared.ts`, che non importa
+   nessun altro modulo. Non è pignoleria: i due `createXDocument` leggono
+   `SCHEMA_VERSION` come valore, e tenerlo in `document.ts` chiude con la union un
+   ciclo di **valori** — misurato in fase di implementazione, rompeva 12 file di
+   test su 30. Precedente: `src/model/er/validate.ts` esiste già.
 2. **Geometria.** `src/editor/er-geometry.ts` ha 18 importatori, e sei vogliono
    solo la metà condivisa. Diventa `src/editor/geometry.ts` (costanti, `snap`,
    `Point`/`Rect`/`Size`, `rectsBounds`, `rectsIntersect`) più
@@ -504,9 +534,14 @@ fatto che il file in questione mescolerebbe due tipi di diagramma:
 
 ## 13. Test
 
-Il progetto non ha jsdom: non esistono test unitari di componenti, e la prova
-nel browser arriva dagli e2e sulla build di produzione. La ripartizione è quindi
-forzata.
+Il progetto non ha jsdom, ma questo **non** significa che i componenti non si
+testino: `src/ui/canvas/render.test.tsx` rende le viste guidate dalle prop con
+`renderToStaticMarkup` di `react-dom/server` e asserisce sul markup — nessun DOM
+richiesto. Quello che jsdom impedirebbe sono i test di *interazione*: eventi,
+hook, fuoco, clipboard. Quelli vanno negli e2e sulla build di produzione.
+
+La ripartizione segue quella linea: le viste pure si testano unitariamente, le
+interazioni no.
 
 **Unitari:**
 
@@ -520,16 +555,21 @@ forzata.
   molteplicità asimmetriche** (`"1"` da un lato, `"0..*"` dall'altro). È il solo
   modo di far fallire uno scambio dei lati: con molteplicità uguali il test
   passerebbe anche invertite.
-- `DiagramOps` delle classi, tutti e nove i metodi — **e la stessa batteria
+- `DiagramOps` delle classi, tutti e dieci i metodi — **e la stessa batteria
   eseguita contro le ops dell'ER**, che è ciò che dimostra che la giuntura non ha
   cambiato il comportamento esistente.
+- `ClassNodeView` e `ClassEdgeView` con `renderToStaticMarkup`, come già fa
+  `render.test.tsx` per l'ER: tre scomparti, scomparto vuoto non disegnato,
+  stereotipo con e senza riga propria, e i sei tipi di arco con il tratteggio e
+  il riempimento giusti.
 
 **Regressione del refactoring:** i 332 test esistenti devono restare verdi
 attraverso i tre spostamenti di §12. Se uno si rompe, la rinomina ha cambiato
 semantica.
 
-**Sesta scena e2e**, `scripts/e2e/class.mjs`, perché la `textarea` dei membri
-senza jsdom non è provabile altrove: crea un documento classe, due classi,
+**Sesta scena e2e**, `scripts/e2e/class.mjs`, perché la `textarea` dei membri è
+interazione — fuoco, digitazione, commit sul blur — e quella è esattamente la
+categoria che senza jsdom non si prova altrove: crea un documento classe, due classi,
 scrive i membri nel corpo, collega, cambia il tipo in generalizzazione dal
 pannello, clicca «Disponi» e verifica che **il padre stia sopra il figlio**,
 poi esporta Mermaid e controlla che la riga contenga `<|--` **con il padre a

@@ -1,4 +1,6 @@
-import { createErDocument, type DevDocument } from "@/model/document"
+import type { DevDocument, Diagram } from "@/model/document"
+import { createClassDocument } from "@/model/class/schema"
+import { createErDocument } from "@/model/er/schema"
 import { parseDocument, toJson } from "@/model/serialize"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore } from "@/editor/session-store"
@@ -31,7 +33,8 @@ export interface DocumentIoDeps {
 export interface DocumentIo {
   /** All'avvio: riapre l'ultimo documento dal buffer, o ne crea uno nuovo. */
   restoreLast(): Promise<void>
-  newDocument(): Promise<void>
+  /** `type` sceglie fra `createErDocument` e `createClassDocument`; il default preserva ogni chiamata esistente. */
+  newDocument(type?: Diagram["type"]): Promise<void>
   openWithPicker(): Promise<void>
   /** Da picker o da upload: il testo passa da `parseDocument`, che è il confine di fiducia. */
   openFile(opened: OpenedFile): Promise<void>
@@ -52,6 +55,8 @@ function hasContent(doc: DevDocument): boolean {
   switch (doc.diagram.type) {
     case "er":
       return Object.keys(doc.diagram.model.entities).length > 0
+    case "class":
+      return Object.keys(doc.diagram.model.classes).length > 0
   }
 }
 
@@ -133,8 +138,8 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     }, undefined)
   }
 
-  async function newDocument(): Promise<void> {
-    const doc = createErDocument("Senza titolo")
+  async function newDocument(type: Diagram["type"] = "er"): Promise<void> {
+    const doc = type === "er" ? createErDocument("Senza titolo") : createClassDocument("Senza titolo")
     await activate(doc, { fileName: null, handle: null, lastSavedAt: null, dirty: false }, { savedToFileAt: null })
   }
 

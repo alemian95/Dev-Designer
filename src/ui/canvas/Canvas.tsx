@@ -1,7 +1,8 @@
 import { useRef, type ReactNode } from "react"
-import { FONT_SIZE, GRID } from "@/editor/er-geometry"
+import { FONT_SIZE, GRID } from "@/editor/geometry"
 import { InlineEditor } from "./InlineEditor"
-import { EdgesLayer, NodesLayer } from "./layers"
+import { useDiagramView } from "./kinds/registry"
+import { MembersEditor } from "./MembersEditor"
 import { Overlay } from "./Overlay"
 import { useCanvasInteraction } from "./use-canvas-interaction"
 import { ViewportGroup } from "./ViewportGroup"
@@ -13,6 +14,9 @@ export function Canvas({ children }: { children?: ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null)
   // L'hook osserva l'svg: aggiorna la dimensione del canvas nella sessione e invalida il rect in cache.
   useCanvasInteraction(svgRef)
+  // I layer vengono dal registro: con un solo tipo di diagramma sono sempre NodesLayer/EdgesLayer
+  // di `layers.tsx`, ma il canvas non lo sa più — legge `DiagramView`, non un modulo fisso.
+  const { NodesLayer, EdgesLayer } = useDiagramView()
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -31,6 +35,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
         </ViewportGroup>
       </svg>
       <InlineEditor />
+      <MembersEditor />
     </div>
   )
 }

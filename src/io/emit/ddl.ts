@@ -1,5 +1,5 @@
 import type { Dialect } from "@/io/ddl/schema"
-import type { Attribute, Entity, ErModel, Relationship } from "@/model/document"
+import type { Attribute, Entity, ErModel, Relationship } from "@/model/er/schema"
 import type { EmitResult } from "./result"
 import { DIALECT_LABEL, foreignTypes } from "./sql-types"
 

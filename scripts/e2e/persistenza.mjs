@@ -12,7 +12,7 @@
  * `pnpm build`): `node scripts/e2e/persistenza.mjs`. `HEADLESS=0` per vedere il browser.
  */
 import { readFile } from "node:fs/promises"
-import { expectNodes, expectText, isMainModule, pickFromMenu, startEnv } from "./helpers.mjs"
+import { expectMenu, expectNodes, expectText, isMainModule, pickFromMenu, startEnv } from "./helpers.mjs"
 
 const ENTITY = "utenti"
 
@@ -88,7 +88,14 @@ export async function run(browser, base) {
     })
 
     await step("nuovo documento: canvas vuoto", async () => {
-      await pickFromMenu(page, page.getByRole("menuitem", { name: "Nuovo" }))
+      // "Nuovo" (Task 13) è un sottomenu, non più una voce diretta: `pickFromMenu` chiude tutto
+      // dopo un solo click, quindi qui si apre a mano e si sceglie il tipo nel sottomenu.
+      await expectMenu(page, "closed")
+      await page.locator("[data-document-menu]").click()
+      await expectMenu(page, "open")
+      await page.getByRole("menuitem", { name: "Nuovo" }).click()
+      await page.getByRole("menuitem", { name: "Diagramma ER" }).click()
+      await expectMenu(page, "closed")
       await expectNodes(page, 0)
     })
 

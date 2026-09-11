@@ -1,13 +1,13 @@
-import type { Cardinality, Relationship } from "@/model/document"
-import type { Point, Rect } from "./er-geometry"
+import type { Cardinality, Relationship } from "@/model/er/schema"
+import type { Point, Rect } from "./geometry"
 
 export interface Dir { x: -1 | 0 | 1; y: -1 | 0 | 1 }
 export interface EdgeRoute { points: Point[]; sourceDir: Dir; targetDir: Dir }
 
-const RIGHT: Dir = { x: 1, y: 0 }
-const LEFT: Dir = { x: -1, y: 0 }
-const UP: Dir = { x: 0, y: -1 }
-const DOWN: Dir = { x: 0, y: 1 }
+export const RIGHT: Dir = { x: 1, y: 0 }
+export const LEFT: Dir = { x: -1, y: 0 }
+export const UP: Dir = { x: 0, y: -1 }
+export const DOWN: Dir = { x: 0, y: 1 }
 const SELF_LOOP_OFFSET = 30
 
 const center = (r: Rect): Point => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 })
@@ -84,6 +84,9 @@ export interface EdgeGeometry {
   targetMarker: string
   /** Punto medio del segmento centrale, per l'etichetta. */
   label: Point
+  /** Capi per le molteplicità testuali: solo nei class diagram, l'ER non li popola. */
+  sourceEnd?: Point
+  targetEnd?: Point
 }
 
 /** Tutta la geometria di un edge da due rettangoli e la relazione. Usata sia da React sia dagli aggiornamenti imperativi. */

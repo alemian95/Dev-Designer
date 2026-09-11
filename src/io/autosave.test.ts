@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createErDocument } from "@/model/document"
+import { createErDocument } from "@/model/er/schema"
 import { addEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"

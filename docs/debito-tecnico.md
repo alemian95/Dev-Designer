@@ -271,6 +271,50 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   invece di riusare un aiutante di `import.mjs`. Da estrarre in un
   `helpers.mjs` condiviso quando servirà un terzo scenario: ce ne sono due.
 
+### Class diagram
+
+- ~~`IssuesPanel` ricalcola la validazione a ogni dispatch sul documento, non
+  solo ai cambi del modello.~~ **Risolto:** il selettore resta su `s.doc`
+  (allargato lì nel Task 6, per restare neutro rispetto al tipo), ma
+  `opsFor(doc).validate()` ora vive in uno `useMemo` la cui dipendenza è
+  ristretta a `doc.diagram.model` — campo comune della union — invece che a
+  `doc` intero: un commit di drag cambia `view.nodes` e lascia il modello
+  com'era, quindi il ricalcolo non riparte. La dipendenza ristretta costa un
+  `eslint-disable-next-line react-hooks/exhaustive-deps` puntuale, commentato
+  sul posto; preferito a una cache mutabile a livello di modulo, che avrebbe
+  risolto lo stesso problema introducendo stato globale dentro un file di
+  componente senza bisogno reale. `TextExportDialog`, che aveva la stessa
+  forma e non era registrata qui, è stata chiusa insieme: il suo `ModelState`
+  viene dal selettore, con `useShallow`.
+- `lastTopLevelColon` in `src/model/class/members.ts` non segnala le
+  parentesi sbilanciate, mentre `splitTopLevel` — nata dalla stessa
+  primitiva — sì: due funzioni con comportamenti diversi sullo stesso input
+  malformato. Costo-se-sbagliato: teorico — l'input che le distingue
+  (`+ x: a > b: int`) non è un tipo legittimo in nessun linguaggio.
+- `parseMembers` non valida i nomi contro `Identifier` dello schema: produce
+  oggetti strutturalmente tipizzati ma mai passati per `.parse()`. Un nome
+  che lo schema rifiuterebbe viene preso dal validatore molto più tardi, con
+  una riga di errore diversa da quella dove l'utente ha sbagliato.
+- Il calcolo della perpendicolare in `src/editor/class/geometry.ts`
+  (`umlMarkerPath`) duplica in forma le tre righe equivalenti di
+  `crowsFootPath` in `edge-routing.ts`. Con due soli consumatori resta dentro
+  la regola «tre righe simili valgono più di un'astrazione prematura»; al
+  terzo consumatore vale un `perpOf(dir)` condiviso.
+- Buchi di copertura, in una voce sola: lo stereotipo `enum` non è provato
+  nei tre punti che lo trattano — `hasStereotypeLine` (il test in
+  `geometry.test.ts` si intitola «interface ed enum» ma nel corpo asserisce
+  solo `interface` e `abstract`), il metodo astratto dentro un `enum`, e il
+  suo render; `renameClass` è provato solo sul `source` di una relazione
+  (`commands.test.ts`), mai sul `target` né con un'autorelazione;
+  `addRelation` col `kind` di default (`association`) e
+  `END_LABEL_OFFSET = 14` non sono fissati da nessun test; il ramo di
+  `safeName` che prefissa `_` ai nomi che iniziano con una cifra non ha
+  fixture. Tutti verificati a mano: comportamento corretto, prova assente.
+- Le variabili locali `entities`/`relationships` nella `Properties()` di
+  `src/ui/canvas/kinds/er.tsx` tengono il nome vecchio pur contenendo le
+  chiavi filtrate per `"node"`/`"edge"` (`selectedKeys`). Non esportate,
+  nessun effetto osservabile.
+
 ---
 
 ## Perduto

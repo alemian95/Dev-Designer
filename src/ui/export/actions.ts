@@ -1,10 +1,20 @@
 import fontUrl from "@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url"
 import { documentStore } from "@/editor/document-store"
-import { erDiagram } from "@/editor/er-access"
 import { download } from "@/io/file"
+import type { DevDocument } from "@/model/document"
 import { documentFileName } from "./file-name"
 import { svgToPng } from "./png"
 import { buildSvg } from "./svg"
+
+/** Vero se il diagramma ha almeno un nodo, ER o classe: il caso vuoto di `copyPng`. */
+function hasNodes(doc: DevDocument): boolean {
+  switch (doc.diagram.type) {
+    case "er":
+      return Object.keys(doc.diagram.model.entities).length > 0
+    case "class":
+      return Object.keys(doc.diagram.model.classes).length > 0
+  }
+}
 
 /**
  * I colori che il canvas usa davvero, più `--background` per il fondo: nell'app lo dipinge il div
@@ -100,7 +110,8 @@ function loadFontFace(): Promise<string | undefined> {
 }
 
 async function currentSvg(): Promise<string | null> {
-  return buildSvg(erDiagram(documentStore.getState().doc), { vars: readLightVars(), fontFace: await loadFontFace() })
+  // `buildSvg` fa il proprio switch sul tipo: non serve più narrowing qui, solo il documento.
+  return buildSvg(documentStore.getState().doc.diagram, { vars: readLightVars(), fontFace: await loadFontFace() })
 }
 
 /** Esporta il diagramma come SVG. Non fa nulla se non c'è nessuna entità. */
@@ -125,9 +136,8 @@ export function copyPng(): Promise<void> {
   if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") return exportPng()
 
   // Il diagramma vuoto si riconosce qui, sincrono di proposito: sotto non si può attendere niente
-  // prima di `write`. Il caso più fine — entità senza posizione — resta al null di buildSvg.
-  const { entities } = erDiagram(documentStore.getState().doc).model
-  if (Object.keys(entities).length === 0) return Promise.resolve()
+  // prima di `write`. Il caso più fine — un nodo senza posizione — resta al null di buildSvg.
+  if (!hasNodes(documentStore.getState().doc)) return Promise.resolve()
 
   // Dentro `ClipboardItem` va la promise, non il blob: Safari annulla la scrittura se il gesto
   // dell'utente è già finito quando `write` parte, e così font e rasterizzazione restano dentro il

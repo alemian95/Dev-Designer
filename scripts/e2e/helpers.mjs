@@ -112,3 +112,17 @@ export async function pickFromMenu(page, item) {
   await item.click()
   await expectMenu(page, "closed")
 }
+
+/**
+ * Firma delle posizioni letta dal DOM: chiave e attributo `transform`, ordinati.
+ * Serve a aspettare che «Disponi» o altre operazioni di layout abbiano davvero
+ * cambiato le posizioni dei nodi.
+ */
+export async function signature(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll("[data-node-id]")]
+      .map((g) => `${g.getAttribute("data-node-id")}@${g.getAttribute("transform")}`)
+      .sort()
+      .join("|"),
+  )
+}

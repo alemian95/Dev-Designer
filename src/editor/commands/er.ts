@@ -1,7 +1,7 @@
-import { entityKey, type Attribute, type Entity, type ErModel, type Relationship } from "@/model/document"
+import { entityKey, type Attribute, type Entity, type ErModel, type Relationship } from "@/model/er/schema"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
-import { snap, type Point } from "../er-geometry"
+import { snap, type Point } from "../geometry"
 
 export const DEFAULT_ATTRIBUTE: Attribute = {
   name: "id",
@@ -76,26 +76,6 @@ export function renameEntity(key: string, name: string, schema?: string): Recipe
       if (rel.source.entity === key) rel.source.entity = newKey
       if (rel.target.entity === key) rel.target.entity = newKey
     }
-  }
-}
-
-export function moveNodes(keys: readonly string[], dx: number, dy: number): Recipe | null {
-  if (dx === 0 && dy === 0) return null
-  return (draft) => {
-    const d = erDiagram(draft)
-    for (const key of keys) {
-      const node = d.view.nodes[key]
-      if (!node) continue
-      node.x = snap(node.x + dx)
-      node.y = snap(node.y + dy)
-    }
-  }
-}
-
-export function setCollapsed(key: string, collapsed: boolean): Recipe {
-  return (draft) => {
-    const node = erDiagram(draft).view.nodes[key]
-    if (node) node.collapsed = collapsed
   }
 }
 

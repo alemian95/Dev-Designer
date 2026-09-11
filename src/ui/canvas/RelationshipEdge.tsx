@@ -4,9 +4,10 @@ import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { edgeGeometry } from "@/editor/edge-routing"
 import { erDiagram } from "@/editor/er-access"
-import { entityRect, type Rect } from "@/editor/er-geometry"
+import { entityRect } from "@/editor/er/geometry"
+import type { Rect } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
-import type { Relationship } from "@/model/document"
+import type { Relationship } from "@/model/er/schema"
 import { registerEdge } from "./dom-registry"
 
 interface Props {
@@ -59,7 +60,7 @@ export function RelationshipEdge({ edgeKey }: { edgeKey: string }) {
   const relationship = useStore(documentStore, (s) => erDiagram(s.doc).model.relationships[edgeKey])
   const source = useEntityRect(relationship?.source.entity)
   const target = useEntityRect(relationship?.target.entity)
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("relationship", edgeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
   if (!relationship || !source || !target) return null
   return <RelationshipEdgeView edgeKey={edgeKey} relationship={relationship} source={source} target={target} selected={selected} />
 }

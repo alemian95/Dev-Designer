@@ -1,5 +1,5 @@
 import type { EdgeGeometry } from "@/editor/edge-routing"
-import type { Point, Rect } from "@/editor/er-geometry"
+import type { Point, Rect } from "@/editor/geometry"
 
 /**
  * Elementi SVG per chiave. Serve al drag: le posizioni si scrivono sul DOM senza passare da React,
@@ -27,6 +27,14 @@ export function setNodePosition(key: string, x: number, y: number): void {
   nodes.get(key)?.setAttribute("transform", `translate(${x} ${y})`)
 }
 
+/** Scrive `x`/`y` su un elemento del gruppo edge, se c'è. `dy` è l'offset verticale, come per l'etichetta. */
+function positionLabel(g: SVGGElement, selector: string, point: Point, dy = 0): void {
+  const el = g.querySelector(selector)
+  if (!el) return
+  el.setAttribute("x", String(point.x))
+  el.setAttribute("y", String(point.y + dy))
+}
+
 export function setEdgeGeometry(key: string, geo: EdgeGeometry): void {
   const g = edges.get(key)
   if (!g) return
@@ -34,11 +42,11 @@ export function setEdgeGeometry(key: string, geo: EdgeGeometry): void {
   g.querySelector("[data-edge-line]")?.setAttribute("d", geo.d)
   g.querySelector("[data-edge-source]")?.setAttribute("d", geo.sourceMarker)
   g.querySelector("[data-edge-target]")?.setAttribute("d", geo.targetMarker)
-  const label = g.querySelector("[data-edge-label]")
-  if (label) {
-    label.setAttribute("x", String(geo.label.x))
-    label.setAttribute("y", String(geo.label.y - 6))
-  }
+  positionLabel(g, "[data-edge-label]", geo.label, -6)
+  // Molteplicità agli estremi: esistono solo nei class diagram, e il guard fa
+  // saltare il blocco quando gli elementi non ci sono — come per l'etichetta.
+  if (geo.sourceEnd) positionLabel(g, "[data-edge-source-label]", geo.sourceEnd)
+  if (geo.targetEnd) positionLabel(g, "[data-edge-target-label]", geo.targetEnd)
 }
 
 /** Rettangolo di selezione: `null` lo nasconde. */

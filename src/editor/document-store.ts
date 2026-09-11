@@ -1,6 +1,7 @@
 import { applyPatches, enablePatches, freeze, produceWithPatches, type Patch } from "immer"
 import { createStore } from "zustand/vanilla"
-import { createErDocument, type DevDocument } from "@/model/document"
+import type { DevDocument } from "@/model/document"
+import { createErDocument } from "@/model/er/schema"
 
 enablePatches()
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/document"
-import { deleteSelection, duplicateSelection, fitToContent, selectAllEntities, zoomBy } from "./actions"
+import { createErDocument } from "@/model/er/schema"
+import { deleteSelection, duplicateSelection, fitToContent, selectAllNodes, zoomBy } from "./actions"
 import { documentStore } from "./document-store"
 import { erDiagram } from "./er-access"
 import { selId, sessionStore } from "./session-store"
@@ -22,13 +22,13 @@ describe("actions", () => {
     sessionStore.setState({ selection: new Set(), viewport: IDENTITY, canvasSize: { w: 1000, h: 800 } })
   })
 
-  it("selectAllEntities seleziona solo le entità", () => {
-    selectAllEntities()
-    expect([...sessionStore.getState().selection].sort()).toEqual([selId("entity", "a"), selId("entity", "b")])
+  it("selectAllNodes seleziona solo i nodi", () => {
+    selectAllNodes()
+    expect([...sessionStore.getState().selection].sort()).toEqual([selId("node", "a"), selId("node", "b")])
   })
 
   it("deleteSelection elimina e svuota la selezione", () => {
-    sessionStore.getState().setSelection([selId("entity", "a")])
+    sessionStore.getState().setSelection([selId("node", "a")])
     deleteSelection()
     expect(erDiagram(documentStore.getState().doc).model.entities.a).toBeUndefined()
     expect(erDiagram(documentStore.getState().doc).model.relationships.r).toBeUndefined()
@@ -36,9 +36,9 @@ describe("actions", () => {
   })
 
   it("duplicateSelection seleziona le copie", () => {
-    sessionStore.getState().setSelection([selId("entity", "a"), selId("relationship", "r")])
+    sessionStore.getState().setSelection([selId("node", "a"), selId("edge", "r")])
     duplicateSelection()
-    expect([...sessionStore.getState().selection]).toEqual([selId("entity", "a_copy")])
+    expect([...sessionStore.getState().selection]).toEqual([selId("node", "a_copy")])
   })
 
   it("fitToContent inquadra le entità; zoomBy scala attorno al centro", () => {

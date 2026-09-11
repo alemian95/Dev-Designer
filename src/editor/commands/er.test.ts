@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument, type Attribute } from "@/model/document"
+import { createErDocument, type Attribute } from "@/model/er/schema"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import {
@@ -9,10 +9,8 @@ import {
   deleteItems,
   duplicateEntities,
   moveAttribute,
-  moveNodes,
   removeAttribute,
   renameEntity,
-  setCollapsed,
   uniqueKey,
   updateAttribute,
   updateRelationship,
@@ -90,18 +88,6 @@ describe("comandi ER", () => {
   it("renameEntity rifiuta nome vuoto e collisione", () => {
     expect(renameEntity("users", "  ")).toBeNull()
     expect(state().dispatch(renameEntity("users", "posts")!)).toBe(false)
-  })
-
-  it("moveNodes sposta con snap e ignora spostamento nullo", () => {
-    expect(moveNodes(["users"], 0, 0)).toBeNull()
-    state().dispatch(moveNodes(["users", "posts"], 23, -7)!)
-    expect(er().view.nodes.users).toMatchObject({ x: 20, y: -10 })
-    expect(er().view.nodes.posts).toMatchObject({ x: 320, y: -10 })
-  })
-
-  it("setCollapsed", () => {
-    state().dispatch(setCollapsed("users", true))
-    expect(er().view.nodes.users?.collapsed).toBe(true)
   })
 
   it("attributi: add con nome unico, update, move, remove", () => {

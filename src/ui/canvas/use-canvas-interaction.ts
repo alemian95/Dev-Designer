@@ -1,11 +1,11 @@
 import { useEffect, type RefObject } from "react"
 import { flushSync } from "react-dom"
-import { addEntity, addRelationship, moveNodes } from "@/editor/commands/er"
+import { classDiagram } from "@/editor/class-access"
+import { moveNodes } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
-import { edgeGeometry } from "@/editor/edge-routing"
-import { erDiagram } from "@/editor/er-access"
-import { entityRect, rectsIntersect, snap, type Point, type Rect } from "@/editor/er-geometry"
+import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
 import { IDLE, reduce, type Effect, type Hit, type InteractionEvent, type Mode, type PointerInfo } from "@/editor/interaction"
+import { opsFor, type EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import { panBy, screenToWorld, zoomAt } from "@/editor/viewport"
 import { setEdgeGeometry, setNodePosition, showConnect, showMarquee } from "./dom-registry"
@@ -14,7 +14,7 @@ const ZOOM_WHEEL_FACTOR = 0.01
 
 interface DragTargets {
   nodes: { key: string; x: number; y: number }[]
-  edges: { key: string; source: string; target: string }[]
+  edges: EdgeEnds[]
 }
 
 /**
@@ -27,10 +27,27 @@ function elementAt(e: MouseEvent): Element | null {
 
 function hitTest(el: Element | null): Hit {
   const node = el?.closest("[data-node-id]")
-  if (node) return { kind: "entity", key: node.getAttribute("data-node-id")! }
+  if (node) return { kind: "node", key: node.getAttribute("data-node-id")! }
   const edge = el?.closest("[data-edge-id]")
-  if (edge) return { kind: "relationship", key: edge.getAttribute("data-edge-id")! }
+  if (edge) return { kind: "edge", key: edge.getAttribute("data-edge-id")! }
   return { kind: "canvas" }
+}
+
+/**
+ * Nome o corpo, per il doppio click su una classe: il contratto DOM (`data-node-header`) non basta
+ * da solo. Una classe senza membri non ha pixel di "corpo" distinti dall'header — l'header copre
+ * l'intero nodo (`classSize`, §6 della spec) — ma deve comunque poter aprire `MembersEditor`,
+ * altrimenti non riceverebbe mai il suo primo membro: niente import, niente riga di form la
+ * popolano. La decisione è quindi presa a partire dal modello, non solo dal DOM: una classe vuota
+ * ed espansa risolve sempre a "body", anche quando il click cade geometricamente sull'header.
+ */
+function classEditTarget(key: string, headerHit: boolean): "name" | "body" {
+  const diagram = classDiagram(documentStore.getState().doc)
+  const cls = diagram.model.classes[key]
+  const view = diagram.view.nodes[key]
+  const emptyExpanded = !!cls && !view?.collapsed && cls.attributes.length === 0 && cls.methods.length === 0
+  if (emptyExpanded) return "body"
+  return headerHit ? "name" : "body"
 }
 
 function isTextInput(target: EventTarget | null): target is HTMLElement {
@@ -38,55 +55,40 @@ function isTextInput(target: EventTarget | null): target is HTMLElement {
 }
 
 function collectDragTargets(keys: readonly string[]): DragTargets {
-  const d = erDiagram(documentStore.getState().doc)
-  const set = new Set(keys)
+  const ops = opsFor(documentStore.getState().doc)
   return {
     nodes: keys.flatMap((key) => {
-      const v = d.view.nodes[key]
-      return v ? [{ key, x: v.x, y: v.y }] : []
+      const r = ops.rectOf(key)
+      return r ? [{ key, x: r.x, y: r.y }] : []
     }),
-    edges: Object.entries(d.model.relationships)
-      .filter(([, r]) => set.has(r.source.entity) || set.has(r.target.entity))
-      .map(([key, r]) => ({ key, source: r.source.entity, target: r.target.entity })),
+    edges: ops.edgesTouching(new Set(keys)),
   }
 }
 
 /** Anteprima del drag: posizioni snappate sui nodi e geometria ricalcolata sugli edge toccati, tutto sul DOM. */
 function previewDrag(targets: DragTargets, dx: number, dy: number): void {
-  const d = erDiagram(documentStore.getState().doc)
+  const ops = opsFor(documentStore.getState().doc)
   const moved = new Map(targets.nodes.map((n) => [n.key, { x: snap(n.x + dx), y: snap(n.y + dy) }]))
   for (const [key, p] of moved) setNodePosition(key, p.x, p.y)
-  const rectOf = (key: string): Rect | null => {
-    const entity = d.model.entities[key]
-    const view = d.view.nodes[key]
-    if (!entity || !view) return null
-    return entityRect(entity, { ...view, ...moved.get(key) })
-  }
   for (const edge of targets.edges) {
-    const rel = d.model.relationships[edge.key]
-    const a = rectOf(edge.source)
-    const b = rectOf(edge.target)
-    if (rel && a && b) setEdgeGeometry(edge.key, edgeGeometry(a, b, rel))
+    const a = ops.rectOf(edge.source, moved.get(edge.source))
+    const b = ops.rectOf(edge.target, moved.get(edge.target))
+    const geo = a && b ? ops.edgeGeometry(edge.key, a, b) : null
+    if (geo) setEdgeGeometry(edge.key, geo)
   }
 }
 
-function entityCenter(key: string): Point | null {
-  const d = erDiagram(documentStore.getState().doc)
-  const entity = d.model.entities[key]
-  const view = d.view.nodes[key]
-  if (!entity || !view) return null
-  const r = entityRect(entity, view)
-  return { x: r.x + r.w / 2, y: r.y + r.h / 2 }
+function nodeCenter(key: string): Point | null {
+  const r = opsFor(documentStore.getState().doc).rectOf(key)
+  return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : null
 }
 
-function entitiesIn(rect: Rect): string[] {
-  const d = erDiagram(documentStore.getState().doc)
-  return Object.entries(d.model.entities)
-    .filter(([key, entity]) => {
-      const view = d.view.nodes[key]
-      return view && rectsIntersect(entityRect(entity, view), rect)
-    })
-    .map(([key]) => key)
+function nodesIn(rect: Rect): string[] {
+  const ops = opsFor(documentStore.getState().doc)
+  return ops.nodeKeys().filter((key) => {
+    const r = ops.rectOf(key)
+    return r !== null && rectsIntersect(r, rect)
+  })
 }
 
 export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): void {
@@ -153,26 +155,26 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
           showMarquee(fx.rect)
           break
         case "commit-marquee": {
-          const ids = entitiesIn(fx.rect).map((k) => selId("entity", k))
+          const ids = nodesIn(fx.rect).map((k) => selId("node", k))
           session().setSelection(fx.additive ? [...session().selection, ...ids] : ids)
           break
         }
         case "preview-connect":
-          showConnect(fx.to ? entityCenter(fx.source) : null, fx.to)
+          showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
           break
         case "commit-connect": {
-          const { key, recipe } = addRelationship(erDiagram(documentStore.getState().doc).model.relationships, fx.source, fx.target)
+          const { key, recipe } = opsFor(documentStore.getState().doc).addEdge(fx.source, fx.target)
           documentStore.getState().dispatch(recipe)
-          session().setSelection([selId("relationship", key)])
+          session().setSelection([selId("edge", key)])
           session().setTool("select")
           break
         }
-        case "create-entity": {
-          const { key, recipe } = addEntity(erDiagram(documentStore.getState().doc).model.entities, fx.at)
+        case "create-node": {
+          const { key, recipe } = opsFor(documentStore.getState().doc).addNode(fx.at)
           documentStore.getState().dispatch(recipe)
-          session().setSelection([selId("entity", key)])
+          session().setSelection([selId("node", key)])
           session().setTool("select")
-          session().setEditing({ key })
+          session().setEditing({ key, target: "name" })
           break
         }
       }
@@ -197,9 +199,9 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const active = document.activeElement
       if (isTextInput(active)) flushSync(() => active.blur())
       svg.setPointerCapture(e.pointerId)
-      // Lo strumento entità apre l'editor inline già nel down: senza annullare il default il
+      // Lo strumento nodo apre l'editor inline già nel down: senza annullare il default il
       // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.
-      if (e.button === 1 || session().tool === "entity") e.preventDefault()
+      if (e.button === 1 || session().tool === "node") e.preventDefault()
       step({ type: "down", info: info(e), spaceHeld })
     }
     const onPointerMove = (e: PointerEvent) => {
@@ -225,7 +227,16 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
       const hit = hitTest(el)
-      if (el?.closest("[data-node-header]") && hit.kind === "entity") session().setEditing({ key: hit.key })
+      if (hit.kind !== "node") return
+      const headerHit = !!el?.closest("[data-node-header]")
+      // Il corpo si apre come testo solo nelle classi: nell'ER non esiste un formato di testo per
+      // gli attributi, e aprire una textarea sarebbe una feature non chiesta — lì il contratto DOM
+      // basta da solo, il doppio click rinomina solo quando cade sull'header.
+      if (documentStore.getState().doc.diagram.type !== "class") {
+        if (headerHit) session().setEditing({ key: hit.key, target: "name" })
+        return
+      }
+      session().setEditing({ key: hit.key, target: classEditTarget(hit.key, headerHit) })
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTextInput(e.target)) return

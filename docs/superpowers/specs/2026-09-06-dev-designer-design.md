@@ -10,7 +10,7 @@ ER, flowchart, UML class diagram, UML sequence diagram.
 
 Non compete con gli editor generici. I nodi conoscono il dominio (un'entità ha
 attributi tipizzati e chiavi, una classe ha visibilità e metodi) e il disegno
-produce artefatti utili a un dev: DDL, Mermaid, PlantUML, SVG, PNG.
+produce artefatti utili a un dev: DDL, Mermaid, SVG, PNG.
 
 Applicazione **solo frontend**: file statici, nessun server. Il canvas è la
 fonte di verità; il testo è import ed export.
@@ -28,8 +28,9 @@ fonte di verità; il testo è import ed export.
   redo, scorciatoie da tastiera.
 - Editing del testo inline sul nodo, pannello proprietà per il resto.
 - Export immagine: SVG, PNG, copia negli appunti.
-- Export testo: Mermaid per tutti i tipi, DDL dall'ER (PostgreSQL e MySQL),
-  PlantUML per il class diagram.
+- Export testo: Mermaid per tutti i tipi, DDL dall'ER (PostgreSQL e MySQL).
+  PlantUML per il class diagram, qui previsto, è stato scartato nella
+  progettazione del class diagram (§16 della sua spec): resta solo Mermaid.
 - Import: il formato proprio e DDL PostgreSQL e MySQL verso ER.
 - Auto layout con ELK per i tipi a grafo.
 - Tema chiaro e scuro.
@@ -67,7 +68,11 @@ fonte di verità; il testo è import ed export.
    Mermaid).~~ Fatto: import DDL, export immagini (SVG, PNG), export testo (DDL
    PostgreSQL e MySQL, Mermaid), copia del PNG negli appunti e auto layout con
    ELK.
-2. Class diagram.
+2. ~~Class diagram.~~ Fatto: modello (classi con stereotipo, sei tipi di
+   relazione), attributi e metodi come testo con un parser dedicato, geometria
+   e rendering dei tre scomparti e delle sei punte UML, validazione live,
+   editor testuale dei membri sul nodo, pannello proprietà, voce di menu,
+   auto layout ed export immagini condivisi con l'ER, export testo in Mermaid.
 3. Flowchart.
 4. Sequence.
 

@@ -1,9 +1,10 @@
 import { useEffect } from "react"
-import { deleteSelection, duplicateSelection, fitToContent, resetView, selectAllEntities, zoomBy } from "@/editor/actions"
+import { deleteSelection, duplicateSelection, fitToContent, resetView, selectAllNodes, zoomBy } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore } from "@/editor/session-store"
 import { documentIo } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
+import { viewFor } from "./canvas/kinds/registry"
 import { requestOpen } from "./document-actions"
 import { autoLayout } from "./layout-actions"
 
@@ -18,6 +19,9 @@ function onKeyDown(e: KeyboardEvent): void {
   const session = sessionStore.getState()
   const doc = documentStore.getState()
   const key = e.key.toLowerCase()
+  // Le lettere di nodo/arco vengono dal tipo di diagramma corrente, non da un valore cablato:
+  // per l'ER sono "e" e "r", come prima di questo cambiamento.
+  const tools = viewFor(doc.doc.diagram.type).tools
   // Le scorciatoie che toccano il documento: in sola lettura non agiscono, ma restano consumate,
   // perché senza preventDefault ⌘S farebbe comparire il dialogo di salvataggio del browser.
   // ⌘O non è fra queste: apre un altro documento, come la voce di menu che resta abilitata.
@@ -37,14 +41,14 @@ function onKeyDown(e: KeyboardEvent): void {
   else if (mod && key === "z") doc.undo()
   else if (mod && key === "y") doc.redo()
   else if (mod && key === "d") duplicateSelection()
-  else if (mod && key === "a") selectAllEntities()
+  else if (mod && key === "a") selectAllNodes()
   else if (mod && (key === "=" || key === "+")) zoomBy(1.25)
   else if (mod && key === "-") zoomBy(0.8)
   else if (mod && key === "0") resetView()
   else if (!mod && (e.key === "Delete" || e.key === "Backspace")) deleteSelection()
   else if (!mod && key === "v") session.setTool("select")
-  else if (!mod && key === "e") session.setTool("entity")
-  else if (!mod && key === "r") session.setTool("relation")
+  else if (!mod && key === tools.node.key) session.setTool("node")
+  else if (!mod && key === tools.edge.key) session.setTool("edge")
   else if (!mod && key === "f") fitToContent()
   else if (!mod && key === "l") void autoLayout()
   else if (e.key === "Escape") {
@@ -58,7 +62,8 @@ function onKeyDown(e: KeyboardEvent): void {
  * Scorciatoie globali. mod = cmd su macOS, ctrl altrove.
  * mod+s salva · mod+shift+s salva con nome · mod+o apri
  * mod+z undo · mod+shift+z / mod+y redo · mod+d duplica · mod+a seleziona tutto · canc/backspace elimina
- * v/e/r tool · f fit · l disponi · mod+= / mod+- zoom · mod+0 reset · esc deseleziona e torna al tool select
+ * v tool selezione · le lettere di nodo/arco vengono da `viewFor(tipo).tools` (per l'ER, e/r)
+ * f fit · l disponi · mod+= / mod+- zoom · mod+0 reset · esc deseleziona e torna al tool select
  */
 export function useKeyboardShortcuts(): void {
   useEffect(() => {

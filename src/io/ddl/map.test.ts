@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { ErModel } from "@/model/document"
+import type { ErModel } from "@/model/er/schema"
 import { mapToEr } from "./map"
 import type { SqlTable } from "./schema"
 

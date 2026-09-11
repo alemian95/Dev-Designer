@@ -58,10 +58,49 @@ function typeAndName(type: string, name: string): string {
   return type ? `${type} ${name}` : name
 }
 
+/**
+ * Traduce le parentesi angolari di un generico nelle tilde che Mermaid interpreta. Senza questa
+ * traduzione `List<Ordine>` **rende `List`**: il parametro sparisce, in silenzio — misurato su
+ * `mermaid@11`, §3 della spec di ampiezza. Nessun caso speciale per la virgola: la stessa misura
+ * mostra che `Map~string, int~` funziona, contro quel che dice la documentazione.
+ *
+ * Il `>` preceduto da `=` o `-` resta com'è: `(int) => void` è un tipo legale nella nostra
+ * sintassi, e sostituirlo produrrebbe `(int) =~ void`.
+ *
+ * Torna `null` se il risultato non è bilanciato — tilde in numero dispari: meglio il tipo
+ * originale e un avviso che una sintassi a metà.
+ */
+function genericsToTildes(type: string): string | null {
+  const out = type.replace(/</g, "~").replace(/(?<![=-])>/g, "~")
+  const tildes = (out.match(/~/g) ?? []).length
+  return tildes % 2 === 0 ? out : null
+}
+
+/** Rimuove ogni gruppo `{…}` graffe comprese, e la graffa spaiata con tutto ciò che la segue. */
+function stripBraces(type: string): string {
+  return type.replace(/\{[^}]*\}/g, "").replace(/[{}].*$/, "").replace(/\s+/g, " ").trim()
+}
+
+/**
+ * Traduce il tipo di un membro per l'emissione, registrando in `unbalanced`/`braced` il nome
+ * completo (`Classe.membro`) di ogni membro coinvolto: sono le liste da cui `emitClassMermaid`
+ * costruisce i due avvisi aggregati, uno per tipo di problema e non uno per membro.
+ */
+function emittableType(type: string, qualifiedName: string, unbalanced: string[], braced: string[]): string {
+  const tildes = genericsToTildes(type)
+  if (tildes === null) {
+    unbalanced.push(qualifiedName)
+    return type
+  }
+  if (tildes.includes("{")) braced.push(qualifiedName)
+  return stripBraces(tildes)
+}
+
 /** Riga di un attributo: il tipo precede il nome, il classificatore statico segue il nome. */
-function attributeLine(a: ClassAttribute): string {
+function attributeLine(a: ClassAttribute, className: string, unbalanced: string[], braced: string[]): string {
   const classifier = a.isStatic ? "$" : ""
-  return `${SYMBOL_BY_VISIBILITY[a.visibility]}${typeAndName(a.type, a.name)}${classifier}`
+  const type = emittableType(a.type, `${className}.${a.name}`, unbalanced, braced)
+  return `${SYMBOL_BY_VISIBILITY[a.visibility]}${typeAndName(type, a.name)}${classifier}`
 }
 
 /**
@@ -69,10 +108,14 @@ function attributeLine(a: ClassAttribute): string {
  * dentro le parentesi — coerenza coi campi), il tipo di ritorno dopo le parentesi separato da uno
  * spazio, e i classificatori `$`/`*` in coda, dopo il tipo di ritorno.
  */
-function methodLine(m: ClassMethod): string {
-  const params = m.parameters.map((p) => typeAndName(p.type, p.name)).join(", ")
+function methodLine(m: ClassMethod, className: string, unbalanced: string[], braced: string[]): string {
+  const qualified = `${className}.${m.name}`
+  const params = m.parameters
+    .map((p) => typeAndName(emittableType(p.type, qualified, unbalanced, braced), p.name))
+    .join(", ")
   const classifier = `${m.isStatic ? "$" : ""}${m.isAbstract ? "*" : ""}`
-  const returnPart = m.type ? ` ${m.type}` : ""
+  const returnType = emittableType(m.type, qualified, unbalanced, braced)
+  const returnPart = returnType ? ` ${returnType}` : ""
   return `${SYMBOL_BY_VISIBILITY[m.visibility]}${m.name}(${params})${returnPart}${classifier}`
 }
 
@@ -114,13 +157,17 @@ function noteText(text: string): string {
   return text.replaceAll('"', "'").replaceAll("\n", "\\n")
 }
 
-/** Il blocco `class Nome { ... }`: stereotipo (se annotato) poi attributi poi metodi. */
-function classBlock(node: ClassNode, name: string): string[] {
+/**
+ * Il blocco `class Nome { ... }`: stereotipo (se annotato) poi attributi poi metodi. `node.name`
+ * (il nome grezzo del modello, non `name` già sanificato) qualifica i membri negli avvisi: è quello
+ * che l'utente riconosce nel proprio diagramma.
+ */
+function classBlock(node: ClassNode, name: string, unbalanced: string[], braced: string[]): string[] {
   const lines = [`  class ${name} {`]
   const annotation = STEREOTYPE_ANNOTATION[node.stereotype]
   if (annotation) lines.push(`    <<${annotation}>>`)
-  for (const a of node.attributes) lines.push(`    ${attributeLine(a)}`)
-  for (const m of node.methods) lines.push(`    ${methodLine(m)}`)
+  for (const a of node.attributes) lines.push(`    ${attributeLine(a, node.name, unbalanced, braced)}`)
+  for (const m of node.methods) lines.push(`    ${methodLine(m, node.name, unbalanced, braced)}`)
   lines.push("  }")
   return lines
 }
@@ -135,6 +182,8 @@ function classBlock(node: ClassNode, name: string): string[] {
  */
 export function emitClassMermaid(model: ClassModel): EmitResult {
   const renamed = new Map<string, string>()
+  const unbalanced: string[] = []
+  const braced: string[] = []
   const out = ["classDiagram"]
 
   for (const key of Object.keys(model.relations).sort()) {
@@ -142,7 +191,8 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
   }
 
   for (const key of Object.keys(model.classes).sort()) {
-    out.push(...classBlock(model.classes[key]!, safeName(key, renamed)))
+    const node = model.classes[key]!
+    out.push(...classBlock(node, safeName(key, renamed), unbalanced, braced))
   }
 
   for (const key of Object.keys(model.notes).sort()) {
@@ -155,6 +205,12 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
   if (renamed.size > 0) {
     const list = [...renamed].map(([raw, clean]) => `"${raw}" → "${clean}"`).join(", ")
     warnings.push(`${renamed.size} nomi sono stati cambiati perché Mermaid non li accetta nudi: ${list}`)
+  }
+  if (unbalanced.length > 0) {
+    warnings.push(`${unbalanced.length} tipi hanno parentesi angolari sbilanciate e sono usciti com'erano: ${unbalanced.join(", ")}`)
+  }
+  if (braced.length > 0) {
+    warnings.push(`${braced.length} tipi contenevano graffe, rimosse perché fanno fallire il parsing dell'intero diagramma: ${braced.join(", ")}`)
   }
 
   return { text: `${out.join("\n")}\n`, warnings }

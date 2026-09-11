@@ -168,3 +168,65 @@ describe("note", () => {
     expect(text).not.toContain("note ")
   })
 })
+
+describe("tipi che Mermaid non porta com'è", () => {
+  const conTipo = (type: string) => ({
+    classes: { A: { name: "A", stereotype: "class" as const, attributes: [{ name: "campo", type, visibility: "public" as const, isStatic: false }], methods: [] } },
+    relations: {},
+    notes: {},
+  })
+
+  it("i generici passano alle tilde, che è la sintassi che Mermaid interpreta", () => {
+    expect(emitClassMermaid(conTipo("List<Ordine>")).text).toContain("+List~Ordine~ campo")
+  })
+
+  it("anche con la virgola: misurato su mermaid@11, contro quel che dice la doc", () => {
+    expect(emitClassMermaid(conTipo("Map<string, int>")).text).toContain("+Map~string, int~ campo")
+  })
+
+  it("un generico annidato traduce tutte le coppie, non solo la più esterna", () => {
+    expect(emitClassMermaid(conTipo("Map<string, List<int>>")).text).toContain("+Map~string, List~int~~ campo")
+  })
+
+  it("il `>` di `=>` non è una parentesi angolare e non si tocca", () => {
+    // È il quinto difetto del Task 8 del piano precedente: il parser gestisce `(int) => void`
+    // apposta, e una sostituzione cieca lo trasformerebbe in `(int) =~ void`.
+    const { text } = emitClassMermaid(conTipo("(int) => void"))
+    expect(text).toContain("=>")
+    expect(text).not.toContain("=~")
+  })
+
+  it("un tipo con angolari sbilanciate esce com'era, con un avviso", () => {
+    const { text, warnings } = emitClassMermaid(conTipo("List<Ordine"))
+    expect(text).toContain("List<Ordine")
+    expect(warnings.join(" ")).toContain("A.campo")
+    expect(warnings.join(" ")).toContain("sbilanciate")
+  })
+
+  it("le graffe si rimuovono: una sola fa fallire il parsing dell'intero diagramma", () => {
+    const { text, warnings } = emitClassMermaid(conTipo("string {readOnly}"))
+    expect(text).toContain("+string campo")
+    // Nota: non `expect(text).not.toContain("{")` sull'intero testo — il blocco `class A {` lo
+    // contiene sempre, per sintassi Mermaid. Qui si verifica che sia la riga del membro a non
+    // portarsi dietro la graffa, che è quanto il test vuole davvero controllare.
+    expect(text.split("\n").find((l) => l.includes("campo"))).not.toContain("{")
+    expect(warnings.join(" ")).toContain("A.campo")
+    expect(warnings.join(" ")).toContain("graffe")
+  })
+
+  it("una graffa spaiata si rimuove dalla graffa in poi", () => {
+    expect(emitClassMermaid(conTipo("string {read")).text).toContain("+string campo")
+  })
+
+  it("gli avvisi sono aggregati, non uno per membro", () => {
+    const modello = conTipo("string {readOnly}")
+    modello.classes.A.attributes.push({ name: "altro", type: "int {x}", visibility: "public", isStatic: false })
+    expect(emitClassMermaid(modello).warnings.filter((w) => w.includes("graffe"))).toHaveLength(1)
+  })
+
+  it("`= valore` passa senza avviso: Mermaid lo rende letteralmente", () => {
+    const { text, warnings } = emitClassMermaid(conTipo("decimal = 0"))
+    expect(text).toContain("+decimal = 0 campo")
+    expect(warnings).toEqual([])
+  })
+})

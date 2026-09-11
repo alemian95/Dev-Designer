@@ -147,9 +147,10 @@ export async function run(browser, base) {
       await page.waitForSelector("[data-text-export-dialog]")
       const text = await page.locator("[data-export-preview]").textContent()
 
-      // `noteText` (`io/emit/class-mermaid.ts`) sostituisce l'a capo vero con `\n` letterale: la
-      // riga attesa lo riflette, non un a capo vero dentro la stringa.
-      const expectedLine = `note "${NOTE_LINE_1}\\n${NOTE_LINE_2}"`
+      // `noteText` (`io/emit/class-mermaid.ts`) sostituisce l'a capo vero con `<br>`, misurato su
+      // mermaid@11 come la sintassi che produce davvero un a capo nella nota (F1): la riga attesa
+      // lo riflette, non più il backslash-n letterale di prima.
+      const expectedLine = `note "${NOTE_LINE_1}<br>${NOTE_LINE_2}"`
       if (!text.includes(expectedLine)) {
         throw new Error(`la nota non compare nell'export come atteso:\n${text}\n(attesa la riga: ${expectedLine})`)
       }

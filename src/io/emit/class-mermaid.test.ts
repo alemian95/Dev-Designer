@@ -151,16 +151,40 @@ describe("note", () => {
     expect(text).not.toContain("class {")
   })
 
-  it("gli a capo veri diventano \\n letterali", () => {
+  it("gli a capo veri diventano <br>, non un backslash-n visibile (misurato su mermaid@11)", () => {
     const { text } = emitClassMermaid(modello({ "n-1": { text: "prima\nseconda" } }))
-    expect(text).toContain('note "prima\\nseconda"')
+    expect(text).toContain('note "prima<br>seconda"')
     // Una riga sola nell'output: l'a capo vero romperebbe la sintassi.
     expect(text.split("\n").filter((l) => l.includes("note ")).length).toBe(1)
   })
 
-  it("le virgolette doppie diventano singole, o chiuderebbero la stringa", () => {
+  it("le virgolette doppie diventano l'entità #quot;, misurata dentro una note: rende la virgoletta vera", () => {
     const { text } = emitClassMermaid(modello({ "n-1": { text: 'il campo "id"' } }))
-    expect(text).toContain(`note "il campo 'id'"`)
+    expect(text).toContain(`note "il campo #quot;id#quot;"`)
+  })
+
+  it("`<`, `>` e `&` grezzi si escapano con le entità di Mermaid, o l'HTML viene interpretato e il testo si perde", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: "se a<b allora <b>grassetto</b>" } }))
+    expect(text).toContain('note "se a#lt;b allora #lt;b#gt;grassetto#lt;/b#gt;"')
+  })
+
+  it("l'utente scrive una propria entità (&lt;): l'& si escapa per primo, così non viene decodificata due volte", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: "Tizio & Caio, &lt;" } }))
+    // Se l'& non fosse il primo a essere escapato, questo testo uscirebbe identico a un `<` vero
+    // e verrebbe interpretato come tale da Mermaid — invece deve restare `&lt;` letterale.
+    expect(text).toContain('note "Tizio #amp; Caio, #amp;lt;"')
+  })
+
+  it("una nota con newline e `<` letterale: l'ordine conta, il <br> emesso deve sopravvivere alla propria escape di `<`", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: "riga1 <b>\nriga2" } }))
+    // Se la sostituzione dell'a capo girasse prima dell'escape di `<`, il `<br>` risulterebbe
+    // a sua volta escapato in `#lt;br#gt;` invece di restare un vero a capo per Mermaid.
+    expect(text).toContain('note "riga1 #lt;b#gt;<br>riga2"')
+  })
+
+  it("una nota con newline, virgoletta, `<` e `&` tutti insieme: l'escape sopravvive esatto", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: 'riga1 & "cit" <b>\nriga2' } }))
+    expect(text).toContain('note "riga1 #amp; #quot;cit#quot; #lt;b#gt;<br>riga2"')
   })
 
   it("una nota vuota non produce nessuna riga", () => {
@@ -186,6 +210,19 @@ describe("tipi che Mermaid non porta com'è", () => {
 
   it("un generico annidato traduce tutte le coppie, non solo la più esterna", () => {
     expect(emitClassMermaid(conTipo("Map<string, List<int>>")).text).toContain("+Map~string, List~int~~ campo")
+  })
+
+  it("un generico annidato non è rappresentabile in Mermaid: resta in forma a tilde, ma con un avviso aggregato", () => {
+    // Misurato su mermaid@11: `Map~string, List~int~~` rende `Map<string, List<int~>`, testo mangled.
+    // Nessuna codifica lo risolve — è un limite di Mermaid — quindi si avvisa invece di far finta di niente.
+    const { text, warnings } = emitClassMermaid(conTipo("Map<string, List<int>>"))
+    expect(text).toContain("+Map~string, List~int~~ campo")
+    expect(warnings.join(" ")).toContain("A.campo")
+    expect(warnings.join(" ")).toMatch(/annidat/i)
+  })
+
+  it("un generico piatto non allarma: rende corretto in Mermaid", () => {
+    expect(emitClassMermaid(conTipo("Map<string, int>")).warnings).toEqual([])
   })
 
   it("il `>` di `=>` non è una parentesi angolare e non si tocca", () => {

@@ -47,6 +47,7 @@ tabella che segue viene da `mermaid@11` fatto girare davvero su ciò che
 | `+ trova(id: int): Collection<Cliente>` | `+trova(int id) Collection<Cliente>` | **`+trova(int id) : Collection`** |
 | — | `+List~Ordine~ ordini` | `+List<Ordine> ordini` ✓ |
 | — | `+Map~string, int~ mappa` | `+Map<string, int> mappa` ✓ |
+| — | `+Map~string, List~int~~ mappa` (annidato) | **`+Map<string, List<int~> mappa`** — mangled: Mermaid non sa rendere un generico annidato dentro un altro |
 | `+ nome: string {readOnly}` | `+string {readOnly} nome` | **errore di parsing, nessun diagramma** |
 | `- saldo: decimal = 0` | `-decimal = 0 saldo` | `-decimal = 0 saldo`, passa |
 | `+ /eta: int` | `+int /eta` | `+int /eta`, passa |
@@ -61,6 +62,12 @@ Due conseguenze, entrambe contro la documentazione:
   export.** L'errore è `Expecting 'STRUCT_STOP', 'MEMBER', got
   'OPEN_IN_STRUCT'`. Non è un difetto cosmetico di una riga, è un file
   inutilizzabile.
+- **Un generico annidato non è rappresentabile.** Non è un problema di
+  escaping: `Map<string, List<int>>` tradotto in tilde produce un doppio
+  livello (`Map~string, List~int~~`) che Mermaid non sa disambiguare, e rende
+  testo mangled. Si continua a emettere la forma a tilde — è comunque la meno
+  peggio, ed è quella che l'utente incolla — ma con un avviso: §6 lo tratta
+  come terza categoria, accanto ad angolari sbilanciate e graffe.
 
 ## 4. Note
 
@@ -154,16 +161,26 @@ esclude: è il prezzo dichiarato di quel taglio.
 
 ### Export
 
-Mermaid: `note "testo"`, fuori dai blocchi `class`. Due sostituzioni sul testo,
-entrambe deterministiche:
+Mermaid: `note "testo"`, fuori dai blocchi `class`. Cinque sostituzioni sul
+testo, tutte misurate su `mermaid@11` con lo stesso metodo di §3 (un secondo
+giro di misura, successivo al primo):
 
-- gli a capo veri diventano `\n` letterali, che è la forma documentata;
-- le virgolette doppie diventano singole.
-
-La seconda è una perdita minima e certa. L'alternativa sarebbe l'entità
-`#quot;`, che Mermaid documenta altrove ma che **non è stata misurata dentro
-una `note`**: se qualcuno la misura col metodo di §3 e funziona, sostituirla è
-un miglioramento; finché non è misurata, non si emette una sintassi sperata.
+- `&` diventa `#amp;`, **per prima** fra tutte: se un utente scrive già una
+  propria entità (`&lt;`) e si escapasse prima `<`, il risultato sarebbe
+  indistinguibile da un `<` vero appena escapato, e Mermaid la decodificherebbe
+  due volte perdendo il testo originale. Escapando `&` per prima, `&lt;` esce
+  `#amp;lt;` e rende `&lt;` letterale — esatto, misurato;
+- `<` diventa `#lt;` e `>` diventa `#gt;`: senza queste due, l'HTML grezzo
+  nella nota viene interpretato da Mermaid e il testo si perde (`<b>` apre un
+  tag vero, non compare come testo);
+- `"` diventa `#quot;`: **è stata misurata dentro una `note`** e rende la
+  virgoletta vera. Non è più necessario scendere all'apice singolo, che era la
+  scelta presa finché l'entità restava ipotetica;
+- l'a capo vero diventa `<br>`, **dopo** le quattro sostituzioni precedenti:
+  se girasse prima, il tag che emettiamo verrebbe a sua volta escapato in
+  `#lt;br#gt;` e non andrebbe più a capo. `\n` letterale (la vecchia scelta) è
+  stato scartato: misurato, rende un backslash-n visibile nell'etichetta, non
+  un a capo.
 
 `buildSvg` (`ui/export/svg.tsx`) è l'unico punto che legge i record grezzi del
 modello, e la §3 del documento madre lo dice esplicitamente. Lì `nodeModels`

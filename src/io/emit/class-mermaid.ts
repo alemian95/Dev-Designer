@@ -82,28 +82,59 @@ function stripBraces(type: string): string {
 }
 
 /**
- * Traduce il tipo di un membro per l'emissione, registrando in `unbalanced`/`braced` il nome
- * completo (`Classe.membro`) di ogni membro coinvolto: sono le liste da cui `emitClassMermaid`
- * costruisce i due avvisi aggregati, uno per tipo di problema e non uno per membro.
+ * Vero se il tipo ha un generico annidato: una `<` che si apre mentre un'altra è già aperta, come
+ * in `Map<string, List<int>>`. Nessuna codifica lo risolve — non è un problema di escaping ma un
+ * limite di Mermaid, misurato su `mermaid@11` (§3 della spec di ampiezza): la doppia tilde che ne
+ * risulta (`Map~string, List~int~~`) rende `Map<string, List<int~>`, testo mangled. Un generico
+ * piatto come `Map<string, int>` ha profondità massima 1 e non deve allarmare: rende corretto.
+ *
+ * Stessa esclusione di `genericsToTildes` per il `>` di `=>`/`->`, così la profondità non scende
+ * per un token che non è mai stato un `<` di apertura.
+ */
+function hasNestedGenerics(type: string): boolean {
+  let depth = 0
+  for (let i = 0; i < type.length; i++) {
+    const ch = type[i]
+    if (ch === "<") {
+      depth++
+      if (depth >= 2) return true
+    } else if (ch === ">" && type[i - 1] !== "=" && type[i - 1] !== "-") {
+      depth = Math.max(0, depth - 1)
+    }
+  }
+  return false
+}
+
+/**
+ * Traduce il tipo di un membro per l'emissione, registrando in `unbalanced`/`braced`/`nested` il
+ * nome completo (`Classe.membro`) di ogni membro coinvolto: sono le liste da cui
+ * `emitClassMermaid` costruisce i tre avvisi aggregati, uno per tipo di problema e non uno per
+ * membro.
  *
  * `stripBraces` gira **sempre**, angolari bilanciate o no: la graffa è quella che rompe l'intero
  * parsing Mermaid, quindi va eliminata anche quando la traduzione dei generici fallisce — un tipo
  * può comparire in entrambi gli avvisi, non è un bug ma un'informazione in più per chi legge.
+ *
+ * `nested` si valuta solo quando le tilde sono bilanciate: un tipo con angolari sbilanciate esce
+ * già com'era (l'altro avviso lo copre), annidato o no non cambia cosa viene emesso.
  */
-function emittableType(type: string, qualifiedName: string, unbalanced: string[], braced: string[]): string {
+function emittableType(
+  type: string, qualifiedName: string, unbalanced: string[], braced: string[], nested: string[],
+): string {
   if (type.includes("{")) braced.push(qualifiedName)
   const tildes = genericsToTildes(type)
   if (tildes === null) {
     unbalanced.push(qualifiedName)
     return stripBraces(type)
   }
+  if (hasNestedGenerics(type)) nested.push(qualifiedName)
   return stripBraces(tildes)
 }
 
 /** Riga di un attributo: il tipo precede il nome, il classificatore statico segue il nome. */
-function attributeLine(a: ClassAttribute, className: string, unbalanced: string[], braced: string[]): string {
+function attributeLine(a: ClassAttribute, className: string, unbalanced: string[], braced: string[], nested: string[]): string {
   const classifier = a.isStatic ? "$" : ""
-  const type = emittableType(a.type, `${className}.${a.name}`, unbalanced, braced)
+  const type = emittableType(a.type, `${className}.${a.name}`, unbalanced, braced, nested)
   return `${SYMBOL_BY_VISIBILITY[a.visibility]}${typeAndName(type, a.name)}${classifier}`
 }
 
@@ -112,13 +143,13 @@ function attributeLine(a: ClassAttribute, className: string, unbalanced: string[
  * dentro le parentesi — coerenza coi campi), il tipo di ritorno dopo le parentesi separato da uno
  * spazio, e i classificatori `$`/`*` in coda, dopo il tipo di ritorno.
  */
-function methodLine(m: ClassMethod, className: string, unbalanced: string[], braced: string[]): string {
+function methodLine(m: ClassMethod, className: string, unbalanced: string[], braced: string[], nested: string[]): string {
   const qualified = `${className}.${m.name}`
   const params = m.parameters
-    .map((p) => typeAndName(emittableType(p.type, qualified, unbalanced, braced), p.name))
+    .map((p) => typeAndName(emittableType(p.type, qualified, unbalanced, braced, nested), p.name))
     .join(", ")
   const classifier = `${m.isStatic ? "$" : ""}${m.isAbstract ? "*" : ""}`
-  const returnType = emittableType(m.type, qualified, unbalanced, braced)
+  const returnType = emittableType(m.type, qualified, unbalanced, braced, nested)
   const returnPart = returnType ? ` ${returnType}` : ""
   return `${SYMBOL_BY_VISIBILITY[m.visibility]}${m.name}(${params})${returnPart}${classifier}`
 }
@@ -152,13 +183,28 @@ function relationLine(rel: ClassRelation, renamed: Map<string, string>): string 
 }
 
 /**
- * Testo di una nota dentro `note "…"`. Due sostituzioni, entrambe deterministiche: l'a capo vero
- * romperebbe la riga, la virgoletta doppia chiuderebbe la stringa. L'entità `#quot;` che Mermaid
- * documenta altrove **non è stata misurata dentro una `note`** (§4 della spec): finché non lo è,
- * non si emette una sintassi sperata.
+ * Testo di una nota dentro `note "…"`. Le entità sono quelle di Mermaid, tutte misurate su
+ * `mermaid@11` (§3/§4 della spec di ampiezza): senza di loro `<`, `>` e `"` grezzi vengono
+ * interpretati come HTML e perdono testo dell'utente (`<b>grassetto</b>` diventa grassetto vero,
+ * i tag spariscono), e la virgoletta doppia chiuderebbe la stringa Mermaid.
+ *
+ * **L'ordine conta, due volte:**
+ * 1. `&` va escapato per primo. Se un utente scrive già `&lt;` come testo letterale e si escapasse
+ *    prima `<`, l'output sarebbe indistinguibile da un `<` vero appena escapato — Mermaid
+ *    decodificherebbe la sua stessa entità e il testo dell'utente ne uscirebbe alterato.
+ *    Escapando `&` per primo, `&lt;` diventa `#amp;lt;`, che rende `&lt;` letterale: esatto.
+ * 2. L'a capo vero diventa `<br>` **dopo** le altre sostituzioni, non prima: il tag `<br>` che
+ *    emettiamo noi non deve subire la nostra stessa escape di `<`/`>`, altrimenti uscirebbe
+ *    `#lt;br#gt;` e non andrebbe più a capo. `\n` letterale (la vecchia scelta) è scartato: reso
+ *    da mermaid@11 come backslash-n visibile, non come a capo.
  */
 function noteText(text: string): string {
-  return text.replaceAll('"', "'").replaceAll("\n", "\\n")
+  return text
+    .replaceAll("&", "#amp;")
+    .replaceAll("<", "#lt;")
+    .replaceAll(">", "#gt;")
+    .replaceAll('"', "#quot;")
+    .replaceAll("\n", "<br>")
 }
 
 /**
@@ -166,12 +212,12 @@ function noteText(text: string): string {
  * (il nome grezzo del modello, non `name` già sanificato) qualifica i membri negli avvisi: è quello
  * che l'utente riconosce nel proprio diagramma.
  */
-function classBlock(node: ClassNode, name: string, unbalanced: string[], braced: string[]): string[] {
+function classBlock(node: ClassNode, name: string, unbalanced: string[], braced: string[], nested: string[]): string[] {
   const lines = [`  class ${name} {`]
   const annotation = STEREOTYPE_ANNOTATION[node.stereotype]
   if (annotation) lines.push(`    <<${annotation}>>`)
-  for (const a of node.attributes) lines.push(`    ${attributeLine(a, node.name, unbalanced, braced)}`)
-  for (const m of node.methods) lines.push(`    ${methodLine(m, node.name, unbalanced, braced)}`)
+  for (const a of node.attributes) lines.push(`    ${attributeLine(a, node.name, unbalanced, braced, nested)}`)
+  for (const m of node.methods) lines.push(`    ${methodLine(m, node.name, unbalanced, braced, nested)}`)
   lines.push("  }")
   return lines
 }
@@ -188,6 +234,7 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
   const renamed = new Map<string, string>()
   const unbalanced: string[] = []
   const braced: string[] = []
+  const nested: string[] = []
   const out = ["classDiagram"]
 
   for (const key of Object.keys(model.relations).sort()) {
@@ -196,7 +243,7 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
 
   for (const key of Object.keys(model.classes).sort()) {
     const node = model.classes[key]!
-    out.push(...classBlock(node, safeName(key, renamed), unbalanced, braced))
+    out.push(...classBlock(node, safeName(key, renamed), unbalanced, braced, nested))
   }
 
   for (const key of Object.keys(model.notes).sort()) {
@@ -215,6 +262,9 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
   }
   if (braced.length > 0) {
     warnings.push(`${braced.length} tipi contenevano graffe, rimosse perché fanno fallire il parsing dell'intero diagramma: ${braced.join(", ")}`)
+  }
+  if (nested.length > 0) {
+    warnings.push(`${nested.length} tipi hanno generici annidati, non rappresentabili in Mermaid: restano nella forma a tilde ma potrebbero rendere in modo scorretto: ${nested.join(", ")}`)
   }
 
   return { text: `${out.join("\n")}\n`, warnings }

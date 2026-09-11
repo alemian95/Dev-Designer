@@ -3,7 +3,7 @@ import { memberLines } from "@/model/class/members"
 import type { ClassNode, ClassRelation } from "@/model/class/schema"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Rect } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
-import { classEdgeGeometry, classSize, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
+import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
 
 // Annotazione esplicita `ClassNode` sulle fixture, non `as const`: il brief le
 // scriveva `as const`, ma un `ClassNode` ha array mutabili e `as const` li
@@ -138,5 +138,82 @@ describe("classEdgeGeometry", () => {
     const geo = classEdgeGeometry(source, target, asimmetrica)
     expect(geo.sourceEnd).toBeDefined()
     expect(geo.targetEnd).toBeDefined()
+  })
+
+  it("sourceEnd/targetEnd presenti anche quando c'è solo il ruolo e nessuna molteplicità", () => {
+    // Il ruolo si rende nella stessa etichetta della molteplicità: un capo che ha solo il ruolo
+    // ha comunque qualcosa da mostrare, e prima di questo caso non riceveva nessun punto.
+    const soloRuolo: ClassRelation = { ...relazione, target: { ...relazione.target, role: "titolare" } }
+    const geo = classEdgeGeometry(source, target, soloRuolo)
+    expect(geo.sourceEnd).toBeDefined()
+    expect(geo.targetEnd).toBeDefined()
+  })
+
+  it("l'etichetta del target cade oltre il marker, non dentro", () => {
+    // Il rombo è il marker più lungo (16) e l'apice tocca il bordo del target: un'etichetta a 14
+    // dal bordo finiva dentro il rombo e usciva mangiata. I due rettangoli sono alla stessa
+    // altezza, quindi l'arco è orizzontale e la distanza è tutta sulla x.
+    const conMolt: ClassRelation = { ...relazione, kind: "composition", target: { ...relazione.target, multiplicity: "0..*" } }
+    const geo = classEdgeGeometry(source, target, conMolt)
+    expect(target.x - geo.targetEnd!.x).toBeGreaterThan(16)
+  })
+
+  it("un'etichetta lunga non rientra nel nodo a cui appartiene", () => {
+    // Il testo è centrato sul proprio punto: con una sola cifra ci sta, ma molteplicità e ruolo
+    // insieme sono lunghi, e centrati a poca distanza dal bordo rientrano nel rettangolo e ne
+    // escono tagliati. Lo scarto lungo l'arco deve quindi contare anche la semilarghezza.
+    const lunga = "0..* ordini"
+    const conRuolo: ClassRelation = { ...relazione, kind: "composition", target: { class: "B", multiplicity: "0..*", role: "ordini" } }
+    const geo = classEdgeGeometry(source, target, conRuolo)
+    const semiLarghezza = (lunga.length * 11 * 0.6) / 2
+    // Il bordo del testo più vicino al target, non il suo centro: deve stare oltre il rombo (16).
+    expect(target.x - (geo.targetEnd!.x + semiLarghezza)).toBeGreaterThan(16)
+  })
+
+  it("su un arco orizzontale i capi vanno sotto la linea, il nome resta sopra", () => {
+    // Sono tre etichette sullo stesso arco. `ClassEdgeView` mette il nome sopra la linea
+    // (`label.y - 6`), quindi i capi vanno dall'altra parte: altrimenti condividono la stessa
+    // fascia di pixel e su due nodi vicini si sovrappongono.
+    const conTutto: ClassRelation = {
+      ...relazione,
+      name: "effettua",
+      source: { class: "A", multiplicity: "0..*", role: "ordini" },
+      target: { class: "B", multiplicity: "1", role: "titolare" },
+    }
+    const geo = classEdgeGeometry(source, target, conTutto)
+    // I due rettangoli sono alla stessa altezza: la linea corre a y = 30.
+    expect(geo.sourceEnd!.y).toBeGreaterThan(30)
+    expect(geo.targetEnd!.y).toBeGreaterThan(30)
+    expect(geo.label.y - 6).toBeLessThan(30)
+  })
+
+  it("su un arco verticale l'etichetta si sposta di lato quanto basta a non attraversare la linea", () => {
+    // Il testo è centrato sul proprio punto (`textAnchor="middle"`), quindi lo scarto laterale
+    // deve superare la sua semilarghezza, che con un font monospace è nota: la linea passa per
+    // il centro del lato inferiore del source.
+    const sopra: Rect = { x: 0, y: 0, w: 100, h: 60 }
+    const sotto: Rect = { x: 0, y: 300, w: 100, h: 60 }
+    const molteplicita = "1..*"
+    const conMolt: ClassRelation = { ...relazione, source: { ...relazione.source, multiplicity: molteplicita } }
+    const geo = classEdgeGeometry(sopra, sotto, conMolt)
+    const semiLarghezza = (molteplicita.length * 11 * 0.6) / 2
+    expect(Math.abs(geo.sourceEnd!.x - 50)).toBeGreaterThan(semiLarghezza)
+  })
+})
+
+describe("endLabel", () => {
+  const capo = (multiplicity: string, role: string) => ({ class: "Cliente", multiplicity, role })
+
+  it("unisce molteplicità e ruolo in un testo solo", () => {
+    expect(endLabel(capo("0..*", "ordini"))).toBe("0..* ordini")
+  })
+
+  it("con una sola delle due metà non lascia spazi in più", () => {
+    expect(endLabel(capo("0..*", ""))).toBe("0..*")
+    expect(endLabel(capo("", "ordini"))).toBe("ordini")
+  })
+
+  it("vuota quando il capo non ha né molteplicità né ruolo: è la condizione che usa chi la chiama", () => {
+    expect(endLabel(capo("", ""))).toBe("")
   })
 })

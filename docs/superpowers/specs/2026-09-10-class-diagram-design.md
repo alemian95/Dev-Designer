@@ -369,8 +369,29 @@ cosa colleghi — non cambia.
 renderer (`strokeDasharray` e `fill` in `RelationshipEdge.tsx`), dipendono dal
 `kind` e non dalla posizione: `setEdgeGeometry` riscrive solo attributi `d`.
 
-**`EdgeGeometry` guadagna però due campi**, perché le molteplicità sono due
-etichette vicino ai capi e durante un drag devono seguire l'arco:
+**Ogni capo ha una sola etichetta, che porta molteplicità e ruolo.** I due si
+uniscono in un testo solo separato da uno spazio (`endLabel`), e ciascuna metà
+può mancare: un capo con il solo ruolo ha comunque la sua etichetta. La
+collocazione UML rigorosa metterebbe il ruolo sull'altro lato della linea
+rispetto alla molteplicità, ma due etichette per capo vorrebbero due punti in
+più in `EdgeGeometry` e due `querySelector` per arco su ogni frame del drag —
+il costo che questa stessa sezione, qui sotto, dice di non aggiungere alla
+leggera.
+
+**Dove si colloca l'etichetta di un capo.** Il testo è centrato sul proprio
+punto, quindi ogni scarto conta una semilarghezza oltre al distacco; la
+semilarghezza si calcola, perché il font è monospace. Lo scarto lungo l'arco
+parte da `DIAMOND_LEN + 8`: il rombo è il marker più lungo e il suo apice tocca
+il bordo del nodo, quindi un'etichetta più vicina finisce dentro il rombo. Poi:
+
+- **arco orizzontale**: la semilarghezza va lungo l'arco, altrimenti
+  un'etichetta lunga rientra nel rettangolo del proprio nodo. Il testo scende
+  **sotto** la linea, perché sopra c'è già il nome della relazione.
+- **arco verticale**: la semilarghezza va di lato, o la linea passa in mezzo
+  alle lettere.
+
+**`EdgeGeometry` guadagna però due campi**, perché le etichette dei capi
+vivono vicino ai capi e durante un drag devono seguire l'arco:
 
 ```ts
 export interface EdgeGeometry {
@@ -431,6 +452,13 @@ Il nostro `enum` diventa `enumeration`: è il nome che Mermaid usa.
 
 I parametri non sono documentati da Mermaid, che li rende come testo dentro le
 parentesi. Si emette `tipo nome`, per coerenza con i campi.
+
+**Il ruolo dei capi non si esporta, ed è deliberato.** La documentazione
+corrente di Mermaid elenca per la stringa fra apici a ciascun capo solo i token
+di cardinalità (`1`, `0..1`, `1..*`, `*`, `n`, `0..n`, `1..n`), e i role name
+sui capi non esistono come concetto. Emettere `"0..* ordini"` sarebbe appoggiarsi
+a comportamento non documentato; il ruolo resta quindi sul canvas e nell'export
+SVG/PNG, che sono nostri. È un limite di Mermaid, non una perdita da recuperare.
 
 ### I lati delle relazioni
 

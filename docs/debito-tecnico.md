@@ -300,6 +300,28 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `crowsFootPath` in `edge-routing.ts`. Con due soli consumatori resta dentro
   la regola «tre righe simili valgono più di un'astrazione prematura»; al
   terzo consumatore vale un `perpOf(dir)` condiviso.
+- Ogni arco attacca al centro del proprio lato, quindi **due archi distinti
+  fra la stessa coppia di nodi si sovrappongono esattamente**, e così le loro
+  etichette. Distribuire gli attacchi richiede che `routeEdge` sappia quali
+  archi toccano un nodo, mentre oggi vede due `Rect` e nient'altro — la §7
+  della spec del class diagram tiene quella conoscenza fuori di proposito. Il
+  cappio dell'auto-relazione è stato spostato verso l'angolo per non cadere
+  nel caso peggiore, ma è un rimedio al sintomo, non alla causa.
+- Le etichette di **archi diversi** possono ancora accavallarsi quando più
+  archi convergono sullo stesso lato di un nodo a poca distanza: la
+  collocazione di `endPoint` risolve solo i conflitti interni a un arco
+  (etichetta contro marker, contro il proprio nodo, contro il nome della
+  relazione). Un anti-sovrapposizione vero è globale, stessa causa del punto
+  sopra.
+- `{static}` e `{abstract}` si rendono a testo dentro la riga del membro. In
+  UML lo statico è **sottolineato** — è la forma normativa, ed è quella che
+  usano gli altri strumenti. Sottolineare solo il nome dentro una riga
+  allineata a colonne vuole spezzare il `<text>` in `<tspan>`, quindi non è
+  il cambio di una costante. `{abstract}` invece è notazione UML legittima e
+  può restare com'è.
+- L'allineamento a colonne di `memberLines` produce `+ conta()    : int`
+  invece di `+ conta(): int`. Rende le righe scansionabili ma non è la forma
+  che si vede negli altri strumenti UML.
 - Buchi di copertura, in una voce sola: lo stereotipo `enum` non è provato
   nei tre punti che lo trattano — `hasStereotypeLine` (il test in
   `geometry.test.ts` si intitola «interface ed enum» ma nel corpo asserisce

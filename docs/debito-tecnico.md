@@ -313,12 +313,65 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   (etichetta contro marker, contro il proprio nodo, contro il nome della
   relazione). Un anti-sovrapposizione vero è globale, stessa causa del punto
   sopra.
-- `{static}` e `{abstract}` si rendono a testo dentro la riga del membro. In
-  UML lo statico è **sottolineato** — è la forma normativa, ed è quella che
-  usano gli altri strumenti. Sottolineare solo il nome dentro una riga
-  allineata a colonne vuole spezzare il `<text>` in `<tspan>`, quindi non è
-  il cambio di una costante. `{abstract}` invece è notazione UML legittima e
-  può restare com'è.
+- ~~`{static}` e `{abstract}` si rendono a testo dentro la riga del membro,
+  invece della sottolineatura che UML prescrive per lo statico.~~ **Risolto:**
+  `memberLines` (`src/model/class/members.ts`) torna `MemberLine[]` con un
+  campo `underline: { from, to } | null` calcolato sugli estremi del nome, e
+  `ClassNodeView` (`src/ui/canvas/ClassNode.tsx`) spezza il `<text>` in tre
+  `<tspan>` quando `underline` non è nullo. `{abstract}` resta testo in
+  chiaro, notazione UML legittima.
+- Un utente che scrive nel testo di una nota la sintassi delle entità
+  Mermaid stesse (`#amp;`, `#lt;`, `#gt;`, `#quot;`) verbatim se la vede
+  decodificata in silenzio all'export: `noteText`
+  (`src/io/emit/class-mermaid.ts:201`) non distingue quelle quattro sequenze
+  da quelle che produce lui stesso escapando `&`, `<`, `>`, `"`, e Mermaid le
+  interpreta come se fossero la sua stessa codifica. Escapare anche il `#`
+  eliminerebbe l'ambiguità, ma introdurrebbe una quinta sostituzione nello
+  stesso ordine vincolante delle altre quattro — rinviato perché il caso è
+  un utente che digita sintassi di un altro programma dentro una nota di
+  testo libero.
+- I generici annidati (`Map<string, List<int>>`) non sono rappresentabili in
+  `mermaid@11` in nessuna codifica: misurato, la forma a tilde che emettiamo
+  rende `Map~string, List<int~>` (testo mangled), e la forma nuda
+  renderebbe `Map>` (il contenuto del generico esterno sparisce). Si
+  continua a emettere la forma a tilde con un avviso (`hasNestedGenerics`,
+  `src/io/emit/class-mermaid.ts:94`) perché è comunque la meno peggio, non
+  perché risolva il problema: non c'è niente di meglio da emettere finché
+  Mermaid non cambia.
+- Un tipo con parentesi angolari sbilanciate esce così com'era e viene
+  segnalato nell'avviso aggregato, ma Mermaid alla resa perde comunque il
+  testo dopo la `<` spaiata (misurato: `List<Foo` rende `List`). L'avviso
+  dice che il tipo è sospetto, non che il file esportato lo mostrerà per
+  intero.
+- `mount()` in `src/io/document-io.ts:114` azzera selezione ed editing ma
+  non `session.tool`: passando da un class diagram con lo strumento nota
+  selezionato a un diagramma ER, lo strumento nota resta attivo e un click
+  sul canvas ER non fa nulla (l'ER non ha uno strumento nota). L'hook di
+  interazione tollera lo strumento per design — è lo strumento rimasto
+  incoerente col diagramma il difetto, non l'hook.
+- `NoteEditor` (overlay sul canvas) e la `textarea` di `NoteProperties` nel
+  pannello proprietà (`src/ui/panels/ClassProperties.tsx`) possono montare
+  insieme sullo stesso testo di una nota — doppio click su una nota già
+  selezionata apre entrambi. Il piano lo ha chiesto così (§4 della spec di
+  ampiezza), ma è esattamente la situazione che il commento della stessa
+  `ClassProperties.tsx` scarta per le classi: «due editor per lo stesso dato
+  divergerebbero».
+- In `deleteItems` (`src/editor/kinds/class.ts:58`), una chiave che non è né
+  una classe né una nota finisce comunque in `classKeys` (`!(k in notes)`
+  come unico filtro), invece di essere scartata. Irraggiungibile oggi — le
+  chiavi vengono da `nodeKeys()`, che enumera solo `view.nodes` — ma
+  `rectOf` nella stessa funzione (righe 30-40) usa il pattern difensivo
+  giusto: verifica prima l'appartenenza alle classi, poi alle note, invece
+  di dedurre una delle due per esclusione.
+- Due residui di igiene nei test di `src/editor/class/geometry.test.ts`: il
+  caso «l'associazione non disegna punta» (riga 99) è ora un sottoinsieme
+  del test «l'associazione non navigabile resta nuda, quella navigabile
+  prende la freccia» (riga 116), che asserisce la stessa cosa in più; e la
+  parità fra la freccia dell'associazione navigabile e quella della
+  dipendenza («la freccia dell'associazione navigabile è la stessa della
+  dipendenza», riga 121) è verificata su un solo punto e una sola direzione
+  (`RIGHT`), non sulle quattro che il test della punta di generalizzazione
+  usa poco sopra.
 - L'allineamento a colonne di `memberLines` produce `+ conta()    : int`
   invece di `+ conta(): int`. Rende le righe scansionabili ma non è la forma
   che si vede negli altri strumenti UML.

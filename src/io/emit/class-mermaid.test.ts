@@ -229,4 +229,40 @@ describe("tipi che Mermaid non porta com'è", () => {
     expect(text).toContain("+decimal = 0 campo")
     expect(warnings).toEqual([])
   })
+
+  it("angolari sbilanciate e graffe nello stesso tipo: la graffa si toglie comunque, in entrambi gli avvisi", () => {
+    // La graffa è quella fatale (rompe il parsing dell'intero diagramma): va rimossa anche quando
+    // la traduzione dei generici fallisce, non solo quando riesce.
+    const { text, warnings } = emitClassMermaid(conTipo("List<Foo {x}"))
+    expect(text).toContain("+List<Foo campo")
+    expect(text.split("\n").find((l) => l.includes("campo"))).not.toContain("{")
+    expect(warnings.join(" ")).toContain("sbilanciate")
+    expect(warnings.join(" ")).toContain("graffe")
+    expect(warnings.filter((w) => w.includes("A.campo"))).toHaveLength(2)
+  })
+
+  it("il tipo passa anche da parametro e ritorno di un metodo, non solo dagli attributi", () => {
+    const modello: ClassModel = {
+      classes: {
+        A: {
+          name: "A",
+          stereotype: "class",
+          attributes: [],
+          methods: [{
+            name: "salva",
+            type: "Map<string, int>",
+            visibility: "public",
+            isStatic: false,
+            isAbstract: false,
+            parameters: [{ name: "x", type: "List<Ordine>" }],
+          }],
+        },
+      },
+      relations: {},
+      notes: {},
+    }
+    const { text, warnings } = emitClassMermaid(modello)
+    expect(text).toContain("+salva(List~Ordine~ x) Map~string, int~")
+    expect(warnings).toEqual([])
+  })
 })

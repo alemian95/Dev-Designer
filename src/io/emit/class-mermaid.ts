@@ -85,14 +85,18 @@ function stripBraces(type: string): string {
  * Traduce il tipo di un membro per l'emissione, registrando in `unbalanced`/`braced` il nome
  * completo (`Classe.membro`) di ogni membro coinvolto: sono le liste da cui `emitClassMermaid`
  * costruisce i due avvisi aggregati, uno per tipo di problema e non uno per membro.
+ *
+ * `stripBraces` gira **sempre**, angolari bilanciate o no: la graffa è quella che rompe l'intero
+ * parsing Mermaid, quindi va eliminata anche quando la traduzione dei generici fallisce — un tipo
+ * può comparire in entrambi gli avvisi, non è un bug ma un'informazione in più per chi legge.
  */
 function emittableType(type: string, qualifiedName: string, unbalanced: string[], braced: string[]): string {
+  if (type.includes("{")) braced.push(qualifiedName)
   const tildes = genericsToTildes(type)
   if (tildes === null) {
     unbalanced.push(qualifiedName)
-    return type
+    return stripBraces(type)
   }
-  if (tildes.includes("{")) braced.push(qualifiedName)
   return stripBraces(tildes)
 }
 

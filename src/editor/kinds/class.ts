@@ -47,7 +47,8 @@ export function classOps(doc: DevDocument): DiagramOps {
 
     addEdge: (source, target) => addRelation(diagram().model.relations, source, target),
 
-    deleteItems: (nodeKeys, edgeKeys) => deleteClassItems(nodeKeys, edgeKeys),
+    // `[]` è provvisorio: nodeKeys mescola classi e note, e la separazione arriva nel Task 4.
+    deleteItems: (nodeKeys, edgeKeys) => deleteClassItems(nodeKeys, edgeKeys, []),
 
     duplicateNodes: (keys) => duplicateClasses(diagram().model, keys),
 

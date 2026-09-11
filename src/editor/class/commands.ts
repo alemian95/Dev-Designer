@@ -109,8 +109,37 @@ export function updateRelation(key: string, mutate: (r: ClassRelation) => void):
   }
 }
 
-export function deleteClassItems(classKeys: readonly string[], relationKeys: readonly string[]): Recipe | null {
-  if (classKeys.length === 0 && relationKeys.length === 0) return null
+/**
+ * Nuova nota vuota. La chiave è un uuid e non deriva dal testo: il testo cambia a ogni battitura,
+ * e una chiave che lo segue farebbe di ogni carattere una rinomina (§4 della spec).
+ */
+export function addNote(at: Point): { key: string; recipe: Recipe } {
+  const key = crypto.randomUUID()
+  return {
+    key,
+    recipe: (draft) => {
+      const d = classDiagram(draft)
+      d.model.notes[key] = { text: "" }
+      d.view.nodes[key] = { x: snap(at.x), y: snap(at.y), collapsed: false }
+    },
+  }
+}
+
+export function setNoteText(key: string, text: string): Recipe {
+  return (draft) => {
+    const note = classDiagram(draft).model.notes[key]
+    // Si scrive solo se cambia davvero: riaprire e richiudere l'editor senza toccare niente
+    // lascerebbe altrimenti una voce di undo fantasma.
+    if (note && note.text !== text) note.text = text
+  }
+}
+
+export function deleteClassItems(
+  classKeys: readonly string[],
+  relationKeys: readonly string[],
+  noteKeys: readonly string[],
+): Recipe | null {
+  if (classKeys.length === 0 && relationKeys.length === 0 && noteKeys.length === 0) return null
   const classes = new Set(classKeys)
   return (draft) => {
     const d = classDiagram(draft)
@@ -122,21 +151,31 @@ export function deleteClassItems(classKeys: readonly string[], relationKeys: rea
       delete d.model.classes[key]
       delete d.view.nodes[key]
     }
+    // Le note non hanno archi: nessuna relazione da ripulire di rimbalzo.
+    for (const key of noteKeys) {
+      delete d.model.notes[key]
+      delete d.view.nodes[key]
+    }
   }
 }
 
-/** Copia le classi con suffisso `_2`/`_3` di `uniqueKey`; le relazioni non si duplicano. */
+/** Copia le classi con suffisso `_2`/`_3` di `uniqueKey`, e le note con un uuid nuovo; le relazioni non si duplicano. */
 export function duplicateClasses(model: ClassModel, keys: readonly string[]): { keys: string[]; recipe: Recipe } {
   const taken: Record<string, true> = Object.fromEntries(Object.keys(model.classes).map((k) => [k, true]))
   const plan: { from: string; to: string }[] = []
+  const notePlan: { from: string; to: string }[] = []
   for (const from of keys) {
-    if (!(from in model.classes)) continue
-    const to = uniqueKey(taken, from)
-    taken[to] = true
-    plan.push({ from, to })
+    if (from in model.classes) {
+      const to = uniqueKey(taken, from)
+      taken[to] = true
+      plan.push({ from, to })
+    } else if (from in model.notes) {
+      // Una nota non ha nome, quindi niente `uniqueKey` col suffisso `_2`: un uuid nuovo.
+      notePlan.push({ from, to: crypto.randomUUID() })
+    }
   }
   return {
-    keys: plan.map((p) => p.to),
+    keys: [...plan.map((p) => p.to), ...notePlan.map((p) => p.to)],
     recipe: (draft) => {
       const d = classDiagram(draft)
       for (const { from, to } of plan) {
@@ -149,6 +188,17 @@ export function duplicateClasses(model: ClassModel, keys: readonly string[]): { 
           attributes: cls.attributes.map((a) => ({ ...a })),
           methods: cls.methods.map((m) => ({ ...m })),
         }
+        d.view.nodes[to] = {
+          x: (view?.x ?? 0) + DUPLICATE_OFFSET,
+          y: (view?.y ?? 0) + DUPLICATE_OFFSET,
+          collapsed: view?.collapsed ?? false,
+        }
+      }
+      for (const { from, to } of notePlan) {
+        const note = d.model.notes[from]
+        const view = d.view.nodes[from]
+        if (!note) continue
+        d.model.notes[to] = { ...note }
         d.view.nodes[to] = {
           x: (view?.x ?? 0) + DUPLICATE_OFFSET,
           y: (view?.y ?? 0) + DUPLICATE_OFFSET,

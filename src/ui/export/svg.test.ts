@@ -189,6 +189,7 @@ function classDiagram(): ClassDiagram {
           target: { class: "Persona", multiplicity: "", role: "" },
         },
       },
+      notes: {},
     },
     view: {
       nodes: {
@@ -298,7 +299,7 @@ describe("buildSvg (class diagram)", () => {
   })
 
   it("restituisce null su un diagramma senza classi: non c'è niente da esportare", () => {
-    const empty = { type: "class", model: { classes: {}, relations: {} }, view: { nodes: {} } } as ClassDiagram
+    const empty = { type: "class", model: { classes: {}, relations: {}, notes: {} }, view: { nodes: {} } } as ClassDiagram
     expect(buildSvg(empty, { vars })).toBeNull()
   })
 

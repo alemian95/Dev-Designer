@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { DocumentSchema } from "../document"
 import { createErDocument } from "../er/schema"
 import { SCHEMA_VERSION } from "../shared"
-import { ClassDiagramSchema, createClassDocument } from "./schema"
+import { ClassDiagramSchema, ClassModelSchema, ClassRelationSchema, createClassDocument } from "./schema"
 
 /** Un diagramma di classi minimo con due classi e una relazione fra loro.
  *  `patch` sovrascrive campi della relazione, per provare i casi rifiutati. */
@@ -22,6 +22,7 @@ function diagrammaConRelazione(patch: Record<string, unknown>) {
           ...patch,
         },
       },
+      notes: {},
     },
     view: { nodes: {} },
   }
@@ -41,7 +42,7 @@ describe("schema del class diagram", () => {
   it("uno stereotipo fuori dai quattro è rifiutato", () => {
     const r = ClassDiagramSchema.safeParse({
       type: "class",
-      model: { classes: { X: { name: "X", stereotype: "trait", attributes: [], methods: [] } }, relations: {} },
+      model: { classes: { X: { name: "X", stereotype: "trait", attributes: [], methods: [] } }, relations: {}, notes: {} },
       view: { nodes: {} },
     })
     expect(r.success).toBe(false)
@@ -67,8 +68,33 @@ describe("schema del class diagram", () => {
   it("i documenti ER continuano a validare: la union è allargata, non cambiata", () => {
     const er = createErDocument("prova")
     expect(DocumentSchema.safeParse(er).success).toBe(true)
-    // Nessuna migrazione: se questa riga cambia, ogni file già salvato va migrato.
-    expect(SCHEMA_VERSION).toBe(1)
+    // La versione è quella corrente: la migrazione 1 → 2 tocca solo il class diagram.
+    expect(SCHEMA_VERSION).toBe(2)
     expect(er.schemaVersion).toBe(SCHEMA_VERSION)
+  })
+})
+
+describe("note e navigabilità", () => {
+  it("un modello senza notes non passa più", () => {
+    const senza = { classes: {}, relations: {} }
+    expect(ClassModelSchema.safeParse(senza).success).toBe(false)
+  })
+
+  it("una nota è testo libero, anche vuoto e multiriga", () => {
+    const modello = { classes: {}, relations: {}, notes: { n1: { text: "" }, n2: { text: "prima\nseconda" } } }
+    expect(ClassModelSchema.parse(modello).notes.n2!.text).toBe("prima\nseconda")
+  })
+
+  it("navigable è opzionale: una relazione senza il campo resta valida", () => {
+    const rel = { kind: "association", source: { class: "A", multiplicity: "", role: "" }, target: { class: "B", multiplicity: "", role: "" } }
+    const parsed = ClassRelationSchema.parse(rel)
+    expect(parsed.navigable).toBeUndefined()
+    expect(ClassRelationSchema.parse({ ...rel, navigable: true }).navigable).toBe(true)
+  })
+
+  it("createClassDocument nasce con notes vuoto e alla versione corrente", () => {
+    const doc = createClassDocument("Prova", "id-fisso")
+    expect(doc.diagram.model.notes).toEqual({})
+    expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })

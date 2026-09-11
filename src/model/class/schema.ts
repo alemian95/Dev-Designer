@@ -66,6 +66,9 @@ export type ClassEnd = z.infer<typeof ClassEndSchema>
 export const ClassRelationSchema = z.object({
   kind: RelationKindSchema,
   name: z.string().optional(),
+  /** Solo per `association`: il `target` è raggiungibile dal `source`. Assente = non navigabile,
+   *  che è il comportamento di sempre — per questo è opzionale e non richiede una migrazione. */
+  navigable: z.boolean().optional(),
   /** Il figlio: sottoclasse, implementatore, parte, dipendente. */
   source: ClassEndSchema,
   /** Il padre: superclasse, interfaccia, tutto, dipendenza. */
@@ -83,12 +86,21 @@ export type ClassRelation = z.infer<typeof ClassRelationSchema>
 // - Il rombo della composizione va sul *tutto*, che è il `target`. È l'errore che
 //   si fa di solito, e la convenzione lo risolve prima che si presenti (§7).
 
+/**
+ * Una nota è testo libero appoggiato sul canvas. Nessun campo di ancoraggio: §2 della spec taglia
+ * `note for Cliente`, che sembra una riga tratteggiata e invece è un arco.
+ */
+export const ClassNoteSchema = z.object({ text: z.string() })
+export type ClassNote = z.infer<typeof ClassNoteSchema>
+
 // Nessun `.refine` sulla coerenza fra chiave e nome: qui la chiave è il nome, e
 // un refine sarebbe una tautologia che costa un errore di validazione a ogni
 // rinomina in corso (l'ER ce l'ha perché la sua chiave è composta, `schema.nome`).
 export const ClassModelSchema = z.object({
   classes: z.record(z.string(), ClassNodeSchema),
   relations: z.record(z.string(), ClassRelationSchema),
+  /** Chiave = uuid, non il testo: una nota non ha nome, e il testo cambia a ogni battitura. */
+  notes: z.record(z.string(), ClassNoteSchema),
 })
 export type ClassModel = z.infer<typeof ClassModelSchema>
 
@@ -108,6 +120,6 @@ export function createClassDocument(name: string, id: string = crypto.randomUUID
     schemaVersion: SCHEMA_VERSION,
     id,
     name,
-    diagram: { type: "class", model: { classes: {}, relations: {} }, view: { nodes: {} } },
+    diagram: { type: "class", model: { classes: {}, relations: {}, notes: {} }, view: { nodes: {} } },
   }
 }

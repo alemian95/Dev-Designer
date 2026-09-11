@@ -22,12 +22,13 @@ function modello(relazione: ClassRelation): ClassModel {
   return {
     classes: { Figlio: classe("Figlio"), Padre: classe("Padre") },
     relations: { r: relazione },
+    notes: {},
   }
 }
 
 /** Un modello con una sola classe dal nome anomalo, nessuna relazione. */
 function modelloCon(nome: string): ClassModel {
-  return { classes: { [nome]: classe(nome) }, relations: {} }
+  return { classes: { [nome]: classe(nome) }, relations: {}, notes: {} }
 }
 
 /**
@@ -40,6 +41,7 @@ function emitten(text: string): string {
   const model: ClassModel = {
     classes: { C: { name: "C", stereotype: "class", attributes: parsed.value.attributes, methods: parsed.value.methods } },
     relations: {},
+    notes: {},
   }
   return emitClassMermaid(model).text
 }
@@ -110,6 +112,7 @@ describe("emitClassMermaid: i membri", () => {
     const m: ClassModel = {
       classes: { E: classe("E", "enum"), C: classe("C", "class") },
       relations: {},
+      notes: {},
     }
     const { text } = emitClassMermaid(m)
     expect(text).toContain("<<Enumeration>>")

@@ -4,11 +4,24 @@ type RawDocument = Record<string, unknown>
 export type Migration = (raw: RawDocument) => RawDocument
 
 /**
+ * 1 → 2: il class diagram guadagna `model.notes`, obbligatorio. Tocca **solo** i diagrammi di
+ * tipo `class`: un ER non ha un `ClassModel` e aggiungergli il campo gli farebbe fallire lo schema.
+ */
+const addClassNotes: Migration = (raw) => {
+  const diagram = raw.diagram
+  if (diagram === null || typeof diagram !== "object") return raw
+  const d = diagram as Record<string, unknown>
+  if (d.type !== "class") return raw
+  const model = d.model
+  if (model === null || typeof model !== "object") return raw
+  return { ...raw, diagram: { ...d, model: { ...(model as Record<string, unknown>), notes: {} } } }
+}
+
+/**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
- * Oggi vuota: la versione 1 è la prima.
  */
-const migrations: ReadonlyMap<number, Migration> = new Map()
+const migrations: ReadonlyMap<number, Migration> = new Map([[1, addClassNotes]])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }
 

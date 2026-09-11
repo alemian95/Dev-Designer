@@ -12,6 +12,7 @@ function modello(classi: ClassNode[], relazioni: ClassRelation[] = []): ClassMod
   return {
     classes: Object.fromEntries(classi.map((c) => [c.name, c])),
     relations: Object.fromEntries(relazioni.map((r, i) => [`r${i}`, r])),
+    notes: {},
   }
 }
 

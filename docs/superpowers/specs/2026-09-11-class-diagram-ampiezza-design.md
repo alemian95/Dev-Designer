@@ -26,14 +26,14 @@ dimenticanza: cambia `rectOf` e i bounds, cambia il drag — trascinare un
 contenitore muove il contenuto — obbliga ELK a un layout gerarchico e obbliga
 `buildSvg` a inquadrare i contenitori. Vale una spec sua.
 
-**La nota non si ancora a una classe.** Vedi §3: `note for Cliente` sembra una
-riga tratteggiata e invece è un arco, con le conseguenze che §3 elenca.
+**La nota non si ancora a una classe.** Vedi §4: `note for Cliente` sembra una
+riga tratteggiata e invece è un arco, con le conseguenze che §4 elenca.
 
 **I valori di default e le property string non diventano campi del modello.**
-Restano testo dentro il tipo, come sono oggi. §5 si limita a non mentire su di
+Restano testo dentro il tipo, come sono oggi. §6 si limita a non mentire su di
 loro in export.
 
-## 3. Le misure su cui poggia la §5
+## 3. Le misure su cui poggia la §6
 
 La §9 del documento madre dice che la sintassi Mermaid viene dalla
 documentazione corrente e non dalla memoria. Qui si va oltre: la
@@ -55,7 +55,7 @@ Due conseguenze, entrambe contro la documentazione:
 
 - **I generici con la virgola funzionano.** La pagina di Mermaid dice che i
   generici separati da virgola non sono supportati; `Map~string, int~` rende
-  `Map<string, int>`. La regola di §5 non ha quindi un caso speciale per la
+  `Map<string, int>`. La regola di §6 non ha quindi un caso speciale per la
   virgola.
 - **Una sola graffa in un tipo non rompe la propria riga: rompe l'intero
   export.** L'errore è `Expecting 'STRUCT_STOP', 'MEMBER', got

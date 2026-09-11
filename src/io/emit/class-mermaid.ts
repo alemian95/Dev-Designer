@@ -100,6 +100,16 @@ function relationLine(rel: ClassRelation, renamed: Map<string, string>): string 
   return `  ${parts.join(" ")}${label}`
 }
 
+/**
+ * Testo di una nota dentro `note "…"`. Due sostituzioni, entrambe deterministiche: l'a capo vero
+ * romperebbe la riga, la virgoletta doppia chiuderebbe la stringa. L'entità `#quot;` che Mermaid
+ * documenta altrove **non è stata misurata dentro una `note`** (§4 della spec): finché non lo è,
+ * non si emette una sintassi sperata.
+ */
+function noteText(text: string): string {
+  return text.replaceAll('"', "'").replaceAll("\n", "\\n")
+}
+
 /** Il blocco `class Nome { ... }`: stereotipo (se annotato) poi attributi poi metodi. */
 function classBlock(node: ClassNode, name: string): string[] {
   const lines = [`  class ${name} {`]
@@ -129,6 +139,12 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
 
   for (const key of Object.keys(model.classes).sort()) {
     out.push(...classBlock(model.classes[key]!, safeName(key, renamed)))
+  }
+
+  for (const key of Object.keys(model.notes).sort()) {
+    const text = model.notes[key]!.text
+    // Una nota vuota non ha niente da dire: `note ""` è rumore nel file emesso.
+    if (text !== "") out.push(`  note "${noteText(text)}"`)
   }
 
   const warnings: string[] = []

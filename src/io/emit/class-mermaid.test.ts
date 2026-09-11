@@ -128,3 +128,30 @@ describe("emitClassMermaid: nomi che Mermaid non prende nudi", () => {
     expect(warnings[0]).toMatch(/1 nom/i)
   })
 })
+
+describe("note", () => {
+  const modello = (notes: Record<string, { text: string }>) => ({ classes: {}, relations: {}, notes })
+
+  it("una nota diventa una riga note, fuori da qualunque blocco class", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: "da rivedere" } }))
+    expect(text).toContain('note "da rivedere"')
+    expect(text).not.toContain("class {")
+  })
+
+  it("gli a capo veri diventano \\n letterali", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: "prima\nseconda" } }))
+    expect(text).toContain('note "prima\\nseconda"')
+    // Una riga sola nell'output: l'a capo vero romperebbe la sintassi.
+    expect(text.split("\n").filter((l) => l.includes("note ")).length).toBe(1)
+  })
+
+  it("le virgolette doppie diventano singole, o chiuderebbero la stringa", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: 'il campo "id"' } }))
+    expect(text).toContain(`note "il campo 'id'"`)
+  })
+
+  it("una nota vuota non produce nessuna riga", () => {
+    const { text } = emitClassMermaid(modello({ "n-1": { text: "" } }))
+    expect(text).not.toContain("note ")
+  })
+})

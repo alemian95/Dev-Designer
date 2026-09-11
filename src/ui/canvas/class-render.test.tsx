@@ -16,13 +16,13 @@ const cliente: ClassNode = {
  *  test: nel modello vivono dentro i due estremi. */
 function relazione(
   kind: RelationKind,
-  over: { name?: string; sourceMult?: string; targetMult?: string } = {},
+  over: { name?: string; sourceMult?: string; targetMult?: string; sourceRole?: string; targetRole?: string } = {},
 ): ClassRelation {
   return {
     kind,
     ...(over.name === undefined ? {} : { name: over.name }),
-    source: { class: "Cliente", multiplicity: over.sourceMult ?? "", role: "" },
-    target: { class: "Persona", multiplicity: over.targetMult ?? "", role: "" },
+    source: { class: "Cliente", multiplicity: over.sourceMult ?? "", role: over.sourceRole ?? "" },
+    target: { class: "Persona", multiplicity: over.targetMult ?? "", role: over.targetRole ?? "" },
   }
 }
 
@@ -110,6 +110,27 @@ describe("ClassEdgeView", () => {
     const html = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={conMolt} {...rects} selected={false} />)
     expect(html).toContain("data-edge-source-label")
     expect(html).toContain(">0..*<")
+  })
+
+  it("il ruolo si rende accanto alla molteplicità, nella stessa etichetta", () => {
+    // Una sola etichetta per capo e non due: la molteplicità e il ruolo condividono il `<text>`,
+    // così la geometria non guadagna due punti né il drag due `querySelector` per arco.
+    const html = renderToStaticMarkup(
+      <ClassEdgeView edgeKey="r" relation={relazione("association", { sourceMult: "0..*", sourceRole: "ordini" })} {...rects} selected={false} />,
+    )
+    expect(html).toContain(">0..* ordini<")
+  })
+
+  it("un capo con il solo ruolo ha comunque la sua etichetta", () => {
+    // È il caso che prima si perdeva: il ruolo si scriveva nel pannello, finiva nel file salvato
+    // e non compariva da nessuna parte.
+    const html = renderToStaticMarkup(
+      <ClassEdgeView edgeKey="r" relation={relazione("association", { targetRole: "titolare" })} {...rects} selected={false} />,
+    )
+    expect(html).toContain("data-edge-target-label")
+    expect(html).toContain(">titolare<")
+    // Il capo senza né molteplicità né ruolo resta senza elemento, come prima.
+    expect(html).not.toContain("data-edge-source-label")
   })
 
   it("l'etichetta del nome compare solo se il nome c'è", () => {

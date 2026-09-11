@@ -1,5 +1,5 @@
 import { memberLines } from "@/model/class/members"
-import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
+import type { ClassEnd, ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import type { NodeView } from "@/model/shared"
 import { pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Point, type Rect, type Size } from "../geometry"
@@ -96,8 +96,61 @@ export function isFilled(kind: RelationKind): boolean {
   return kind === "composition"
 }
 
-/** Distanza lungo l'edge a cui piazzare l'etichetta di molteplicità, sullo stesso lato del marker. */
-const END_LABEL_OFFSET = 14
+/**
+ * Distanza lungo l'edge a cui piazzare l'etichetta di un capo, sullo stesso lato del marker.
+ * Deve superare il marker più lungo — il rombo, `DIAMOND_LEN` — il cui apice tocca il bordo del
+ * nodo: a 14 l'etichetta del target cadeva dentro il rombo e ne usciva mangiata.
+ */
+const END_LABEL_OFFSET = DIAMOND_LEN + 8
+
+/** Stacco fra l'etichetta di un capo e la linea dell'arco. */
+const END_LABEL_GAP = 5
+
+/** `fontSize` delle etichette dei capi in `ClassEdgeView`, e larghezza del suo carattere: il font
+ *  è monospace con avanzamento 0,6 em, la stessa assunzione di `CHAR_W` (`editor/geometry.ts`). */
+const END_LABEL_FONT = 11
+const END_LABEL_CHAR_W = END_LABEL_FONT * 0.6
+
+/**
+ * Testo dell'etichetta di un capo: molteplicità e ruolo nello stesso testo, separati da uno
+ * spazio, e ciascuna delle due metà può mancare.
+ *
+ * **Una sola etichetta per capo e non due.** La collocazione UML rigorosa mette il ruolo
+ * sull'altro lato della linea rispetto alla molteplicità, ma due etichette per capo vorrebbero
+ * due punti in più in `EdgeGeometry` e due `querySelector` per arco su ogni frame del drag — il
+ * costo che la §7 della spec mette per iscritto come cosa da non aggiungere alla leggera.
+ *
+ * Vuota quando il capo non ha né molteplicità né ruolo: `classEdgeGeometry` e `ClassEdgeView` la
+ * usano entrambi come condizione, così geometria e render decidono sullo stesso valore.
+ */
+export function endLabel(end: ClassEnd): string {
+  return [end.multiplicity, end.role].filter(Boolean).join(" ")
+}
+
+/**
+ * Punto a cui ancorare l'etichetta di un capo. `at` sta sul bordo del nodo, `dir` è il versore che
+ * ne esce lungo l'edge — stessa convenzione di `umlMarkerPath`.
+ *
+ * Il testo è centrato sul proprio punto (`textAnchor="middle"` in `ClassEdgeView`), quindi ogni
+ * scarto conta una **semilarghezza** oltre al distacco vero: la semilarghezza si calcola e non si
+ * indovina, perché il font è monospace. Dove va lo scarto dipende dalla direzione:
+ *
+ * - arco orizzontale: la semilarghezza va lungo l'arco, altrimenti un'etichetta lunga rientra nel
+ *   rettangolo del proprio nodo e ne esce tagliata. Perpendicolarmente il testo scende **sotto**
+ *   la linea, perché sopra c'è già il nome della relazione (`label.y - 6` in `ClassEdgeView`): su
+ *   due nodi vicini le tre etichette condividerebbero la stessa fascia di pixel.
+ * - arco verticale: la linea passerebbe in mezzo alle lettere, quindi la semilarghezza va di lato
+ *   e lungo l'arco resta il solo `END_LABEL_OFFSET`, che già scavalca il marker.
+ */
+function endPoint(at: Point, dir: Dir, label: string): Point {
+  const half = (label.length * END_LABEL_CHAR_W) / 2
+  if (dir.y !== 0) {
+    return { x: at.x + END_LABEL_GAP + half, y: at.y + dir.y * END_LABEL_OFFSET }
+  }
+  // La base del testo va sotto la linea di uno stacco più l'altezza delle maiuscole, altrimenti
+  // «sotto la linea» sarebbe la base e le lettere starebbero ancora sopra.
+  return { x: at.x + dir.x * (END_LABEL_OFFSET + half), y: at.y + END_LABEL_GAP + END_LABEL_FONT * 0.75 }
+}
 
 /**
  * Tutta la geometria di un arco fra classi, da due rettangoli e la relazione — stesso ruolo di
@@ -107,12 +160,12 @@ const END_LABEL_OFFSET = 14
  * arco, quindi la composizione vive qui una volta sola.
  *
  * Un solo marker per arco, e cade sempre sul `target` — contratto di `umlMarkerPath`: il `source`
- * resta nudo. `sourceEnd`/`targetEnd` si calcolano *in coppia*: se almeno un estremo ha una
- * molteplicità, li popola entrambi, anche quando l'altro estremo è vuoto e quindi `ClassEdgeView`
- * non renderà mai la sua etichetta (rende ciascuna solo se la propria molteplicità non è vuota).
- * Non è un problema: `setEdgeGeometry`/`positionLabel` (`dom-registry.ts`) aggiornano solo
- * l'elemento che trovano nel DOM e non fanno nulla se manca, quindi il capo senza etichetta non
- * viene mai toccato davvero — il calcolo in più è innocuo, non un bug da evitare.
+ * resta nudo. `sourceEnd`/`targetEnd` si calcolano *in coppia*: se almeno un capo ha qualcosa da
+ * mostrare (`endLabel`), li popola entrambi, anche quando l'altro è vuoto e quindi
+ * `ClassEdgeView` non renderà mai la sua etichetta (rende ciascuna solo se la propria `endLabel`
+ * non è vuota). Non è un problema: `setEdgeGeometry`/`positionLabel` (`dom-registry.ts`)
+ * aggiornano solo l'elemento che trovano nel DOM e non fanno nulla se manca, quindi il capo senza
+ * etichetta non viene mai toccato davvero — il calcolo in più è innocuo, non un bug da evitare.
  */
 export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRelation): EdgeGeometry {
   const route = routeEdge(source, target)
@@ -128,9 +181,11 @@ export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRel
     targetMarker: umlMarkerPath(to, route.targetDir, relation.kind),
     label: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
   }
-  if (relation.source.multiplicity || relation.target.multiplicity) {
-    geo.sourceEnd = { x: from.x + route.sourceDir.x * END_LABEL_OFFSET, y: from.y + route.sourceDir.y * END_LABEL_OFFSET }
-    geo.targetEnd = { x: to.x + route.targetDir.x * END_LABEL_OFFSET, y: to.y + route.targetDir.y * END_LABEL_OFFSET }
+  const sourceLabel = endLabel(relation.source)
+  const targetLabel = endLabel(relation.target)
+  if (sourceLabel || targetLabel) {
+    geo.sourceEnd = endPoint(from, route.sourceDir, sourceLabel)
+    geo.targetEnd = endPoint(to, route.targetDir, targetLabel)
   }
   return geo
 }

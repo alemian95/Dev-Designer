@@ -231,6 +231,15 @@ describe("buildSvg (class diagram)", () => {
     expect(bg).toContain(`fill="${vars["--background"]}"`)
   })
 
+  it("porta nell'export molteplicità e ruolo dei capi", () => {
+    // L'export monta la stessa vista del canvas, ma è l'immagine che esce dall'app: se il ruolo
+    // si vedesse solo a schermo e non qui, la perdita sarebbe silenziosa.
+    const d = classDiagram()
+    d.model.relations.cliente_persona!.source = { class: "Cliente", multiplicity: "0..*", role: "sottoposti" }
+    const svg = buildSvg(d, { vars })!
+    expect(svg).toContain(">0..* sottoposti<")
+  })
+
   it("risolve le variabili CSS in valori letterali", () => {
     const svg = buildSvg(classDiagram(), { vars })!
     expect(svg).not.toContain("var(--")

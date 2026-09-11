@@ -2,7 +2,7 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
-import { classEdgeGeometry, classRect, isDashed, isFilled } from "@/editor/class/geometry"
+import { classEdgeGeometry, classRect, endLabel, isDashed, isFilled } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import type { Rect } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
@@ -20,6 +20,10 @@ interface Props {
 export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, source, target, selected }: Props) {
   const geo = classEdgeGeometry(source, target, relation)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
+  // Molteplicità e ruolo nella stessa etichetta, una per capo: `endLabel` è la stessa funzione su
+  // cui `classEdgeGeometry` decide se popolare i punti, così render e geometria non divergono.
+  const sourceLabel = endLabel(relation.source)
+  const targetLabel = endLabel(relation.target)
   return (
     <g
       data-edge-id={edgeKey}
@@ -32,14 +36,14 @@ export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, so
       <path data-edge-line d={geo.d} fill="none" stroke={stroke} strokeWidth={selected ? 2 : 1.5} strokeDasharray={isDashed(relation.kind) ? "6 4" : undefined} />
       <path data-edge-source d={geo.sourceMarker} fill="none" stroke={stroke} strokeWidth={1.5} />
       <path data-edge-target d={geo.targetMarker} fill={isFilled(relation.kind) ? stroke : "none"} stroke={stroke} strokeWidth={1.5} />
-      {relation.source.multiplicity && geo.sourceEnd && (
+      {sourceLabel && geo.sourceEnd && (
         <text data-edge-source-label x={geo.sourceEnd.x} y={geo.sourceEnd.y} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
-          {relation.source.multiplicity}
+          {sourceLabel}
         </text>
       )}
-      {relation.target.multiplicity && geo.targetEnd && (
+      {targetLabel && geo.targetEnd && (
         <text data-edge-target-label x={geo.targetEnd.x} y={geo.targetEnd.y} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
-          {relation.target.multiplicity}
+          {targetLabel}
         </text>
       )}
       {relation.name && (

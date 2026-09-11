@@ -34,6 +34,22 @@ describe("routeEdge", () => {
     expect(r.points).toHaveLength(5)
     expect(r.targetDir).toEqual({ x: 0, y: -1 })
   })
+
+  it("il cappio non attacca al centro dei lati, dove attaccano tutti gli altri archi", () => {
+    const a = { x: 0, y: 0, w: 100, h: 50 }
+    const r = routeEdge(a, a)
+    const primo = r.points[0]!
+    const ultimo = r.points[r.points.length - 1]!
+    // Ogni altro arco che tocca questo nodo attacca al centro del lato — (100, 25) a destra,
+    // (50, 0) in alto, come mostrano i tre casi qui sopra. Un cappio che partisse da lì
+    // finirebbe esattamente sotto la punta di quell'arco.
+    expect(primo).not.toEqual({ x: 100, y: 25 })
+    expect(ultimo).not.toEqual({ x: 50, y: 0 })
+    // Resta comunque sul lato destro e su quello superiore: sono i lati che `sourceDir` e
+    // `targetDir` dichiarano, e il marker vi si appoggia.
+    expect(primo.x).toBe(100)
+    expect(ultimo.y).toBe(0)
+  })
 })
 
 describe("crowsFootPath", () => {

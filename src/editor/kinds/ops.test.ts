@@ -140,3 +140,51 @@ function docClass(): DevDocument {
 }
 
 verificaContrattoOps("class", docClass)
+
+describe("classOps e le note", () => {
+  /** Documento con una classe e una nota, entrambe con una view. Nomi inventati. */
+  function docConNota() {
+    const doc = createClassDocument("Prova", "doc-1")
+    doc.diagram.model.classes.Cliente = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+    doc.diagram.view.nodes.Cliente = { x: 0, y: 0, collapsed: false }
+    doc.diagram.model.notes["n-1"] = { text: "promemoria" }
+    doc.diagram.view.nodes["n-1"] = { x: 300, y: 0, collapsed: false }
+    return doc
+  }
+
+  it("nodeKeys elenca classi e note insieme: leggono entrambe da view.nodes", () => {
+    expect(opsFor(docConNota()).nodeKeys().sort()).toEqual(["Cliente", "n-1"])
+  })
+
+  it("rectOf risolve una chiave di nota, non solo una di classe", () => {
+    const ops = opsFor(docConNota())
+    expect(ops.rectOf("n-1")).not.toBeNull()
+    expect(ops.rectOf("n-1")!.x).toBe(300)
+    expect(ops.rectOf("assente")).toBeNull()
+  })
+
+  it("rectOf su una nota rispetta `at`, che serve all'anteprima del drag", () => {
+    expect(opsFor(docConNota()).rectOf("n-1", { x: 10, y: 20 })!.x).toBe(10)
+  })
+
+  it("edgesTouching non trova niente per una nota: non ha archi", () => {
+    expect(opsFor(docConNota()).edgesTouching(new Set(["n-1"]))).toEqual([])
+  })
+
+  it("layoutGraph esclude le note: senza archi ELK le piazzerebbe dove capita", () => {
+    const g = opsFor(docConNota()).layoutGraph()
+    expect(g.nodes.map((n) => n.id)).toEqual(["Cliente"])
+  })
+
+  it("deleteItems separa le chiavi di nota da quelle di classe: cancella entrambe", () => {
+    const doc = docConNota()
+    const recipe = opsFor(doc).deleteItems(["Cliente", "n-1"], [])
+    expect(recipe).not.toBeNull()
+    recipe!(doc)
+    expect(opsFor(doc).nodeKeys()).toEqual([])
+    // `nodeKeys` da sola non basterebbe: una divisione sbagliata (come la riga provvisoria
+    // del Task 3) svuota comunque `view.nodes`, ma lascia la nota orfana in `model.notes`.
+    expect(doc.diagram.model.notes["n-1"]).toBeUndefined()
+    expect(doc.diagram.model.classes.Cliente).toBeUndefined()
+  })
+})

@@ -10,7 +10,7 @@ import {
   deleteClassItems,
   duplicateClasses,
 } from "../class/commands"
-import { classEdgeGeometry, classRect } from "../class/geometry"
+import { classEdgeGeometry, classRect, noteRect } from "../class/geometry"
 import type { EdgeGeometry } from "../edge-routing"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
@@ -27,10 +27,15 @@ export function classOps(doc: DevDocument): DiagramOps {
     nodeKeys: () => Object.keys(diagram().view.nodes),
 
     rectOf: (key, at) => {
-      const cls = diagram().model.classes[key]
       const view = diagram().view.nodes[key]
-      if (!cls || !view) return null
-      return classRect(cls, at ? { ...view, ...at } : view)
+      if (!view) return null
+      const at_ = at ? { ...view, ...at } : view
+      const cls = diagram().model.classes[key]
+      if (cls) return classRect(cls, at_)
+      // `view.nodes` è lo spazio di chiavi condiviso fra classi e note (§4 della spec): una chiave
+      // che non è una classe può essere una nota, e solo qui si sa quale delle due.
+      const note = diagram().model.notes[key]
+      return note ? noteRect(note, at_) : null
     },
 
     edgesTouching: (keys): EdgeEnds[] =>
@@ -47,11 +52,17 @@ export function classOps(doc: DevDocument): DiagramOps {
 
     addEdge: (source, target) => addRelation(diagram().model.relations, source, target),
 
-    // `[]` è provvisorio: nodeKeys mescola classi e note, e la separazione arriva nel Task 4.
-    deleteItems: (nodeKeys, edgeKeys) => deleteClassItems(nodeKeys, edgeKeys, []),
+    deleteItems: (nodeKeys, edgeKeys) => {
+      const notes = diagram().model.notes
+      const noteKeys = nodeKeys.filter((k) => k in notes)
+      const classKeys = nodeKeys.filter((k) => !(k in notes))
+      return deleteClassItems(classKeys, edgeKeys, noteKeys)
+    },
 
     duplicateNodes: (keys) => duplicateClasses(diagram().model, keys),
 
+    // Le note restano fuori dal grafo: non hanno archi, e ELK le piazzerebbe lontano da ciò che
+    // annotano. «Disponi» le lascia dove sono — il prezzo dichiarato di non averle ancorate (§4).
     layoutGraph: (): LayoutGraph => classLayoutGraph(diagram()),
 
     validate: (): Issue[] => validateClass(diagram().model),

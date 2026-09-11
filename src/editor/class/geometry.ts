@@ -56,9 +56,11 @@ export const NOTE_FOLD = 12
 const NOTE_PAD_Y = 6
 
 /**
- * Dimensione di una nota, con la stessa formula di `classSize` (§6 del documento madre): larghezza
- * dal carattere più lungo arrotondata alla griglia, altezza dal numero di righe. Il minimo è metà
- * di quello di una classe — una nota vuota deve restare cliccabile, non larga quanto una classe.
+ * Dimensione di una nota, sulla falsariga di `classSize` (§6 del documento madre): larghezza dal
+ * carattere più lungo arrotondata alla griglia, altezza dal numero di righe. A differenza di
+ * `classSize`, la larghezza aggiunge `NOTE_FOLD`: senza quello spazio la piega dell'angolo
+ * morderebbe l'ultimo carattere della riga più lunga. Il minimo è metà di quello di una classe —
+ * una nota vuota deve restare cliccabile, non larga quanto una classe.
  */
 export function noteSize(note: ClassNote): Size {
   const lines = note.text.split("\n")

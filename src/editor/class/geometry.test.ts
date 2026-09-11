@@ -3,7 +3,7 @@ import { memberLines } from "@/model/class/members"
 import type { ClassNode, ClassRelation } from "@/model/class/schema"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Rect } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
-import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, notePath, noteSize, NOTE_FOLD, STEREO_H, umlMarkerPath } from "./geometry"
+import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, notePath, noteSize, STEREO_H, umlMarkerPath } from "./geometry"
 
 // Annotazione esplicita `ClassNode` sulle fixture, non `as const`: il brief le
 // scriveva `as const`, ma un `ClassNode` ha array mutabili e `as const` li
@@ -240,10 +240,10 @@ describe("noteSize", () => {
 describe("notePath", () => {
   it("il corpo salta l'angolo in alto a destra e la piega lo chiude", () => {
     const { body, fold } = notePath(200, 80)
-    // Il corpo non passa per (200, 0): quell'angolo è tagliato dalla piega.
-    expect(body).not.toContain("M200 0")
-    expect(body).toContain(`${200 - NOTE_FOLD} 0`)
-    // La piega è un triangolo chiuso.
-    expect(fold.trim().endsWith("Z")).toBe(true)
+    // Path esatti e non solo "non lancia": la piega è la geometria più delicata del diff,
+    // e il renderer (task successivo) deve riprodurla identica — un vertice spostato o
+    // mancante deve far fallire il test, non passare inosservato.
+    expect(body).toBe("M0 0 L188 0 L200 12 L200 80 L0 80 Z")
+    expect(fold).toBe("M188 0 L200 12 L188 12 Z")
   })
 })

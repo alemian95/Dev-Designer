@@ -135,9 +135,14 @@ per esteso invece che composta, o diventa illeggibile.
 | `rectOf` | cerca anche in `model.notes`, e usa `noteSize` |
 | `deleteItems` | le chiavi di nota arrivano mescolate a quelle di classe: `deleteClassItems` separa in tre invece che in due |
 | `duplicateNodes` | una nota duplicata prende un uuid nuovo, non `uniqueKey` |
-| `addNode` | invariato: la nota ha il proprio comando, `addNote` |
+| `addNode` | invariato: la nota ha il proprio metodo, `addNote?`, **opzionale** — l'ER non ha note e non lo implementa |
 | `layoutGraph` | **le note restano fuori** — vedi sotto |
 | `validate` | invariato: una nota non produce nessun `Issue`, nemmeno vuota |
+
+Il click con lo strumento nota non arriva al canvas direttamente: passa dal riduttore puro
+`reduce` (`src/editor/interaction.ts`), che produce un `Effect` `create-note` eseguito dal hook.
+Quell'effetto apre l'editor con `target: "body"` e non `"name"`, perché una nota non ha nome —
+`editing.target` resta quindi la union di due casi che è oggi.
 
 **Le note non entrano nel grafo di layout, e questo ha un costo che si
 accetta.** ELK dispone un grafo di nodi e archi; una nota non ha archi, quindi

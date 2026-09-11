@@ -2,7 +2,7 @@ import { createStore } from "zustand/vanilla"
 import type { Size } from "./geometry"
 import { IDENTITY, type Viewport } from "./viewport"
 
-export type Tool = "select" | "node" | "edge"
+export type Tool = "select" | "node" | "edge" | "note"
 export type SelectionKind = "node" | "edge"
 
 /** Gli id di selezione hanno un prefisso di tipo: nodi e archi possono avere la stessa chiave. */

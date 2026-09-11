@@ -5,6 +5,7 @@ import type { LayoutGraph } from "@/model/layout"
 import { classDiagram } from "../class-access"
 import {
   addClass,
+  addNote,
   addRelation,
   classLayoutGraph,
   deleteClassItems,
@@ -49,6 +50,8 @@ export function classOps(doc: DevDocument): DiagramOps {
     },
 
     addNode: (at) => addClass(diagram().model.classes, at),
+
+    addNote,
 
     addEdge: (source, target) => addRelation(diagram().model.relations, source, target),
 

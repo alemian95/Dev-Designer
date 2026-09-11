@@ -39,6 +39,7 @@ export type Effect =
   | { type: "preview-connect"; source: string; to: Point | null }
   | { type: "commit-connect"; source: string; target: string }
   | { type: "create-node"; at: Point }
+  | { type: "create-note"; at: Point }
 
 export interface Context {
   tool: Tool
@@ -72,6 +73,9 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
 
   if (ctx.tool === "node") {
     if (info.hit.kind === "canvas") return { mode: IDLE, effects: [{ type: "create-node", at: info.world }] }
+  }
+  if (ctx.tool === "note") {
+    if (info.hit.kind === "canvas") return { mode: IDLE, effects: [{ type: "create-note", at: info.world }] }
   }
   if (ctx.tool === "edge") {
     if (info.hit.kind === "node") {

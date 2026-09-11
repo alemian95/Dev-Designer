@@ -1,4 +1,4 @@
-import { Box, Spline } from "lucide-react"
+import { Box, Spline, StickyNote } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
@@ -72,6 +72,7 @@ export const classView: DiagramView = {
   tools: {
     node: { label: "Classe", key: "c", Icon: Box },
     edge: { label: "Relazione", key: "r", Icon: Spline },
+    note: { label: "Nota", key: "n", Icon: StickyNote },
   },
   textFormats: ["class-mermaid"],
 }

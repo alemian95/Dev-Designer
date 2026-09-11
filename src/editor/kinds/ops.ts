@@ -15,7 +15,8 @@ export interface EdgeEnds {
 
 /**
  * Contratto che ogni tipo di diagramma rispetta. Il canvas e le azioni condivise ci parlano
- * attraverso: non sanno cos'è un nodo o un arco per un tipo specifico, solo questi dieci metodi.
+ * attraverso: non sanno cos'è un nodo o un arco per un tipo specifico, solo questi metodi.
+ * `addNote` è l'unico opzionale: l'ER non ha note e non lo implementa.
  */
 export interface DiagramOps {
   nodeKeys(): string[]
@@ -24,6 +25,8 @@ export interface DiagramOps {
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
   edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
   addNode(at: Point): { key: string; recipe: Recipe }
+  /** Terza specie di nodo, oggi solo nel class diagram. Assente dove il tipo non ha note. */
+  addNote?(at: Point): { key: string; recipe: Recipe }
   addEdge(source: string, target: string): { key: string; recipe: Recipe }
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }

@@ -46,6 +46,8 @@ export interface EdgeViewProps {
  * `buildSvg` (`@/ui/export/svg.tsx`), che gira dentro `renderToStaticMarkup` e uno store non ce
  * l'ha.
  */
+interface ToolDef { label: string; key: string; Icon: LucideIcon }
+
 export interface DiagramView {
   NodesLayer: ComponentType
   EdgesLayer: ComponentType
@@ -53,8 +55,10 @@ export interface DiagramView {
   EdgeView: ComponentType<EdgeViewProps>
   Properties: ComponentType
   tools: {
-    node: { label: string; key: string; Icon: LucideIcon }
-    edge: { label: string; key: string; Icon: LucideIcon }
+    node: ToolDef
+    edge: ToolDef
+    /** Terza specie di nodo, oggi solo nel class diagram: l'ER non ha note e non ne dichiara. */
+    note?: ToolDef
   }
   textFormats: TextFormat[]
 }

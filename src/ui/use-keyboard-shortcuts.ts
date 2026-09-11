@@ -49,6 +49,7 @@ function onKeyDown(e: KeyboardEvent): void {
   else if (!mod && key === "v") session.setTool("select")
   else if (!mod && key === tools.node.key) session.setTool("node")
   else if (!mod && key === tools.edge.key) session.setTool("edge")
+  else if (!mod && tools.note && key === tools.note.key) session.setTool("note")
   else if (!mod && key === "f") fitToContent()
   else if (!mod && key === "l") void autoLayout()
   else if (e.key === "Escape") {
@@ -62,7 +63,7 @@ function onKeyDown(e: KeyboardEvent): void {
  * Scorciatoie globali. mod = cmd su macOS, ctrl altrove.
  * mod+s salva · mod+shift+s salva con nome · mod+o apri
  * mod+z undo · mod+shift+z / mod+y redo · mod+d duplica · mod+a seleziona tutto · canc/backspace elimina
- * v tool selezione · le lettere di nodo/arco vengono da `viewFor(tipo).tools` (per l'ER, e/r)
+ * v tool selezione · le lettere di nodo/arco/nota vengono da `viewFor(tipo).tools` (per l'ER, e/r; le classi aggiungono n)
  * f fit · l disponi · mod+= / mod+- zoom · mod+0 reset · esc deseleziona e torna al tool select
  */
 export function useKeyboardShortcuts(): void {

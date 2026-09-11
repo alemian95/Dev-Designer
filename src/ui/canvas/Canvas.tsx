@@ -3,6 +3,7 @@ import { FONT_SIZE, GRID } from "@/editor/geometry"
 import { InlineEditor } from "./InlineEditor"
 import { useDiagramView } from "./kinds/registry"
 import { MembersEditor } from "./MembersEditor"
+import { NoteEditor } from "./NoteEditor"
 import { Overlay } from "./Overlay"
 import { useCanvasInteraction } from "./use-canvas-interaction"
 import { ViewportGroup } from "./ViewportGroup"
@@ -36,6 +37,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
       </svg>
       <InlineEditor />
       <MembersEditor />
+      <NoteEditor />
     </div>
   )
 }

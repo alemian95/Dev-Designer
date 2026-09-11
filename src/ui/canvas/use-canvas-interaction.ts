@@ -43,6 +43,8 @@ function hitTest(el: Element | null): Hit {
  */
 function classEditTarget(key: string, headerHit: boolean): "name" | "body" {
   const diagram = classDiagram(documentStore.getState().doc)
+  // Una nota non ha nome: qualunque punto del suo rettangolo apre il corpo.
+  if (diagram.model.notes[key]) return "body"
   const cls = diagram.model.classes[key]
   const view = diagram.view.nodes[key]
   const emptyExpanded = !!cls && !view?.collapsed && cls.attributes.length === 0 && cls.methods.length === 0
@@ -177,6 +179,16 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
           session().setEditing({ key, target: "name" })
           break
         }
+        case "create-note": {
+          const ops = opsFor(documentStore.getState().doc)
+          if (!ops.addNote) break
+          const { key, recipe } = ops.addNote(fx.at)
+          documentStore.getState().dispatch(recipe)
+          session().setSelection([selId("node", key)])
+          session().setTool("select")
+          session().setEditing({ key, target: "body" })
+          break
+        }
       }
     }
 
@@ -199,9 +211,9 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const active = document.activeElement
       if (isTextInput(active)) flushSync(() => active.blur())
       svg.setPointerCapture(e.pointerId)
-      // Lo strumento nodo apre l'editor inline già nel down: senza annullare il default il
+      // Gli strumenti nodo e nota aprono un editor già nel down: senza annullare il default il
       // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.
-      if (e.button === 1 || session().tool === "node") e.preventDefault()
+      if (e.button === 1 || session().tool === "node" || session().tool === "note") e.preventDefault()
       step({ type: "down", info: info(e), spaceHeld })
     }
     const onPointerMove = (e: PointerEvent) => {

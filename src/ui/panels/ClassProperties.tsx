@@ -1,6 +1,6 @@
 import { useStore } from "zustand"
 import { Label } from "@/components/ui/label"
-import { setStereotype, updateRelation } from "@/editor/class/commands"
+import { setNoteText, setStereotype, updateRelation } from "@/editor/class/commands"
 import { classDiagram } from "@/editor/class-access"
 import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
@@ -81,6 +81,30 @@ function ClassNodeProperties({ classKey: key }: { classKey: string }) {
   )
 }
 
+/**
+ * Corpo del pannello per una nota selezionata: una `textarea` col testo, commessa sul blur con lo
+ * stesso comando `setNoteText` che usa `NoteEditor` — l'alternativa al doppio click sul canvas,
+ * come il campo «Membri» lo è per le classi.
+ */
+function NoteProperties({ noteKey: key }: { noteKey: string }) {
+  const note = useStore(documentStore, (s) => classDiagram(s.doc).model.notes[key])
+  if (!note) return null
+  return (
+    <div className="flex flex-col gap-3 p-3">
+      <div className="grid gap-1">
+        <Label htmlFor="note-text">Testo</Label>
+        <textarea
+          id="note-text"
+          key={note.text}
+          defaultValue={note.text}
+          onBlur={(e) => dispatch(setNoteText(key, e.currentTarget.value))}
+          className="min-h-24 resize-none rounded-md border bg-background p-2 text-sm"
+        />
+      </div>
+    </div>
+  )
+}
+
 function RelationProperties({ relationKey: key }: { relationKey: string }) {
   const rel = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[key])
   if (!rel) return null
@@ -122,11 +146,20 @@ function RelationProperties({ relationKey: key }: { relationKey: string }) {
  * delle due. Nessuna riga di form per membro, deliberatamente: sarebbe la ricostruzione
  * dell'alternativa scartata nel brainstorming (§15 della spec), e due editor per lo stesso dato
  * divergerebbero.
+ *
+ * Classi e note condividono lo spazio di chiavi di selezione (`selId("node", ...)`, §4 della
+ * spec): una singola chiave selezionata va quindi ancora distinta, e lo si fa come altrove
+ * (`kinds/class.tsx`, `use-canvas-interaction.ts`) guardando in quale dei due record del modello
+ * la chiave compare.
  */
 export function ClassProperties() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const classes = selectedKeys(selection, "node")
-  if (classes.length === 1) return <ClassNodeProperties key={classes[0]} classKey={classes[0]!} />
+  const nodes = selectedKeys(selection, "node")
+  const key = nodes.length === 1 ? nodes[0]! : undefined
+  const isNote = useStore(documentStore, (s) => key !== undefined && key in classDiagram(s.doc).model.notes)
+  if (key !== undefined) {
+    return isNote ? <NoteProperties key={key} noteKey={key} /> : <ClassNodeProperties key={key} classKey={key} />
+  }
   const relations = selectedKeys(selection, "edge")
   return <RelationProperties key={relations[0]} relationKey={relations[0]!} />
 }

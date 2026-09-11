@@ -17,9 +17,13 @@ function indeterminateArticle(label: string): string {
  * selezionato) e in tal caso monta `view.Properties`, il corpo specifico del tipo di diagramma
  * corrente. Il caso «niente selezionato» — zero o più selezioni miste — non dipende dal tipo,
  * quindi resta qui, ma la frase sì: «nodo» e «arco» sono il vocabolario di `SelectionKind`, non
- * quello dell'utente. Composta da `view.tools.node.label`/`view.tools.edge.label`, che sono già a
- * portata di mano, così l'ER dice «entità» e le classi dicono «classe», invece di un generico che
- * non è il lessico di nessuno dei due.
+ * quello dell'utente.
+ *
+ * La frase composta (`Seleziona una X o una Y.`) reggeva due strumenti; con la nota come terzo
+ * non regge più — comporla per tre voci produrrebbe una lista innaturale in italiano. Si biforca
+ * quindi per tipo di diagramma: dove `tools.note` esiste (le classi) la frase è scritta per
+ * esteso, dove non esiste (l'ER) resta la composizione a due, con `view.tools.node.label`/
+ * `view.tools.edge.label` come già facevano.
  */
 export function PropertiesPanel() {
   const selection = useStore(sessionStore, (s) => s.selection)
@@ -30,11 +34,12 @@ export function PropertiesPanel() {
   if (single) return <view.Properties />
   const nodeLabel = view.tools.node.label.toLowerCase()
   const edgeLabel = view.tools.edge.label.toLowerCase()
+  const vuoto = view.tools.note
+    ? "Seleziona una classe, una relazione o una nota."
+    : `Seleziona ${indeterminateArticle(nodeLabel)}${nodeLabel} o ${indeterminateArticle(edgeLabel)}${edgeLabel}.`
   return (
     <p className="p-3 text-sm text-muted-foreground">
-      {selection.size === 0
-        ? `Seleziona ${indeterminateArticle(nodeLabel)}${nodeLabel} o ${indeterminateArticle(edgeLabel)}${edgeLabel}.`
-        : `${selection.size} elementi selezionati`}
+      {selection.size === 0 ? vuoto : `${selection.size} elementi selezionati`}
     </p>
   )
 }

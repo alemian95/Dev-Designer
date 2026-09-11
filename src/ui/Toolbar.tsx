@@ -58,6 +58,7 @@ export function Toolbar() {
         <Hint label="Seleziona (V)"><ToggleGroupItem value="select" aria-label="Seleziona" className={TOOL_ITEM}><MousePointer2 /></ToggleGroupItem></Hint>
         <ToolItem value="node" def={view.tools.node} />
         <ToolItem value="edge" def={view.tools.edge} />
+        {view.tools.note && <ToolItem value="note" def={view.tools.note} />}
       </ToggleGroup>
       <Separator orientation="vertical" className="h-6" />
       <Hint label="Annulla (⌘Z)"><Button variant="ghost" size="icon" aria-label="Annulla" disabled={!canUndo} onClick={() => documentStore.getState().undo()}><Undo2 /></Button></Hint>

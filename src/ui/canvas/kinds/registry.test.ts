@@ -1,4 +1,4 @@
-import { Box, Spline, Square } from "lucide-react"
+import { Box, Spline, Square, StickyNote } from "lucide-react"
 import { describe, expect, it } from "vitest"
 import { viewFor } from "./registry"
 
@@ -36,8 +36,24 @@ describe("viewFor", () => {
     expect(cls.tools).toEqual({
       node: { label: "Classe", key: "c", Icon: Box },
       edge: { label: "Relazione", key: "r", Icon: Spline },
+      note: { label: "Nota", key: "n", Icon: StickyNote },
     })
     expect(er.textFormats).toEqual(["postgres", "mysql", "mermaid"])
     expect(cls.textFormats).toEqual(["class-mermaid"])
+  })
+})
+
+describe("terzo strumento", () => {
+  it("la vista delle classi dichiara lo strumento nota, quella ER no", () => {
+    expect(viewFor("class").tools.note).toBeDefined()
+    expect(viewFor("er").tools.note).toBeUndefined()
+  })
+
+  it("le scorciatoie dei tre strumenti sono distinte", () => {
+    const t = viewFor("class").tools
+    const keys = [t.node.key, t.edge.key, t.note!.key]
+    expect(new Set(keys).size).toBe(3)
+    // `v` è riservata a «Seleziona» in `use-keyboard-shortcuts.ts`.
+    expect(keys).not.toContain("v")
   })
 })

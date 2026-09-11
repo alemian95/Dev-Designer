@@ -255,6 +255,19 @@ describe("tipi che Mermaid non porta com'è", () => {
     expect(emitClassMermaid(conTipo("string {read")).text).toContain("+string campo")
   })
 
+  it("una graffa di chiusura senza apertura si rimuove e avvisa comunque: oggi sparisce in silenzio", () => {
+    // `stripBraces` tronca da qualunque `{` o `}` in poi, ma prima di questo fix l'avviso scattava
+    // solo per `type.includes("{")`: un `}` spaiato passava il controllo e il tipo veniva
+    // silenziosamente accorciato, senza che nessun avviso lo dicesse.
+    const primo = emitClassMermaid(conTipo("Map}"))
+    expect(primo.text).toContain("+Map campo")
+    expect(primo.warnings.join(" ")).toContain("graffe")
+
+    const secondo = emitClassMermaid(conTipo("string readOnly}"))
+    expect(secondo.text).toContain("+string readOnly campo")
+    expect(secondo.warnings.join(" ")).toContain("graffe")
+  })
+
   it("gli avvisi sono aggregati, non uno per membro", () => {
     const modello = conTipo("string {readOnly}")
     modello.classes.A.attributes.push({ name: "altro", type: "int {x}", visibility: "public", isStatic: false })
@@ -301,5 +314,33 @@ describe("tipi che Mermaid non porta com'è", () => {
     const { text, warnings } = emitClassMermaid(modello)
     expect(text).toContain("+salva(List~Ordine~ x) Map~string, int~")
     expect(warnings).toEqual([])
+  })
+
+  it("un metodo con graffe sia nel parametro sia nel ritorno conta come un membro solo, non due", () => {
+    // `methodLine` registra lo stesso `A.salva` una volta per parametro e una per il ritorno: senza
+    // deduplicare, l'avviso leggerebbe «2 tipi ... A.salva, A.salva» per un solo membro.
+    const modello: ClassModel = {
+      classes: {
+        A: {
+          name: "A",
+          stereotype: "class",
+          attributes: [],
+          methods: [{
+            name: "salva",
+            type: "int {x}",
+            visibility: "public",
+            isStatic: false,
+            isAbstract: false,
+            parameters: [{ name: "p", type: "string {y}" }],
+          }],
+        },
+      },
+      relations: {},
+      notes: {},
+    }
+    const { warnings } = emitClassMermaid(modello)
+    const avviso = warnings.find((w) => w.includes("graffe"))!
+    expect(avviso).toContain("1 tipi")
+    expect(avviso.match(/A\.salva/g)).toHaveLength(1)
   })
 })

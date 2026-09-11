@@ -59,7 +59,8 @@ export function verificaContrattoOps(nome: string, docConDueNodiEUnArco: () => D
       const doc = docConDueNodiEUnArco()
       const ops = opsFor(doc)
       const [a, b] = ops.nodeKeys()
-      const { recipe } = ops.addEdge(a!, b!)
+      // Non-null: né `a` né `b` sono note in questo documento, quindi `addEdge` non torna mai null qui.
+      const { recipe } = ops.addEdge(a!, b!)!
       recipe(doc)
       expect(opsFor(doc).edgesTouching(new Set([a!]))).toHaveLength(2)
     })
@@ -183,6 +184,20 @@ describe("classOps e le note", () => {
   it("layoutGraph esclude le note: senza archi ELK le piazzerebbe dove capita", () => {
     const g = opsFor(docConNota()).layoutGraph()
     expect(g.nodes.map((n) => n.id)).toEqual(["Cliente"])
+  })
+
+  it("addEdge torna null quando un estremo è una nota: nota→classe, classe→nota, nota→nota", () => {
+    const doc = docConNota()
+    const ops = opsFor(doc)
+    expect(ops.addEdge("n-1", "Cliente")).toBeNull()
+    expect(ops.addEdge("Cliente", "n-1")).toBeNull()
+    expect(ops.addEdge("n-1", "n-1")).toBeNull()
+    // Il caso classe→classe resta l'unico che produce davvero una relazione.
+    const doc2 = docConNota()
+    doc2.diagram.model.classes.Altra = { name: "Altra", stereotype: "class", attributes: [], methods: [] }
+    doc2.diagram.view.nodes.Altra = { x: 500, y: 0, collapsed: false }
+    const result = opsFor(doc2).addEdge("Cliente", "Altra")
+    expect(result).not.toBeNull()
   })
 
   it("deleteItems separa le chiavi di nota da quelle di classe: cancella entrambe", () => {

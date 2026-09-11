@@ -389,6 +389,30 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `src/ui/canvas/kinds/er.tsx` tengono il nome vecchio pur contenendo le
   chiavi filtrate per `"node"`/`"edge"` (`selectedKeys`). Non esportate,
   nessun effetto osservabile.
+- **Una nota non si ancora a una classe.** `ClassNoteSchema`
+  (`src/model/class/schema.ts:93`) ha il solo campo `text`: nessun campo di
+  ancoraggio verso la classe che la nota commenta. Il link `..` che UML
+  prevede fra una nota e l'elemento a cui si riferisce non è modellato — il
+  commento a fianco dello schema lo dice esplicito, «§2 della spec taglia
+  `note for Cliente`», che sembrerebbe quel link ed è invece un arco. Deciso
+  fuori scopo per questo giro: una nota resta testo libero appoggiato sul
+  canvas, senza legame registrato con nessuna classe.
+- **Le note restano fuori dal layout.** `classLayoutGraph`
+  (`src/editor/class/commands.ts:218-238`) cammina solo `model.classes`: una
+  nota non diventa mai un nodo del grafo che ELK dispone, quindi «Disponi»
+  la lascia esattamente dov'era. Se nel frattempo una classe vicina si è
+  spostata, la nota può ritrovarsi sovrapposta a un nodo che prima non la
+  toccava. Chiuderlo servirebbe l'ancoraggio della voce sopra, o in
+  alternativa una passata di layout dedicata che allontani le note dai nodi
+  disposti — nessuna delle due è stata scritta.
+- **Il valore di default resta testo dentro il tipo.** `decimal = 0` (e
+  forme simili) attraversa `parseMembers` ed `emitClassMermaid` come parte
+  del campo `type`, mai come un valore di default modellato a parte: il test
+  «`= valore` passa senza avviso» (`src/io/emit/class-mermaid.test.ts:277`)
+  conferma solo che Mermaid lo rende letteralmente, non che il modello lo
+  distingua dal resto del tipo. Chiuderlo richiederebbe un campo `default`
+  separato in `ClassAttributeSchema`, con `parseMembers` che lo estrae
+  invece di lasciarlo dentro la stringa del tipo.
 
 ---
 

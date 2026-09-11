@@ -53,7 +53,14 @@ export function classOps(doc: DevDocument): DiagramOps {
 
     addNote,
 
-    addEdge: (source, target) => addRelation(diagram().model.relations, source, target),
+    // Una nota non può essere estremo di relazione (§4 della spec): lo strumento relazione la
+    // classifica come `node` alla pari di una classe (stesso `data-node-id`), quindi il controllo
+    // va fatto qui, nel seam che sa cos'è una nota — l'ER non ha note e non deve impararlo.
+    addEdge: (source, target) => {
+      const notes = diagram().model.notes
+      if (source in notes || target in notes) return null
+      return addRelation(diagram().model.relations, source, target)
+    },
 
     deleteItems: (nodeKeys, edgeKeys) => {
       const notes = diagram().model.notes

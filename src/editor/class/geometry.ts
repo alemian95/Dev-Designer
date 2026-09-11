@@ -49,8 +49,9 @@ export function classRect(node: ClassNode, view: NodeView): Rect {
   return { x: view.x, y: view.y, ...classSize(node, view.collapsed) }
 }
 
-/** Lato del triangolo piegato nell'angolo in alto a destra della nota. */
-export const NOTE_FOLD = 12
+/** Lato del triangolo piegato nell'angolo in alto a destra della nota. Nessun consumatore fuori da
+ *  questo modulo: `noteSize` e `notePath` lo usano entrambi, ma solo qui dentro. */
+const NOTE_FOLD = 12
 
 /** Margine interno verticale della nota, sopra e sotto il blocco di righe. */
 const NOTE_PAD_Y = 6

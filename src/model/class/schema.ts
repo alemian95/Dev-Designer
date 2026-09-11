@@ -108,7 +108,7 @@ export type ClassModel = z.infer<typeof ClassModelSchema>
 // `collapsed` mostra il solo header. Nessun terzo stato «solo attributi».
 export const ClassDiagramSchema = z.object({
   type: z.literal("class"),
-  model: ClassModelSchema, // { classes: Record<string, ClassNode>, relations: Record<string, ClassRelation> }
+  model: ClassModelSchema, // { classes: Record<string, ClassNode>, relations: Record<string, ClassRelation>, notes: Record<string, ClassNote> }
   view: z.object({ nodes: z.record(z.string(), NodeViewSchema) }),
 })
 export type ClassDiagram = z.infer<typeof ClassDiagramSchema>

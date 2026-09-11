@@ -165,9 +165,13 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
           showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
           break
         case "commit-connect": {
-          const { key, recipe } = opsFor(documentStore.getState().doc).addEdge(fx.source, fx.target)
-          documentStore.getState().dispatch(recipe)
-          session().setSelection([selId("edge", key)])
+          // `null` quando un estremo è una nota (§4 della spec, contratto in `DiagramOps.addEdge`):
+          // nessuna selezione, nessun dispatch. Trascinare una relazione da o verso una nota non fa
+          // nulla — comportamento voluto, non un caso da segnalare all'utente.
+          const result = opsFor(documentStore.getState().doc).addEdge(fx.source, fx.target)
+          if (!result) break
+          documentStore.getState().dispatch(result.recipe)
+          session().setSelection([selId("edge", result.key)])
           session().setTool("select")
           break
         }

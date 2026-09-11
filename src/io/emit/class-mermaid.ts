@@ -121,7 +121,9 @@ function hasNestedGenerics(type: string): boolean {
 function emittableType(
   type: string, qualifiedName: string, unbalanced: string[], braced: string[], nested: string[],
 ): string {
-  if (type.includes("{")) braced.push(qualifiedName)
+  // Non solo `{`: `stripBraces` tronca anche da una `}` spaiata (nessuna apertura), quindi un tipo
+  // come `"Map}"` va segnalato allo stesso modo — controllare solo `{` lo lasciava sparire in silenzio.
+  if (/[{}]/.test(type)) braced.push(qualifiedName)
   const tildes = genericsToTildes(type)
   if (tildes === null) {
     unbalanced.push(qualifiedName)
@@ -252,19 +254,26 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
     if (text !== "") out.push(`  note "${noteText(text)}"`)
   }
 
+  // Deduplicate: `methodLine` registra lo stesso `Classe.metodo` una volta per parametro e una per
+  // il tipo di ritorno, quindi lo stesso membro può comparire più volte nella stessa lista — senza
+  // `Set` il conteggio dell'avviso conterebbe le occorrenze, non i membri (§ revisione finale, voce D).
+  const unbalancedUnique = [...new Set(unbalanced)]
+  const bracedUnique = [...new Set(braced)]
+  const nestedUnique = [...new Set(nested)]
+
   const warnings: string[] = []
   if (renamed.size > 0) {
     const list = [...renamed].map(([raw, clean]) => `"${raw}" → "${clean}"`).join(", ")
     warnings.push(`${renamed.size} nomi sono stati cambiati perché Mermaid non li accetta nudi: ${list}`)
   }
-  if (unbalanced.length > 0) {
-    warnings.push(`${unbalanced.length} tipi hanno parentesi angolari sbilanciate e sono usciti com'erano: ${unbalanced.join(", ")}`)
+  if (unbalancedUnique.length > 0) {
+    warnings.push(`${unbalancedUnique.length} tipi hanno parentesi angolari sbilanciate e sono usciti com'erano: ${unbalancedUnique.join(", ")}`)
   }
-  if (braced.length > 0) {
-    warnings.push(`${braced.length} tipi contenevano graffe, rimosse perché fanno fallire il parsing dell'intero diagramma: ${braced.join(", ")}`)
+  if (bracedUnique.length > 0) {
+    warnings.push(`${bracedUnique.length} tipi contenevano graffe, rimosse perché fanno fallire il parsing dell'intero diagramma: ${bracedUnique.join(", ")}`)
   }
-  if (nested.length > 0) {
-    warnings.push(`${nested.length} tipi hanno generici annidati, non rappresentabili in Mermaid: restano nella forma a tilde ma potrebbero rendere in modo scorretto: ${nested.join(", ")}`)
+  if (nestedUnique.length > 0) {
+    warnings.push(`${nestedUnique.length} tipi hanno generici annidati, non rappresentabili in Mermaid: restano nella forma a tilde, che misurato su mermaid@11 rende comunque in modo scorretto: ${nestedUnique.join(", ")}`)
   }
 
   return { text: `${out.join("\n")}\n`, warnings }

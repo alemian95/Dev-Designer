@@ -323,4 +323,13 @@ describe("buildSvg (class diagram)", () => {
     const hOf = (svg: string) => Number(/viewBox="[^ ]+ [^ ]+ [^ ]+ ([^"]+)"/.exec(svg)![1])
     expect(hOf(collassato)).toBeLessThan(hOf(aperto))
   })
+
+  it("esporta anche le note, che sono nodi come le classi", () => {
+    const d = classDiagram()
+    d.model.notes = { "n-1": { text: "da rivedere" } }
+    d.view.nodes["n-1"] = { x: 700, y: 700, collapsed: false }
+    const svg = buildSvg(d, { vars })!
+    expect(svg).toContain('data-node-id="n-1"')
+    expect(svg).toContain(">da rivedere<")
+  })
 })

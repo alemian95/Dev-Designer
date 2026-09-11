@@ -5,6 +5,7 @@ import { HEADER_H } from "@/editor/geometry"
 import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import { ClassNodeView } from "./ClassNode"
 import { ClassEdgeView } from "./ClassEdge"
+import { ClassNoteView } from "./ClassNote"
 
 const cliente: ClassNode = {
   name: "Cliente", stereotype: "class",
@@ -141,5 +142,29 @@ describe("ClassEdgeView", () => {
     const con = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association", { name: "possiede" })} {...rects} selected={false} />)
     expect(con).toContain("data-edge-label")
     expect(con).toContain(">possiede<")
+  })
+})
+
+describe("ClassNoteView", () => {
+  const nota = { text: "prima\nseconda" }
+
+  it("disegna corpo e piega, e una riga di testo per riga di nota", () => {
+    const html = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={nota} view={{ x: 10, y: 20, collapsed: false }} selected={false} />)
+    expect(html).toContain('data-node-id="n-1"')
+    expect(html).toContain('transform="translate(10 20)"')
+    expect(html).toContain("data-note-fold")
+    expect(html).toContain(">prima<")
+    expect(html).toContain(">seconda<")
+  })
+
+  it("una nota vuota non produce righe di testo ma esiste come nodo", () => {
+    const html = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={{ text: "" }} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
+    expect(html).toContain('data-node-id="n-1"')
+    expect(html).not.toContain("<text")
+  })
+
+  it("la selezione cambia il contorno, come per le classi", () => {
+    const sel = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={nota} view={{ x: 0, y: 0, collapsed: false }} selected={true} />)
+    expect(sel).toContain("var(--primary)")
   })
 })

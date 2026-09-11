@@ -47,7 +47,8 @@ function opsForDiagram(diagram: Diagram) {
 export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions): string | null {
   const ops = opsForDiagram(diagram)
   const { NodeView, EdgeView } = viewFor(diagram.type)
-  const nodeModels: Record<string, unknown> = diagram.type === "er" ? diagram.model.entities : diagram.model.classes
+  const nodeModels: Record<string, unknown> =
+    diagram.type === "er" ? diagram.model.entities : { ...diagram.model.classes, ...diagram.model.notes }
   const edgeModels: Record<string, unknown> = diagram.type === "er" ? diagram.model.relationships : diagram.model.relations
 
   const keys = ops.nodeKeys()

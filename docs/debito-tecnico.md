@@ -304,6 +304,34 @@ rettangoli a seconda di cosa dice il modello. Il cappio vero è stato anche
 riprovato in pagina su un'auto-relazione ER — cinque punti, esce a destra e
 rientra dall'alto — perché nessun e2e lo copre.
 
+### DT-17 · i buchi di copertura del class diagram
+
+Sette prove mancanti, tutte su comportamento già corretto e verificato a mano.
+Ora ci sono, e la voce si chiude.
+
+- **`enum` nei tre punti che lo trattano.** `classSize`: il test si intitolava
+  «interface ed enum» e nel corpo asseriva `interface` e `abstract` — ora
+  asserisce tutti e quattro gli stereotipi. Il render di `ClassNodeView` con
+  `enum`, che senza la sua riga occuperebbe un'altezza che `classSize` non
+  prevede. E il metodo astratto *dentro* un `enum`, dove annotazione di
+  stereotipo e classificatore in coda al membro — due meccanismi in punti
+  diversi dell'emettitore — non erano mai stati provati insieme.
+- **`renameClass` sul `target` e sull'autorelazione.** Era provato solo sul
+  `source`: il ramo del `target` non veniva mai percorso, e una relazione con
+  entrambi i capi sulla stessa classe avrebbe potuto restare con un estremo
+  pendente.
+- **`addRelation` col `kind` di default.** È il solo modo in cui lo strumento
+  relazione crea un arco: cambiarne il default in silenzio cambierebbe cosa
+  disegna ogni trascinamento fra due classi.
+- **Il ramo `_` di `safeName`**, che prefissa i nomi che iniziano con una
+  cifra — Mermaid non li accetta.
+
+**La voce sbagliava un numero:** `END_LABEL_OFFSET` non è 14 ma **24**, perché
+`DIAMOND_LEN` è 16. Il test lo fissa al valore vero e, accanto, l'invariante
+che quel numero serve a garantire — l'etichetta del capo cade oltre la punta
+del rombo — scritta a parte dal numero, così un domani si vede quale dei due
+si sta cambiando.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -564,16 +592,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 - L'allineamento a colonne di `memberLines` produce `+ conta()    : int`
   invece di `+ conta(): int`. Rende le righe scansionabili ma non è la forma
   che si vede negli altri strumenti UML.
-- Buchi di copertura, in una voce sola: lo stereotipo `enum` non è provato
-  nei tre punti che lo trattano — `hasStereotypeLine` (il test in
-  `geometry.test.ts` si intitola «interface ed enum» ma nel corpo asserisce
-  solo `interface` e `abstract`), il metodo astratto dentro un `enum`, e il
-  suo render; `renameClass` è provato solo sul `source` di una relazione
-  (`commands.test.ts`), mai sul `target` né con un'autorelazione;
-  `addRelation` col `kind` di default (`association`) e
-  `END_LABEL_OFFSET = 14` non sono fissati da nessun test; il ramo di
-  `safeName` che prefissa `_` ai nomi che iniziano con una cifra non ha
-  fixture. Tutti verificati a mano: comportamento corretto, prova assente.
+- I buchi di copertura del class diagram → **coperti**, vedi DT-17, che
+  corregge anche un numero sbagliato di questa voce: `END_LABEL_OFFSET` è 24.
 - Le variabili locali `entities`/`relationships` nella `Properties()` di
   `src/ui/canvas/kinds/er.tsx` tengono il nome vecchio pur contenendo le
   chiavi filtrate per `"node"`/`"edge"` (`selectedKeys`). Non esportate,

@@ -103,6 +103,22 @@ del `restoreLast` e pretende `select` dopo: verificato RED togliendo la riga
 (`expected 'note' to be 'select'`), e riprovato nel browser sul percorso
 reale, «Nuovo ▸ Diagramma ER» con lo strumento nota premuto.
 
+### DT-9 · due editor montati sul testo della stessa nota
+
+Il doppio click su una nota già selezionata — e anche la creazione di una nota
+nuova, che apre l'overlay da sé — monta insieme `NoteEditor` e la `textarea`
+di `NoteProperties`: due campi modificabili sullo stesso dato, cioè ciò che il
+commento del campo «Membri» nello stesso file scarta per le classi.
+
+**La voce d'Archivio sospettava una divergenza dei valori: non c'è.** Provato
+nel browser: `key={note.text}` rimonta il campo del pannello appena l'overlay
+commette sul blur, e mettere a fuoco il pannello è precisamente ciò che
+*provoca* quel blur — la scrittura perduta non si riesce a produrre. Il
+difetto vero è che dalla schermata non si legge quale dei due comandi il
+testo. Finché l'overlay è aperto su quella nota il campo del pannello è
+`readOnly`, opaco, e lo dichiara («Modifica in corso sul canvas»). *Di nuovo
+la lezione di DT-1: correggere il difetto osservato, non quello immaginato.*
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -356,13 +372,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   dice che il tipo è sospetto, non che il file esportato lo mostrerà per
   intero.
 - Lo strumento che sopravvive al cambio di diagramma → **corretto**, vedi DT-8.
-- `NoteEditor` (overlay sul canvas) e la `textarea` di `NoteProperties` nel
-  pannello proprietà (`src/ui/panels/ClassProperties.tsx`) possono montare
-  insieme sullo stesso testo di una nota — doppio click su una nota già
-  selezionata apre entrambi. Il piano lo ha chiesto così (§4 della spec di
-  ampiezza), ma è esattamente la situazione che il commento della stessa
-  `ClassProperties.tsx` scarta per le classi: «due editor per lo stesso dato
-  divergerebbero».
+- I due editor sullo stesso testo di una nota → **corretto**, vedi DT-9, che
+  corregge anche la diagnosi di questa voce: non divergevano.
 - In `deleteItems` (`src/editor/kinds/class.ts:58`), una chiave che non è né
   una classe né una nota finisce comunque in `classKeys` (`!(k in notes)`
   come unico filtro), invece di essere scartata. Irraggiungibile oggi — le

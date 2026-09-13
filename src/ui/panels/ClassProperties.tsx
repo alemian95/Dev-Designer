@@ -85,9 +85,18 @@ function ClassNodeProperties({ classKey: key }: { classKey: string }) {
  * Corpo del pannello per una nota selezionata: una `textarea` col testo, commessa sul blur con lo
  * stesso comando `setNoteText` che usa `NoteEditor` — l'alternativa al doppio click sul canvas,
  * come il campo «Membri» lo è per le classi.
+ *
+ * **Alternativa, non secondo editor.** Il doppio click su una nota già selezionata — e la creazione
+ * di una nota nuova — monta anche l'overlay `NoteEditor` sullo stesso testo: due campi modificabili
+ * per lo stesso dato, cioè la situazione che il commento del campo «Membri» qui sopra scarta per le
+ * classi. I valori non divergono davvero (`key={note.text}` rimonta questo campo appena l'overlay
+ * commette sul blur, verificato nel browser), ma quale dei due comandi il testo non è leggibile
+ * dalla schermata. Finché l'overlay è aperto su *questa* nota il campo è in sola lettura e lo
+ * dichiara: l'editor sul canvas è quello che l'utente sta guardando.
  */
 function NoteProperties({ noteKey: key }: { noteKey: string }) {
   const note = useStore(documentStore, (s) => classDiagram(s.doc).model.notes[key])
+  const editingHere = useStore(sessionStore, (s) => s.editing?.key === key && s.editing.target === "body")
   if (!note) return null
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -97,9 +106,11 @@ function NoteProperties({ noteKey: key }: { noteKey: string }) {
           id="note-text"
           key={note.text}
           defaultValue={note.text}
+          readOnly={editingHere}
           onBlur={(e) => dispatch(setNoteText(key, e.currentTarget.value))}
-          className="min-h-24 resize-none rounded-md border bg-background p-2 text-sm"
+          className="min-h-24 resize-none rounded-md border bg-background p-2 text-sm read-only:opacity-50"
         />
+        {editingHere && <p className="text-xs text-muted-foreground">Modifica in corso sul canvas.</p>}
       </div>
     </div>
   )

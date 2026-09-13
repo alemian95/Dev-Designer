@@ -6,6 +6,7 @@ import { autosave, documentIo } from '@/io/app-io'
 import { documentSession } from '@/io/document-session'
 import { buildStressDocument } from '@/perf/stress'
 import App from '@/ui/App'
+import { ErrorBoundary } from '@/ui/ErrorBoundary'
 
 async function bootstrap(): Promise<void> {
   // `?stress=N` carica un documento sintetico per la misura FPS: non passa dall'archivio e non lo sporca.
@@ -24,9 +25,19 @@ async function bootstrap(): Promise<void> {
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </StrictMode>,
   )
 }
+
+// Un rigetto non gestito non passa da un render, quindi l'`ErrorBoundary` non lo vede: senza questo
+// resterebbe solo in console e l'utente vedrebbe un'azione che non succede e basta. Non si chiama
+// `preventDefault`: l'avviso si aggiunge alla console, non la sostituisce.
+window.addEventListener('unhandledrejection', (e) => {
+  const reason = e.reason instanceof Error ? e.reason.message : String(e.reason)
+  documentSession.getState().patch({ notice: `Operazione non riuscita: ${reason}` })
+})
 
 void bootstrap()

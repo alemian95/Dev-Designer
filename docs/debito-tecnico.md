@@ -19,11 +19,20 @@ nessuno le riscopra come se fossero nuove.
 
 ## Da correggere
 
-Niente, al 2026-09-09. DT-1..DT-6 sono state corrette nel commit `eeca340`,
+Niente, al 2026-09-13. DT-1..DT-6 sono state corrette nel commit `eeca340`,
 DT-7 e le minori aperte dalla revisione di `feat/export-testo` subito dopo;
 restano qui sotto in **Corretti** perché due di esse sono state corrette in un
 posto diverso da quello che questo documento indicava, e la ragione vale più
-della voce.
+della voce. DT-8..DT-10 sono state scelte dall'Archivio il 2026-09-13, per
+priorità: un difetto riproducibile in tre click, l'unica incoerenza che il
+codice dichiara sbagliata su sé stesso, e la classe di guasto che lasciava la
+pagina bianca.
+
+Quel che resta in **Archivio** non è stato promosso qui. Il candidato
+successivo è la sovrapposizione esatta di due archi fra la stessa coppia di
+nodi: è il difetto visibile del class diagram, ma costa un cambio di progetto
+in `routeEdge`, che dovrebbe conoscere il fascio di archi che tocca un nodo
+mentre la §7 della spec quella conoscenza la tiene fuori di proposito.
 
 ---
 
@@ -118,6 +127,28 @@ difetto vero è che dalla schermata non si legge quale dei due comandi il
 testo. Finché l'overlay è aperto su quella nota il campo del pannello è
 `readOnly`, opaco, e lo dichiara («Modifica in corso sul canvas»). *Di nuovo
 la lezione di DT-1: correggere il difetto osservato, non quello immaginato.*
+
+### DT-10 · nessuna rete sotto l'albero di render
+
+Non esisteva né un `ErrorBoundary` né un gestore di `unhandledrejection`: la
+correzione dell'avvio aveva chiuso il percorso noto — il `try` attorno a
+`restoreLast()` in `main.tsx` — non la classe. In un'app senza backend una
+pagina bianca è lavoro perso, e nessun posto dove leggere cosa sia successo.
+
+[ErrorBoundary.tsx](../src/ui/ErrorBoundary.tsx) avvolge `<App />`: mostra il
+messaggio, offre il ricarico e in `componentDidCatch` forza `autosave.flush()`
+così il ricarico riparte dall'ultima modifica e non dall'ultimo debounce
+scaduto. Il flush non è atteso e l'archivio può essere indisponibile, quindi
+il testo promette solo ciò che `restoreLast` garantisce comunque: l'ultimo
+stato *presente nell'archivio*. Lo stack resta in console — l'eccezione non si
+nasconde.
+
+I rigetti non gestiti non passano da un render e il boundary non li vede: un
+listener in `main.tsx` li porta nella `NoticeBar` senza `preventDefault`,
+quindi l'avviso si aggiunge alla console invece di sostituirla. Entrambi
+provati nel browser: un `throw` temporaneo in `App` rende il pannello invece
+della pagina bianca, un `Promise.reject` produce «Operazione non riuscita: …»
+nella barra.
 
 ### Minori chiuse il 2026-09-09
 
@@ -292,8 +323,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `no-restricted-imports` blocca anche gli `import type`: voluto.
 - `noUncheckedIndexedAccess` non è abilitato in `tsconfig` (verificato).
 - Script di prestazione → **corretto**, vedi DT-6.
-- Non esiste `ErrorBoundary` né un gestore di `unhandledrejection`: la
-  correzione dell'avvio ha chiuso il percorso noto, non la classe.
+- `ErrorBoundary` e gestore di `unhandledrejection` assenti → **corretto**,
+  vedi DT-10.
 - Il blocco che importa un DDL è duplicato quasi verbatim fra
   `scripts/e2e/export-testo.mjs` e `export.mjs`, che a sua volta duplica
   invece di riusare un aiutante di `import.mjs`. Da estrarre in un

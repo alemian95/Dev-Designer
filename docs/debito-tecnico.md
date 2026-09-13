@@ -271,6 +271,18 @@ Resta aperto: il culling del drag **non ha un test automatico**. L'invariante
 l'hook delle interazioni continua a non avere rete di regressione — voce
 d'Archivio che questo lavoro non chiude.
 
+### DT-15 · una specie dedotta per esclusione dall'altra
+
+In `deleteItems` (`src/editor/kinds/class.ts`) le note si riconoscevano dalla
+propria mappa e le classi per esclusione (`!(k in notes)`): una chiave che non
+fosse né l'una né l'altra finiva fra le classi invece di essere scartata.
+Irraggiungibile — le chiavi vengono da `nodeKeys()`, che enumera `view.nodes`
+— e infatti nessun test poteva provarlo: la correzione è allineare il filtro a
+`rectOf`, trenta righe sopra nello stesso file, che già verifica
+l'appartenenza positiva a ciascuna delle due mappe. Dedurre per esclusione è
+vero solo finché le specie restano due, e `view.nodes` è lo spazio di chiavi
+*condiviso* proprio perché possa ospitarne altre.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -519,13 +531,7 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 - Lo strumento che sopravvive al cambio di diagramma → **corretto**, vedi DT-8.
 - I due editor sullo stesso testo di una nota → **corretto**, vedi DT-9, che
   corregge anche la diagnosi di questa voce: non divergevano.
-- In `deleteItems` (`src/editor/kinds/class.ts:58`), una chiave che non è né
-  una classe né una nota finisce comunque in `classKeys` (`!(k in notes)`
-  come unico filtro), invece di essere scartata. Irraggiungibile oggi — le
-  chiavi vengono da `nodeKeys()`, che enumera solo `view.nodes` — ma
-  `rectOf` nella stessa funzione (righe 30-40) usa il pattern difensivo
-  giusto: verifica prima l'appartenenza alle classi, poi alle note, invece
-  di dedurre una delle due per esclusione.
+- La specie dedotta per esclusione in `deleteItems` → **corretto**, vedi DT-15.
 - Due residui di igiene nei test di `src/editor/class/geometry.test.ts`: il
   caso «l'associazione non disegna punta» (riga 99) è ora un sottoinsieme
   del test «l'associazione non navigabile resta nuda, quella navigabile

@@ -63,10 +63,14 @@ export function classOps(doc: DevDocument): DiagramOps {
       return addRelation(diagram().model.relations, source, target)
     },
 
+    // Ciascuna delle due specie si riconosce dalla propria mappa, non per esclusione dall'altra:
+    // `rectOf` qui sopra usa già il pattern giusto, e una chiave che non fosse né classe né nota
+    // finirebbe altrimenti fra le classi. Oggi non può succedere — le chiavi vengono da `nodeKeys()`,
+    // che enumera `view.nodes` — ma dedurre per esclusione è vero solo finché le specie restano due.
     deleteItems: (nodeKeys, edgeKeys) => {
-      const notes = diagram().model.notes
+      const { classes, notes } = diagram().model
       const noteKeys = nodeKeys.filter((k) => k in notes)
-      const classKeys = nodeKeys.filter((k) => !(k in notes))
+      const classKeys = nodeKeys.filter((k) => k in classes)
       return deleteClassItems(classKeys, edgeKeys, noteKeys)
     },
 

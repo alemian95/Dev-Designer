@@ -28,7 +28,8 @@ priorità: un difetto riproducibile in tre click, l'unica incoerenza che il
 codice dichiara sbagliata su sé stesso, e la classe di guasto che lasciava la
 pagina bianca.
 
-DT-11, DT-12 e DT-13 sono le voci che seguivano, chiuse lo stesso giorno.
+DT-11, DT-12 e DT-13 sono le voci che seguivano, chiuse lo stesso giorno, e DT-14
+è il gate di prestazione che DT-11 ha fatto scoprire rosso.
 
 ---
 
@@ -230,6 +231,46 @@ rifiuta il parser, con la sua riga. Il primo è verificato RED aggiungendo una
 regex a `Identifier`: fallisce lì invece che in produzione, che è il solo
 lavoro che questa voce chiedeva.
 
+### DT-14 · il gate di prestazione era rosso, e nessuno l'aveva scritto
+
+Registrato in Archivio poche ore prima, misurando la base di DT-11: `dragAll`
+p95 25,9 ms e `zoom` 33,5 ms contro un criterio di 20. `pnpm perf` falliva da
+tempo imprecisato, quindi un FAIL nuovo non si sarebbe distinto dai due
+vecchi — cioè il gate reso utilizzabile in CI da DT-6 non poteva passare.
+
+**Ora passano tutti e sei gli scenari, a 300 e a 600 entità**, ciascuno al
+pavimento del display. Il verbale con tutte le misure sta in
+[docs/perf/2026-09-13-gate-verde.md](perf/2026-09-13-gate-verde.md); qui le
+due sostanze.
+
+- **`dragAll`**: la diagnosi era già scritta nel §5 del documento del 6
+  settembre e non era mai stata agita — «lavoro pagato per intero su elementi
+  che nessuno guarda». `previewDrag` salta la scrittura fuori
+  dall'inquadratura, col criterio sul rettangolo **dopo** lo spostamento
+  (un nodo che entra va scritto), e misura i rettangoli una volta alla presa
+  invece di due volte per arco a ogni frame. Da 25,9 a 9,9 ms.
+- **`zoom`**: il costo è layout di testo ed è **per glifo** — 3.900 `<text>`
+  svuotati costano 207 ms contro 2.082 pieni. Nessuna proprietà CSS lo tocca
+  (provate `text-rendering` nelle tre varianti, `font-kerning`,
+  `shape-rendering`, `contain`, e il transform CSS al posto dell'attributo
+  SVG). L'unica leva è togliere i glifi dal layout: `ViewportGroup` mette
+  `data-zooming` mentre la scala cambia e una regola in `index.css` fa uscire
+  dal layout il testo del corpo dei nodi. Da 33,5 a 10,2 ms.
+
+**La trappola vale più del risultato.** `display: none` sul `<g>` che contiene
+i testi non serve a niente: `getComputedStyle` dice «none», il gruppo sparisce
+a schermo, e in Chrome i `<text>` discendenti **restano nel layout SVG** —
+1.683 ms contro i 1.662 senza regola. La regola deve colpire i `<text>`, e
+allora il layout crolla a 162 ms. La prima misura sembrava dire che la leva
+era sbagliata; era sbagliato il selettore. Il conteggio dei glifi ancora in
+layout è la misura che non mente, `getComputedStyle` no: descrive l'elemento a
+cui si chiede, non il lavoro che il motore fa.
+
+Resta aperto: il culling del drag **non ha un test automatico**. L'invariante
+«un nodo che entra nell'inquadratura viene scritto» è verificata in pagina, e
+l'hook delle interazioni continua a non avere rete di regressione — voce
+d'Archivio che questo lavoro non chiude.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -400,14 +441,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   Risolto lungo la strada, senza che nessuno lo registrasse.
   `no-restricted-imports` blocca anche gli `import type`: voluto.
 - `noUncheckedIndexedAccess` non è abilitato in `tsconfig` (verificato).
-- **Il gate di prestazione è rosso su due scenari, e lo era già.** Misurato il
-  2026-09-13 sul commit `2a825fc`, prima di DT-11: `dragAll` p95 25,9 ms e
-  `zoom` p95 58,4 ms, contro un criterio di 20 ms — `drag`, `pan`, `marquee` e
-  `marqueeAll` stanno a ~9 ms. Nessuno l'aveva registrato, quindi `pnpm perf`
-  fallisce da tempo imprecisato e un FAIL nuovo non si distinguerebbe dai due
-  vecchi. Il profiler dà la direzione: `dragAll` è script (12,2 s su 15,3 di
-  scenario), `zoom` è layout (2,6 s su 3,9), cioè due cause diverse e due
-  interventi diversi.
+- Il gate di prestazione rosso su `dragAll` e `zoom` → **corretto**, vedi
+  DT-14: ora passano tutti e sei gli scenari, a 300 e a 600 entità.
 - Script di prestazione → **corretto**, vedi DT-6.
 - `ErrorBoundary` e gestore di `unhandledrejection` assenti → **corretto**,
   vedi DT-10.

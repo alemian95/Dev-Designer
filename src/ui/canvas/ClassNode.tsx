@@ -90,14 +90,19 @@ export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, 
       >
         {node.name}
       </text>
+      {/* Le righe di separazione degli scomparti restano: non hanno glifi, non costano layout, e
+          senza di loro un nodo con i membri nascosti sembrerebbe una classe senza membri. */}
       {attrLines.length > 0 && <line data-compartment-rule x1={0} y1={attrTop} x2={w} y2={attrTop} stroke="var(--border)" />}
-      {attrLines.map((line, i) => (
-        <MemberRow key={`a${i}`} line={line} y={attrTop + 3 + ROW_H * i + ROW_H / 2} />
-      ))}
       {methodLines.length > 0 && <line data-compartment-rule x1={0} y1={methodTop} x2={w} y2={methodTop} stroke="var(--border)" />}
-      {methodLines.map((line, i) => (
-        <MemberRow key={`m${i}`} line={line} y={methodTop + 3 + ROW_H * i + ROW_H / 2} />
-      ))}
+      {/* `data-node-body`: il contratto del livello di dettaglio, vedi `ViewportGroup`. */}
+      <g data-node-body>
+        {attrLines.map((line, i) => (
+          <MemberRow key={`a${i}`} line={line} y={attrTop + 3 + ROW_H * i + ROW_H / 2} />
+        ))}
+        {methodLines.map((line, i) => (
+          <MemberRow key={`m${i}`} line={line} y={methodTop + 3 + ROW_H * i + ROW_H / 2} />
+        ))}
+      </g>
     </g>
   )
 })

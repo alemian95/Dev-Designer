@@ -35,11 +35,15 @@ export const EntityNodeView = memo(function EntityNodeView({ nodeKey, entity, vi
       <text data-node-header x={w / 2} y={HEADER_H / 2} textAnchor="middle" dominantBaseline="central" fontWeight={600} fill="var(--foreground)">
         {entityKey(entity)}
       </text>
-      {lines.map((line, i) => (
-        <text key={i} x={PAD_X} y={HEADER_H + 3 + ROW_H * i + ROW_H / 2} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
-          {line}
-        </text>
-      ))}
+      {/* `data-node-body` è il contratto del livello di dettaglio: è ciò che sparisce dal layout
+          mentre si zooma, e qui dentro sta tutto il testo che non è il nome. Vedi `ViewportGroup`. */}
+      <g data-node-body>
+        {lines.map((line, i) => (
+          <text key={i} x={PAD_X} y={HEADER_H + 3 + ROW_H * i + ROW_H / 2} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
+            {line}
+          </text>
+        ))}
+      </g>
     </g>
   )
 })

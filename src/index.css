@@ -133,4 +133,17 @@
     user-select: none;
     touch-action: none;
   }
+  /* Livello di dettaglio mentre la scala cambia: il testo del corpo dei nodi esce dal layout finché
+     il gesto di zoom non finisce (`ViewportGroup` mette e toglie `data-zooming`, e lì c'è il
+     perché).
+
+     **Il selettore colpisce i `<text>`, non il gruppo che li contiene.** Misurato: un `display:
+     none` sul `<g data-node-body>` nasconde il gruppo — `getComputedStyle` dice «none» — ma in
+     Chrome i `<text>` discendenti **restano nel layout SVG**, e il costo dello zoom non cala di un
+     millisecondo (1.683 ms di layout contro 1.662 senza regola). Sui `<text>` cala a 162 ms.
+     `visibility: hidden` e `font-size: 0` non servono a nulla per la stessa ragione: lasciano i
+     glifi nel layout, che è esattamente ciò che c'è da togliere. */
+  [data-viewport][data-zooming] [data-node-body] text {
+    display: none;
+  }
 }

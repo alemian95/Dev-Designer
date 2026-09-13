@@ -39,11 +39,15 @@ export const ClassNoteView = memo(function ClassNoteView({ nodeKey, note, view, 
     >
       <path d={body} fill="var(--card)" stroke={stroke} strokeWidth={selected ? 2 : 1} />
       <path data-note-fold d={fold} fill="var(--muted)" stroke={stroke} strokeWidth={selected ? 2 : 1} />
-      {lines.map((line, i) => (
-        <text key={i} x={PAD_X} y={6 + ROW_H * i + ROW_H / 2} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
-          {line}
-        </text>
-      ))}
+      {/* `data-node-body`: il contratto del livello di dettaglio, vedi `ViewportGroup`. Una nota è
+          tutta testo, quindi mentre si zooma resta il solo foglio con l'orecchia. */}
+      <g data-node-body>
+        {lines.map((line, i) => (
+          <text key={i} x={PAD_X} y={6 + ROW_H * i + ROW_H / 2} dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">
+            {line}
+          </text>
+        ))}
+      </g>
     </g>
   )
 })

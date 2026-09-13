@@ -34,6 +34,9 @@ export interface EdgeViewProps {
   source: Rect
   target: Rect
   selected: boolean
+  /** Scarto del fascio (`edgeOffsets`): 0 per l'arco unico fra due nodi. Prop e non calcolo interno
+   *  perché dipende da *tutti* gli archi, e la vista pura vede solo il proprio. */
+  offset: number
 }
 
 /**

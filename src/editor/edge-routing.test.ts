@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Relationship } from "@/model/er/schema"
-import { crowsFootPath, edgeGeometry, pathFromPoints, routeEdge } from "./edge-routing"
+import { BUNDLE_GAP, crowsFootPath, edgeGeometry, edgeOffsets, pathFromPoints, routeEdge } from "./edge-routing"
 
 const rel: Relationship = {
   source: { entity: "a", attributes: [], cardinality: "many" },
@@ -72,5 +72,97 @@ describe("edgeGeometry", () => {
     expect(g.label).toEqual({ x: 200, y: 25 })
     expect(g.sourceMarker).toContain("M")
     expect(g.targetMarker).toBe("M288 31 L288 19")
+  })
+})
+
+describe("edgeOffsets", () => {
+  const ends = (...triples: [string, string, string][]) =>
+    triples.map(([key, source, target]) => ({ key, source, target }))
+
+  it("un arco solo nel proprio fascio non si sposta di un pixel", () => {
+    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "b", "c"]))
+    expect(o.get("e1")).toBe(0)
+    expect(o.get("e2")).toBe(0)
+  })
+
+  it("due archi fra la stessa coppia si aprono simmetrici attorno all'asse", () => {
+    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "a", "b"]))
+    expect(o.get("e1")).toBe(-BUNDLE_GAP / 2)
+    expect(o.get("e2")).toBe(BUNDLE_GAP / 2)
+    // simmetrici: l'insieme resta centrato dov'era il singolo arco
+    expect(o.get("e1")! + o.get("e2")!).toBe(0)
+  })
+
+  it("il fascio non è orientato: a→b e b→a sono lo stesso", () => {
+    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "b", "a"]))
+    expect(o.get("e1")).not.toBe(o.get("e2"))
+  })
+
+  it("tre archi: quello di mezzo resta al centro", () => {
+    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "a", "b"], ["e3", "a", "b"]))
+    expect([o.get("e1"), o.get("e2"), o.get("e3")]).toEqual([-BUNDLE_GAP, 0, BUNDLE_GAP])
+  })
+
+  it("i cappi crescono verso l'esterno invece di aprirsi simmetrici", () => {
+    // Un cappio ha un solo nodo: non c'è un lato opposto su cui bilanciarsi, e due scarti opposti
+    // darebbero due anelli della stessa dimensione, cioè di nuovo sovrapposti.
+    const o = edgeOffsets(ends(["l1", "a", "a"], ["l2", "a", "a"]))
+    expect(o.get("l1")).toBe(0)
+    expect(o.get("l2")).toBe(BUNDLE_GAP)
+  })
+
+  it("una coppia con più archi non tocca gli scarti delle altre coppie", () => {
+    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "a", "b"], ["solo", "c", "d"]))
+    expect(o.get("solo")).toBe(0)
+  })
+})
+
+describe("routeEdge con lo scarto del fascio", () => {
+  const a = { x: 0, y: 0, w: 100, h: 100 }
+  const b = { x: 300, y: 0, w: 100, h: 100 }
+
+  it("senza scarto attacca al centro del lato, come prima", () => {
+    expect(routeEdge(a, b, 0).points).toEqual(routeEdge(a, b).points)
+  })
+
+  it("due archi della stessa coppia non condividono più nessun punto", () => {
+    const uno = routeEdge(a, b, -BUNDLE_GAP / 2).points
+    const due = routeEdge(a, b, BUNDLE_GAP / 2).points
+    expect(uno[0]).not.toEqual(due[0])
+    expect(uno[uno.length - 1]).not.toEqual(due[due.length - 1])
+  })
+
+  it("su archi verticali lo scarto va di lato, non lungo l'arco", () => {
+    const sotto = { x: 0, y: 300, w: 100, h: 100 }
+    const r = routeEdge(a, sotto, BUNDLE_GAP)
+    expect(r.sourceDir).toEqual({ x: 0, y: 1 })
+    expect(r.points[0]).toEqual({ x: 50 + BUNDLE_GAP, y: 100 })
+  })
+
+  it("il fascio sopravvive anche su un nodo alto quanto il solo header", () => {
+    // Il caso che il rientro sbagliato schiacciava: un'entità senza attributi è alta HEADER_H, e
+    // con un rientro pari a BUNDLE_GAP la banda utile si chiudeva a zero: archi di nuovo identici.
+    const basso = { x: 0, y: 0, w: 160, h: 28 }
+    const uno = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, -BUNDLE_GAP / 2)
+    const due = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, BUNDLE_GAP / 2)
+    expect(uno.points[0]).not.toEqual(due.points[0])
+  })
+
+  it("l'attacco resta sul lato anche con uno scarto più grande del nodo", () => {
+    // Meglio due archi che ripartono dallo stesso punto e divergono subito, che due archi che
+    // partono dal vuoto accanto al nodo.
+    const basso = { x: 0, y: 0, w: 100, h: 20 }
+    const r = routeEdge(basso, { x: 300, y: 0, w: 100, h: 20 }, 500)
+    expect(r.points[0]!.y).toBeGreaterThanOrEqual(basso.y)
+    expect(r.points[0]!.y).toBeLessThanOrEqual(basso.y + basso.h)
+  })
+
+  it("due cappi sullo stesso nodo non condividono né anello né attacchi", () => {
+    const uno = routeEdge(a, a, 0).points
+    const due = routeEdge(a, a, BUNDLE_GAP).points
+    expect(uno[0]).not.toEqual(due[0])
+    expect(uno[4]).not.toEqual(due[4])
+    // l'anello esterno sta davvero più in fuori
+    expect(due[1]!.x).toBeGreaterThan(uno[1]!.x)
   })
 })

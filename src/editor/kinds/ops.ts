@@ -2,16 +2,14 @@ import type { DevDocument } from "@/model/document"
 import type { Issue } from "@/model/issue"
 import type { LayoutGraph } from "@/model/layout"
 import type { Recipe } from "../document-store"
-import type { EdgeGeometry } from "../edge-routing"
+import type { EdgeEnds, EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
 import { classOps } from "./class"
 import { erOps } from "./er"
 
-export interface EdgeEnds {
-  key: string
-  source: string
-  target: string
-}
+// `EdgeEnds` sta in `edge-routing.ts`, dove `edgeOffsets` lo consuma; qui si ri-esporta perché è
+// il tipo di ritorno di `edgesTouching` e i chiamanti lo importano dal contratto.
+export type { EdgeEnds }
 
 /**
  * Contratto che ogni tipo di diagramma rispetta. Il canvas e le azioni condivise ci parlano

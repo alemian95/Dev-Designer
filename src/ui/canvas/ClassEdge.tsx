@@ -15,10 +15,12 @@ interface Props {
   source: Rect
   target: Rect
   selected: boolean
+  /** Scarto del fascio: arriva dal layer, che è l'unico a vedere tutte le relazioni. */
+  offset: number
 }
 
-export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, source, target, selected }: Props) {
-  const geo = classEdgeGeometry(source, target, relation)
+export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, source, target, selected, offset }: Props) {
+  const geo = classEdgeGeometry(source, target, relation, offset)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   // Molteplicità e ruolo nella stessa etichetta, una per capo: `endLabel` è la stessa funzione su
   // cui `classEdgeGeometry` decide se popolare i punti, così render e geometria non divergono.
@@ -69,11 +71,11 @@ function useClassRect(key: string | undefined): Rect | null {
   )
 }
 
-export function ClassEdge({ edgeKey }: { edgeKey: string }) {
+export function ClassEdge({ edgeKey, offset }: { edgeKey: string; offset: number }) {
   const relation = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[edgeKey])
   const source = useClassRect(relation?.source.class)
   const target = useClassRect(relation?.target.class)
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
   if (!relation || !source || !target) return null
-  return <ClassEdgeView edgeKey={edgeKey} relation={relation} source={source} target={target} selected={selected} />
+  return <ClassEdgeView edgeKey={edgeKey} relation={relation} source={source} target={target} selected={selected} offset={offset} />
 }

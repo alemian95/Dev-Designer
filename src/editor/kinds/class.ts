@@ -11,7 +11,7 @@ import {
   deleteClassItems,
   duplicateClasses,
 } from "../class/commands"
-import { classEdgeGeometry, classRect, noteRect } from "../class/geometry"
+import { classEdgeGeometry, classEdgeOffsets, classRect, noteRect } from "../class/geometry"
 import type { EdgeGeometry } from "../edge-routing"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
@@ -45,8 +45,9 @@ export function classOps(doc: DevDocument): DiagramOps {
         .map(([key, rel]) => ({ key, source: rel.source.class, target: rel.target.class })),
 
     edgeGeometry: (key, a, b): EdgeGeometry | null => {
-      const rel = diagram().model.relations[key]
-      return rel ? classEdgeGeometry(a, b, rel) : null
+      const model = diagram().model
+      const rel = model.relations[key]
+      return rel ? classEdgeGeometry(a, b, rel, classEdgeOffsets(model.relations).get(key) ?? 0) : null
     },
 
     addNode: (at) => addClass(diagram().model.classes, at),

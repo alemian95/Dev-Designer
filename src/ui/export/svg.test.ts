@@ -55,6 +55,22 @@ describe("buildSvg", () => {
     expect(y + h).toBeGreaterThan(600)
   })
 
+  it("due relazioni fra le stesse entità escono separate, come sul canvas", () => {
+    // La geometria del fascio dipende da *tutte* le relazioni: l'export la ricalcola per conto suo
+    // e deve arrivare alla stessa mappa, altrimenti il file scaricato mostrerebbe un diagramma
+    // diverso da quello che l'utente ha davanti.
+    const d = diagram()
+    d.model.relationships["seconda"] = {
+      source: { entity: "ordini", attributes: ["utente_id"], cardinality: "one" },
+      target: { entity: "utenti", attributes: ["id"], cardinality: "one" },
+      identifying: true,
+    }
+    const svg = buildSvg(d, { vars })!
+    const lines = [...svg.matchAll(/data-edge-line="true" d="([^"]+)"/g)].map((m) => m[1])
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).not.toBe(lines[1])
+  })
+
   it("dichiara larghezza e altezza coerenti col viewBox", () => {
     const svg = buildSvg(diagram(), { vars })!
     const [, , w, h] = /viewBox="([^"]+)"/.exec(svg)![1]!.split(" ").map(Number) as [number, number, number, number]
@@ -211,6 +227,22 @@ describe("buildSvg (class diagram)", () => {
     expect(y).toBe(200 - EXPORT_PADDING)
     expect(x + w).toBeGreaterThan(500)
     expect(y + h).toBeGreaterThan(600)
+  })
+
+  it("due relazioni fra le stesse entità escono separate, come sul canvas", () => {
+    // La geometria del fascio dipende da *tutte* le relazioni: l'export la ricalcola per conto suo
+    // e deve arrivare alla stessa mappa, altrimenti il file scaricato mostrerebbe un diagramma
+    // diverso da quello che l'utente ha davanti.
+    const d = diagram()
+    d.model.relationships["seconda"] = {
+      source: { entity: "ordini", attributes: ["utente_id"], cardinality: "one" },
+      target: { entity: "utenti", attributes: ["id"], cardinality: "one" },
+      identifying: true,
+    }
+    const svg = buildSvg(d, { vars })!
+    const lines = [...svg.matchAll(/data-edge-line="true" d="([^"]+)"/g)].map((m) => m[1])
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).not.toBe(lines[1])
   })
 
   it("dichiara larghezza e altezza coerenti col viewBox", () => {

@@ -41,14 +41,14 @@ describe("RelationshipEdgeView", () => {
     identifying: false,
   }
   it("disegna linea tratteggiata, marker ed etichetta", () => {
-    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={rel} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} />)
+    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={rel} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} offset={0} />)
     expect(html).toContain('data-edge-id="r"')
     expect(html).toContain('stroke-dasharray="6 4"')
     expect(html).toContain("data-edge-source")
     expect(html).toContain(">scrive<")
   })
   it("identificante: linea continua", () => {
-    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={{ ...rel, identifying: true }} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} />)
+    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={{ ...rel, identifying: true }} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} offset={0} />)
     expect(html).not.toContain("stroke-dasharray")
   })
 })

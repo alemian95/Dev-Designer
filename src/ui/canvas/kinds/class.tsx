@@ -2,6 +2,7 @@ import { Box, Spline, StickyNote } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
+import { classEdgeOffsets } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import type { ClassNote as ClassNoteModel, ClassNode as ClassNodeModel, ClassRelation } from "@/model/class/schema"
 import { ClassProperties } from "@/ui/panels/ClassProperties"
@@ -30,11 +31,13 @@ function NodesLayer() {
   )
 }
 
+/** Stessa forma — e stessa ragione — di `EdgesLayer` in `../layers.tsx`: vedi il commento lì. */
 function EdgesLayer() {
-  const keys = useStore(documentStore, useShallow((s) => Object.keys(classDiagram(s.doc).model.relations)))
+  const relations = useStore(documentStore, (s) => classDiagram(s.doc).model.relations)
+  const offsets = classEdgeOffsets(relations)
   return (
     <g data-layer="edges">
-      {keys.map((key) => <ClassEdge key={key} edgeKey={key} />)}
+      {Object.keys(relations).map((key) => <ClassEdge key={key} edgeKey={key} offset={offsets.get(key) ?? 0} />)}
     </g>
   )
 }
@@ -57,8 +60,8 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   return <ClassNodeView nodeKey={nodeKey} node={node as ClassNodeModel} view={view} selected={selected} />
 }
 
-function EdgeView({ edgeKey, relation, source, target, selected }: EdgeViewProps) {
-  return <ClassEdgeView edgeKey={edgeKey} relation={relation as ClassRelation} source={source} target={target} selected={selected} />
+function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeViewProps) {
+  return <ClassEdgeView edgeKey={edgeKey} relation={relation as ClassRelation} source={source} target={target} selected={selected} offset={offset} />
 }
 
 /** `DiagramView` per il class diagram: cablaggio verso i componenti già scritti nei Task 11-12,

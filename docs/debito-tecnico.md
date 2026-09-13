@@ -28,11 +28,7 @@ priorità: un difetto riproducibile in tre click, l'unica incoerenza che il
 codice dichiara sbagliata su sé stesso, e la classe di guasto che lasciava la
 pagina bianca.
 
-Quel che resta in **Archivio** non è stato promosso qui. Il candidato
-successivo è la sovrapposizione esatta di due archi fra la stessa coppia di
-nodi: è il difetto visibile del class diagram, ma costa un cambio di progetto
-in `routeEdge`, che dovrebbe conoscere il fascio di archi che tocca un nodo
-mentre la §7 della spec quella conoscenza la tiene fuori di proposito.
+DT-11 è la voce che seguiva, chiusa lo stesso giorno.
 
 ---
 
@@ -149,6 +145,46 @@ quindi l'avviso si aggiunge alla console invece di sostituirla. Entrambi
 provati nel browser: un `throw` temporaneo in `App` rende il pannello invece
 della pagina bianca, un `Promise.reject` produce «Operazione non riuscita: …»
 nella barra.
+
+### DT-11 · due archi fra la stessa coppia si sovrapponevano esattamente
+
+Ogni arco attaccava al centro del proprio lato, quindi due relazioni fra le
+stesse due classi si disegnavano una sull'altra, etichette comprese: se ne
+vedeva una sola e l'altra non si poteva nemmeno selezionare.
+
+**La voce d'Archivio diceva che serviva far conoscere a `routeEdge` il fascio
+di archi che tocca un nodo. Non serve, e infatti non è stato fatto.** Quel che
+il fascio sa e il routing no è *un numero per arco*: lo scarto laterale
+rispetto agli altri archi della stessa coppia. `edgeOffsets`
+([edge-routing.ts](../src/editor/edge-routing.ts)) lo calcola una volta sul
+modello, `routeEdge` lo riceve come parametro e si limita ad applicarlo, e la
+§7 della spec resta dov'era. Zero — il default — è esattamente la geometria di
+prima, quindi un arco unico non si sposta di un pixel: i 546 test esistenti
+sono passati senza toccarne uno.
+
+Un fascio si apre simmetrico attorno all'asse; i cappi crescono concentrici,
+perché un cappio ha un solo nodo e non ha un lato opposto su cui bilanciarsi.
+
+Tre cose trovate misurando, non ragionando:
+
+- **Il rientro dallo spigolo era troppo largo.** A `BUNDLE_GAP` la banda utile
+  si chiude a zero su un nodo alto quanto il solo header (28), e due archi fra
+  due entità senza attributi uscivano di nuovo identici — visto nell'export
+  prima che in un test. Ora è 6, con un test sul caso a 28.
+- **L'export ricalcolava il fascio per conto proprio.** Parte dagli stessi
+  estremi che il canvas passa a `edgeOffsets`, altrimenti il file scaricato
+  mostrerebbe un diagramma diverso da quello a schermo. Un test in
+  `svg.test.ts` lo tiene fermo.
+- **`ops.edgeGeometry` rifaceva la mappa intera a ogni arco a ogni frame.**
+  Regressione vera, misurata dal gate: `dragAll` da 25,9 a 125,1 ms di p95.
+  `erEdgeOffsets`/`classEdgeOffsets` sono memoizzate sull'identità della mappa
+  delle relazioni — Immer sostituisce l'oggetto a ogni cambiamento e non muta
+  mai sul posto, quindi stesso riferimento significa davvero stesso contenuto.
+  Con il memo: 26,3 e 26,6 ms su due misure, cioè il valore di partenza.
+
+Resta fuori, e resta vero, il punto gemello dell'Archivio: le etichette di
+archi **diversi** che convergono sullo stesso lato da direzioni diverse
+possono ancora accavallarsi. Il fascio risolve la coppia, non la convergenza.
 
 ### Minori chiuse il 2026-09-09
 
@@ -322,6 +358,14 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   Risolto lungo la strada, senza che nessuno lo registrasse.
   `no-restricted-imports` blocca anche gli `import type`: voluto.
 - `noUncheckedIndexedAccess` non è abilitato in `tsconfig` (verificato).
+- **Il gate di prestazione è rosso su due scenari, e lo era già.** Misurato il
+  2026-09-13 sul commit `2a825fc`, prima di DT-11: `dragAll` p95 25,9 ms e
+  `zoom` p95 58,4 ms, contro un criterio di 20 ms — `drag`, `pan`, `marquee` e
+  `marqueeAll` stanno a ~9 ms. Nessuno l'aveva registrato, quindi `pnpm perf`
+  fallisce da tempo imprecisato e un FAIL nuovo non si distinguerebbe dai due
+  vecchi. Il profiler dà la direzione: `dragAll` è script (12,2 s su 15,3 di
+  scenario), `zoom` è layout (2,6 s su 3,9), cioè due cause diverse e due
+  interventi diversi.
 - Script di prestazione → **corretto**, vedi DT-6.
 - `ErrorBoundary` e gestore di `unhandledrejection` assenti → **corretto**,
   vedi DT-10.
@@ -359,13 +403,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `crowsFootPath` in `edge-routing.ts`. Con due soli consumatori resta dentro
   la regola «tre righe simili valgono più di un'astrazione prematura»; al
   terzo consumatore vale un `perpOf(dir)` condiviso.
-- Ogni arco attacca al centro del proprio lato, quindi **due archi distinti
-  fra la stessa coppia di nodi si sovrappongono esattamente**, e così le loro
-  etichette. Distribuire gli attacchi richiede che `routeEdge` sappia quali
-  archi toccano un nodo, mentre oggi vede due `Rect` e nient'altro — la §7
-  della spec del class diagram tiene quella conoscenza fuori di proposito. Il
-  cappio dell'auto-relazione è stato spostato verso l'angolo per non cadere
-  nel caso peggiore, ma è un rimedio al sintomo, non alla causa.
+- I due archi fra la stessa coppia che si sovrapponevano → **corretto**, vedi
+  DT-11, che corregge anche il rimedio che questa voce dava per necessario.
 - Le etichette di **archi diversi** possono ancora accavallarsi quando più
   archi convergono sullo stesso lato di un nodo a poca distanza: la
   collocazione di `endPoint` risolve solo i conflitti interni a un arco

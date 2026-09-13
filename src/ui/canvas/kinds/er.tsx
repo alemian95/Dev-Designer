@@ -143,8 +143,8 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   return <EntityNodeView nodeKey={nodeKey} entity={node as Entity} view={view} selected={selected} />
 }
 
-function EdgeView({ edgeKey, relation, source, target, selected }: EdgeViewProps) {
-  return <RelationshipEdgeView edgeKey={edgeKey} relationship={relation as Relationship} source={source} target={target} selected={selected} />
+function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeViewProps) {
+  return <RelationshipEdgeView edgeKey={edgeKey} relationship={relation as Relationship} source={source} target={target} selected={selected} offset={offset} />
 }
 
 /** `DiagramView` per l'ER: cablaggio verso i componenti che esistono già, nessuna logica nuova. */

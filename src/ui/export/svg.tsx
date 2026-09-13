@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { opsFor } from "@/editor/kinds/ops"
+import { edgeOffsets } from "@/editor/edge-routing"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
 import type { Diagram } from "@/model/document"
 import { SCHEMA_VERSION } from "@/model/shared"
@@ -58,6 +59,11 @@ export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions):
     if (rect) rects.set(key, rect)
   }
 
+  // Gli stessi estremi che il canvas dà a `edgeOffsets` dal proprio layer: l'export deve disegnare
+  // il fascio dov'è sullo schermo, non ricentrarlo perché lo calcola per conto proprio.
+  const edges = ops.edgesTouching(new Set(keys))
+  const offsets = edgeOffsets(edges)
+
   const bounds = rectsBounds([...rects.values()])
   if (!bounds) return null
 
@@ -73,7 +79,7 @@ export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions):
     <>
       <rect data-background x={x} y={y} width={w} height={h} fill="var(--background)" />
       <g data-layer="edges">
-        {ops.edgesTouching(new Set(keys)).map((edge) => {
+        {edges.map((edge) => {
           const source = rects.get(edge.source)
           const target = rects.get(edge.target)
           const relation = edgeModels[edge.key]
@@ -81,7 +87,7 @@ export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions):
           // stessa guardia di `relation` qui sotto): la vista ricalcola comunque la propria
           // geometria dalle prop, come già fa nel canvas.
           if (!source || !target || !relation || !ops.edgeGeometry(edge.key, source, target)) return null
-          return <EdgeView key={edge.key} edgeKey={edge.key} relation={relation} source={source} target={target} selected={false} />
+          return <EdgeView key={edge.key} edgeKey={edge.key} relation={relation} source={source} target={target} selected={false} offset={offsets.get(edge.key) ?? 0} />
         })}
       </g>
       <g data-layer="nodes">

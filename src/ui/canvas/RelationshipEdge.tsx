@@ -16,10 +16,12 @@ interface Props {
   source: Rect
   target: Rect
   selected: boolean
+  /** Scarto del fascio: arriva dal layer, che è l'unico a vedere tutte le relazioni. */
+  offset: number
 }
 
-export const RelationshipEdgeView = memo(function RelationshipEdgeView({ edgeKey, relationship, source, target, selected }: Props) {
-  const geo = edgeGeometry(source, target, relationship)
+export const RelationshipEdgeView = memo(function RelationshipEdgeView({ edgeKey, relationship, source, target, selected, offset }: Props) {
+  const geo = edgeGeometry(source, target, relationship, offset)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   return (
     <g
@@ -56,11 +58,11 @@ function useEntityRect(key: string | undefined): Rect | null {
   )
 }
 
-export function RelationshipEdge({ edgeKey }: { edgeKey: string }) {
+export function RelationshipEdge({ edgeKey, offset }: { edgeKey: string; offset: number }) {
   const relationship = useStore(documentStore, (s) => erDiagram(s.doc).model.relationships[edgeKey])
   const source = useEntityRect(relationship?.source.entity)
   const target = useEntityRect(relationship?.target.entity)
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
   if (!relationship || !source || !target) return null
-  return <RelationshipEdgeView edgeKey={edgeKey} relationship={relationship} source={source} target={target} selected={selected} />
+  return <RelationshipEdgeView edgeKey={edgeKey} relationship={relationship} source={source} target={target} selected={selected} offset={offset} />
 }

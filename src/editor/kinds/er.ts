@@ -6,7 +6,7 @@ import { addEntity, addRelationship, deleteItems, duplicateEntities } from "../c
 import { layoutGraph } from "../commands/layout"
 import { edgeGeometry } from "../edge-routing"
 import { erDiagram } from "../er-access"
-import { entityRect } from "../er/geometry"
+import { entityRect, erEdgeOffsets } from "../er/geometry"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
@@ -32,8 +32,9 @@ export function erOps(doc: DevDocument): DiagramOps {
         .map(([key, rel]) => ({ key, source: rel.source.entity, target: rel.target.entity })),
 
     edgeGeometry: (key, a, b) => {
-      const rel = diagram().model.relationships[key]
-      return rel ? edgeGeometry(a, b, rel) : null
+      const model = diagram().model
+      const rel = model.relationships[key]
+      return rel ? edgeGeometry(a, b, rel, erEdgeOffsets(model.relationships).get(key) ?? 0) : null
     },
 
     addNode: (at) => addEntity(diagram().model.entities, at),

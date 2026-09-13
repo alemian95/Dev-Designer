@@ -1,7 +1,7 @@
 import { memberLines } from "@/model/class/members"
 import type { ClassEnd, ClassNode, ClassNote, ClassRelation, RelationKind } from "@/model/class/schema"
 import type { NodeView } from "@/model/shared"
-import { pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
+import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Point, type Rect, type Size } from "../geometry"
 
 /** Altezza della riga «stereotipo» dentro l'header, per interface ed enum. */
@@ -210,12 +210,12 @@ function endPoint(at: Point, dir: Dir, label: string): Point {
  * resta nudo. `sourceEnd`/`targetEnd` si calcolano *in coppia*: se almeno un capo ha qualcosa da
  * mostrare (`endLabel`), li popola entrambi, anche quando l'altro è vuoto e quindi
  * `ClassEdgeView` non renderà mai la sua etichetta (rende ciascuna solo se la propria `endLabel`
- * non è vuota). Non è un problema: `setEdgeGeometry`/`positionLabel` (`dom-registry.ts`)
+ * non è vuota). `offset` è lo scarto del fascio (`edgeOffsets`), 0 per un arco unico fra due nodi. Non è un problema: `setEdgeGeometry`/`positionLabel` (`dom-registry.ts`)
  * aggiornano solo l'elemento che trovano nel DOM e non fanno nulla se manca, quindi il capo senza
  * etichetta non viene mai toccato davvero — il calcolo in più è innocuo, non un bug da evitare.
  */
-export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRelation): EdgeGeometry {
-  const route = routeEdge(source, target)
+export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRelation, offset = 0): EdgeGeometry {
+  const route = routeEdge(source, target, offset)
   const pts = route.points
   const mid = Math.floor((pts.length - 1) / 2)
   const p1 = pts[mid]!
@@ -236,3 +236,10 @@ export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRel
   }
   return geo
 }
+
+/** Gemella di `erEdgeOffsets` (`er/geometry.ts`): stessa ragione, estremi in `source.class`/`target.class`. */
+export const classEdgeOffsets = memoOnIdentity((relations: Readonly<Record<string, ClassRelation>>) =>
+  edgeOffsets(
+    Object.entries(relations).map(([key, r]) => ({ key, source: r.source.class, target: r.target.class })),
+  ),
+)

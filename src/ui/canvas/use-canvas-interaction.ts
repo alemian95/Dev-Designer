@@ -7,14 +7,30 @@ import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
 import { IDLE, reduce, type Effect, type Hit, type InteractionEvent, type Mode, type PointerInfo } from "@/editor/interaction"
 import { opsFor, type EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
-import { panBy, screenToWorld, zoomAt } from "@/editor/viewport"
+import { panBy, screenToWorld, visibleWorldRect, zoomAt } from "@/editor/viewport"
 import { setEdgeGeometry, setNodePosition, showConnect, showMarquee } from "./dom-registry"
 
 const ZOOM_WHEEL_FACTOR = 0.01
 
+/**
+ * Margine, in unità di mondo, attorno all'inquadratura entro cui l'anteprima del drag scrive
+ * comunque. Un arco non sta dentro l'ingombro dei suoi due nodi: il cappio di un'auto-relazione
+ * esce di `SELF_LOOP_OFFSET` (30) più il suo anello, un marker arriva a 24 dal bordo e
+ * un'etichetta di capo poco oltre. Senza margine, un nodo appena fuori dallo schermo lascerebbe
+ * mezzo cappio visibile e fermo.
+ */
+const PREVIEW_MARGIN = 64
+
 interface DragTargets {
   nodes: { key: string; x: number; y: number }[]
   edges: EdgeEnds[]
+  /**
+   * Il rettangolo di ogni nodo coinvolto — trascinato o all'estremo di un arco toccato — com'era
+   * alla presa. La **dimensione** di un nodo non dipende da dove sta: durante il drag cambiano solo
+   * `x`/`y`, e ricalcolarla vale una misura di testo per ogni attributo, due volte per arco, a ogni
+   * frame. Qui si misura una volta sola e poi si sposta.
+   */
+  rects: Map<string, Rect>
 }
 
 /**
@@ -58,24 +74,70 @@ function isTextInput(target: EventTarget | null): target is HTMLElement {
 
 function collectDragTargets(keys: readonly string[]): DragTargets {
   const ops = opsFor(documentStore.getState().doc)
+  const edges = ops.edgesTouching(new Set(keys))
+  const rects = new Map<string, Rect>()
+  const measure = (key: string) => {
+    if (rects.has(key)) return
+    const r = ops.rectOf(key)
+    if (r) rects.set(key, r)
+  }
+  for (const key of keys) measure(key)
+  for (const edge of edges) {
+    measure(edge.source)
+    measure(edge.target)
+  }
   return {
     nodes: keys.flatMap((key) => {
-      const r = ops.rectOf(key)
+      const r = rects.get(key)
       return r ? [{ key, x: r.x, y: r.y }] : []
     }),
-    edges: ops.edgesTouching(new Set(keys)),
+    edges,
+    rects,
   }
 }
 
-/** Anteprima del drag: posizioni snappate sui nodi e geometria ricalcolata sugli edge toccati, tutto sul DOM. */
+/** Unione di due rettangoli: l'ingombro di un arco è quello dei suoi due estremi. */
+function union(a: Rect, b: Rect): Rect {
+  const x = Math.min(a.x, b.x)
+  const y = Math.min(a.y, b.y)
+  return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y }
+}
+
+/**
+ * Anteprima del drag: posizioni snappate sui nodi e geometria ricalcolata sugli edge toccati, tutto
+ * sul DOM.
+ *
+ * **Si scrive solo ciò che finisce nell'inquadratura.** Trascinando una selezione larga, la
+ * stragrande maggioranza dei nodi e degli archi sta fuori dallo schermo — alla scala 1, con 300
+ * entità, se ne vedono otto — e ogni `setAttribute` su di loro costa comunque ricalcolo di stile
+ * per un pixel che nessuno guarda. Il criterio è il rettangolo **dopo** lo spostamento, non prima:
+ * un nodo che entra nell'inquadratura durante il drag va scritto, uno che ne esce no. Al rilascio
+ * React rende comunque tutto dalle posizioni del comando, quindi il DOM saltato qui non resta
+ * indietro: è un'anteprima, non lo stato.
+ */
 function previewDrag(targets: DragTargets, dx: number, dy: number): void {
   const ops = opsFor(documentStore.getState().doc)
+  const { viewport, canvasSize } = sessionStore.getState()
+  const v = visibleWorldRect(viewport, canvasSize)
+  const seen = { x: v.x - PREVIEW_MARGIN, y: v.y - PREVIEW_MARGIN, w: v.w + 2 * PREVIEW_MARGIN, h: v.h + 2 * PREVIEW_MARGIN }
   const moved = new Map(targets.nodes.map((n) => [n.key, { x: snap(n.x + dx), y: snap(n.y + dy) }]))
-  for (const [key, p] of moved) setNodePosition(key, p.x, p.y)
+  const rectAt = (key: string): Rect | null => {
+    const base = targets.rects.get(key)
+    if (!base) return null
+    const p = moved.get(key)
+    return p ? { ...base, x: p.x, y: p.y } : base
+  }
+  for (const [key, p] of moved) {
+    const r = rectAt(key)
+    if (r && rectsIntersect(r, seen)) setNodePosition(key, p.x, p.y)
+  }
   for (const edge of targets.edges) {
-    const a = ops.rectOf(edge.source, moved.get(edge.source))
-    const b = ops.rectOf(edge.target, moved.get(edge.target))
-    const geo = a && b ? ops.edgeGeometry(edge.key, a, b) : null
+    const a = rectAt(edge.source)
+    const b = rectAt(edge.target)
+    // L'ingombro dell'arco e non i suoi estremi: un arco lungo può attraversare l'inquadratura con
+    // entrambi i nodi fuori.
+    if (!a || !b || !rectsIntersect(union(a, b), seen)) continue
+    const geo = ops.edgeGeometry(edge.key, a, b)
     if (geo) setEdgeGeometry(edge.key, geo)
   }
 }

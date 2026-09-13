@@ -1,0 +1,39 @@
+# I tre gate che girano ovunque: lint, test, build (che è anche il type check, `tsc -b`).
+#
+# `e2e` e `perf` restano a mano, per due ragioni diverse. L'e2e pilota il **Chrome di sistema** e
+# tocca appunti, download e IndexedDB: su un runner condiviso è la ricetta per un rosso che non
+# significa niente, e una CI che mente si impara a ignorare. Il `perf` misura tempi di frame su un
+# display reale — il suo stesso rapporto dice che il numero cambia fra macchine e sessioni, quindi
+# su hardware condiviso il verdetto non sarebbe confrontabile con niente.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Un push che ne segue un altro sullo stesso ramo annulla la corsa precedente: conta l'ultimo commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Prima di setup-node: la cache di pnpm ha bisogno che il gestore esista già.
+      # La versione non si scrive qui, viene da `packageManager` nel package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build

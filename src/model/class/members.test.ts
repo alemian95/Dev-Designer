@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { memberLines, memberText, parseMembers, type Members } from "./members"
+import { ClassNodeSchema } from "./schema"
 
 /** Le dieci righe della tabella §5 della spec, tutte insieme. */
 const TESTO = [
@@ -180,5 +181,48 @@ describe("memberLines e lo statico", () => {
     const righe = memberLines({ attributes: [attributo("a", true), attributo("bbbbbb", false)], methods: [] })
     const colonne = righe.map((r) => r.text.indexOf(":"))
     expect(new Set(colonne).size).toBe(1)
+  })
+})
+
+/**
+ * `parseMembers` costruisce oggetti tipizzati strutturalmente, senza passarli mai per `.parse()`
+ * dello schema: un nome che lo schema rifiutasse arriverebbe al validatore molto più tardi, con una
+ * riga di errore diversa da quella dove l'utente ha sbagliato.
+ *
+ * **Oggi quel buco è vuoto.** `Identifier` è `z.string().min(1)` e il parser rifiuta già il nome
+ * vuoto nei tre punti che ne producono uno (attributo, metodo, parametro): non esiste un input che
+ * l'uno accetti e l'altro no. Infilare una `.parse()` in mezzo al parser sarebbe cerimonia.
+ *
+ * Questo test è il pezzo che serve davvero: tiene insieme le due definizioni. Se qualcuno stringe
+ * `Identifier` — una regex, una lunghezza massima — senza stringere il parser, fallisce qui invece
+ * che in produzione.
+ */
+describe("parseMembers rispetta lo schema", () => {
+  const fonte = [
+    "+ id: int",
+    "- {static} contatore: long",
+    "# nome_con_underscore: string",
+    "~ 9inizia_con_cifra: string",
+    "+ Mappa: Map<string, List<int>>",
+    "+ calcola(a: int, b: Map<K, V>): decimal",
+    "+ {abstract} render()",
+    "- senzaTipo(x)",
+  ].join("\n")
+
+  it("ogni nome che produce passa da ClassNodeSchema", () => {
+    const parsed = parseMembers(fonte)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    const node = { name: "C", stereotype: "class" as const, ...parsed.value }
+    expect(() => ClassNodeSchema.parse(node)).not.toThrow()
+  })
+
+  it("il nome vuoto lo rifiuta il parser, prima e non dopo lo schema", () => {
+    // I tre punti che producono un nome: attributo, metodo, parametro.
+    for (const riga of ["+ : int", "+ (x: int)", "+ f(: int)"]) {
+      const r = parseMembers(riga)
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.message).toContain("vuoto")
+    }
   })
 })

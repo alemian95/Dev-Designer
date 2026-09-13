@@ -28,7 +28,7 @@ priorità: un difetto riproducibile in tre click, l'unica incoerenza che il
 codice dichiara sbagliata su sé stesso, e la classe di guasto che lasciava la
 pagina bianca.
 
-DT-11 e DT-12 sono le voci che seguivano, chiuse lo stesso giorno.
+DT-11, DT-12 e DT-13 sono le voci che seguivano, chiuse lo stesso giorno.
 
 ---
 
@@ -212,6 +212,23 @@ difetti, e vale più la verifica della correzione.**
   adesso* quando la promessa si risolve. Restituire la scrittura già in volo
   romperebbe quel contratto, e incatenarle aggiunge una coda per uno spreco
   che nessuno paga.
+
+### DT-13 · `parseMembers` non passa i nomi per `.parse()` dello schema
+
+La voce d'Archivio temeva che un nome rifiutato dallo schema arrivasse al
+validatore molto più tardi, con una riga di errore diversa da quella dove
+l'utente ha sbagliato. **Il timore è giusto, il buco è vuoto:** `Identifier` è
+`z.string().min(1)` (`src/model/shared.ts`) e `parseMembers` rifiuta già il
+nome vuoto nei tre punti che ne producono uno — attributo, metodo, parametro.
+Non esiste un input che l'uno accetti e l'altro no, quindi infilare una
+`.parse()` dentro il parser sarebbe cerimonia pura.
+
+Il pezzo che mancava davvero è la prova che le due definizioni restino
+d'accordo. Due test in `members.test.ts`: il primo fa passare l'uscita del
+parser per `ClassNodeSchema.parse()`, il secondo fissa che il nome vuoto lo
+rifiuta il parser, con la sua riga. Il primo è verificato RED aggiungendo una
+regex a `Identifier`: fallisce lì invece che in produzione, che è il solo
+lavoro che questa voce chiedeva.
 
 ### Minori chiuse il 2026-09-09
 
@@ -419,10 +436,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   primitiva — sì: due funzioni con comportamenti diversi sullo stesso input
   malformato. Costo-se-sbagliato: teorico — l'input che le distingue
   (`+ x: a > b: int`) non è un tipo legittimo in nessun linguaggio.
-- `parseMembers` non valida i nomi contro `Identifier` dello schema: produce
-  oggetti strutturalmente tipizzati ma mai passati per `.parse()`. Un nome
-  che lo schema rifiuterebbe viene preso dal validatore molto più tardi, con
-  una riga di errore diversa da quella dove l'utente ha sbagliato.
+- `parseMembers` che non passa per `.parse()` → **esaminato**, vedi DT-13: il
+  buco che la voce temeva è vuoto, e ora c'è il test che lo tiene tale.
 - Il calcolo della perpendicolare in `src/editor/class/geometry.ts`
   (`umlMarkerPath`) duplica in forma le tre righe equivalenti di
   `crowsFootPath` in `edge-routing.ts`. Con due soli consumatori resta dentro

@@ -57,8 +57,9 @@ correzione immaginata.*
 
 Listener `blur` su `window`. Il `keyup` non arriva se il fuoco lascia la
 finestra col tasto premuto, e al rientro il canvas restava in pan senza modo
-di uscirne. Nessun test unitario possibile senza jsdom: provato in un browser
-con input reale, e con la controprova (senza il blur lo stesso drag pana).
+di uscirne. Provato in un browser con input reale, e con la controprova
+(senza il blur lo stesso drag pana). «Nessun test unitario possibile senza
+jsdom», diceva questa voce: **ora c'è**, vedi DT-19.
 
 ### DT-3 · la rinomina falliva in silenzio
 
@@ -94,8 +95,9 @@ entrambi.
 `try/catch` su entrambi gli accessi in [use-theme.ts](../src/ui/use-theme.ts),
 non solo su `getItem` come diceva la voce: dove i dati del sito sono bloccati
 anche `setItem` lancia, e lì il lancio è dentro l'effect — stessa pagina
-bianca per una strada diversa. Senza jsdom non c'è dove eseguire un test:
-simulare lo storage bloccato in Playwright costa più del difetto.
+bianca per una strada diversa. Quando questa voce è stata scritta non c'era
+dove eseguire un test — simulare lo storage bloccato in Playwright costa più
+del difetto — ma da DT-19 jsdom c'è, e questo sarebbe il primo posto dove usarlo.
 
 ### DT-8 · lo strumento sopravviveva al cambio di diagramma
 
@@ -374,6 +376,51 @@ browser. Che un `pointerdown` col tasto destro non avvii un drag, che il
 pointer capture venga rilasciato, che il rect in cache si invalidi al resize —
 tutto ciò che sta ancora nell'hook ha bisogno di un DOM per essere provato, e
 un DOM questo progetto non ce l'ha.
+
+### DT-19 · il cablaggio degli eventi non era coperto, e non si poteva
+
+DT-18 aveva tirato la macchina a stati fuori dall'hook e lasciato scritto
+quel che restava scoperto: il cablaggio degli eventi del browser. Che un
+`pointerdown` col tasto destro non apra niente, che il pointer capture venga
+rilasciato, che il rect in cache si invalidi al resize — tutto ciò ha bisogno
+di un DOM per essere provato.
+
+**`jsdom` è ora una dipendenza di sviluppo**, ed è usato da un file solo, con
+`// @vitest-environment jsdom` in testa invece che da una configurazione
+globale: tutti gli altri test restano nell'ambiente `node`, che è più veloce e
+non finge di essere un browser. L'ambiente costa il 9% del tempo di
+`pnpm test`.
+
+**Tre cose jsdom non le implementa** — `setPointerCapture` e compagni,
+`elementFromPoint`, `ResizeObserver` — e vanno messe a mano. Non sono
+scorciatoie: due delle tre sono proprio ciò che il test vuole osservare. Il
+capture diventa un registro, che è anche il modo per asserire il protocollo;
+`elementFromPoint` è il modo in cui il test decide cosa sta sotto il cursore,
+che nel browser dipende dal layout e qui non esiste. Anche
+`getBoundingClientRect` è sovrascritto, perché **quante volte viene chiamato**
+è metà di ciò che questo file verifica.
+
+Diciotto test in `use-canvas-interaction.test.tsx`: pointer capture, il rect
+in cache e le sue tre invalidazioni, la rotella con e senza modificatori, lo
+spazio che pana, Escape, il doppio click, il menu contestuale, il
+`pointercancel`, lo smontaggio dei listener.
+
+Otto mutazioni dell'hook, una riga ciascuna, e **ognuna è caduta sul test che
+la sorveglia** — niente capture, nessun filtro sul pulsante, rect senza cache,
+move anche a riposo, niente `onBlur`, niente guardia sul campo di testo,
+niente invalidazione al resize, niente cleanup allo smontaggio. Il rect senza
+cache ne fa cadere tre, che è giusto: tre test guardano lo stesso meccanismo
+da tre lati.
+
+**Chiude anche mezza DT-2.** La voce diceva «nessun test unitario possibile
+senza jsdom: provato in un browser». Ora il blur della finestra che azzera lo
+spazio ha il suo test, con la stessa controprova che allora era stata fatta a
+mano.
+
+**Resta possibile e non fatto:** DT-7 diceva «senza jsdom non c'è dove
+eseguire un test» per il `try/catch` sugli accessi a `localStorage` di
+`use-theme.ts`. Ora ci sarebbe. Non l'ho scritto perché non è cablaggio di
+eventi, ed è la prossima voce che l'arrivo di jsdom rende raggiungibile.
 
 ### Minori chiuse il 2026-09-09
 

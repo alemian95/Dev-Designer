@@ -32,7 +32,11 @@ describe("classSize", () => {
   })
 
   it("interface ed enum aggiungono la riga dello stereotipo, class e abstract no", () => {
+    // Il titolo prometteva quattro casi e il corpo ne asseriva due: `enum` — che è l'altro
+    // stereotipo con la riga — e `class`, che è il default, non erano provati.
     expect(classSize({ ...vuota, stereotype: "interface" }, false).h).toBe(HEADER_H + STEREO_H)
+    expect(classSize({ ...vuota, stereotype: "enum" }, false).h).toBe(HEADER_H + STEREO_H)
+    expect(classSize({ ...vuota, stereotype: "class" }, false).h).toBe(HEADER_H)
     expect(classSize({ ...vuota, stereotype: "abstract" }, false).h).toBe(HEADER_H)
   })
 
@@ -149,6 +153,20 @@ describe("classEdgeGeometry", () => {
     const geo = classEdgeGeometry(source, target, { ...relazione, kind: "composition" })
     expect(geo.sourceMarker).toBe("")
     expect(geo.targetMarker.length).toBeGreaterThan(0)
+  })
+
+  it("su un arco orizzontale l'etichetta del capo scavalca il marker di END_LABEL_OFFSET", () => {
+    // `END_LABEL_OFFSET` è `DIAMOND_LEN + 8` = 24: il rombo è lungo 16 e l'etichetta deve cadere
+    // oltre la sua punta, altrimenti il testo finisce sopra il marker. Nessun test lo fissava, e
+    // abbassarlo sotto 16 non avrebbe rotto niente.
+    const conMolteplicita: ClassRelation = { ...relazione, source: { ...relazione.source, multiplicity: "1" } }
+    const geo = classEdgeGeometry(source, target, conMolteplicita)
+    // Il capo sorgente attacca a (100, 30) e l'arco esce verso destra: lo scarto lungo l'arco è
+    // `END_LABEL_OFFSET` più la semilarghezza del testo (font 11 × 0,6 per carattere, un carattere).
+    const semiLarghezza = (11 * 0.6) / 2
+    expect(geo.sourceEnd!.x - source.w).toBeCloseTo(24 + semiLarghezza, 5)
+    // L'invariante che il numero serve a garantire, scritta a parte dal numero.
+    expect(geo.sourceEnd!.x - source.w).toBeGreaterThan(16)
   })
 
   it("sourceEnd/targetEnd assenti quando entrambe le molteplicità sono vuote", () => {

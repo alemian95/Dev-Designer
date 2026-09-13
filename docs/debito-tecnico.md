@@ -283,6 +283,27 @@ l'appartenenza positiva a ciascuna delle due mappe. Dedurre per esclusione è
 vero solo finché le specie restano due, e `view.nodes` è lo spazio di chiavi
 *condiviso* proprio perché possa ospitarne altre.
 
+### DT-16 · l'auto-relazione riconosciuta per uguaglianza di rettangoli
+
+`routeEdge` distingueva il cappio dall'arco normale confrontando i due `Rect`
+per valore (`sameRect`). Due nodi **diversi** delle stesse dimensioni,
+trascinati sulla stessa cella della griglia, producono rettangoli identici — e
+con lo snap non è un caso di laboratorio: l'arco fra loro veniva disegnato come
+un cappio su uno solo dei due.
+
+Se un estremo è lo stesso nodo lo sa il modello, che è il solo posto dove è
+vero: `loop` è ora un parametro **obbligatorio**, e `edgeGeometry` /
+`classEdgeGeometry` lo ricavano da `rel.source.entity === rel.target.entity`
+(rispettivamente `.class`). `sameRect` è sparito. Obbligatorio e non con un
+default: il compilatore ha trovato tutti e quindici i punti da aggiornare, che
+un default avrebbe lasciato silenziosamente al comportamento vecchio.
+
+Due test nuovi: lo stesso rettangolo passato con `loop` falso non produce più
+cinque punti, e `edgeGeometry` dà due percorsi diversi per la stessa coppia di
+rettangoli a seconda di cosa dice il modello. Il cappio vero è stato anche
+riprovato in pagina su un'auto-relazione ER — cinque punti, esce a destra e
+rientra dall'alto — perché nessun e2e lo copre.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -327,9 +348,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 - `fk-without-relationship` valuta le relazioni uscenti a livello di entità,
   non per singolo attributo — è il codice del piano, accettato. Falsi
   negativi su entità con più FK e una sola relazione.
-- `routeEdge` riconosce l'auto-relazione per **uguaglianza di valore** dei
-  `Rect` (`sameRect`, `src/editor/edge-routing.ts:14,18`), non per identità
-  delle entità: due nodi perfettamente sovrapposti diventano un self-loop.
+- L'auto-relazione riconosciuta per uguaglianza di rettangoli → **corretto**,
+  vedi DT-16.
 - Il clamp di `zoomAt` è testato solo a `MAX_SCALE`.
 - `duplicateEntities` usa i suffissi `_copy2`/`_copy3`
   (`src/editor/commands/er.ts:188`) mentre `uniqueKey` usa `_2`/`_3`:

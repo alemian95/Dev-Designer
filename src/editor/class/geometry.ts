@@ -215,7 +215,7 @@ function endPoint(at: Point, dir: Dir, label: string): Point {
  * etichetta non viene mai toccato davvero — il calcolo in più è innocuo, non un bug da evitare.
  */
 export function classEdgeGeometry(source: Rect, target: Rect, relation: ClassRelation, offset = 0): EdgeGeometry {
-  const route = routeEdge(source, target, offset)
+  const route = routeEdge(source, target, relation.source.class === relation.target.class, offset)
   const pts = route.points
   const mid = Math.floor((pts.length - 1) / 2)
   const p1 = pts[mid]!

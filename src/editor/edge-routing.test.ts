@@ -10,19 +10,19 @@ const rel: Relationship = {
 
 describe("routeEdge", () => {
   it("entità affiancate: esce da destra, entra da sinistra, due pieghe", () => {
-    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 100, w: 100, h: 50 })
+    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 100, w: 100, h: 50 }, false)
     expect(r.sourceDir).toEqual({ x: 1, y: 0 })
     expect(r.targetDir).toEqual({ x: -1, y: 0 })
     expect(r.points).toEqual([{ x: 100, y: 25 }, { x: 200, y: 25 }, { x: 200, y: 125 }, { x: 300, y: 125 }])
   })
 
   it("stessa altezza: segmento dritto", () => {
-    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 })
+    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 }, false)
     expect(r.points).toHaveLength(2)
   })
 
   it("entità impilate: esce dal basso, entra dall'alto", () => {
-    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 20, y: 300, w: 100, h: 50 })
+    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 20, y: 300, w: 100, h: 50 }, false)
     expect(r.sourceDir).toEqual({ x: 0, y: 1 })
     expect(r.targetDir).toEqual({ x: 0, y: -1 })
     expect(r.points[0]).toEqual({ x: 50, y: 50 })
@@ -30,14 +30,14 @@ describe("routeEdge", () => {
 
   it("relazione su se stessa: anello a destra e rientro dall'alto", () => {
     const a = { x: 0, y: 0, w: 100, h: 50 }
-    const r = routeEdge(a, a)
+    const r = routeEdge(a, a, true)
     expect(r.points).toHaveLength(5)
     expect(r.targetDir).toEqual({ x: 0, y: -1 })
   })
 
   it("il cappio non attacca al centro dei lati, dove attaccano tutti gli altri archi", () => {
     const a = { x: 0, y: 0, w: 100, h: 50 }
-    const r = routeEdge(a, a)
+    const r = routeEdge(a, a, true)
     const primo = r.points[0]!
     const ultimo = r.points[r.points.length - 1]!
     // Ogni altro arco che tocca questo nodo attacca al centro del lato — (100, 25) a destra,
@@ -122,19 +122,19 @@ describe("routeEdge con lo scarto del fascio", () => {
   const b = { x: 300, y: 0, w: 100, h: 100 }
 
   it("senza scarto attacca al centro del lato, come prima", () => {
-    expect(routeEdge(a, b, 0).points).toEqual(routeEdge(a, b).points)
+    expect(routeEdge(a, b, false, 0).points).toEqual(routeEdge(a, b, false).points)
   })
 
   it("due archi della stessa coppia non condividono più nessun punto", () => {
-    const uno = routeEdge(a, b, -BUNDLE_GAP / 2).points
-    const due = routeEdge(a, b, BUNDLE_GAP / 2).points
+    const uno = routeEdge(a, b, false, -BUNDLE_GAP / 2).points
+    const due = routeEdge(a, b, false, BUNDLE_GAP / 2).points
     expect(uno[0]).not.toEqual(due[0])
     expect(uno[uno.length - 1]).not.toEqual(due[due.length - 1])
   })
 
   it("su archi verticali lo scarto va di lato, non lungo l'arco", () => {
     const sotto = { x: 0, y: 300, w: 100, h: 100 }
-    const r = routeEdge(a, sotto, BUNDLE_GAP)
+    const r = routeEdge(a, sotto, false, BUNDLE_GAP)
     expect(r.sourceDir).toEqual({ x: 0, y: 1 })
     expect(r.points[0]).toEqual({ x: 50 + BUNDLE_GAP, y: 100 })
   })
@@ -143,8 +143,8 @@ describe("routeEdge con lo scarto del fascio", () => {
     // Il caso che il rientro sbagliato schiacciava: un'entità senza attributi è alta HEADER_H, e
     // con un rientro pari a BUNDLE_GAP la banda utile si chiudeva a zero: archi di nuovo identici.
     const basso = { x: 0, y: 0, w: 160, h: 28 }
-    const uno = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, -BUNDLE_GAP / 2)
-    const due = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, BUNDLE_GAP / 2)
+    const uno = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, false, -BUNDLE_GAP / 2)
+    const due = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, false, BUNDLE_GAP / 2)
     expect(uno.points[0]).not.toEqual(due.points[0])
   })
 
@@ -152,17 +152,35 @@ describe("routeEdge con lo scarto del fascio", () => {
     // Meglio due archi che ripartono dallo stesso punto e divergono subito, che due archi che
     // partono dal vuoto accanto al nodo.
     const basso = { x: 0, y: 0, w: 100, h: 20 }
-    const r = routeEdge(basso, { x: 300, y: 0, w: 100, h: 20 }, 500)
+    const r = routeEdge(basso, { x: 300, y: 0, w: 100, h: 20 }, false, 500)
     expect(r.points[0]!.y).toBeGreaterThanOrEqual(basso.y)
     expect(r.points[0]!.y).toBeLessThanOrEqual(basso.y + basso.h)
   })
 
   it("due cappi sullo stesso nodo non condividono né anello né attacchi", () => {
-    const uno = routeEdge(a, a, 0).points
-    const due = routeEdge(a, a, BUNDLE_GAP).points
+    const uno = routeEdge(a, a, true, 0).points
+    const due = routeEdge(a, a, true, BUNDLE_GAP).points
     expect(uno[0]).not.toEqual(due[0])
     expect(uno[4]).not.toEqual(due[4])
     // l'anello esterno sta davvero più in fuori
     expect(due[1]!.x).toBeGreaterThan(uno[1]!.x)
+  })
+})
+
+describe("l'auto-relazione la dichiara il chiamante", () => {
+  it("due nodi diversi con lo stesso rettangolo non diventano un cappio", () => {
+    // Raggiungibile con lo snap: due entità uguali trascinate sulla stessa cella della griglia
+    // hanno rettangoli identici. Prima `routeEdge` li confrontava per valore e disegnava un cappio.
+    const stesso = { x: 40, y: 40, w: 160, h: 80 }
+    const fra = routeEdge(stesso, stesso, false)
+    const cappio = routeEdge(stesso, stesso, true)
+    expect(cappio.points).toHaveLength(5)
+    expect(fra.points).not.toHaveLength(5)
+  })
+
+  it("edgeGeometry prende il cappio dal modello, non dai rettangoli", () => {
+    const stesso = { x: 0, y: 0, w: 100, h: 50 }
+    const suSe: Relationship = { ...rel, target: { ...rel.target, entity: "a" } }
+    expect(edgeGeometry(stesso, stesso, rel).d).not.toBe(edgeGeometry(stesso, stesso, suSe).d)
   })
 })

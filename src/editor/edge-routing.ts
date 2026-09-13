@@ -21,7 +21,6 @@ export interface EdgeEnds {
 }
 
 const center = (r: Rect): Point => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 })
-const sameRect = (a: Rect, b: Rect): boolean => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h
 
 /** Chiave della coppia, non orientata: A→B e B→A sono lo stesso fascio. Lo `\u0000` non può stare
  *  in un nome, quindi non confonde `{"a\u0000b"}` con `{"a", "b"}` — la collisione di DT-1. */
@@ -115,11 +114,17 @@ function slide(at: number, min: number, size: number, offset: number): number {
 /**
  * Routing ortogonale con al più due pieghe, senza evitamento ostacoli (spec §4.3).
  *
- * `offset` è lo scarto del fascio (`edgeOffsets`): 0 — il default — è l'arco unico fra due nodi, con
- * l'attacco al centro del lato.
+ * **`loop` lo dice il chiamante, non si deduce dai rettangoli.** Prima si riconosceva
+ * l'auto-relazione confrontando `a` e `b` per valore: due nodi *diversi* delle stesse dimensioni
+ * trascinati sulla stessa cella della griglia — e lo snap rende la cosa facile, non ipotetica —
+ * producevano rettangoli identici e l'arco fra loro veniva disegnato come un cappio su uno solo dei
+ * due. Se un estremo è lo stesso nodo lo sa il modello, che è il solo posto dove è vero.
+ *
+ * `offset` è lo scarto del fascio (`edgeOffsets`): 0 è l'arco unico fra due nodi, con l'attacco al
+ * centro del lato.
  */
-export function routeEdge(a: Rect, b: Rect, offset = 0): EdgeRoute {
-  if (sameRect(a, b)) return selfLoop(a, offset)
+export function routeEdge(a: Rect, b: Rect, loop: boolean, offset = 0): EdgeRoute {
+  if (loop) return selfLoop(a, offset)
   const ca = center(a)
   const cb = center(b)
   const dx = cb.x - ca.x
@@ -206,7 +211,7 @@ export interface EdgeGeometry {
 
 /** Tutta la geometria di un edge da due rettangoli e la relazione. Usata sia da React sia dagli aggiornamenti imperativi. */
 export function edgeGeometry(source: Rect, target: Rect, rel: Relationship, offset = 0): EdgeGeometry {
-  const route = routeEdge(source, target, offset)
+  const route = routeEdge(source, target, rel.source.entity === rel.target.entity, offset)
   const pts = route.points
   const mid = Math.floor((pts.length - 1) / 2)
   const a = pts[mid]!

@@ -131,6 +131,32 @@ describe("emitClassMermaid: i membri", () => {
     expect(text).toContain("<<Enumeration>>")
     expect(text).not.toMatch(/<<Class>>/i)
   })
+
+  it("un metodo astratto dentro un enum porta annotazione e classificatore insieme", () => {
+    // I due meccanismi — l'annotazione di stereotipo sulla classe e il classificatore in coda al
+    // membro — vivono in punti diversi dell'emettitore e non erano mai stati provati insieme.
+    const parsed = parseMembers("+ {abstract} valore(): int")
+    if (!parsed.ok) throw new Error("fixture non valida")
+    const m: ClassModel = {
+      classes: { E: { name: "E", stereotype: "enum", attributes: [], methods: parsed.value.methods } },
+      relations: {},
+      notes: {},
+    }
+    const { text } = emitClassMermaid(m)
+    expect(text).toContain("<<Enumeration>>")
+    expect(text).toContain("+valore() int*")
+  })
+
+  it("un nome che inizia con una cifra prende il prefisso _ ed è segnalato", () => {
+    // `safeName` ha due rami: la sostituzione dei caratteri non ammessi e il prefisso `_` per chi
+    // inizia con una cifra. Il secondo non aveva fixture, e un identificatore che inizia con una
+    // cifra Mermaid non lo accetta.
+    const m: ClassModel = { classes: { "9Cliente": classe("9Cliente") }, relations: {}, notes: {} }
+    const { text, warnings } = emitClassMermaid(m)
+    expect(text).toContain("_9Cliente")
+    expect(text).not.toMatch(/class 9Cliente/)
+    expect(warnings.join(" ")).toContain("9Cliente")
+  })
 })
 
 describe("emitClassMermaid: nomi che Mermaid non prende nudi", () => {

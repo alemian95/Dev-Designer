@@ -1,8 +1,9 @@
 import { produce } from "immer"
 import { beforeEach, describe, expect, it } from "vitest"
 import { createClassDocument, type ClassAttribute, type ClassDocument } from "@/model/class/schema"
+import { classDiagram } from "../class-access"
 import { documentStore, type Recipe } from "../document-store"
-import { addNote, deleteClassItems, duplicateClasses, renameClass, setMembers, setNoteText } from "./commands"
+import { addNote, addRelation, deleteClassItems, duplicateClasses, renameClass, setMembers, setNoteText } from "./commands"
 
 /** Applica una recipe a un documento senza passare dallo store: comodo per i test che non
  *  hanno bisogno di undo/redo, solo del documento risultante. */
@@ -49,6 +50,47 @@ describe("comandi delle classi", () => {
     expect(renameClass("Cliente", "")).toBeNull()
     expect(state().dispatch(renameClass("Cliente", "Persona")!)).toBe(false)
     expect(Object.keys(cd().model.classes).sort()).toEqual(["Cliente", "Persona"])
+  })
+
+  it("renameClass aggiorna anche il target di una relazione, non solo il source", () => {
+    // Il test qui sotto rinomina Cliente, che in `r1` è il `source`: il ramo del `target` non era
+    // mai percorso, e `renameClass` deve toccarli entrambi.
+    state().dispatch(renameClass("Persona", "Essere")!)
+    const d = cd()
+    expect(d.model.relations["r1"]?.target.class).toBe("Essere")
+    expect(d.model.relations["r1"]?.source.class).toBe("Cliente")
+    expect(d.model.classes["Persona"]).toBeUndefined()
+  })
+
+  it("renameClass rinomina entrambi i capi di un'autorelazione", () => {
+    // Con `source` e `target` sulla stessa classe, un `renameClass` che aggiornasse un capo solo
+    // lascerebbe una relazione con un estremo pendente — e il caso non era coperto.
+    state().dispatch((draft) => {
+      classDiagram(draft).model.relations["r2"] = {
+        kind: "association",
+        source: { class: "Cliente", multiplicity: "", role: "" },
+        target: { class: "Cliente", multiplicity: "", role: "" },
+      }
+    })
+    state().dispatch(renameClass("Cliente", "Acquirente")!)
+    expect(cd().model.relations["r2"]).toEqual({
+      kind: "association",
+      source: { class: "Acquirente", multiplicity: "", role: "" },
+      target: { class: "Acquirente", multiplicity: "", role: "" },
+    })
+  })
+
+  it("addRelation nasce come associazione, coi capi vuoti", () => {
+    // Il `kind` di default e i capi vuoti non erano fissati da nessun test: `addRelation` è il
+    // solo modo in cui lo strumento relazione crea un arco, e cambiarne il default in silenzio
+    // cambierebbe cosa disegna ogni trascinamento fra due classi.
+    const { key, recipe } = addRelation(cd().model.relations, "Cliente", "Persona")
+    state().dispatch(recipe)
+    expect(cd().model.relations[key]).toEqual({
+      kind: "association",
+      source: { class: "Cliente", multiplicity: "", role: "" },
+      target: { class: "Persona", multiplicity: "", role: "" },
+    })
   })
 
   it("renameClass sposta anche la view e gli estremi delle relazioni", () => {

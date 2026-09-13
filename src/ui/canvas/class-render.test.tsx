@@ -45,6 +45,13 @@ describe("ClassNodeView", () => {
     expect((html.match(/data-compartment-rule/g) ?? [])).toHaveLength(1)
   })
 
+  it("enum mostra la riga dello stereotipo, come interface", () => {
+    // `hasStereotypeLine` è vero per interface **ed enum**: il render del secondo non era provato,
+    // e un enum senza la sua riga occuperebbe un'altezza che `classSize` non prevede.
+    const e = renderToStaticMarkup(<ClassNodeView nodeKey="E" node={{ ...cliente, stereotype: "enum" }} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
+    expect(e).toContain("«enum»")
+  })
+
   it("interface mostra la riga dello stereotipo, class no", () => {
     const i = renderToStaticMarkup(<ClassNodeView nodeKey="S" node={{ ...cliente, stereotype: "interface" }} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
     expect(i).toContain("«interface»")

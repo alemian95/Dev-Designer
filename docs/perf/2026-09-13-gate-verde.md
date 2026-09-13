@@ -123,6 +123,8 @@ Chrome, entità tutte espanse. In più, qui:
   gesto continua» e «il gesto è finito» è una scelta, provata a mano sulla rotella, non misurata su
   utenti o su dispositivi di puntamento diversi. Un trackpad con inerzia lunga potrebbe tenere i
   corpi via più a lungo di quanto sembri naturale.
-- **Il culling del drag non ha un test automatico.** L'invariante «un nodo che entra
-  nell'inquadratura viene scritto» è verificata in pagina (sopra), non in un test: l'hook delle
-  interazioni non ha una rete di regressione, ed è un debito che questo lavoro non chiude.
+- ~~**Il culling del drag non ha un test automatico.**~~ **Chiuso lo stesso giorno** (DT-18 del
+  debito): la macchina a stati è uscita dall'hook in `interaction-runner.ts` e ha i suoi test, il
+  culling compreso — fixture con un nodo che esce, uno che entra e uno sempre fuori, più i tre casi
+  di arco. Resta senza rete il solo cablaggio degli eventi del browser, che un DOM lo richiede
+  davvero.

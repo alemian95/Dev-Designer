@@ -266,10 +266,8 @@ era sbagliata; era sbagliato il selettore. Il conteggio dei glifi ancora in
 layout è la misura che non mente, `getComputedStyle` no: descrive l'elemento a
 cui si chiede, non il lavoro che il motore fa.
 
-Resta aperto: il culling del drag **non ha un test automatico**. L'invariante
-«un nodo che entra nell'inquadratura viene scritto» è verificata in pagina, e
-l'hook delle interazioni continua a non avere rete di regressione — voce
-d'Archivio che questo lavoro non chiude.
+Restava aperto il culling del drag senza test automatico: **chiuso da DT-18**,
+che ha tirato la macchina a stati fuori dall'hook e le ha dato i suoi.
 
 ### DT-15 · una specie dedotta per esclusione dall'altra
 
@@ -332,6 +330,51 @@ che quel numero serve a garantire — l'etichetta del capo cade oltre la punta
 del rombo — scritta a parte dal numero, così un domani si vede quale dei due
 si sta cambiando.
 
+### DT-18 · l'hook delle interazioni non aveva rete di regressione
+
+Due voci in una: l'Archivio diceva che «l'invariante *un comando al rilascio*
+non ha rete di regressione», e DT-14 aveva aggiunto che il culling del drag era
+verificato solo in pagina. Nessuna delle due si poteva chiudere com'era il
+codice: `reduce` ha i suoi tredici test, ma tutto quello che veniva **dopo** —
+l'applicazione degli effetti, l'anteprima, il comando al rilascio — viveva in
+una `useEffect` di 380 righe, raggiungibile solo da un browser.
+
+**La correzione non è un test, è una separazione.** `interaction-runner.ts`
+tiene la macchina a stati e i suoi effetti;
+[use-canvas-interaction.ts](../src/ui/canvas/use-canvas-interaction.ts) tiene
+solo ciò che ha bisogno del browser per esistere — `getBoundingClientRect`,
+`elementFromPoint`, il pointer capture, il cablaggio degli eventi. 381 righe
+diventano 211 e 211. Non è una giuntura inventata per i test: erano due
+responsabilità dentro la stessa chiusura, e una delle due non ne aveva
+nessuna, di dipendenze dal DOM.
+
+**Niente jsdom.** Ogni scrittura dell'anteprima passa già dal registro di
+`dom-registry`, che è una mappa da chiave a elemento e su una chiave non
+registrata non fa nulla: registrando finti elementi si vede *esattamente* cosa
+l'anteprima ha toccato, senza un DOM e senza spiare funzioni. È la stessa
+giuntura che usa il canvas vero — la si usa, non la si simula.
+
+Otto test in `interaction-runner.test.ts`. Il culling ha la fixture che
+contiene i tre casi interessanti in un solo spostamento: un nodo che **esce**
+dall'inquadratura, uno che **entra**, uno che resta fuori; e tre archi — uno
+che attraversa lo schermo con entrambi gli estremi lontani (il caso per cui il
+criterio è l'ingombro e non gli estremi), uno con un capo solo in vista, uno
+interamente sotto. Un quarto test prende l'altra metà: il nodo mai scritto sul
+DOM ha comunque il modello giusto dopo il rilascio, perché il DOM saltato è
+un'anteprima, non lo stato.
+
+Tutti verificati RED, ciascuno contro il guasto che sorveglia: senza le due
+guardie di visibilità cadono i due test del culling; senza lo scarto dello
+snapshot cade quello delle due prese di seguito; e sostituendo l'anteprima con
+un comando per movimento — la regressione che l'invariante esiste per
+impedire — ne cadono quattro.
+
+**Resta aperto**, e non è coperto da qui: il cablaggio degli eventi del
+browser. Che un `pointerdown` col tasto destro non avvii un drag, che il
+pointer capture venga rilasciato, che il rect in cache si invalidi al resize —
+tutto ciò che sta ancora nell'hook ha bisogno di un DOM per essere provato, e
+un DOM questo progetto non ce l'ha.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -390,8 +433,9 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `PointerInfo.button` è irraggiungibile.
 - Nessun test sul marquee additivo (shift+drag sul vuoto), sullo shift+click
   su relazione, sulla soglia esatta `MARQUEE_MIN=3`.
-- L'hook delle interazioni non ha test automatici: l'invariante «un comando
-  al rilascio» non ha rete di regressione.
+- L'hook delle interazioni senza rete di regressione → **corretto**, vedi
+  DT-18: la macchina a stati è uscita dall'hook e ha i suoi test. Resta senza
+  rete il solo cablaggio degli eventi del browser.
 - La guardia «il target è un campo di testo» è duplicata fra
   `use-canvas-interaction.ts` e `use-keyboard-shortcuts.ts`. Una riga: un
   modulo condiviso sarebbe astrazione prematura.

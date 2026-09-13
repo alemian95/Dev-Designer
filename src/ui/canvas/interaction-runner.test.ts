@@ -1,0 +1,201 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { createErDocument, type Entity, type ErDocument } from "@/model/er/schema"
+import { documentStore } from "@/editor/document-store"
+import { erDiagram } from "@/editor/er-access"
+import { HEADER_H, MIN_W } from "@/editor/geometry"
+import type { InteractionEvent, PointerInfo } from "@/editor/interaction"
+import { selId, sessionStore } from "@/editor/session-store"
+import { IDENTITY } from "@/editor/viewport"
+import { registerEdge, registerNode } from "./dom-registry"
+import { createInteractionRunner } from "./interaction-runner"
+
+/**
+ * Le scritture dell'anteprima passano tutte dal registro di `dom-registry`, che è una mappa da
+ * chiave a elemento: registrando finti elementi si vede **esattamente cosa l'anteprima ha toccato**,
+ * senza un DOM e senza spiare le funzioni. È la stessa giuntura che usa il canvas vero.
+ */
+function fintoNodo(scritture: string[], key: string) {
+  return { setAttribute: (_n: string, v: string) => scritture.push(`${key}:${v}`) } as unknown as SVGGElement
+}
+
+/** `setEdgeGeometry` cerca i propri figli con `querySelector`: contarne le chiamate dice se l'arco è stato toccato. */
+function fintoArco(tocchi: Map<string, number>, key: string) {
+  return {
+    querySelector: () => {
+      tocchi.set(key, (tocchi.get(key) ?? 0) + 1)
+      return null
+    },
+  } as unknown as SVGGElement
+}
+
+const entita = (name: string): Entity => ({ name, attributes: [] })
+
+/** Un'entità senza attributi è larga MIN_W e alta quanto il solo header: rettangoli prevedibili. */
+const W = MIN_W
+const H = HEADER_H
+
+/**
+ * Quattro entità e tre relazioni, in un'inquadratura 800×600 alla scala 1. Con uno spostamento di
+ * 900 unità verso l'alto:
+ *
+ * - `dentro` (y=100) è in vista e finisce a −800: **esce**;
+ * - `entra` (y=1000) è fuori e finisce a 100: **entra**;
+ * - `lontana` (y=2000) finisce a 1100 e `lontanissima` (y=3000) a 2100: non si vedono mai.
+ *
+ * I tre archi coprono i tre casi del criterio:
+ *
+ * - `attraversa` (dentro–entra): a fine drag **entrambi** gli estremi sono lontani
+ *   dall'inquadratura, ma il segmento la taglia in mezzo. È il caso per cui il criterio è
+ *   l'ingombro dell'arco e non i suoi estremi.
+ * - `unCapoDentro` (entra–lontana): un estremo solo è in vista, e tanto basta.
+ * - `sottoTutto` (lontana–lontanissima): resta tutto sotto lo schermo.
+ */
+function documento(): ErDocument {
+  const doc = createErDocument("t", "t")
+  const m = doc.diagram.model
+  const v = doc.diagram.view
+  for (const [key, y] of [["dentro", 100], ["entra", 1000], ["lontana", 2000], ["lontanissima", 3000]] as const) {
+    m.entities[key] = entita(key)
+    v.nodes[key] = { x: 100, y, collapsed: false }
+  }
+  const arco = (source: string, target: string) => ({
+    source: { entity: source, attributes: [], cardinality: "many" as const },
+    target: { entity: target, attributes: [], cardinality: "one" as const },
+    identifying: false,
+  })
+  m.relationships["attraversa"] = arco("dentro", "entra")
+  m.relationships["unCapoDentro"] = arco("entra", "lontana")
+  m.relationships["sottoTutto"] = arco("lontana", "lontanissima")
+  return doc
+}
+
+const CHIAVI = ["dentro", "entra", "lontana", "lontanissima"] as const
+const ARCHI = ["attraversa", "unCapoDentro", "sottoTutto"] as const
+
+const info = (over: Partial<PointerInfo>): PointerInfo => ({
+  screen: { x: 0, y: 0 }, world: { x: 0, y: 0 }, button: 0, shift: false, alt: false, hit: { kind: "canvas" }, ...over,
+})
+const giu = (i: Partial<PointerInfo>): InteractionEvent => ({ type: "down", info: info(i), spaceHeld: false })
+const muovi = (i: Partial<PointerInfo>): InteractionEvent => ({ type: "move", info: info(i) })
+const su = (i: Partial<PointerInfo>): InteractionEvent => ({ type: "up", info: info(i) })
+
+let scritture: string[]
+let tocchi: Map<string, number>
+
+beforeEach(() => {
+  scritture = []
+  tocchi = new Map()
+  documentStore.getState().load(documento())
+  sessionStore.getState().setViewport(IDENTITY)
+  sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
+  sessionStore.getState().setSelection(CHIAVI.map((k) => selId("node", k)))
+  for (const k of CHIAVI) registerNode(k, fintoNodo(scritture, k))
+  for (const k of ARCHI) registerEdge(k, fintoArco(tocchi, k))
+})
+
+afterEach(() => {
+  for (const k of CHIAVI) registerNode(k, null)
+  for (const k of ARCHI) registerEdge(k, null)
+  sessionStore.getState().setSelection([])
+})
+
+/** Presa sull'header di `dentro`, un solo spostamento di 900 unità verso l'alto, rilascio. */
+function trascina(runner = createInteractionRunner()) {
+  const partenza = { x: 100 + W / 2, y: 100 + H / 2 }
+  runner.step(giu({ world: partenza, hit: { kind: "node", key: "dentro" } }))
+  runner.step(muovi({ world: { x: partenza.x, y: partenza.y - 900 } }))
+  return runner
+}
+
+describe("l'anteprima del drag scrive solo ciò che si vede", () => {
+  it("un nodo che entra nell'inquadratura viene scritto, uno che ne esce no", () => {
+    trascina()
+    const toccati = new Set(scritture.map((s) => s.split(":")[0]))
+    // `entra` arriva a y=100: dentro l'inquadratura, e senza questa scrittura resterebbe invisibile
+    // proprio nel momento in cui l'utente se lo aspetta davanti.
+    expect(toccati.has("entra")).toBe(true)
+    // `dentro` finisce a −800 e `lontana` a 1100: nessuno dei due si vede.
+    expect(toccati.has("dentro")).toBe(false)
+    expect(toccati.has("lontana")).toBe(false)
+    expect(scritture).toContain("entra:translate(100 100)")
+  })
+
+  it("un arco che attraversa l'inquadratura si aggiorna anche con entrambi i nodi fuori", () => {
+    trascina()
+    // `attraversa` va da y=−800 a y=100: i suoi estremi sono uno sopra e uno dentro lo schermo, e
+    // il segmento lo taglia. Il criterio è l'ingombro dell'arco, non i suoi estremi.
+    expect(tocchi.get("attraversa") ?? 0).toBeGreaterThan(0)
+    expect(tocchi.get("unCapoDentro") ?? 0).toBeGreaterThan(0)
+    // `sottoTutto` resta interamente sotto l'inquadratura, con entrambi gli estremi.
+    expect(tocchi.get("sottoTutto") ?? 0).toBe(0)
+  })
+
+  it("il DOM saltato è un'anteprima, non lo stato: al rilascio si muovono tutti", () => {
+    const runner = trascina()
+    runner.step(su({ world: { x: 100 + W / 2, y: 100 + H / 2 - 900 } }))
+    const nodi = erDiagram(documentStore.getState().doc).view.nodes
+    // `dentro` non è mai stato scritto sul DOM dopo essere uscito, e il suo modello è giusto lo stesso.
+    expect(nodi["dentro"]).toMatchObject({ x: 100, y: -800 })
+    expect(nodi["entra"]).toMatchObject({ x: 100, y: 100 })
+    expect(nodi["lontana"]).toMatchObject({ x: 100, y: 1100 })
+    expect(nodi["lontanissima"]).toMatchObject({ x: 100, y: 2100 })
+  })
+})
+
+describe("un comando al rilascio", () => {
+  it("nessun comando durante il drag, esattamente uno al rilascio", () => {
+    const prima = documentStore.getState().past.length
+    const runner = createInteractionRunner()
+    const partenza = { x: 100 + W / 2, y: 100 + H / 2 }
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: "dentro" } }))
+    for (let i = 1; i <= 5; i++) runner.step(muovi({ world: { x: partenza.x, y: partenza.y - i * 20 } }))
+    // Cinque `pointermove` e nessuna voce di storia: è l'invariante dello spike — il documento
+    // riceve un comando solo, al rilascio, non uno per movimento.
+    expect(documentStore.getState().past.length).toBe(prima)
+    runner.step(su({ world: { x: partenza.x, y: partenza.y - 100 } }))
+    expect(documentStore.getState().past.length).toBe(prima + 1)
+  })
+
+  it("un drag annullato non lascia nessun comando", () => {
+    const prima = documentStore.getState().past.length
+    const runner = trascina()
+    runner.step({ type: "cancel" })
+    expect(documentStore.getState().past.length).toBe(prima)
+  })
+
+  it("una presa senza movimento non produce comando: nulla da annullare", () => {
+    const prima = documentStore.getState().past.length
+    const runner = createInteractionRunner()
+    const partenza = { x: 100 + W / 2, y: 100 + H / 2 }
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: "dentro" } }))
+    runner.step(su({ world: partenza }))
+    expect(documentStore.getState().past.length).toBe(prima)
+  })
+
+  it("busy() distingue un'interazione in corso dal riposo", () => {
+    // L'hook lo usa per non costruire un `PointerInfo` a ogni `pointermove` quando non c'è nulla in
+    // corso: costerebbe un `getBoundingClientRect`, cioè uno stile e un layout forzati.
+    const runner = createInteractionRunner()
+    expect(runner.busy()).toBe(false)
+    runner.step(giu({ world: { x: 100, y: 100 }, hit: { kind: "node", key: "dentro" } }))
+    expect(runner.busy()).toBe(true)
+    runner.step(su({ world: { x: 100, y: 100 } }))
+    expect(runner.busy()).toBe(false)
+  })
+
+  it("lo snapshot del drag non sopravvive al drag: due prese di seguito partono da dove sono", () => {
+    // `dragTargets` è uno snapshot delle posizioni alla presa. Se sopravvivesse al rilascio, il
+    // secondo drag partirebbe dalle posizioni del primo e il nodo salterebbe indietro.
+    const runner = createInteractionRunner()
+    const primo = { x: 100 + W / 2, y: 100 + H / 2 }
+    runner.step(giu({ world: primo, hit: { kind: "node", key: "dentro" } }))
+    runner.step(muovi({ world: { x: primo.x, y: primo.y + 200 } }))
+    runner.step(su({ world: { x: primo.x, y: primo.y + 200 } }))
+
+    scritture.length = 0
+    const secondo = { x: 100 + W / 2, y: 300 + H / 2 }
+    runner.step(giu({ world: secondo, hit: { kind: "node", key: "dentro" } }))
+    runner.step(muovi({ world: { x: secondo.x, y: secondo.y + 100 } }))
+    expect(scritture).toContain("dentro:translate(100 400)")
+  })
+})

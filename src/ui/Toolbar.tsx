@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { deleteSelection, duplicateSelection, fitToContent, zoomBy } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore, type Tool } from "@/editor/session-store"
+import { About } from "./About"
 import { useDiagramView } from "./canvas/kinds/registry"
 import { DocumentMenu } from "./DocumentMenu"
 import { autoLayout, useCanAutoLayout } from "./layout-actions"
@@ -80,6 +81,7 @@ export function Toolbar() {
       <Hint label={theme === "dark" ? "Tema chiaro" : "Tema scuro"}>
         <Button variant="ghost" size="icon" aria-label={theme === "dark" ? "Tema chiaro" : "Tema scuro"} onClick={toggle}>{theme === "dark" ? <Sun /> : <Moon />}</Button>
       </Hint>
+      <About />
     </header>
   )
 }

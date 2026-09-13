@@ -28,7 +28,7 @@ priorità: un difetto riproducibile in tre click, l'unica incoerenza che il
 codice dichiara sbagliata su sé stesso, e la classe di guasto che lasciava la
 pagina bianca.
 
-DT-11 è la voce che seguiva, chiusa lo stesso giorno.
+DT-11 e DT-12 sono le voci che seguivano, chiuse lo stesso giorno.
 
 ---
 
@@ -186,6 +186,33 @@ Resta fuori, e resta vero, il punto gemello dell'Archivio: le etichette di
 archi **diversi** che convergono sullo stesso lato da direzioni diverse
 possono ancora accavallarsi. Il fascio risolve la coppia, non la convergenza.
 
+### DT-12 · l'autosave armava timer a vuoto dopo essersi disabilitato
+
+Una voce d'Archivio ne metteva insieme tre. **Due delle tre non erano
+difetti, e vale più la verifica della correzione.**
+
+- **I timer a vuoto erano reali**: dopo il primo errore `flush` esce subito,
+  ma la sottoscrizione continuava ad armare un `setTimeout` a ogni comando —
+  uno per comando, per tutta la vita della scheda. Un `if (disabled) return`
+  dopo il `patch({ dirty: true })`, che invece va segnato comunque: il
+  documento è davvero cambiato e la barra lo dice. Il test guarda
+  `vi.getTimerCount()`, che è l'unica cosa osservabile: senza la riga resta un
+  timer armato (verificato RED).
+- **«`stop()` non attende la scrittura in volo» è irraggiungibile.** L'unico
+  chiamante nell'app è `main.tsx`, nel ramo `?stress=N`, *prima* di
+  `documentStore.load`: a quel punto nessun comando è mai stato eseguito e
+  nessuna scrittura può essere in volo. Il resto sono i test. La promessa non
+  viene comunque annullata da `stop()`, quindi la scrittura arriva a
+  destinazione lo stesso: il difetto immaginato era un avviso impostato su una
+  sessione in smontaggio, in un percorso che non esiste.
+- **«Due `flush()` ravvicinati producono due `put` quasi identici» è vero e
+  non si corregge.** I `put` sono idempotenti — stesso `id`, stesso contenuto
+  — e l'unico rimedio sarebbe incatenare le scritture. Ma `flush` ha un
+  contratto preciso ai tre cambi di documento: deve aver scritto *lo stato di
+  adesso* quando la promessa si risolve. Restituire la scrittura già in volo
+  romperebbe quel contratto, e incatenarle aggiunge una coda per uno spreco
+  che nessuno paga.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -291,10 +318,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   handler `process.on("unhandledRejection")`, che in worker condivisi
   catturerebbe i rigetti di altri test — un test fragile diventerebbe un
   test che mente.
-- Autosave: due `flush()` ravvicinati producono due `put` quasi identici;
-  dopo l'autodisabilitazione si continuano a programmare timer a vuoto;
-  `stop()` non attende una scrittura in volo, che se fallisce imposta ancora
-  l'avviso. Il docblock prescrive già `flush()` atteso prima di `stop()`.
+- I tre difetti dell'autosave → **esaminati**, vedi DT-12: uno corretto, e
+  gli altri due archiviati con la ragione per cui non lo erano.
 - `openWithPicker` senza test: composizione pura, ma è l'unico percorso che
   né i test né l'e2e raggiungono.
 - `document-io.ts` è a 272 righe: il ledger diceva 256 «al limite», da

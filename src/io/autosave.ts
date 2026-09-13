@@ -63,6 +63,10 @@ export function startAutosave({ db, delay = AUTOSAVE_DELAY_MS, now = Date.now }:
     if (state.past.length + state.future.length === 0) return
     documentSession.getState().patch({ dirty: true })
     clear()
+    // Dopo l'autodisabilitazione `flush` esce subito: il timer scadrebbe per non fare nulla, e ne
+    // resterebbe uno armato a ogni comando per tutta la vita della scheda. `dirty` invece continua
+    // a segnarsi — il documento è davvero cambiato, e la barra lo dice.
+    if (disabled) return
     timer = setTimeout(() => void flush(), delay)
   })
 

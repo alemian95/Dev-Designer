@@ -122,6 +122,10 @@ describe("startAutosave", () => {
     command()
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS)
     expect(db.put).toHaveBeenCalledTimes(1)
+    // «Smette» davvero: dopo l'autodisabilitazione non resta nemmeno un timer armato a vuoto.
+    command()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(documentSession.getState().dirty).toBe(true)
   })
 
   it("stop disiscrive", async () => {

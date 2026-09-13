@@ -1,83 +1,118 @@
 # Dev Designer
 
-Editor web **solo frontend** di diagrammi per sviluppatori: ER, flowchart, UML class e UML sequence.
-Nessun backend, nessun account: il documento vive nel browser e si importa/esporta come file.
+Editor web di diagrammi per sviluppatori: **ER** e **UML class diagram**.
 
-## Stato
+Nessun backend, nessun account, niente da configurare: il documento vive nel browser e si apre e si
+salva come file, come in un editor di testo. Il deploy è automatico su Vercel a ogni push su
+`master`.
 
-Ci sono due editor funzionanti — ER e class diagram — e i documenti sopravvivono alla chiusura della
-pagina. Quello che c'è, condiviso da entrambi i tipi di diagramma salvo dove specificato:
+## Cosa fa
 
-- **Modello del documento** validato con Zod e **undo/redo a patch** (Immer `produceWithPatches`: la
-  storia non tiene snapshot del documento, tiene le patch e le loro inverse).
-- **Validazione live** del documento, con i problemi elencati in un pannello.
-- **Canvas SVG** scritto a mano, un solo `<svg>`: pan, zoom, drag di uno o più nodi, selezione a
-  rettangolo, creazione di entità, connessione fra entità. Pan, zoom e drag non passano da React —
-  scrivono direttamente sul DOM.
-- **Toolbar** con gli strumenti e le azioni, **scorciatoie da tastiera**, tema chiaro/scuro.
-- **Pannello proprietà** (entità, attributi, relazioni) e **pannello problemi**; rinomina inline
-  dell'entità con doppio click sull'header.
-- **Persistenza**: autosave in IndexedDB come rete di sicurezza, e al ritorno si riapre l'ultimo
-  documento com'era. Il file su disco resta la verità, l'archivio del browser è solo la rete.
-- **Apri e salva** su file `.dd.json`: File System Access API dove c'è (con l'handle riusato dai
-  salvataggi successivi), altrimenti upload e download. `?fallback=1` forza il secondo percorso.
-- **Sola lettura fra schede**: un documento lo scrive una scheda sola, le altre lo mostrano con un
-  avviso e un pulsante "prendi il controllo" — la proprietaria fa un ultimo salvataggio prima di
-  cedere, così non si perde niente.
-- **Misura di prestazioni** riproducibile su documenti sintetici fino a 600 entità.
-- **Import DDL**: incolla o carica un dump PostgreSQL o MySQL/MariaDB, si scelgono le tabelle e
-  entrano nel diagramma aperto in un solo passo annullabile, con cardinalità dedotte dalle foreign
-  key e disposizione a griglia per le entità nuove. Una tabella già presente viene sostituita
-  tenendo la sua posizione sul canvas. La griglia è tutto quello che fa: l'auto layout è un'azione
-  a parte, non un effetto dell'import. Limite: un vincolo UNIQUE su più colonne non è
-  rappresentabile su un attributo, quindi viene ignorato — con un avviso che dice quanti.
-- **Auto layout**: «Disponi» (`L`) ridispone tutto il diagramma con ELK (`layered`, dall'alto in
-  basso) in un worker, in un solo passo annullabile. Le rotte degli archi non vengono da ELK: il
-  router ortogonale le ricalcola dai rettangoli a ogni render, al worker si chiedono solo le
-  posizioni dei nodi.
-- **Export immagini**: SVG e PNG del diagramma intero, più «Copia PNG» negli appunti. Escono col
-  tema chiaro qualunque sia quello attivo — finiscono in README e PR, che hanno fondo chiaro — e col
-  font incorporato nel file come `data:` URI, perché la rasterizzazione avviene in un contesto che
-  non ha i font della pagina.
-- **Export testo**: DDL PostgreSQL, DDL MySQL e Mermaid, da copiare negli appunti o scaricare (per l'ER).
-- **Class diagram**: classi con stereotipo (`class`, `interface`, `abstract`, `enum`), attributi e
-  metodi scritti come testo in un editor dedicato — non una riga di form per membro — con le stesse
-  regole di visibilità e modificatori dell'UML. Le sei relazioni (associazione, generalizzazione,
-  realizzazione, composizione, aggregazione, dipendenza), ciascuna con la punta e il tratto giusti.
-  Validazione live, auto layout ed export immagini condivisi con l'ER, più l'export testo in Mermaid
-  (`classDiagram`). Fuori scope, dichiarato: generici, package, note, classi di associazione, classi
-  annidate, visibilità sui pacchetti, una riga di form per membro nel pannello, PlantUML, generazione
-  di codice, import da Mermaid o da codice sorgente, documenti multi-diagramma, conversione di un ER
-  esistente in class diagram (§16 della [spec](docs/superpowers/specs/2026-09-10-class-diagram-design.md)).
+### Disegna
 
-Quello che **non** c'è ancora: gli altri due tipi di diagramma — flowchart e sequence. Sui limiti di
-scala misurati — lo zoom sfonda il criterio già a 300 entità — vedi la misura qui sotto.
+Canvas SVG scritto a mano: pan, zoom, drag di uno o più nodi, selezione a rettangolo, creazione di
+nodi e connessioni. Pan, zoom e drag non passano da React — scrivono direttamente sul DOM, ed è il
+motivo per cui il gesto resta fluido anche su documenti grandi.
 
-- [Spec di design](docs/superpowers/specs/2026-09-06-dev-designer-design.md) — architettura, stack e
-  ordine di consegna
-- [Spec: persistenza dei documenti](docs/superpowers/specs/2026-09-07-persistenza-design.md)
-- [Spec: import DDL](docs/superpowers/specs/2026-09-08-import-ddl-design.md)
-- [Spec: auto layout](docs/superpowers/specs/2026-09-09-auto-layout-design.md) — il §3 va letto prima
-  di toccare `src/io/layout/`
-- [Spec: export testo](docs/superpowers/specs/2026-09-09-export-testo-design.md)
-- [Spec: class diagram](docs/superpowers/specs/2026-09-10-class-diagram-design.md)
-- [Piani di implementazione](docs/superpowers/plans/)
-- [Decisioni di architettura](docs/adr/) — sei ADR
-- [Debito tecnico](docs/debito-tecnico.md) — difetti noti e semplificazioni accettate
-- [Risultati dello spike](docs/superpowers/spikes/2026-09-06-spike-results.md)
+Attorno al canvas: toolbar, pannello proprietà, pannello dei problemi, tema chiaro/scuro, rinomina
+inline con doppio click, undo/redo su ogni azione.
 
-## Stack
+- **ER**: entità con attributi tipizzati, chiavi e relazioni con cardinalità.
+- **UML class**: classi con stereotipo (`class`, `interface`, `abstract`, `enum`), attributi e metodi
+  scritti come **testo** in un editor dedicato — non una riga di form per membro — con le regole di
+  visibilità e modificatori dell'UML, lo statico sottolineato come prescrive la notazione. Le sei
+  relazioni (associazione anche navigabile, generalizzazione, realizzazione, composizione,
+  aggregazione, dipendenza), ciascuna con la punta e il tratto giusti, più le note.
+
+La **validazione è live**: i problemi del documento compaiono in un pannello mentre si disegna, non a
+un comando esplicito.
+
+**«Disponi» (`L`)** ridispone tutto il diagramma con ELK (`layered`, dall'alto in basso) in un
+worker, in un solo passo annullabile.
+
+### Importa un database che esiste già
+
+Incolla o carica un dump **PostgreSQL** o **MySQL/MariaDB**: si scelgono le tabelle e entrano nel
+diagramma aperto in un solo passo annullabile, con le cardinalità dedotte dalle foreign key. Una
+tabella già presente viene sostituita tenendo la sua posizione sul canvas, così un re-import dopo una
+migrazione non scombina il lavoro di disposizione.
+
+### Esporta
+
+- **Immagini**: SVG e PNG del diagramma intero, più «Copia PNG» negli appunti. Escono sempre col tema
+  chiaro — finiscono in README e PR, che hanno fondo chiaro — e col font incorporato nel file.
+- **Testo**: DDL PostgreSQL, DDL MySQL e Mermaid `erDiagram` per l'ER; Mermaid `classDiagram` per le
+  classi. Da copiare negli appunti o scaricare.
+
+### Il documento è un file
+
+Si apre e si salva come `.dd.json`, con la File System Access API dove c'è (handle riusato dai
+salvataggi successivi) e con upload/download dove non c'è. `?fallback=1` forza il secondo percorso.
+
+Sotto, come rete di sicurezza: **autosave in IndexedDB**, e al ritorno si riapre l'ultimo documento
+com'era. Il file su disco resta la verità, l'archivio del browser è solo la rete.
+
+Un documento lo scrive **una scheda sola**: le altre lo mostrano in sola lettura, con un avviso e un
+pulsante «prendi il controllo» — la proprietaria fa un ultimo salvataggio prima di cedere, così non
+si perde niente.
+
+## Scorciatoie
+
+| | |
+|---|---|
+| `V` · `E`/`C` · `R` · `N` | selezione · nodo (entità/classe) · relazione · nota (solo classi) |
+| `F` · `L` | inquadra tutto · disponi |
+| `⌘Z` · `⇧⌘Z` / `⌘Y` · `⌘D` · `⌫` | annulla · ripeti · duplica · elimina |
+| `⌘S` · `⇧⌘S` · `⌘O` | salva · salva con nome · apri |
+| `⌘=` · `⌘-` · `⌘0` · `⌘A` | zoom avanti · indietro · reset · seleziona tutto |
+| `Esc` | deseleziona e torna alla selezione |
+
+## Limiti noti
+
+**Non ci sono flowchart e sequence diagram.** La spec originale ne prevedeva quattro tipi: ne sono
+stati consegnati due. La giuntura per aggiungerli esiste già (union sul tipo di diagramma, registro
+`kinds/`), ma il lavoro non è fatto.
+
+**È uno strumento da desktop.** Il canvas disabilita i gesti touch del browser: su tablet e telefono
+non si usa. Sviluppato e collaudato su Chrome; su Firefox e Safari manca la File System Access API e
+si cade sul percorso upload/download, che esiste ed è coperto dai test end-to-end ma non è provato a
+mano su quei browser.
+
+**Scala misurata fino a 600 entità**, con il criterio «p95 del tempo di frame ≤ 20 ms in build di
+produzione» rispettato su tutti e sei gli scenari di gesto — vedi [la misura](docs/perf/2026-09-13-gate-verde.md).
+Oltre non è misurato.
+
+Limiti puntuali, ciascuno con la sua ragione scritta:
+
+- **Import DDL**: un vincolo `UNIQUE` su più colonne non è rappresentabile su un attributo e viene
+  ignorato, con un avviso che dice quanti. In MySQL un `REFERENCES` senza lista di colonne fa
+  rifiutare l'intero `CREATE TABLE` al parser di terze parti.
+- **Class diagram**: i generici annidati non sono rappresentabili in Mermaid in nessuna codifica (si
+  emette la forma meno peggio, con un avviso). Una nota non si àncora a una classe e resta fuori dal
+  layout. Fuori scopo dichiarato: package, classi di associazione, classi annidate, PlantUML,
+  generazione di codice, import da Mermaid o da codice sorgente, documenti multi-diagramma.
+
+Tutto il resto sta in [debito tecnico](docs/debito-tecnico.md), che è il registro dei difetti noti e
+delle semplificazioni accettate, con il motivo di ogni rinvio.
+
+---
+
+## Sviluppo
+
+### Stack
 
 - React 19 + TypeScript 6, build con Vite 8.
 - **Zustand** (store vanilla, fuori da React) per lo stato del documento e della sessione, **Immer**
-  per i comandi e le patch di undo/redo, **Zod** per lo schema del documento.
+  per i comandi e per le patch di undo/redo — la storia non tiene snapshot del documento, tiene le
+  patch e le loro inverse — **Zod** per lo schema del documento.
 - Tailwind CSS 4 con shadcn/ui e Radix per la cornice dell'interfaccia.
 - Canvas SVG scritto a mano, un componente React per nodo.
-- Import DDL: `libpg-query` (WASM) per PostgreSQL, `node-sql-parser` per MySQL/MariaDB, entrambi in worker.
-- Auto layout: `elkjs` in un worker.
+- Import DDL: `libpg-query` (WASM) per PostgreSQL, `node-sql-parser` per MySQL/MariaDB, in worker.
+- Auto layout: `elkjs` in un worker. Le rotte degli archi non vengono da ELK: il router ortogonale le
+  ricalcola dai rettangoli a ogni render, al worker si chiedono solo le posizioni dei nodi.
 - Test con Vitest, lint con ESLint 10.
 
-## Comandi
+### Comandi
 
 Richiede Node >= 22 e pnpm 10.
 
@@ -89,15 +124,21 @@ pnpm lint      # ESLint
 pnpm test      # Vitest
 ```
 
-## Test end-to-end
+Su ogni push su `master` e su ogni pull request, [la CI](.github/workflows/ci.yml) gira `lint`, `test`
+e `build`. Gli altri due gate — `e2e` e `perf` — restano a mano: pilotano il Chrome di sistema e
+misurano tempi di frame su un display reale, e su un runner condiviso darebbero rossi che non
+significano niente. Il deploy su Vercel parte dal push: perché aspetti la CI va chiesto a Vercel
+(Settings ▸ Git ▸ *Require checks to pass*), non al repository.
+
+### Test end-to-end
 
 ```bash
-pnpm e2e       # sei scenari provati in un browser vero
+pnpm e2e       # sette scenari provati in un browser vero
 ```
 
 Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
-condivisi dai sei scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock
-fra schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a vicenda) —
+condivisi dai sette scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock fra
+schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a vicenda) —
 ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
 
 - **Persistenza**: disegna un'entità, ricarica e la ritrova dal buffer IndexedDB, salva come
@@ -121,15 +162,15 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   verifica il commit sul blur (geometria compresa), scrive un testo non valido e verifica che
   l'editor resti aperto col testo intatto, collega le due classi con una generalizzazione e verifica
   che «Disponi» metta il padre sopra il figlio, poi esporta in Mermaid e verifica l'ordine dei lati
-  nell'arco. Sono le cose che senza un browser vero non esistono: il fuoco e il commit sulla
-  `textarea`, il rifiuto che non perde il testo, e l'inversione degli archi nel grafo di layout
-  (`elkjs`, di nuovo un worker finto nei test unitari).
+  nell'arco.
+- **Nota**: crea una nota, ne commette il testo su due righe col blur, la trascina e la rimette con
+  ⌘Z, poi verifica che esca come riga `note "…"` nell'export Mermaid.
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei sei scenari non regge.
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei sette scenari non regge.
 
-## Misura prestazioni
+### Misura prestazioni
 
 ```bash
 pnpm perf [N]  # FPS a frame dipinti su un documento sintetico di N entità (default 300)
@@ -137,10 +178,29 @@ pnpm perf [N]  # FPS a frame dipinti su un documento sintetico di N entità (def
 
 Costruisce la build di produzione, la serve con `vite preview` e guida il **Chrome di sistema** in
 finestra visibile con eventi mouse reali, misurando il tempo fra frame consecutivi in cinque scenari
-(drag, drag di tutta la selezione, pan, marquee, zoom) più il marquee su tutto il diagramma. Stampa una
-tabella e il verdetto rispetto al criterio (p95 ≤ 20 ms, cioè ≥ 50 FPS).
+(drag, drag di tutta la selezione, pan, marquee, zoom) più il marquee su tutto il diagramma. Stampa
+una tabella e il verdetto rispetto al criterio (p95 ≤ 20 ms, cioè ≥ 50 FPS), ed esce 1 se un solo
+scenario lo sfonda: è un gate, non un rapporto.
 
-Prerequisito: **Google Chrome installato** — i browser di Playwright non vengono scaricati. Durante la
-misura la finestra di Chrome non va toccata né coperta: Chrome strozza i frame delle finestre nascoste.
+Prerequisito: **Google Chrome installato** — i browser di Playwright non vengono scaricati. Durante
+la misura la finestra di Chrome non va toccata né coperta: Chrome strozza i frame delle finestre
+nascoste.
 
-Risultati: [Misura FPS a frame dipinti](docs/perf/2026-09-06-fps-frame-dipinti.md).
+Risultati: [il gate verde](docs/perf/2026-09-13-gate-verde.md), e prima di quello
+[la misura che lo trovò rosso](docs/perf/2026-09-06-fps-frame-dipinti.md).
+
+### Documentazione
+
+- [Spec di design](docs/superpowers/specs/2026-09-06-dev-designer-design.md) — architettura, stack e
+  ordine di consegna
+- [Spec: persistenza dei documenti](docs/superpowers/specs/2026-09-07-persistenza-design.md)
+- [Spec: import DDL](docs/superpowers/specs/2026-09-08-import-ddl-design.md)
+- [Spec: auto layout](docs/superpowers/specs/2026-09-09-auto-layout-design.md) — il §3 va letto prima
+  di toccare `src/io/layout/`
+- [Spec: export testo](docs/superpowers/specs/2026-09-09-export-testo-design.md)
+- [Spec: class diagram](docs/superpowers/specs/2026-09-10-class-diagram-design.md) e il
+  [primo giro di ampiezza](docs/superpowers/specs/2026-09-11-class-diagram-ampiezza-design.md)
+- [Piani di implementazione](docs/superpowers/plans/)
+- [Decisioni di architettura](docs/adr/) — sei ADR
+- [Debito tecnico](docs/debito-tecnico.md) — difetti noti e semplificazioni accettate
+- [Risultati dello spike](docs/superpowers/spikes/2026-09-06-spike-results.md)

@@ -91,6 +91,18 @@ anche `setItem` lancia, e lì il lancio è dentro l'effect — stessa pagina
 bianca per una strada diversa. Senza jsdom non c'è dove eseguire un test:
 simulare lo storage bloccato in Playwright costa più del difetto.
 
+### DT-8 · lo strumento sopravviveva al cambio di diagramma
+
+`mount()` azzerava selezione ed editing — chiavi di un altro documento — ma
+non `session.tool`, che non ha chiavi e ha però un *tipo di diagramma*:
+`note` esiste solo nel class diagram. Passando a un ER lo strumento restava
+attivo e il click sul canvas non faceva nulla, senza niente a schermo che lo
+spiegasse. Una riga in [document-io.ts](../src/io/document-io.ts), accanto
+alle due che c'erano già. Il test in `document-io.test.ts` arma `note` prima
+del `restoreLast` e pretende `select` dopo: verificato RED togliendo la riga
+(`expected 'note' to be 'select'`), e riprovato nel browser sul percorso
+reale, «Nuovo ▸ Diagramma ER» con lo strumento nota premuto.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -343,12 +355,7 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   testo dopo la `<` spaiata (misurato: `List<Foo` rende `List`). L'avviso
   dice che il tipo è sospetto, non che il file esportato lo mostrerà per
   intero.
-- `mount()` in `src/io/document-io.ts:114` azzera selezione ed editing ma
-  non `session.tool`: passando da un class diagram con lo strumento nota
-  selezionato a un diagramma ER, lo strumento nota resta attivo e un click
-  sul canvas ER non fa nulla (l'ER non ha uno strumento nota). L'hook di
-  interazione tollera lo strumento per design — è lo strumento rimasto
-  incoerente col diagramma il difetto, non l'hook.
+- Lo strumento che sopravvive al cambio di diagramma → **corretto**, vedi DT-8.
 - `NoteEditor` (overlay sul canvas) e la `textarea` di `NoteProperties` nel
   pannello proprietà (`src/ui/panels/ClassProperties.tsx`) possono montare
   insieme sullo stesso testo di una nota — doppio click su una nota già

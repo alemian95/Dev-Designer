@@ -110,11 +110,16 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     return next !== null
   }
 
-  /** Mette il documento negli store. La selezione e l'editing si azzerano: le chiavi erano di un altro documento. */
+  /**
+   * Mette il documento negli store. La selezione e l'editing si azzerano: le chiavi erano di un altro
+   * documento. Anche lo strumento, che non ha chiavi ma un tipo di diagramma: `note` esiste solo nel
+   * class diagram e resterebbe attivo su un ER, dove il click sul canvas non farebbe nulla.
+   */
   function mount(doc: DevDocument, s: Mounted): void {
     documentStore.getState().load(doc)
     sessionStore.getState().setSelection([])
     sessionStore.getState().setEditing(null)
+    sessionStore.getState().setTool("select")
     patch({ docId: doc.id, ...s, notice: null })
   }
 

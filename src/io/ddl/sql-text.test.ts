@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 import { spans, splitStatements, stripExecutableComments, stripPsqlMeta } from "./sql-text"
 
+/**
+ * Serve solo al test di scalabilità qui sotto. Dichiarato invece di aggiungere `"node"` ai `types`
+ * del tsconfig: l'app è per il browser, e portare tutti i tipi di node in ogni file per una sola
+ * chiamata in un test è un cambio di superficie che non si ripaga. Si dichiara ciò che si usa, come
+ * `file-system-access.d.ts` fa per l'API dei file.
+ */
+declare const process: { cpuUsage(): { user: number; system: number } }
+
 /** Aiuto di lettura: i soli tratti di codice, concatenati. */
 const codeOf = (sql: string) => spans(sql).filter((s) => s.code).map((s) => sql.slice(s.start, s.end)).join("")
 

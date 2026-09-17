@@ -78,9 +78,35 @@ describe("reduce", () => {
     ])
   })
 
+  it("shift+click su un arco lo aggiunge, un secondo shift+click lo toglie", () => {
+    const id = selId("edge", "r")
+    const altro = selId("node", "a")
+    expect(run([down({ hit: { kind: "edge", key: "r" }, shift: true })], ctx({ selection: new Set([altro]) })).effects)
+      .toEqual([{ type: "select", ids: [altro, id] }])
+    expect(run([down({ hit: { kind: "edge", key: "r" }, shift: true })], ctx({ selection: new Set([altro, id]) })).effects)
+      .toEqual([{ type: "select", ids: [altro] }])
+  })
+
+  it("shift+drag sul vuoto: marquee additivo, e la selezione non si svuota alla presa", () => {
+    const r = run(
+      [down({ world: { x: 0, y: 0 }, shift: true }), move({ world: { x: 50, y: 50 } }), up({ world: { x: 50, y: 50 } })],
+      ctx({ selection: new Set([selId("node", "a")]) }),
+    )
+    expect(r.effects.filter((e) => e.type === "select")).toEqual([])
+    expect(r.effects.at(-1)).toEqual({ type: "commit-marquee", rect: { x: 0, y: 0, w: 50, h: 50 }, additive: true })
+  })
+
   it("marquee minuscolo è un click a vuoto: nessun commit", () => {
     const r = run([down({ world: { x: 0, y: 0 } }), up({ world: { x: 1, y: 1 } })])
     expect(r.effects.filter((e) => e.type === "commit-marquee")).toEqual([])
+  })
+
+  it("la soglia del marquee è 3, e basta un lato a superarla", () => {
+    const commits = (to: { x: number; y: number }) =>
+      run([down({ world: { x: 0, y: 0 } }), up({ world: to })]).effects.filter((e) => e.type === "commit-marquee")
+    expect(commits({ x: 2, y: 2 })).toEqual([])
+    expect(commits({ x: 3, y: 0 })).toHaveLength(1)
+    expect(commits({ x: 0, y: 3 })).toHaveLength(1)
   })
 
   it("tool node: click sul canvas crea il nodo", () => {

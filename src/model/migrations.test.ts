@@ -31,6 +31,12 @@ describe("migrazione 1 → 2", () => {
     expect((doc.diagram as { model: Record<string, unknown> }).model).toEqual({ entities: {}, relationships: {} })
   })
 
+  it("non muta l'input: le migrazioni copiano, non scrivono sull'originale", () => {
+    const before = structuredClone(v1Class)
+    migrateDocument(v1Class)
+    expect(v1Class).toEqual(before)
+  })
+
   it("un documento già alla 2 passa senza toccare niente", () => {
     const v2 = { ...v1Class, schemaVersion: 2, diagram: { ...v1Class.diagram, model: { classes: {}, relations: {}, notes: {} } } }
     expect(migrateDocument(v2)).toEqual({ ok: true, value: v2 })

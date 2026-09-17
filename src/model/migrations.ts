@@ -50,7 +50,15 @@ export function runMigrations(
   return { ok: true, value: doc }
 }
 
-/** Porta un documento grezzo (già JSON.parse) alla SCHEMA_VERSION corrente. Non valida: lo fa zod dopo. */
+/**
+ * Porta un documento grezzo (già JSON.parse) alla SCHEMA_VERSION corrente. Non valida: lo fa zod dopo.
+ *
+ * Non muta l'input, ma quando non c'è nessuna migrazione da applicare **restituisce l'input stesso**,
+ * non una copia. Nessuna copia difensiva: l'unico chiamante (`parseDocument`) gli passa un oggetto
+ * appena uscito da `JSON.parse`, che non condivide con nessuno, e ne consegna il risultato a zod, che
+ * copia — chi mette le mani sul documento vede la copia di zod, mai questo alias. Un chiamante nuovo
+ * che volesse mutare il risultato deve copiarselo.
+ */
 export function migrateDocument(raw: unknown): MigrateResult {
   return runMigrations(raw, migrations, SCHEMA_VERSION)
 }

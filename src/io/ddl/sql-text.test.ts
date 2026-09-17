@@ -107,10 +107,23 @@ describe("splitStatements", () => {
    * A 200/400 tabelle, però, le misure assolute sono ~2 ms: con un timer a bassa risoluzione o una CI
    * carica il rumore può avvicinarsi alla misura stessa, rendendo il rapporto instabile pur restando
    * la funzione lineare. Si usano quindi 800/1600 tabelle, dove le misure stanno comodamente in decine
-   * di millisecondi (qui: ~13 ms e ~22 ms, rapporto ~1.7, stabile su più esecuzioni) invece che in poche
-   * unità. Salire ancora costerebbe comunque poco, proprio perché la funzione ora è lineare — un'altra
-   * misura indipendente su 1600 tabelle, in isolamento, ha dato 7 ms — ma 800/1600 bastano già a uscire
-   * dalla zona di rumore senza allungare il test.
+   * di millisecondi (qui: ~13 ms e ~22 ms, rapporto ~1.7) invece che in poche unità.
+   *
+   * Uscire dal rumore non basta a uscire dalla **contesa**: con `performance.now()` e una misura sola
+   * per dimensione, tre suite in parallelo sulla stessa macchina facevano fallire questo test in tutte
+   * e tre, pur restando la funzione lineare — se la preemption cade dentro la misura grande e non
+   * dentro quella piccola, il rapporto salta. Il minimo di più giri non bastava: con quattro suite la
+   * CPU resta satura per tutta la durata, e nessun giro esce pulito.
+   *
+   * Si misura quindi il **tempo CPU** (`process.cpuUsage()`) invece del tempo trascorso: quando lo
+   * scheduler toglie la CPU a questo processo, il wall clock avanza e il tempo CPU no, che è
+   * esattamente la differenza fra «quanto lavoro ha fatto» e «quanto ha aspettato». Il minimo di tre
+   * giri resta, per il caso in cui un GC cada dentro una misura. Provato con quattro suite in
+   * parallelo: prima due su quattro fallivano, ora nessuna.
+   *
+   * Vale solo perché questo file gira in ambiente node e Vitest mette ogni file di test nel proprio
+   * processo: `cpuUsage()` è del processo, e con i worker in thread conterebbe anche il lavoro degli
+   * altri file.
    */
   it("il tempo raddoppiando l'input non è quadratico (non più di ~3x, non ~4x)", () => {
     // Genera N CREATE TABLE con identificatori backtick-quoted, come un vero dump MySQL: è la grafia
@@ -127,13 +140,26 @@ describe("splitStatements", () => {
     const small = genMysqlLike(800)
     const big = genMysqlLike(1600)
 
-    const t0 = performance.now()
-    const rSmall = splitStatements(small)
-    const t1 = performance.now()
-    const rBig = splitStatements(big)
-    const t2 = performance.now()
-    const msSmall = t1 - t0
-    const msBig = t2 - t1
+    // Tempo CPU del processo, in millisecondi: `cpuUsage()` conta microsecondi di user + system.
+    const cpuMs = (): number => {
+      const u = process.cpuUsage()
+      return (u.user + u.system) / 1000
+    }
+
+    // Il minimo di tre giri, e su tempo CPU: vedi il docblock qui sopra.
+    const fastest = (sql: string): { ms: number; out: string[] } => {
+      let ms = Infinity
+      let out: string[] = []
+      for (let i = 0; i < 3; i++) {
+        const t0 = cpuMs()
+        out = splitStatements(sql)
+        ms = Math.min(ms, cpuMs() - t0)
+      }
+      return { ms, out }
+    }
+
+    const { ms: msSmall, out: rSmall } = fastest(small)
+    const { ms: msBig, out: rBig } = fastest(big)
 
     // La prestazione non deve aver cambiato la semantica: stesso numero di statement, stesso
     // contenuto. `big` è `small` con altre 800 tabelle in coda, quindi i primi 800 statement dei due

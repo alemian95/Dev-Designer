@@ -19,7 +19,7 @@ nessuno le riscopra come se fossero nuove.
 
 ## Da correggere
 
-Niente, al 2026-09-13. DT-1..DT-6 sono state corrette nel commit `eeca340`,
+Niente, al 2026-09-17. DT-1..DT-6 sono state corrette nel commit `eeca340`,
 DT-7 e le minori aperte dalla revisione di `feat/export-testo` subito dopo;
 restano qui sotto in **Corretti** perché due di esse sono state corrette in un
 posto diverso da quello che questo documento indicava, e la ragione vale più
@@ -30,6 +30,14 @@ pagina bianca.
 
 DT-11, DT-12 e DT-13 sono le voci che seguivano, chiuse lo stesso giorno, e DT-14
 è il gate di prestazione che DT-11 ha fatto scoprire rosso.
+
+DT-20..DT-24 sono il giro del 2026-09-17, scelte dall'Archivio con lo stesso
+criterio: prima i due difetti che un utente vede nel pannello problemi, poi il
+flag di type safety che mancava, poi i buchi di copertura lasciati dal primo
+piano. DT-25 non era in lista: si è presentata da sé, come una corsa rossa su
+venti, ed era un test instabile — la cosa peggiore da lasciare in giro il
+giorno dopo aver acceso la CI. L'ultima è un'archiviazione e non una correzione: la voce indicava un
+difetto che non c'è, e ora c'è il test che tiene vero il contratto che conta.
 
 ---
 
@@ -422,6 +430,112 @@ eseguire un test» per il `try/catch` sugli accessi a `localStorage` di
 `use-theme.ts`. Ora ci sarebbe. Non l'ho scritto perché non è cablaggio di
 eventi, ed è la prossima voce che l'arrivo di jsdom rende raggiungibile.
 
+### DT-20 · `fk-without-relationship` taceva su una FK su due
+
+Il controllo valutava le relazioni uscenti **a livello di entità**: bastava una
+relazione qualsiasi che partisse da `posts` perché nessuna delle sue FK fosse
+segnalata. Con due FK verso tabelle diverse e una sola relazione disegnata, la
+seconda restava invisibile — falso negativo, in un pannello che esiste per dire
+cosa manca.
+
+Ora il controllo è per attributo: una FK è coperta se una relazione uscente la
+nomina fra i propri `source.attributes`.
+
+**L'eccezione è la ragione per cui la voce era rimasta aperta.** Una relazione
+disegnata a mano ha `attributes` vuoto per l'ADR 0003, e non nomina colonne per
+costruzione: pretendere che ne nomini una trasformerebbe il falso negativo in un
+falso positivo su ogni arco tracciato sul canvas. Continua quindi a coprire
+tutte le FK dell'entità. Il test che lo pretende passava già prima del fix ed è
+stato scritto apposta prima: è la rete che impedisce al rimedio di essere
+peggiore del difetto.
+
+### DT-21 · `entity-name-clash` nascondeva il terzo nome, e taceva sul primo
+
+Il confronto teneva una sola chiave per forma minuscola, la prima vista: con
+`User`, `user` e `USER` i messaggi citavano sempre `User`, e il terzo nome non
+compariva in nessuno dei due. In più la prima entità del gruppo non prendeva mai
+un issue — e siccome il pannello naviga per `node` dell'issue, era l'unica delle
+tre non raggiungibile da lì.
+
+Ora il gruppo si calcola prima del ciclo, ogni entità coinvolta prende il suo
+issue e il messaggio cita tutte le altre.
+
+### DT-22 · `noUncheckedIndexedAccess` non era acceso
+
+Acceso, `tsc` ha segnalato 50 punti: 11 nel codice e 39 nei test. **Nessuno era
+un bug** — ogni accesso indicizzato era davvero garantito da qualcosa — ma in
+tutti e 11 il garante era un commento, o la lettura di due funzioni insieme.
+
+Le correzioni hanno spostato la garanzia dal lettore al compilatore: in
+`applyLayout` filtro e lettura del nodo sono lo stesso passo; `placeNew` itera
+le entries invece delle chiavi; in `map.ts` l'insieme delle chiavi note diventa
+una mappa chiave→entità, perché era il nome dell'entità che serviva e leggerlo
+da due mappe con un `??` era esattamente il punto che il tipo non sapeva
+risolvere. In `sql-text.ts` i gruppi di regex obbligatori si leggono con una
+guardia invece che per indice.
+
+Nei test le 39 correzioni sono `?.` sugli accessi: nessuna indebolisce
+un'asserzione, perché `undefined` non passa né un `toEqual` né un `toBe(false)`
+— verificato una per una sulle cinque che avrebbero potuto.
+
+### DT-23 · i buchi di copertura sulle interazioni
+
+Il primo piano lasciava senza test il marquee additivo (shift+drag sul vuoto),
+lo shift+click su una relazione e la soglia esatta `MARQUEE_MIN`: c'era solo un
+test su un marquee «minuscolo», che non dice dove sta il confine.
+
+Tre test nuovi in `interaction.test.ts`, che passano senza toccare il codice:
+sono rete, non correzione. Che mordano è verificato per mutazione —
+`MARQUEE_MIN = 1` fa cadere i due test della soglia, `additive: false` cablato
+fa cadere quello del marquee additivo.
+
+### DT-24 · l'alias di `migrateDocument`: il difetto non è dove la voce lo cercava
+
+La voce d'archivio diceva: quando non c'è nessuna migrazione da applicare,
+`migrateDocument` restituisce l'input invece di una copia. Vero, e innocuo:
+l'unico chiamante di produzione è `parseDocument`, che gli passa un oggetto
+appena uscito da `JSON.parse` — non condiviso con nessuno — e ne consegna il
+risultato a zod, che **copia**. Chi mette le mani sul documento vede la copia di
+zod, mai quell'alias. Una `structuredClone` difensiva costerebbe una copia a
+ogni apertura per proteggere da uno scenario che non esiste.
+
+Il contratto che conta davvero è un altro, e non era scritto da nessuna parte:
+che le migrazioni **non mutino l'input**. Quello ora ha il suo test, e il
+docblock dice esplicito che il ritorno può essere l'input stesso, e che un
+chiamante nuovo che volesse mutarlo deve copiarselo.
+
+### DT-25 · il test di scalabilità dell'SQL misurava il tempo sbagliato
+
+Scoperto per caso mentre si chiudevano le altre: una corsa della suite su
+venti è fallita, e il test era «il tempo raddoppiando l'input non è
+quadratico» di `sql-text.test.ts`. Riprodotto a comando lanciando più suite in
+parallelo — tre su tre fallivano.
+
+Il test cronometrava `performance.now()`, cioè **tempo trascorso**. Se lo
+scheduler toglie la CPU al processo dentro la misura grande e non dentro quella
+piccola, il rapporto salta pur restando la funzione lineare. L'autore aveva già
+combattuto questa fragilità alzando l'input a 800/1600 tabelle per uscire dal
+rumore del timer, ma il rumore del timer e la contesa per la CPU sono due cose
+diverse, e la seconda non si batte facendo durare di più la misura. Nemmeno il
+minimo di tre giri basta: con quattro suite la CPU resta satura per l'intera
+durata e nessun giro esce pulito.
+
+Ora la misura è il **tempo CPU** (`process.cpuUsage()`): quando lo scheduler
+toglie la CPU, il tempo trascorso avanza e il tempo CPU no — che è esattamente
+la differenza fra «quanto lavoro ha fatto» e «quanto ha aspettato». Con cinque
+suite in parallelo il test non cade più.
+
+Vale perché questo file gira in ambiente node e ogni file di test sta nel
+proprio processo: `cpuUsage()` è del processo, e con i worker in thread
+conterebbe anche il lavoro degli altri file. Scritto nel docblock, perché è la
+condizione che rende valida la misura.
+
+**Osservato e non chiuso:** a cinque suite parallele cade invece
+`round-trip.test.ts` per il timeout di 5 s di Vitest — un parse MySQL con un
+quinto della CPU non fa in tempo. È saturazione della macchina, non un difetto:
+in CI gira una suite sola. Si scrive qui perché chi vedrà quel rosso sappia
+cosa guardare.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -455,17 +569,16 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 ### Modello ed editor ER
 
 - `entityKey` ambigua col punto → **corretta** come collisione di chiave, vedi DT-1.
-- `migrateDocument` restituisce l'alias dell'input quando non ci sono
-  migrazioni da applicare (nessuna copia difensiva).
+- `migrateDocument` che restituisce l'alias dell'input → **esaminato**, vedi
+  DT-24: innocuo con l'unico chiamante che c'è, e il contratto che conta — «non
+  muta l'input» — ora ha il suo test.
 - Round trip di serializzazione con entità qualificata da schema: non
   coperto da test.
 - `validateEr` concentra cinque controlli in un blocco di ~55 righe.
   Estraibili se il file cresce, non prima.
-- `entity-name-clash` confronta solo con la prima entità della chiave
-  case-insensitive: con tre collisioni non le raggruppa.
-- `fk-without-relationship` valuta le relazioni uscenti a livello di entità,
-  non per singolo attributo — è il codice del piano, accettato. Falsi
-  negativi su entità con più FK e una sola relazione.
+- `entity-name-clash` che non raggruppa → **corretto**, vedi DT-21.
+- `fk-without-relationship` valutato a livello di entità → **corretto**, vedi
+  DT-20: ora è per attributo, con l'eccezione delle relazioni disegnate a mano.
 - L'auto-relazione riconosciuta per uguaglianza di rettangoli → **corretto**,
   vedi DT-16.
 - Il clamp di `zoomAt` è testato solo a `MAX_SCALE`.
@@ -478,8 +591,8 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 - `removeAttribute` che lascia riferimenti pendenti → **corretto**, vedi DT-5.
 - `PointerInfo.alt` è dichiarato e popolato ma mai letto; il ramo 2 di
   `PointerInfo.button` è irraggiungibile.
-- Nessun test sul marquee additivo (shift+drag sul vuoto), sullo shift+click
-  su relazione, sulla soglia esatta `MARQUEE_MIN=3`.
+- I test mancanti su marquee additivo, shift+click su relazione e soglia
+  `MARQUEE_MIN` → **coperti**, vedi DT-23.
 - L'hook delle interazioni senza rete di regressione → **corretto**, vedi
   DT-18: la macchina a stati è uscita dall'hook e ha i suoi test. Resta senza
   rete il solo cablaggio degli eventi del browser.
@@ -591,7 +704,7 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `**/*.{ts,tsx}` per tutti e quattro gli strati (righe 32, 45, 57).
   Risolto lungo la strada, senza che nessuno lo registrasse.
   `no-restricted-imports` blocca anche gli `import type`: voluto.
-- `noUncheckedIndexedAccess` non è abilitato in `tsconfig` (verificato).
+- `noUncheckedIndexedAccess` non abilitato → **corretto**, vedi DT-22.
 - Il gate di prestazione rosso su `dragAll` e `zoom` → **corretto**, vedi
   DT-14: ora passano tutti e sei gli scenari, a 300 e a 600 entità.
 - Script di prestazione → **corretto**, vedi DT-6.

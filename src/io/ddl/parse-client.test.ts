@@ -117,12 +117,12 @@ describe("createParser", () => {
     const stale = parser.parse("dump grosso", "postgres")
     const fresh = parser.parse("dump piccolo", "postgres")
     await expect(stale).rejects.toThrow(/abbandonata/)
-    expect(workers[0].terminated).toBe(true)
+    expect(workers[0]?.terminated).toBe(true)
     expect(spawns).toBe(2)
-    workers[1].reply({ id: 2, ok: true, result: EMPTY })
+    workers[1]?.reply({ id: 2, ok: true, result: EMPTY })
     await expect(fresh).resolves.toEqual(EMPTY)
     // La risposta tardiva della parse abbandonata, se mai arrivasse, non farebbe niente.
-    workers[0].reply({ id: 1, ok: true, result: EMPTY })
+    workers[0]?.reply({ id: 1, ok: true, result: EMPTY })
   })
 
   it("dopo un errore di caricamento la parse successiva fa nascere un nuovo worker", async () => {
@@ -135,13 +135,13 @@ describe("createParser", () => {
       return w
     })
     const first = parser.parse("x", "postgres")
-    workers[0].emit("error", new Event("error"))
+    workers[0]?.emit("error", new Event("error"))
     await expect(first).rejects.toThrow(/caricato/)
     expect(spawns).toBe(1)
 
     const second = parser.parse("y", "postgres")
     expect(spawns).toBe(2)
-    workers[1].reply({ id: 2, ok: true, result: EMPTY })
+    workers[1]?.reply({ id: 2, ok: true, result: EMPTY })
     await expect(second).resolves.toEqual(EMPTY)
   })
 
@@ -160,12 +160,12 @@ describe("createParser", () => {
     vi.advanceTimersByTime(1000)
     await expect(first).rejects.toThrow(/in tempo/)
     expect(spawns).toBe(1)
-    expect(workers[0].terminated).toBe(true)
+    expect(workers[0]?.terminated).toBe(true)
 
     vi.useRealTimers()
     const second = parser.parse("y", "postgres")
     expect(spawns).toBe(2)
-    workers[1].reply({ id: 2, ok: true, result: EMPTY })
+    workers[1]?.reply({ id: 2, ok: true, result: EMPTY })
     await expect(second).resolves.toEqual(EMPTY)
   })
 
@@ -183,13 +183,13 @@ describe("createParser", () => {
     vi.advanceTimersByTime(500)
     const next = parser.parse("b", "postgres")
     await expect(abandoned).rejects.toThrow(/abbandonata/)
-    expect(workers[0].terminated).toBe(true)
+    expect(workers[0]?.terminated).toBe(true)
 
     // Il timeout di `abandoned`, se scattasse comunque, non deve toccare `next`: il suo timer
     // riparte da zero sul worker nuovo.
     vi.advanceTimersByTime(1000)
     await expect(next).rejects.toThrow(/in tempo/)
-    expect(workers[1].terminated).toBe(true)
+    expect(workers[1]?.terminated).toBe(true)
   })
 
   it("dispose termina il worker e rigetta le analisi in corso", async () => {

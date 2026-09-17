@@ -46,13 +46,17 @@ export function setCollapsed(key: string, collapsed: boolean): Recipe {
 export function applyLayout(positions: LayoutPositions): Recipe {
   return (draft) => {
     const d = diagramView(draft)
-    const entries = Object.entries(positions).filter(([key]) => key in d.nodes)
+    // Il nodo si prende qui e non nel ciclo: il filtro «la chiave esiste» e la lettura del nodo sono
+    // la stessa domanda, e tenerle insieme la fa rispondere al tipo invece che a un commento.
+    const entries = Object.entries(positions).flatMap(([key, p]) => {
+      const node = d.nodes[key]
+      return node ? [{ node, p }] : []
+    })
     if (entries.length === 0) return
 
-    const minX = Math.min(...entries.map(([, p]) => p.x))
-    const minY = Math.min(...entries.map(([, p]) => p.y))
-    for (const [key, p] of entries) {
-      const node = d.nodes[key]
+    const minX = Math.min(...entries.map(({ p }) => p.x))
+    const minY = Math.min(...entries.map(({ p }) => p.y))
+    for (const { node, p } of entries) {
       node.x = snap(p.x - minX + MARGIN)
       node.y = snap(p.y - minY + MARGIN)
     }

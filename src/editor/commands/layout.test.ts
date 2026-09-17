@@ -50,7 +50,8 @@ describe("layout automatico", () => {
 
     it("un nodo collassato è alto quanto il suo solo header", () => {
       documentStore.getState().dispatch((draft) => {
-        erDiagram(draft).view.nodes.cliente.collapsed = true
+        const node = erDiagram(draft).view.nodes["cliente"]
+        if (node) node.collapsed = true
       })
       const node = layoutGraph(er()).nodes.find((n) => n.id === "cliente")
       expect(node?.h).toBe(HEADER_H)

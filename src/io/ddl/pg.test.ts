@@ -46,12 +46,12 @@ describe("parsePostgres", () => {
 
   it("ALTER COLUMN SET NOT NULL cambia la colonna già raccolta", async () => {
     const r = await parsePostgres("CREATE TABLE t (a int); ALTER TABLE ONLY t ALTER COLUMN a SET NOT NULL;")
-    expect(find(r, "t").columns[0].nullable).toBe(false)
+    expect(find(r, "t").columns[0]?.nullable).toBe(false)
   })
 
   it("un REFERENCES scritto sulla colonna riempie columns col nome della colonna", async () => {
     const r = await parsePostgres("CREATE TABLE t (parent_id bigint REFERENCES other(id));")
-    expect(find(r, "t").foreignKeys[0].columns).toEqual(["parent_id"])
+    expect(find(r, "t").foreignKeys[0]?.columns).toEqual(["parent_id"])
   })
 
   it("REFERENCES senza lista di colonne referenziate lascia refColumns vuoto (si risolve altrove, sulla PK del target)", async () => {

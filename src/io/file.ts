@@ -51,6 +51,8 @@ const isAbort = (e: unknown): boolean => e instanceof DOMException && e.name ===
 export async function pickOpen(): Promise<OpenedFile | null> {
   try {
     const [handle] = await window.showOpenFilePicker!({ types: FILE_TYPES, multiple: false })
+    // Una lista vuota non è prevista dall'API, ma se arrivasse è un annullamento, non un errore.
+    if (!handle) return null
     return await readFile(await handle.getFile(), handle)
   } catch (e) {
     if (isAbort(e)) return null

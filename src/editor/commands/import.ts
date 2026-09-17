@@ -14,10 +14,10 @@ const GUTTER = 40
  * non copre mai il lavoro esistente. Non è auto layout: è una disposizione leggibile e trascinabile.
  */
 export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram): Record<string, Point> {
-  const fresh = Object.keys(entities).filter((key) => !(key in diagram.view.nodes))
+  const fresh = Object.entries(entities).filter(([key]) => !(key in diagram.view.nodes))
   if (fresh.length === 0) return {}
 
-  const sizes = fresh.map((key) => entitySize(entities[key], false))
+  const sizes = fresh.map(([, entity]) => entitySize(entity, false))
   const cellW = snap(Math.max(...sizes.map((s) => s.w)) + GUTTER)
   const cellH = snap(Math.max(...sizes.map((s) => s.h)) + GUTTER)
   const cols = Math.ceil(Math.sqrt(fresh.length))
@@ -33,7 +33,7 @@ export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram): 
   const originY = snap(bounds ? bounds.y + bounds.h + GUTTER : GUTTER)
 
   const out: Record<string, Point> = {}
-  fresh.forEach((key, i) => {
+  fresh.forEach(([key], i) => {
     out[key] = { x: snap(originX + (i % cols) * cellW), y: snap(originY + Math.floor(i / cols) * cellH) }
   })
   return out
@@ -52,7 +52,10 @@ export function importEr(entities: Record<string, Entity>, relationships: readon
     for (const [key, entity] of Object.entries(entities)) {
       d.model.entities[key] = entity
       // Chi c'era tiene il suo nodo, quindi la posizione che l'utente le ha dato sopravvive.
-      if (!(key in d.view.nodes)) d.view.nodes[key] = { ...positions[key], collapsed: false }
+      // `placeNew` copre esattamente le chiavi nuove: leggere la posizione prima di scrivere il nodo
+      // fa dire al tipo ciò che prima si sapeva soltanto leggendo le due funzioni insieme.
+      const pos = positions[key]
+      if (pos && !(key in d.view.nodes)) d.view.nodes[key] = { ...pos, collapsed: false }
     }
 
     // Via le relazioni derivate da una FK delle tabelle in arrivo, altrimenti il re-import le duplica.

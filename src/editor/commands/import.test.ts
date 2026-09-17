@@ -51,7 +51,7 @@ describe("importEr", () => {
     documentStore.getState().dispatch(importEr({ a: entity("a") }, []))
     const before = { ...diagram().view.nodes["a"] }
     documentStore.getState().dispatch(importEr({ a: entity("a", ["id", "nuovo"]) }, []))
-    expect(diagram().model.entities["a"].attributes.map((x) => x.name)).toEqual(["id", "nuovo"])
+    expect(diagram().model.entities["a"]?.attributes.map((x) => x.name)).toEqual(["id", "nuovo"])
     expect(diagram().view.nodes["a"]).toEqual(before)
   })
 
@@ -92,7 +92,9 @@ describe("placeNew", () => {
   it("non sovrappone le entità nuove a quelle già sul canvas", () => {
     documentStore.getState().dispatch(importEr({ vecchia: entity("vecchia") }, []))
     const placed = placeNew({ nuova: entity("nuova") }, diagram())
-    expect(placed["nuova"].y).toBeGreaterThan(diagram().view.nodes["vecchia"].y)
+    const vecchia = diagram().view.nodes["vecchia"]
+    expect(vecchia).toBeDefined()
+    expect(placed["nuova"]?.y).toBeGreaterThan(vecchia!.y)
   })
 
   it("dispone in griglia, quindi la seconda entità non finisce sopra la prima", () => {

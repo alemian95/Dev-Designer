@@ -76,7 +76,7 @@ describe("parseMysql", () => {
 
   it("la PRIMARY KEY spegne nullable anche senza NOT NULL scritto", () => {
     const r = parseMysql("CREATE TABLE `t` (`id` int, PRIMARY KEY (`id`));")
-    expect(find(r, "t").columns[0].nullable).toBe(false)
+    expect(find(r, "t").columns[0]?.nullable).toBe(false)
   })
 
   it("una tabella senza PRIMARY KEY ha primaryKey vuoto e non è un errore", () => {
@@ -107,7 +107,7 @@ describe("parseMysql", () => {
 
   it("ALTER TABLE ADD CONSTRAINT fuori dal CREATE TABLE arriva sulla tabella", () => {
     const r = parseMysql("CREATE TABLE `t` (`id` int, `p` int);\nALTER TABLE `t` ADD CONSTRAINT `t_fk` FOREIGN KEY (`p`) REFERENCES `o` (`id`);")
-    expect(find(r, "t").foreignKeys[0].refTable).toBe("o")
+    expect(find(r, "t").foreignKeys[0]?.refTable).toBe("o")
   })
 
   it("ALTER TABLE ADD PRIMARY KEY fuori dal CREATE TABLE spegne nullable come quella in linea", () => {

@@ -114,7 +114,11 @@ const inCode = (list: readonly Span[], at: number): boolean =>
 function makeCodeCursor(list: readonly Span[]): (at: number) => boolean {
   let idx = 0
   return (at: number): boolean => {
-    while (idx < list.length - 1 && list[idx].end <= at) idx++
+    while (idx < list.length - 1) {
+      const cur = list[idx]
+      if (!cur || cur.end > at) break
+      idx++
+    }
     const s = list[idx]
     return s !== undefined && s.code && at >= s.start && at < s.end
   }
@@ -137,8 +141,8 @@ export function stripPsqlMeta(sql: string): { sql: string; removed: string[] } {
   while (at < sql.length) {
     const end = endOfLine(sql, at)
     const line = sql.slice(at, end)
-    const m = /^[ \t]*\\([A-Za-z]+|\.)/.exec(line)
-    if (m && inCode(list, at + line.indexOf("\\")) && PSQL_META.has(m[1])) {
+    const meta = /^[ \t]*\\([A-Za-z]+|\.)/.exec(line)?.[1]
+    if (meta !== undefined && inCode(list, at + line.indexOf("\\")) && PSQL_META.has(meta)) {
       removed.push(line.trim())
       out += " ".repeat(line.length)
     } else out += line
@@ -179,10 +183,10 @@ export function splitStatements(sql: string): string[] {
     // La direttiva DELIMITER si riconosce solo a inizio riga, in stato codice.
     if (i === start || sql[i - 1] === "\n") {
       const line = sql.slice(i, endOfLine(sql, i))
-      const m = DELIMITER.exec(line)
-      if (m) {
+      const delimiter = DELIMITER.exec(line)?.[1]
+      if (delimiter !== undefined) {
         push(i)
-        terminator = m[1]
+        terminator = delimiter
         i = endOfLine(sql, i) + 1
         start = i
         continue
@@ -210,6 +214,6 @@ const EXECUTABLE = /^\/\*(?:!|M!)\d*\s*([\s\S]*?)\*\/$/
 export function stripExecutableComments(chunk: string): string | null {
   const m = EXECUTABLE.exec(chunk.trim())
   if (!m) return chunk
-  const inner = m[1].trim()
+  const inner = (m[1] ?? "").trim()
   return /^[A-Za-z(]/.test(inner) ? inner : null
 }

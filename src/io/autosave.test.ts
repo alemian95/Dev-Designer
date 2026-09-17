@@ -50,7 +50,7 @@ describe("startAutosave", () => {
     expect(db.put).toHaveBeenCalledTimes(1)
     const rec = db.records[0]
     expect(rec).toMatchObject({ id: "doc-1", name: "t", fileName: "t.dd.json", updatedAt: 500, savedToFileAt: 100 })
-    expect(rec.json).toContain('"entity"')
+    expect(rec?.json).toContain('"entity"')
   })
 
   it("comandi ravvicinati producono una scrittura sola", async () => {

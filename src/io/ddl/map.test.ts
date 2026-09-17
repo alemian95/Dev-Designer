@@ -51,7 +51,7 @@ describe("mapToEr — entità e attributi", () => {
       ],
       model: EMPTY_MODEL,
     })
-    expect(r.entities["t"].attributes).toEqual([
+    expect(r.entities["t"]?.attributes).toEqual([
       { name: "id", type: "bigint", primaryKey: true, foreignKey: false, nullable: false, unique: false },
       { name: "code", type: "text", primaryKey: false, foreignKey: false, nullable: true, unique: true },
       { name: "other_id", type: "bigint", primaryKey: false, foreignKey: true, nullable: true, unique: false },
@@ -60,7 +60,7 @@ describe("mapToEr — entità e attributi", () => {
 
   it("un vincolo UNIQUE su più colonne non marca nessuna colonna e produce un avviso col conteggio", () => {
     const r = mapToEr({ tables: [table({ name: "t", columns: [{ name: "a", type: "int", nullable: true }], unique: [["a", "b"]] })], model: EMPTY_MODEL })
-    expect(r.entities["t"].attributes[0].unique).toBe(false)
+    expect(r.entities["t"]?.attributes[0]?.unique).toBe(false)
     expect(r.warnings.some((w) => w.includes("1") && w.includes("UNIQUE"))).toBe(true)
   })
 })
@@ -68,42 +68,42 @@ describe("mapToEr — entità e attributi", () => {
 describe("mapToEr — cardinalità", () => {
   it("FK non nullabile: il padre è esattamente uno", () => {
     const r = mapToEr({ tables: [child(), parent()], model: EMPTY_MODEL })
-    expect(r.relationships[0].target.cardinality).toBe("one")
+    expect(r.relationships[0]?.target.cardinality).toBe("one")
   })
 
   it("FK nullabile: il padre è opzionale", () => {
     const t = child({ columns: [{ name: "id", type: "bigint", nullable: false }, { name: "parent_id", type: "bigint", nullable: true }] })
     const r = mapToEr({ tables: [t, parent()], model: EMPTY_MODEL })
-    expect(r.relationships[0].target.cardinality).toBe("zero-or-one")
+    expect(r.relationships[0]?.target.cardinality).toBe("zero-or-one")
   })
 
   it("FK non unica nel figlio: molti figli per padre", () => {
     const r = mapToEr({ tables: [child(), parent()], model: EMPTY_MODEL })
-    expect(r.relationships[0].source.cardinality).toBe("zero-or-many")
+    expect(r.relationships[0]?.source.cardinality).toBe("zero-or-many")
   })
 
   it("FK unica nel figlio: relazione uno a uno", () => {
     const t = child({ unique: [["parent_id"]] })
     const r = mapToEr({ tables: [t, parent()], model: EMPTY_MODEL })
-    expect(r.relationships[0].source.cardinality).toBe("zero-or-one")
+    expect(r.relationships[0]?.source.cardinality).toBe("zero-or-one")
   })
 
   it("FK che è la PRIMARY KEY del figlio: uno a uno e identificante", () => {
     const t = child({ primaryKey: ["parent_id"] })
     const r = mapToEr({ tables: [t, parent()], model: EMPTY_MODEL })
-    expect(r.relationships[0].source.cardinality).toBe("zero-or-one")
-    expect(r.relationships[0].identifying).toBe(true)
+    expect(r.relationships[0]?.source.cardinality).toBe("zero-or-one")
+    expect(r.relationships[0]?.identifying).toBe(true)
   })
 
   it("FK fuori dalla PRIMARY KEY: non identificante", () => {
     const r = mapToEr({ tables: [child(), parent()], model: EMPTY_MODEL })
-    expect(r.relationships[0].identifying).toBe(false)
+    expect(r.relationships[0]?.identifying).toBe(false)
   })
 
   it("senza PRIMARY KEY nel figlio la relazione non è identificante", () => {
     const t = child({ primaryKey: [] })
     const r = mapToEr({ tables: [t, parent()], model: EMPTY_MODEL })
-    expect(r.relationships[0].identifying).toBe(false)
+    expect(r.relationships[0]?.identifying).toBe(false)
   })
 })
 
@@ -125,7 +125,7 @@ describe("mapToEr — risoluzione dei riferimenti", () => {
     }
     const r = mapToEr({ tables: [child()], model })
     expect(r.relationships).toHaveLength(1)
-    expect(r.relationships[0].target.entity).toBe("parent")
+    expect(r.relationships[0]?.target.entity).toBe("parent")
   })
 
   it("una FK verso una tabella assente salta la relazione e lascia un avviso", () => {
@@ -152,7 +152,7 @@ describe("mapToEr — risoluzione dei riferimenti", () => {
       ],
       model: EMPTY_MODEL,
     })
-    expect(r.relationships[0].target.entity).toBe("b.parent")
+    expect(r.relationships[0]?.target.entity).toBe("b.parent")
   })
 
   it("una FK verso se stessa non è un caso speciale", () => {
@@ -163,8 +163,8 @@ describe("mapToEr — risoluzione dei riferimenti", () => {
       foreignKeys: [{ columns: ["parent_id"], refTable: "node", refColumns: ["id"] }],
     })
     const r = mapToEr({ tables: [t], model: EMPTY_MODEL })
-    expect(r.relationships[0].source.entity).toBe("node")
-    expect(r.relationships[0].target.entity).toBe("node")
+    expect(r.relationships[0]?.source.entity).toBe("node")
+    expect(r.relationships[0]?.target.entity).toBe("node")
   })
 })
 
@@ -176,7 +176,7 @@ describe("mapToEr — nome di tabella con un punto", () => {
     const source = child({ foreignKeys: [{ name: "child_fk", columns: ["parent_id"], refTable: "my.table", refColumns: ["id"] }] })
     const r = mapToEr({ tables: [source, target], model: EMPTY_MODEL })
     expect(r.relationships).toHaveLength(1)
-    expect(r.relationships[0].target.entity).toBe("my.table")
+    expect(r.relationships[0]?.target.entity).toBe("my.table")
     expect(r.warnings).toEqual([])
   })
 })
@@ -196,7 +196,7 @@ describe("mapToEr — REFERENCES senza lista di colonne referenziate", () => {
     const t = child({ foreignKeys: [{ name: "child_fk", columns: ["parent_id"], refTable: "parent", refColumns: [] }] })
     const r = mapToEr({ tables: [t, parent()], model: EMPTY_MODEL })
     expect(r.relationships).toHaveLength(1)
-    expect(r.relationships[0].target.attributes).toEqual(["id"])
+    expect(r.relationships[0]?.target.attributes).toEqual(["id"])
   })
 
   it("refColumns vuoto e il target non ha una PRIMARY KEY: la FK è irrisolvibile, si scarta col motivo vero", () => {

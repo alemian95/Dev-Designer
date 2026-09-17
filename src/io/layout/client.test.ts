@@ -94,10 +94,10 @@ describe("createLayoutEngine", () => {
     const first = engine.layout(NODES, EDGES)
     const second = engine.layout(NODES, [])
     await expect(first).rejects.toThrow(/abbandonato/)
-    expect(workers[0].terminated).toBe(true)
+    expect(workers[0]?.terminated).toBe(true)
     // Il worker abbandonato è inutilizzabile: la seconda richiesta ne ha fatto nascere uno pulito.
     expect(workers).toHaveLength(2)
-    workers[1].reply({ id: 2, ok: true, positions: POSITIONS })
+    workers[1]?.reply({ id: 2, ok: true, positions: POSITIONS })
     await expect(second).resolves.toEqual(POSITIONS)
   })
 
@@ -119,10 +119,10 @@ describe("createLayoutEngine", () => {
       return w
     })
     const first = engine.layout(NODES, EDGES)
-    workers[0].reply({ id: 1, ok: true, positions: POSITIONS })
+    workers[0]?.reply({ id: 1, ok: true, positions: POSITIONS })
     await first
     const second = engine.layout(NODES, EDGES)
-    workers[0].reply({ id: 2, ok: true, positions: POSITIONS })
+    workers[0]?.reply({ id: 2, ok: true, positions: POSITIONS })
     await second
     // Avviare elkjs costa: il worker si tiene finché non fallisce.
     expect(workers).toHaveLength(1)

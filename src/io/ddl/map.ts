@@ -63,16 +63,17 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
   }
 
   // Le entità già sul canvas contano quanto quelle in arrivo: una FK può puntare a una di quelle.
-  const known = new Set([...Object.keys(entities), ...Object.keys(model.entities)])
+  // Una mappa e non un insieme di chiavi: sotto serve anche il nome dell'entità, e tenerlo qui
+  // evita di rileggerlo da due mappe con un `??` che il tipo non sa risolvere.
+  const known = new Map<string, Entity>([...Object.entries(model.entities), ...Object.entries(entities)])
   // Il nome nudo, per risolvere i riferimenti che non qualificano lo schema: si legge dal campo
   // `name` dell'entità (già nudo, per costruzione), non ricavandolo dalla chiave. Spezzarlo dalla
   // chiave sul primo punto confonderebbe un nome di tabella che contiene un punto con uno schema.
   const byBareName = new Map<string, string[]>()
-  for (const key of known) {
-    // Una chiave può comparire in entrambe le mappe quando l'import sostituisce un'entità già sul
-    // canvas: `known` la deduplica, e si legge l'entità da quella in arrivo se c'è.
-    const name = (entities[key] ?? model.entities[key]).name
-    byBareName.set(name, [...(byBareName.get(name) ?? []), key])
+  // Una chiave può comparire in entrambe le mappe quando l'import sostituisce un'entità già sul
+  // canvas: l'ordine dello spread qui sopra fa vincere quella in arrivo, come prima faceva il `??`.
+  for (const [key, entity] of known) {
+    byBareName.set(entity.name, [...(byBareName.get(entity.name) ?? []), key])
   }
 
   const resolve = (fk: SqlForeignKey, from: string): string | null => {
@@ -83,7 +84,7 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
       return null
     }
     const matches = byBareName.get(fk.refTable) ?? []
-    if (matches.length === 1) return matches[0]
+    if (matches.length === 1) return matches[0] ?? null
     if (matches.length > 1) {
       warnings.push(`relazione saltata: il riferimento a "${fk.refTable}" da ${from} è ambiguo, corrisponde a ${matches.join(" e ")}`)
       return null

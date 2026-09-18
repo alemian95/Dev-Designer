@@ -18,7 +18,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  # Il nome del job è l'identità del check su GitHub, ed è ciò che si seleziona nei Deployment
+  # Checks di Vercel: cambiarlo dopo averlo collegato là obbliga a riconfigurarlo. Descrittivo e
+  # non generico apposta — due workflow con un job omonimo collidono, dice la doc di Vercel.
+  lint-test-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

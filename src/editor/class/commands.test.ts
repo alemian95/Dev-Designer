@@ -293,6 +293,8 @@ describe("addNoteLink", () => {
   })
 
   it("una nota senza view resta fuori dal grafo, come una classe senza view", () => {
+    // Rete di regressione sul ramo `if (diagram.view.nodes[key])`: era già vero prima di questa
+    // task (le note non entravano affatto nel grafo), quindi qui non c'è mai stato un rosso da vedere.
     const doc = produce(conNotaEClasse(), (d) => {
       classDiagram(d).model.notes["orfana"] = { text: "senza view" }
     })

@@ -181,7 +181,7 @@ describe("classOps e le note", () => {
     expect(doc.diagram.model.notes[key]).toBeDefined()
   })
 
-  it("layoutGraph include la nota insieme alla classe: l'ancorata segue la classe grazie al suo arco, la libera non finisce più sotto un nodo spostato", () => {
+  it("layoutGraph include la nota libera insieme alla classe", () => {
     const g = opsFor(docConNota()).layoutGraph()
     expect(g.nodes.map((n) => n.id).sort()).toEqual(["Cliente", "n-1"])
   })

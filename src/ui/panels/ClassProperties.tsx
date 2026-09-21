@@ -5,7 +5,9 @@ import { classDiagram } from "@/editor/class-access"
 import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { RelationKindSchema, StereotypeSchema, type RelationKind, type Stereotype } from "@/model/class/schema"
+import {
+  CLASS_RELATION_KINDS, RelationKindSchema, StereotypeSchema, type RelationKind, type Stereotype,
+} from "@/model/class/schema"
 import { renameClassWithNotice } from "@/ui/class-rename"
 import { CommitInput } from "@/ui/panels/CommitInput"
 
@@ -37,6 +39,7 @@ const RELATION_LABEL: Record<RelationKind, string> = {
   composition: "Composizione",
   aggregation: "Aggregazione",
   dependency: "Dipendenza",
+  "note-link": "Ancoraggio nota",
 }
 
 function StereotypeSelect({ id, value, onChange }: { id: string; value: Stereotype; onChange: (v: Stereotype) => void }) {
@@ -50,7 +53,7 @@ function StereotypeSelect({ id, value, onChange }: { id: string; value: Stereoty
 function RelationKindSelect({ id, value, onChange }: { id: string; value: RelationKind; onChange: (v: RelationKind) => void }) {
   return (
     <select id={id} value={value} onChange={(e) => onChange(RelationKindSchema.parse(e.target.value))} className="h-8 rounded-md border bg-background px-2 text-sm">
-      {RelationKindSchema.options.map((k) => <option key={k} value={k}>{RELATION_LABEL[k]}</option>)}
+      {CLASS_RELATION_KINDS.map((k) => <option key={k} value={k}>{RELATION_LABEL[k]}</option>)}
     </select>
   )
 }

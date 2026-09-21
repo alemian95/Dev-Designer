@@ -1,5 +1,7 @@
+import { isClassRelation } from "@/model/class/schema"
 import type {
-  ClassAttribute, ClassEnd, ClassMethod, ClassModel, ClassNode, ClassRelation, RelationKind, Stereotype, Visibility,
+  ClassAttribute, ClassEnd, ClassMethod, ClassModel, ClassNode, ClassRelation, ClassRelationKind, Stereotype,
+  Visibility,
 } from "@/model/class/schema"
 import type { EmitResult } from "./result"
 
@@ -25,7 +27,7 @@ const STEREOTYPE_ANNOTATION: Partial<Record<Stereotype, string>> = {
  * sempre il `target` (il padre) — realizzazione e dipendenza vogliono il `source` a sinistra — ed è
  * la parte che si sbaglia più facilmente: i test hanno molteplicità asimmetriche apposta per prenderlo.
  */
-const RELATION_TOKEN: Record<RelationKind, string> = {
+const RELATION_TOKEN: Record<ClassRelationKind, string> = {
   generalization: "<|--",
   realization: "..|>",
   composition: "*--",
@@ -35,7 +37,7 @@ const RELATION_TOKEN: Record<RelationKind, string> = {
 }
 
 /** I `kind` che mettono il `target` (il padre/tutto) a sinistra; gli altri tre mettono il `source`. */
-const TARGET_LEFT = new Set<RelationKind>(["generalization", "composition", "aggregation"])
+const TARGET_LEFT = new Set<ClassRelationKind>(["generalization", "composition", "aggregation"])
 
 /** Nome sicuro per un identificatore Mermaid nudo (classe o riferimento a classe in una relazione). */
 const SAFE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
@@ -166,7 +168,7 @@ function quotedMultiplicity(m: string): string {
  * La riga di una relazione. Il lato sinistro/destro dipende dal `kind` (`TARGET_LEFT`), non è
  * sempre `target`/`source`: è la tabella normativa di §9. L'etichetta va in coda dopo i due punti.
  */
-function relationLine(rel: ClassRelation, renamed: Map<string, string>): string {
+function relationLine(rel: ClassRelation & { kind: ClassRelationKind }, renamed: Map<string, string>): string {
   const left: ClassEnd = TARGET_LEFT.has(rel.kind) ? rel.target : rel.source
   const right: ClassEnd = TARGET_LEFT.has(rel.kind) ? rel.source : rel.target
   // `-->` solo quando il modello registra la navigabilità. Finché non la registrava, `--` era la
@@ -240,7 +242,9 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
   const out = ["classDiagram"]
 
   for (const key of Object.keys(model.relations).sort()) {
-    out.push(relationLine(model.relations[key]!, renamed))
+    const rel = model.relations[key]!
+    if (!isClassRelation(rel)) continue
+    out.push(relationLine(rel, renamed))
   }
 
   for (const key of Object.keys(model.classes).sort()) {

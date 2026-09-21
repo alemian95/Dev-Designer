@@ -144,6 +144,10 @@ describe("ancoraggi delle note", () => {
     const issues = validateClass(conNota([link("sparita", "Cliente")]))
     expect(issues).toHaveLength(1)
     expect(issues[0]!.code).toBe("dangling-relation")
-    expect(issues[0]!.message).toContain("sparita")
+    // Messaggio intero, non `toContain`: "sparita" comparirebbe anche nel messaggio del vecchio
+    // ciclo (che cercava `source.class` fra le classi, non fra le note), lasciando verde il test
+    // pure con una regressione che ripristinasse quella ricerca. Solo il testo completo distingue
+    // "ancoraggio ... nota" (giusto) da "relazione ... classe" (il guasto che questa task chiude).
+    expect(issues[0]!.message).toBe('ancoraggio "r0": nota "sparita" inesistente')
   })
 })

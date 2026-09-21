@@ -25,10 +25,10 @@ export interface DiagramOps {
   addNode(at: Point): { key: string; recipe: Recipe }
   /** Terza specie di nodo, oggi solo nel class diagram. Assente dove il tipo non ha note. */
   addNote?(at: Point): { key: string; recipe: Recipe }
-  /** `null` quando un estremo non può ricevere una relazione — oggi solo una nota (§4 della spec:
-   *  una nota non ha un `..` verso l'elemento che commenta, e uno strumento relazione che la
-   *  collegasse produrrebbe un arco che nessun validatore né render sa più trattare). L'ER non ha
-   *  note e continua a tornare sempre un valore. */
+  /** `null` quando i due estremi non possono essere collegati: due note (un ancoraggio ha senso
+   *  solo verso una classe), o una classe che non esiste. Una nota **e** una classe producono
+   *  invece un ancoraggio (`note-link`, spec note ancorate §4). L'ER non ha note e continua a
+   *  tornare sempre un valore. */
   addEdge(source: string, target: string): { key: string; recipe: Recipe } | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }

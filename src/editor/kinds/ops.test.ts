@@ -186,17 +186,27 @@ describe("classOps e le note", () => {
     expect(g.nodes.map((n) => n.id)).toEqual(["Cliente"])
   })
 
-  it("addEdge torna null quando un estremo è una nota: nota→classe, classe→nota, nota→nota", () => {
+  it("addEdge ancora la nota alla classe in entrambi i sensi di trascinamento; nota→nota resta null", () => {
+    // Nota + classe non è più un no-op (spec note ancorate §4): produce un `note-link`.
+    // Resta senza effetto solo nota→nota, l'unico caso che continua a non avere senso.
     const doc = docConNota()
     const ops = opsFor(doc)
-    expect(ops.addEdge("n-1", "Cliente")).toBeNull()
-    expect(ops.addEdge("Cliente", "n-1")).toBeNull()
     expect(ops.addEdge("n-1", "n-1")).toBeNull()
-    // Il caso classe→classe resta l'unico che produce davvero una relazione.
+
+    const dallaNota = ops.addEdge("n-1", "Cliente")!
+    dallaNota.recipe(doc)
+    expect(doc.diagram.model.relations[dallaNota.key]).toMatchObject({ kind: "note-link" })
+
     const doc2 = docConNota()
-    doc2.diagram.model.classes.Altra = { name: "Altra", stereotype: "class", attributes: [], methods: [] }
-    doc2.diagram.view.nodes.Altra = { x: 500, y: 0, collapsed: false }
-    const result = opsFor(doc2).addEdge("Cliente", "Altra")
+    const dallaClasse = opsFor(doc2).addEdge("Cliente", "n-1")!
+    dallaClasse.recipe(doc2)
+    expect(doc2.diagram.model.relations[dallaClasse.key]).toMatchObject({ kind: "note-link" })
+
+    // Il caso classe→classe resta l'unico che produce un'associazione.
+    const doc3 = docConNota()
+    doc3.diagram.model.classes.Altra = { name: "Altra", stereotype: "class", attributes: [], methods: [] }
+    doc3.diagram.view.nodes.Altra = { x: 500, y: 0, collapsed: false }
+    const result = opsFor(doc3).addEdge("Cliente", "Altra")
     expect(result).not.toBeNull()
   })
 

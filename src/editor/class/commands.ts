@@ -102,6 +102,46 @@ export function addRelation(
   }
 }
 
+/**
+ * L'ancoraggio di una nota alla classe che commenta: una voce di `model.relations` di specie
+ * `note-link`, con la chiave della nota in `source`.
+ *
+ * `null` quando gli estremi sono due note o due classi, e quando la classe non esiste: l'unico
+ * legame che ha senso è nota → classe. La **direzione si normalizza** — in UML quel legame non ha
+ * verso, e chi disegna non deve indovinarlo — e una nota ne ha **al più uno**: un secondo
+ * trascinamento è una correzione, non un'aggiunta.
+ */
+export function addNoteLink(model: ClassModel, a: string, b: string): { key: string; recipe: Recipe } | null {
+  const aIsNote = a in model.notes
+  if (aIsNote === b in model.notes) return null
+  const note = aIsNote ? a : b
+  const cls = aIsNote ? b : a
+  if (!(cls in model.classes)) return null
+
+  // Le chiavi che questa aggiunta rimpiazza. Escluse anche dal calcolo di `uniqueKey`, altrimenti
+  // ri-ancorare alla stessa classe produrrebbe un `_2` per collidere con una voce che sta per sparire.
+  const stale = new Set(
+    Object.entries(model.relations)
+      .filter(([, rel]) => rel.kind === "note-link" && rel.source.class === note)
+      .map(([key]) => key),
+  )
+  const survivors = Object.fromEntries(Object.entries(model.relations).filter(([key]) => !stale.has(key)))
+  const key = uniqueKey(survivors, `${note}_${cls}`)
+
+  return {
+    key,
+    recipe: (draft) => {
+      const relations = classDiagram(draft).model.relations
+      for (const old of stale) delete relations[old]
+      relations[key] = {
+        kind: "note-link",
+        source: { class: note, multiplicity: "", role: "" },
+        target: { class: cls, multiplicity: "", role: "" },
+      }
+    },
+  }
+}
+
 export function updateRelation(key: string, mutate: (r: ClassRelation) => void): Recipe {
   return (draft) => {
     const rel = classDiagram(draft).model.relations[key]

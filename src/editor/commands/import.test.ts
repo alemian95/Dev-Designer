@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { createErDocument, type Entity, type ErDocument, type Relationship } from "@/model/er/schema"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
+import { entitySize } from "../er/geometry"
 import { importEr, placeNew } from "./import"
 
 const entity = (name: string, attributes: string[] = ["id"]): Entity => ({
@@ -100,5 +101,19 @@ describe("placeNew", () => {
   it("dispone in griglia, quindi la seconda entità non finisce sopra la prima", () => {
     const placed = placeNew({ a: entity("a"), b: entity("b") }, diagram())
     expect(placed["a"]).not.toEqual(placed["b"])
+  })
+
+  it("una sola entità alta non abbassa la riga di tutte le altre", () => {
+    const alta = entity("alta", Array.from({ length: 40 }, (_, i) => `c${i}`))
+    // Quattro entità → due colonne: `c` sta sotto `alta`, `d` sotto `b`. Se il passo verticale fosse
+    // uniforme, `d` scenderebbe quanto `c` pur avendo sopra di sé un'entità da un attributo.
+    const placed = placeNew({ alta, b: entity("b"), c: entity("c"), d: entity("d") }, diagram())
+    expect(placed["c"]!.y).toBeGreaterThan(placed["d"]!.y)
+  })
+
+  it("dentro una colonna le entità non si sovrappongono", () => {
+    const entities = { a: entity("a", ["id", "x", "y"]), b: entity("b"), c: entity("c"), d: entity("d") }
+    const placed = placeNew(entities, diagram())
+    expect(placed["c"]!.y).toBeGreaterThanOrEqual(placed["a"]!.y + entitySize(entities.a, false).h)
   })
 })

@@ -12,40 +12,11 @@
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/layout.mjs`. `HEADLESS=0` per vedere.
  */
-import { expectMenu, expectNodes, isMainModule, signature, startEnv } from "./helpers.mjs"
+import { expectMenu, expectNodes, isMainModule, nodeRects, overlappingPairs, signature, startEnv } from "./helpers.mjs"
 
 const DDL = `CREATE TABLE mittente (id bigint PRIMARY KEY, etichetta text NOT NULL);
 CREATE TABLE recapito (id bigint PRIMARY KEY, mittente_id bigint NOT NULL REFERENCES mittente(id));
 CREATE TABLE nota (id bigint PRIMARY KEY, recapito_id bigint NOT NULL REFERENCES recapito(id));`
-
-/**
- * Rettangoli dei nodi in coordinate schermo, letti da `getBoundingClientRect` sul `<rect>`.
- *
- * Niente parsing del `transform`: il suo formato è un dettaglio del renderer, e sbagliare la
- * regex darebbe un test che passa senza verificare niente. Lo zoom è una trasformazione uniforme,
- * quindi due nodi si sovrappongono sullo schermo se e solo se si sovrappongono nel mondo — e dopo
- * il layout la vista si adatta, quindi sono tutti dentro il viewport.
- */
-async function rects(page) {
-  return page.evaluate(() =>
-    [...document.querySelectorAll("[data-node-id]")].map((g) => {
-      const r = g.querySelector("rect").getBoundingClientRect()
-      return { id: g.getAttribute("data-node-id"), x: r.x, y: r.y, w: r.width, h: r.height }
-    }),
-  )
-}
-
-/** Le coppie di nodi che si sovrappongono. Vuoto è l'unico risultato accettabile. */
-function overlappingPairs(rects) {
-  const out = []
-  for (let i = 0; i < rects.length; i++)
-    for (let j = i + 1; j < rects.length; j++) {
-      const a = rects[i]
-      const b = rects[j]
-      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) out.push(`${a.id}/${b.id}`)
-    }
-  return out
-}
 
 /** Esegue lo scenario in un proprio contesto del browser condiviso. `true` se tutti i passi passano. */
 export async function run(browser, base) {
@@ -116,7 +87,7 @@ export async function run(browser, base) {
         return now !== before
       }, before, { timeout: 30_000 })
 
-      const overlapping = overlappingPairs(await rects(page))
+      const overlapping = overlappingPairs(await nodeRects(page))
       if (overlapping.length > 0) throw new Error(`nodi sovrapposti dopo il layout: ${overlapping.join(", ")}`)
     })
 

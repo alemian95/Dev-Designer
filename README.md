@@ -22,7 +22,9 @@ inline con doppio click, undo/redo su ogni azione.
   scritti come **testo** in un editor dedicato — non una riga di form per membro — con le regole di
   visibilità e modificatori dell'UML, lo statico sottolineato come prescrive la notazione. Le sei
   relazioni (associazione anche navigabile, generalizzazione, realizzazione, composizione,
-  aggregazione, dipendenza), ciascuna con la punta e il tratto giusti, più le note.
+  aggregazione, dipendenza), ciascuna con la punta e il tratto giusti, più le note. Una nota può
+  dichiarare la classe che commenta — un tratteggio senza punta, con lo strumento relazione — e il
+  legame esce nell'export Mermaid come `note for`; «Disponi» tiene la nota accanto alla sua classe.
 
 La **validazione è live**: i problemi del documento compaiono in un pannello mentre si disegna, non a
 un comando esplicito.
@@ -88,9 +90,9 @@ Limiti puntuali, ciascuno con la sua ragione scritta:
   ignorato, con un avviso che dice quanti. In MySQL un `REFERENCES` senza lista di colonne fa
   rifiutare l'intero `CREATE TABLE` al parser di terze parti.
 - **Class diagram**: i generici annidati non sono rappresentabili in Mermaid in nessuna codifica (si
-  emette la forma meno peggio, con un avviso). Una nota non si àncora a una classe e resta fuori dal
-  layout. Fuori scopo dichiarato: package, classi di associazione, classi annidate, PlantUML,
-  generazione di codice, import da Mermaid o da codice sorgente, documenti multi-diagramma.
+  emette la forma meno peggio, con un avviso). Fuori scopo dichiarato: package, classi di
+  associazione, classi annidate, PlantUML, generazione di codice, import da Mermaid o da codice
+  sorgente, documenti multi-diagramma.
 
 Tutto il resto sta in [debito tecnico](docs/debito-tecnico.md), che è il registro dei difetti noti e
 delle semplificazioni accettate, con il motivo di ogni rinvio.
@@ -164,7 +166,9 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   che «Disponi» metta il padre sopra il figlio, poi esporta in Mermaid e verifica l'ordine dei lati
   nell'arco.
 - **Nota**: crea una nota, ne commette il testo su due righe col blur, la trascina e la rimette con
-  ⌘Z, poi verifica che esca come riga `note "…"` nell'export Mermaid.
+  ⌘Z, la ancora a una classe con lo strumento relazione — verificando che il pannello dica
+  «Ancoraggio nota» e non offra il menu «Tipo» — poi «Disponi» e verifica che non resti sotto nessun
+  nodo, e infine verifica che esca come riga `note for` nell'export Mermaid.
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 

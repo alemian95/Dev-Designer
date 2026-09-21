@@ -126,3 +126,29 @@ export async function signature(page) {
       .join("|"),
   )
 }
+
+/**
+ * Rettangoli di schermo di tutti i nodi. `rect, path` e non solo `rect`: il corpo di una nota del
+ * class diagram è un `<path>` (l'angolo piegato), e `querySelector` prende comunque il primo che
+ * matcha, che per una classe o un'entità resta il suo `rect`.
+ */
+export async function nodeRects(page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll("[data-node-id]")].map((g) => {
+      const r = g.querySelector("rect, path").getBoundingClientRect()
+      return { id: g.getAttribute("data-node-id"), x: r.x, y: r.y, w: r.width, h: r.height }
+    }),
+  )
+}
+
+/** Le coppie di nodi che si sovrappongono. Vuoto è l'unico risultato accettabile. */
+export function overlappingPairs(rects) {
+  const out = []
+  for (let i = 0; i < rects.length; i++)
+    for (let j = i + 1; j < rects.length; j++) {
+      const a = rects[i]
+      const b = rects[j]
+      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) out.push(`${a.id}/${b.id}`)
+    }
+  return out
+}

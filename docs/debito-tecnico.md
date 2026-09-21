@@ -48,6 +48,10 @@ DT-28 è dello stesso giorno ed è il primo passo del giro di ampiezza: una voce
 d'Archivio scelta di proposito, che misurandola si è rivelata la punta di un
 difetto più grande di com'era scritta.
 
+DT-29 è del 2026-09-21 come le precedenti tre, ma viene dal giro delle note
+ancorate e chiude le due voci d'Archivio sull'ancoraggio e sul layout delle
+note, il cui rimedio comune si è rivelato essere un arco, non un campo nuovo.
+
 ---
 
 ## Corretti
@@ -667,6 +671,41 @@ vincolo di tabella nello stesso `CREATE TABLE` si sovrascrivono invece di
 sommarsi — l'ultima vince. È DDL non valido (MySQL rifiuta due PRIMARY KEY), e
 farlo andare d'accordo vorrebbe dire decidere quale delle due è quella giusta.
 
+### DT-29 · una nota poteva dichiarare la sua classe, ma solo a parole
+
+Le due voci d'Archivio erano corrette nella diagnosi e sbagliate nel rimedio
+che davano per necessario: la prima chiedeva un campo di ancoraggio sulla
+nota, la seconda un ingresso della nota nel grafo di layout. Nessuna delle due
+serviva: bastava trattare l'ancoraggio come una relazione.
+
+`addNoteLink` (`src/editor/class/commands.ts`) aggiunge una voce di
+`model.relations` di specie `note-link`, con la chiave della nota in
+`source` e quella della classe in `target` — non un campo su
+`ClassNoteSchema`. La ragione è la stessa per cui una FK non vive come campo
+sull'entità puntata nell'ER: il layer del canvas (`EdgesLayer`,
+`src/ui/canvas/kinds/class.tsx`) e `buildSvg` (`src/ui/export/svg.tsx`)
+iterano già `model.relations` per disegnare gli archi e per esportare
+Mermaid, e un campo sulla nota avrebbe richiesto un secondo percorso di
+lettura ovunque un arco già ne aveva uno. Lo strumento «Relazione» normalizza
+da sé la direzione del trascinamento (nota → classe o classe → nota danno lo
+stesso arco) e un secondo trascinamento sostituisce l'ancoraggio precedente
+invece di aggiungersi: `addNoteLink` cancella la voce `note-link` vecchia
+della stessa nota prima di scrivere quella nuova.
+
+Con l'ancoraggio modellato come arco, il secondo taglio è caduto da sé:
+`classLayoutGraph` cammina ora anche `model.notes` e include l'arco
+`note-link` fra quelli che ELK dispone, quindi la nota ancorata segue la
+classe che commenta invece di restare ferma mentre tutto il resto si muove.
+Una nota senza ancoraggio resta un nodo isolato nel grafo — nessun arco la
+tira da nessuna parte — ma anche questo è un miglioramento rispetto a prima:
+un nodo isolato che ELK dispone non finisce mai sotto un altro nodo, mentre
+prima «Disponi» lasciava le note esattamente dov'erano e una classe vicina
+spostata poteva finirci sopra.
+
+> **Osservato e non chiuso:** una nota si ancora a una classe, non a una
+> relazione, e ne ha al più una. Entrambi i limiti vengono da ciò che Mermaid
+> sa rappresentare, non da ciò che l'UML permette.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -941,22 +980,22 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `src/ui/canvas/kinds/er.tsx` tengono il nome vecchio pur contenendo le
   chiavi filtrate per `"node"`/`"edge"` (`selectedKeys`). Non esportate,
   nessun effetto osservabile.
-- **Una nota non si ancora a una classe.** `ClassNoteSchema`
+- ~~**Una nota non si ancora a una classe.** `ClassNoteSchema`
   (`src/model/class/schema.ts:93`) ha il solo campo `text`: nessun campo di
   ancoraggio verso la classe che la nota commenta. Il link `..` che UML
   prevede fra una nota e l'elemento a cui si riferisce non è modellato — il
   commento a fianco dello schema lo dice esplicito, «§2 della spec taglia
   `note for Cliente`», che sembrerebbe quel link ed è invece un arco. Deciso
   fuori scopo per questo giro: una nota resta testo libero appoggiato sul
-  canvas, senza legame registrato con nessuna classe.
-- **Le note restano fuori dal layout.** `classLayoutGraph`
+  canvas, senza legame registrato con nessuna classe.~~ **Corretto**, vedi DT-29.
+- ~~**Le note restano fuori dal layout.** `classLayoutGraph`
   (`src/editor/class/commands.ts:218-238`) cammina solo `model.classes`: una
   nota non diventa mai un nodo del grafo che ELK dispone, quindi «Disponi»
   la lascia esattamente dov'era. Se nel frattempo una classe vicina si è
   spostata, la nota può ritrovarsi sovrapposta a un nodo che prima non la
   toccava. Chiuderlo servirebbe l'ancoraggio della voce sopra, o in
   alternativa una passata di layout dedicata che allontani le note dai nodi
-  disposti — nessuna delle due è stata scritta.
+  disposti — nessuna delle due è stata scritta.~~ **Corretto**, vedi DT-29.
 - **Il valore di default resta testo dentro il tipo.** `decimal = 0` (e
   forme simili) attraversa `parseMembers` ed `emitClassMermaid` come parte
   del campo `type`, mai come un valore di default modellato a parte: il test

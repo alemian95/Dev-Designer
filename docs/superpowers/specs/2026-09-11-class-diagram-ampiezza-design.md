@@ -29,6 +29,11 @@ contenitore muove il contenuto — obbliga ELK a un layout gerarchico e obbliga
 **La nota non si ancora a una classe.** Vedi §4: `note for Cliente` sembra una
 riga tratteggiata e invece è un arco, con le conseguenze che §4 elenca.
 
+> **Non è più vero dal 2026-09-21:** l'ancoraggio è stato consegnato da
+> `2026-09-21-note-ancorate-design.md`. Il taglio resta registrato perché la
+> ragione per cui fu preso vale ancora — era una spec di ampiezza, non di
+> profondità — ed è cambiato solo il momento.
+
 **I valori di default e le property string non diventano campi del modello.**
 Restano testo dentro il tipo, come sono oggi. §6 si limita a non mentire su di
 loro in export.
@@ -158,6 +163,11 @@ finirebbe piazzata dove capita, lontana da ciò che annota. Tenendola fuori,
 ma almeno è prevedibile e riparabile trascinandola. La scelta giusta sarebbe
 muovere la nota con ciò a cui è ancorata, e l'ancoraggio è la voce che §2
 esclude: è il prezzo dichiarato di quel taglio.
+
+> **Rivisto dal 2026-09-21:** ora entrano, tutte. L'argomento qui sopra valeva
+> finché *ogni* nota era libera; da quando esiste l'ancoraggio, la nota che
+> commenta qualcosa atterra accanto alla propria classe, e la libera è
+> l'eccezione, per cui si preferisce non sovrapporsi mai al restare ferma.
 
 ### Export
 

@@ -113,7 +113,7 @@ export function addRelation(
  */
 export function addNoteLink(model: ClassModel, a: string, b: string): { key: string; recipe: Recipe } | null {
   const aIsNote = a in model.notes
-  if (aIsNote === b in model.notes) return null
+  if (aIsNote === (b in model.notes)) return null
   const note = aIsNote ? a : b
   const cls = aIsNote ? b : a
   if (!(cls in model.classes)) return null

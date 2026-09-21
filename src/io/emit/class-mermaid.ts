@@ -256,7 +256,7 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
   // una passata sola, perché il ciclo qui sotto è ordinato per chiave di nota e non di relazione.
   const anchorOf = new Map<string, string>()
   for (const rel of Object.values(model.relations)) {
-    if (rel.kind === "note-link") anchorOf.set(rel.source.class, rel.target.class)
+    if (!isClassRelation(rel)) anchorOf.set(rel.source.class, rel.target.class)
   }
 
   for (const key of Object.keys(model.notes).sort()) {

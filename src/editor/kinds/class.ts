@@ -77,8 +77,8 @@ export function classOps(doc: DevDocument): DiagramOps {
 
     duplicateNodes: (keys) => duplicateClasses(diagram().model, keys),
 
-    // Le note restano fuori dal grafo: non hanno archi, e ELK le piazzerebbe lontano da ciò che
-    // annotano. «Disponi» le lascia dove sono — il prezzo dichiarato di non averle ancorate (§4).
+    // Il grafo da disporre — classi, note e i loro archi — è tutto in `classLayoutGraph`, che ha
+    // già il docblock per il perché.
     layoutGraph: (): LayoutGraph => classLayoutGraph(diagram()),
 
     validate: (): Issue[] => validateClass(diagram().model),

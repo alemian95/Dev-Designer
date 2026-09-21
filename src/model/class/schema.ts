@@ -108,8 +108,9 @@ export function isClassRelation(rel: ClassRelation): rel is ClassRelation & { ki
 //   si fa di solito, e la convenzione lo risolve prima che si presenti (§7).
 
 /**
- * Una nota è testo libero appoggiato sul canvas. Nessun campo di ancoraggio: §2 della spec taglia
- * `note for Cliente`, che sembra una riga tratteggiata e invece è un arco.
+ * Una nota è testo libero appoggiato sul canvas. Nessun campo di ancoraggio sul suo schema — non
+ * perché manchi (§2 della spec emette `note for Cliente`), ma perché quel legame vive altrove:
+ * è un arco a sé, di specie `note-link` in `model.relations`, non un attributo della nota.
  */
 export const ClassNoteSchema = z.object({ text: z.string() })
 export type ClassNote = z.infer<typeof ClassNoteSchema>

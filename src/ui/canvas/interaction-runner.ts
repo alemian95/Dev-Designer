@@ -165,9 +165,9 @@ export function createInteractionRunner(): InteractionRunner {
         showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
         break
       case "commit-connect": {
-        // `null` quando un estremo è una nota (§4 della spec, contratto in `DiagramOps.addEdge`):
-        // nessuna selezione, nessun dispatch. Trascinare una relazione da o verso una nota non fa
-        // nulla — comportamento voluto, non un caso da segnalare all'utente.
+        // `null` oggi significa solo nota → nota, o un estremo che non esiste (contratto in
+        // `DiagramOps.addEdge`, §4): nessuna selezione, nessun dispatch. Trascinare una relazione
+        // fra due note non fa nulla — comportamento voluto, non un caso da segnalare all'utente.
         const result = opsFor(documentStore.getState().doc).addEdge(fx.source, fx.target)
         if (!result) break
         documentStore.getState().dispatch(result.recipe)

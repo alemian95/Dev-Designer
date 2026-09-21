@@ -5,7 +5,7 @@ import type { Recipe } from "../document-store"
 import { classDiagram } from "../class-access"
 import { snap, type Point } from "../geometry"
 import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
-import { classSize } from "./geometry"
+import { classSize, noteSize } from "./geometry"
 
 const DUPLICATE_OFFSET = 20
 
@@ -257,12 +257,20 @@ export function duplicateClasses(model: ClassModel, keys: readonly string[]): { 
  * l'ER (`commands/layout.ts`): le classi senza nodo nella view sono escluse, e le relazioni
  * con un estremo fuori dal grafo sono saltate — a ELK un arco senza uno dei due estremi fa
  * rifiutare l'intero grafo.
+ *
+ * Entrano nel grafo anche tutte le note, ancorate o no. Quella ancorata porta il suo arco
+ * (`note-link`) e quindi ELK la colloca accanto alla classe che commenta; quella libera è un
+ * nodo isolato, ma proprio per questo smette di poter finire sotto un nodo che nel frattempo
+ * si è spostato: prima le note restavano fuori dal grafo e «Disponi» le lasciava dov'erano.
  */
 export function classLayoutGraph(diagram: ClassDiagram): LayoutGraph {
   const nodes: LayoutNode[] = []
   for (const [key, cls] of Object.entries(diagram.model.classes)) {
     const view = diagram.view.nodes[key]
     if (view) nodes.push({ id: key, ...classSize(cls, view.collapsed) })
+  }
+  for (const [key, note] of Object.entries(diagram.model.notes)) {
+    if (diagram.view.nodes[key]) nodes.push({ id: key, ...noteSize(note) })
   }
 
   const present = new Set(nodes.map((n) => n.id))

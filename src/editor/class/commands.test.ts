@@ -7,6 +7,7 @@ import {
   addNote,
   addNoteLink,
   addRelation,
+  classLayoutGraph,
   deleteClassItems,
   duplicateClasses,
   renameClass,
@@ -271,5 +272,30 @@ describe("addNoteLink", () => {
     const dopo = classDiagram(applica(doc, deleteClassItems(["Cliente"], [], [])!))
     expect(dopo.model.relations).toEqual({})
     expect(Object.keys(dopo.model.notes)).toEqual(["n1"])
+  })
+
+  it("tutte le note sono nodi del grafo di layout, ancorate o no", () => {
+    const doc = produce(conNotaEClasse(), (d) => {
+      classDiagram(d).model.notes["n2"] = { text: "legenda" }
+      classDiagram(d).view.nodes["n2"] = { x: 400, y: 0, collapsed: false }
+    })
+    const grafo = classLayoutGraph(classDiagram(doc))
+    expect(grafo.nodes.map((n) => n.id).sort()).toEqual(["Cliente", "n1", "n2"])
+    expect(grafo.nodes.every((n) => n.w > 0 && n.h > 0)).toBe(true)
+  })
+
+  it("l'ancoraggio è un arco del grafo, invertito come gli altri: la classe è la sorgente", () => {
+    let doc = conNotaEClasse()
+    const link = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
+    doc = applica(doc, link.recipe)
+    const grafo = classLayoutGraph(classDiagram(doc))
+    expect(grafo.edges).toEqual([{ id: link.key, source: "Cliente", target: "n1" }])
+  })
+
+  it("una nota senza view resta fuori dal grafo, come una classe senza view", () => {
+    const doc = produce(conNotaEClasse(), (d) => {
+      classDiagram(d).model.notes["orfana"] = { text: "senza view" }
+    })
+    expect(classLayoutGraph(classDiagram(doc)).nodes.map((n) => n.id)).not.toContain("orfana")
   })
 })

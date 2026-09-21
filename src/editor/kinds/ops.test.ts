@@ -181,9 +181,9 @@ describe("classOps e le note", () => {
     expect(doc.diagram.model.notes[key]).toBeDefined()
   })
 
-  it("layoutGraph esclude le note: senza archi ELK le piazzerebbe dove capita", () => {
+  it("layoutGraph include la nota insieme alla classe: l'ancorata segue la classe grazie al suo arco, la libera non finisce più sotto un nodo spostato", () => {
     const g = opsFor(docConNota()).layoutGraph()
-    expect(g.nodes.map((n) => n.id)).toEqual(["Cliente"])
+    expect(g.nodes.map((n) => n.id).sort()).toEqual(["Cliente", "n-1"])
   })
 
   it("addEdge ancora la nota alla classe in entrambi i sensi di trascinamento; nota→nota resta null", () => {

@@ -44,6 +44,10 @@ database vero**, un dump phpMyAdmin di Chamilo da 240 tabelle passato per
 l'import. Nessuna delle due era in lista, e nessuna delle due si sarebbe vista
 su una fixture sintetica — che è uniforme, mentre uno schema reale non lo è mai.
 
+DT-28 è dello stesso giorno ed è il primo passo del giro di ampiezza: una voce
+d'Archivio scelta di proposito, che misurandola si è rivelata la punta di un
+difetto più grande di com'era scritta.
+
 ---
 
 ## Corretti
@@ -611,6 +615,58 @@ il `CREATE TABLE`. In un dump di phpMyAdmin il `MODIFY` porta solo
 riscrivere la colonna dall'AST dell'`ALTER`. Ora almeno il riepilogo dice
 quante ne ha viste passare.
 
+### DT-28 · le grafie in linea di un CREATE TABLE, di cui una faceva sparire la tabella
+
+L'Archivio registrava un limite di terze parti: in MySQL una `REFERENCES` senza
+lista di colonne — sintassi standard, significa «la PRIMARY KEY della tabella
+puntata» — faceva rifiutare a `node-sql-parser` l'**intero** `CREATE TABLE`, e
+la tabella spariva dal diagramma con tutte le sue colonne. Misurandola prima di
+scrivere il codice, la voce si è rivelata la punta di un difetto più largo.
+
+`readCreate` leggeva i vincoli da un solo ciclo, `if (d.resource !== "column")`,
+ma il parser mette i vincoli **scritti in linea sulla colonna** sull'elemento
+colonna stesso. Quindi valeva anche, senza che nessuna voce lo registrasse:
+
+| grafia in linea | prima |
+|---|---|
+| `code varchar(20) UNIQUE` | letta (aveva il suo ramo) |
+| `id int PRIMARY KEY` | **persa** — `primaryKey` vuoto, e `id` restava nullabile |
+| `b_id int REFERENCES b (id)` | **persa** — nessuna relazione, anche con la lista colonne |
+
+Le tre cose sono lo stesso difetto visto da tre lati, e la prima non si poteva
+chiudere senza la seconda: la relazione si risolve sulla PK della tabella
+puntata, e in un DDL scritto a mano — l'unico posto dove la grafia senza lista
+compare, `mysqldump` non la emette mai — quella PK è spesso dichiarata in linea.
+
+**La correzione.** Il parser è di terze parti e l'unica leva è il testo, quindi
+`fillMissingRefColumns` ([sql-text.ts](../src/io/ddl/sql-text.ts)) riscrive
+`REFERENCES tbl` in ``REFERENCES tbl (`__dd_unspecified__`)`` prima di `astify`.
+Il segnaposto non è un'invenzione: `readForeignKey` lo toglie subito dopo, e il
+`refColumns` **vuoto** che ne esce è esattamente l'ingresso che
+[map.ts](../src/io/ddl/map.ts) risolve già sulla primary key del target — quella
+risoluzione esisteva e vale per entrambi i dialetti, quindi la seconda passata
+che sembrava necessaria non lo era. La riscrittura guarda solo i tratti di
+codice (`spans`) e usa il cursore monotono di `splitStatements`, non `inCode`:
+su un dump vero i tratti si contano a migliaia e cercarli tutti a ogni
+`REFERENCES` sarebbe la stessa spesa quadratica che quella funzione evita.
+`readCreate`, in più, legge ora `primary_key` e `reference_definition`
+sull'elemento colonna.
+
+Otto test: cinque sulla riscrittura (le due grafie, il nome qualificato, la
+lista che precede un `ON DELETE`, il no-op quando la lista c'è, e la parola
+`references` dentro una stringa o un commento), tre sull'adapter. La catena
+intera, provata su DDL scritto a mano: `parent` e `child` entrano entrambe,
+nessun avviso, e le due relazioni escono risolte su `parent(id)` con le
+cardinalità giuste — `NOT NULL` dà `one`, la colonna nullabile `zero-or-one`.
+
+**Non tocca Postgres**: `libpg-query` accetta già quella forma, ed è il motivo
+per cui la risoluzione sulla PK stava in `map.ts` e non nell'adapter.
+
+**Osservato e non chiuso:** una PK dichiarata in linea e una dichiarata come
+vincolo di tabella nello stesso `CREATE TABLE` si sovrascrivono invece di
+sommarsi — l'ultima vince. È DDL non valido (MySQL rifiuta due PRIMARY KEY), e
+farlo andare d'accordo vorrebbe dire decidere quale delle due è quella giusta.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -748,12 +804,11 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   `importEr({}, [])`. Premere «Importa» è un'azione deliberata: che sia
   annullabile è difendibile, e il rimedio — confronto strutturale su ogni
   entità prima della scrittura — è complessità vera per un caso benigno.
-- In MySQL un `REFERENCES` senza lista di colonne fa rifiutare a
+- ~~In MySQL un `REFERENCES` senza lista di colonne fa rifiutare a
   `node-sql-parser` l'**intero** `CREATE TABLE`, inline e su
-  `FOREIGN KEY(...)`: la tabella sparisce del tutto. È un limite del parser
-  di terze parti, non del nostro codice, e non è `refColumns` vuoto (in
-  Postgres il caso è gestito risolvendo sulla PK del target). Se salta fuori
-  su un dump reale, la via è normalizzare il testo prima di `astify`.
+  `FOREIGN KEY(...)`: la tabella sparisce del tutto.~~ **Corretto**, vedi
+  DT-28, per la via che questa voce indicava — normalizzare il testo prima di
+  `astify` — e insieme a due difetti vicini che la voce non sospettava.
 - `worker.format: "es"` non è stato toccato: sarebbe la leva per il code
   splitting nel worker (il formato `iife` di default lo disabilita, un solo
   chunk da 332 KB contiene entrambi i parser) ma rischierebbe l'interop di

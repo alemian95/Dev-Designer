@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { spans, splitStatements, stripExecutableComments, stripPsqlMeta } from "./sql-text"
+import { fillMissingRefColumns, spans, splitStatements, stripExecutableComments, stripPsqlMeta } from "./sql-text"
 
 /**
  * Serve solo al test di scalabilità qui sotto. Dichiarato invece di aggiungere `"node"` ai `types`
@@ -198,5 +198,37 @@ describe("stripExecutableComments", () => {
 
   it("lascia intatto un chunk che non è un commento eseguibile", () => {
     expect(stripExecutableComments("create table t ()")).toBe("create table t ()")
+  })
+})
+
+describe("fillMissingRefColumns", () => {
+  it("aggiunge la lista segnaposto alla REFERENCES in linea che non ce l'ha", () => {
+    expect(fillMissingRefColumns("create table a (b_id int references b)")).toBe(
+      "create table a (b_id int references b (`__dd_unspecified__`))",
+    )
+  })
+
+  it("vale anche per il vincolo di tabella e per il nome qualificato dallo schema", () => {
+    expect(fillMissingRefColumns("create table a (foreign key (b_id) references `db`.`b`)")).toBe(
+      "create table a (foreign key (b_id) references `db`.`b` (`__dd_unspecified__`))",
+    )
+  })
+
+  it("la lista va dov'\u00e8 la sua clausola, non in coda: ON DELETE resta dopo", () => {
+    expect(fillMissingRefColumns("foreign key (b_id) references b on delete cascade,")).toBe(
+      "foreign key (b_id) references b (`__dd_unspecified__`) on delete cascade,",
+    )
+  })
+
+  it("lascia intatta la REFERENCES che la lista ce l'ha gi\u00e0", () => {
+    const sql = "create table a (b_id int references b (id), c_id int references `c` (`id`))"
+    expect(fillMissingRefColumns(sql)).toBe(sql)
+  })
+
+  it("non tocca la parola references fuori dal codice", () => {
+    const string = "insert into t values ('references b')"
+    expect(fillMissingRefColumns(string)).toBe(string)
+    const comment = "-- references b\ncreate table a ()"
+    expect(fillMissingRefColumns(comment)).toBe(comment)
   })
 })

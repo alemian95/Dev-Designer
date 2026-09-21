@@ -85,6 +85,28 @@ describe("parseMysql", () => {
     expect(r.warnings).toEqual([])
   })
 
+  it("la PRIMARY KEY scritta in linea sulla colonna vale quanto quella dichiarata a parte", () => {
+    const r = parseMysql("CREATE TABLE `t` (`id` int PRIMARY KEY, `x` int);")
+    expect(find(r, "t").primaryKey).toEqual(["id"])
+    expect(find(r, "t").columns[0]!.nullable).toBe(false)
+  })
+
+  it("la REFERENCES scritta in linea sulla colonna produce la foreign key", () => {
+    const r = parseMysql("CREATE TABLE `t` (`b_id` int REFERENCES `b` (`id`));")
+    expect(find(r, "t").foreignKeys).toEqual([{ columns: ["b_id"], refTable: "b", refColumns: ["id"] }])
+  })
+
+  it("una REFERENCES senza lista colonne non fa piu sparire la tabella, e lascia refColumns vuoto", () => {
+    const inline = parseMysql("CREATE TABLE `t` (`id` int, `b_id` int REFERENCES `b`);")
+    expect(find(inline, "t").columns.map((c) => c.name)).toEqual(["id", "b_id"])
+    expect(find(inline, "t").foreignKeys).toEqual([{ columns: ["b_id"], refTable: "b", refColumns: [] }])
+
+    const constraint = parseMysql("CREATE TABLE `t` (`b_id` int, FOREIGN KEY (`b_id`) REFERENCES `db`.`b` ON DELETE CASCADE);")
+    expect(constraint.warnings).toEqual([])
+    expect(find(constraint, "t").foreignKeys).toEqual([
+      { columns: ["b_id"], refSchema: "db", refTable: "b", refColumns: [] },
+    ])
+  })
   it("un CHECK json_valid non rompe niente", () => {
     const r = parseMysql("CREATE TABLE `t` (`note` longtext DEFAULT NULL CHECK (json_valid(`note`)));")
     expect(find(r, "t").columns).toHaveLength(1)

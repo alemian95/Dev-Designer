@@ -217,3 +217,45 @@ export function stripExecutableComments(chunk: string): string | null {
   const inner = (m[1] ?? "").trim()
   return /^[A-Za-z(]/.test(inner) ? inner : null
 }
+
+/**
+ * Colonna segnaposto che `fillMissingRefColumns` mette dove il DDL non dichiara su quale colonna
+ * punta una FK. Non è un nome che possa esistere davvero, e `mysql.ts` la toglie subito dopo il
+ * parse: il `refColumns` che ne esce è **vuoto**, che è l'ingresso su cui `map.ts` risolve già la
+ * destinazione sulla primary key della tabella puntata (lo stesso trattamento che Postgres riceve).
+ */
+export const UNSPECIFIED_REF_COLUMN = "__dd_unspecified__"
+
+/** `references` + nome di tabella, eventualmente qualificato dallo schema, in una delle tre grafie. */
+const NAME = "(?:`[^`]+`|\"[^\"]+\"|[\\w$]+)"
+const REFERENCES = new RegExp(`\\breferences\\s+${NAME}(?:\\s*\\.\\s*${NAME})?`, "gi")
+
+/**
+ * `REFERENCES tbl` senza lista di colonne → `REFERENCES tbl (\`__dd_unspecified__\`)`.
+ *
+ * In MySQL quella forma è legittima (la destinazione è la primary key della tabella puntata) ma
+ * `node-sql-parser` non l'accetta e rifiuta l'**intero** `CREATE TABLE`: la tabella spariva dal
+ * diagramma, colonne comprese. Riscrivere il testo prima di `astify` è l'unica leva che abbiamo su
+ * un parser di terze parti; la lista che si aggiunge è un segnaposto e non un'invenzione, perché
+ * chi legge l'AST la riconosce e la butta via.
+ *
+ * La riscrittura guarda solo i tratti di codice (`spans`): la parola `references` dentro una stringa
+ * o un commento resta com'è.
+ */
+export function fillMissingRefColumns(sql: string): string {
+  // Cursore e non `inCode`: `matchAll` scandisce in avanti, e su un dump vero i tratti si contano a
+  // migliaia — cercarli tutti a ogni `REFERENCES` sarebbe la stessa spesa quadratica che
+  // `splitStatements` evita.
+  const codeAt = makeCodeCursor(spans(sql))
+  let out = ""
+  let at = 0
+  for (const m of sql.matchAll(REFERENCES)) {
+    const end = m.index + m[0].length
+    // Una lista già dichiarata non si tocca; e la clausola può essere seguita da `ON DELETE …`,
+    // quindi il segnaposto va inserito qui, subito dopo il nome, non in coda allo statement.
+    if (!codeAt(m.index) || /^\s*\(/.test(sql.slice(end))) continue
+    out += `${sql.slice(at, end)} (\`${UNSPECIFIED_REF_COLUMN}\`)`
+    at = end
+  }
+  return out + sql.slice(at)
+}

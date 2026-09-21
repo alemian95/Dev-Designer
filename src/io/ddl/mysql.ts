@@ -1,6 +1,6 @@
 import { Parser } from "node-sql-parser/build/mysql"
 import { countSkipped, type DdlParseResult, type ParseWarning, type SqlForeignKey, type SqlTable } from "./schema"
-import { splitStatements, stripExecutableComments } from "./sql-text"
+import { fillMissingRefColumns, splitStatements, stripExecutableComments, UNSPECIFIED_REF_COLUMN } from "./sql-text"
 
 /**
  * I tipi del pacchetto lasciano `reference_definition` a `any`: questo è il minimo che ci serve,
@@ -24,6 +24,8 @@ interface Definition {
   // Presente solo quando UNIQUE è scritto in linea sulla colonna (non come vincolo di tabella a
   // parte): stesse due grafie di `constraint_type` ("unique" e "unique key"), lette da isUnique().
   unique?: string
+  /** `"primary key"` quando la PK è scritta in linea sulla colonna invece che come vincolo a parte. */
+  primary_key?: string
 }
 
 /**
@@ -68,14 +70,23 @@ const isUnique = (t: string): boolean => ["unique key", "unique", "unique index"
 /** Chiave qualificata dallo schema, come `pg.ts`: due tabelle omonime in schemi diversi non collidono. */
 const tableKey = (t: Pick<SqlTable, "name" | "schema">): string => (t.schema ? `${t.schema}.${t.name}` : t.name)
 
-function readForeignKey(d: Definition): SqlForeignKey {
+/**
+ * `columns` è un parametro perché le due grafie lo tengono in posti diversi: il vincolo di tabella
+ * nella propria lista (`FOREIGN KEY (a, b) REFERENCES …`), quello in linea nella colonna che lo
+ * porta. Il resto della clausola è identico nei due casi.
+ */
+function readForeignKey(d: Definition, columns: string[] = columnNames(d.definition)): SqlForeignKey {
   const ref = d.reference_definition as ReferenceDefinition | undefined
   return {
     ...(d.constraint ? { name: d.constraint } : {}),
-    columns: columnNames(d.definition),
+    columns,
     ...(ref?.table?.[0]?.db ? { refSchema: ref.table[0].db } : {}),
     refTable: ref?.table?.[0]?.table ?? "",
-    refColumns: (ref?.definition ?? []).map((c) => c.column).filter((c): c is string => typeof c === "string"),
+    // Il segnaposto di `fillMissingRefColumns` esce di scena qui: un `refColumns` vuoto è ciò che
+    // `map.ts` risolve sulla primary key della tabella puntata, come già fa per Postgres.
+    refColumns: (ref?.definition ?? [])
+      .map((c) => c.column)
+      .filter((c): c is string => typeof c === "string" && c !== UNSPECIFIED_REF_COLUMN),
   }
 }
 
@@ -113,15 +124,20 @@ function readCreate(ast: { table?: Array<{ table?: string; db?: string | null }>
   const defs = (ast.create_definitions ?? []) as Definition[]
   for (const d of defs) {
     if (d.resource !== "column") continue
+    const name = d.column?.column ?? ""
     table.columns.push({
-      name: d.column?.column ?? "",
+      name,
       type: typeText(d.definition as ColumnType),
-      // `nullable` c'è solo quando la colonna è NOT NULL: l'assenza vuol dire nullabile.
-      nullable: d.nullable?.type !== "not null",
+      // `nullable` c'è solo quando la colonna è NOT NULL: l'assenza vuol dire nullabile. In linea la
+      // PRIMARY KEY non si scrive NOT NULL e lo implica, come il vincolo di tabella qui sotto.
+      nullable: !d.primary_key && d.nullable?.type !== "not null",
     })
-    // UNIQUE in linea sulla colonna (es. `col int UNIQUE`) non produce un elemento a parte come il
-    // vincolo di tabella: il flag sta qui, sull'elemento colonna stesso.
-    if (isUnique(d.unique ?? "")) table.unique.push([d.column?.column ?? ""])
+    // Le grafie in linea (`col int UNIQUE`, `col int PRIMARY KEY`, `col int REFERENCES t (c)`) non
+    // producono un elemento a parte come i vincoli di tabella: il parser le appende all'elemento
+    // colonna stesso, quindi il ciclo dei vincoli qui sotto non le vedrebbe mai.
+    if (isUnique(d.unique ?? "")) table.unique.push([name])
+    if (d.primary_key) table.primaryKey.push(name)
+    if (d.reference_definition) table.foreignKeys.push(readForeignKey(d, [name]))
   }
   // I vincoli dopo le colonne: la PRIMARY KEY deve poter spegnere `nullable`.
   for (const d of defs) if (d.resource !== "column") applyDefinition(table, d)
@@ -141,7 +157,7 @@ export function parseMysql(ddl: string): DdlParseResult {
   // seguono, si affida a questo per stabilire in quale database finiscono.
   let currentSchema: string | undefined
 
-  for (const chunk of splitStatements(ddl)) {
+  for (const chunk of splitStatements(fillMissingRefColumns(ddl))) {
     const sql = stripExecutableComments(chunk)
     // null: il contenuto del commento eseguibile non è SQL (il marcatore sandbox di MariaDB).
     if (sql === null) {

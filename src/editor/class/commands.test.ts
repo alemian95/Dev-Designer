@@ -254,4 +254,22 @@ describe("addNoteLink", () => {
     })
     expect(addNoteLink(classDiagram(doc).model, "n1", "n2")).toBeNull()
   })
+
+  it("cancellata la nota, il suo ancoraggio non resta nel modello", () => {
+    let doc = conNotaEClasse()
+    const link = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
+    doc = applica(doc, link.recipe)
+    const dopo = classDiagram(applica(doc, deleteClassItems([], [], ["n1"])!))
+    expect(dopo.model.notes).toEqual({})
+    expect(dopo.model.relations).toEqual({})
+  })
+
+  it("cancellata la classe, l'ancoraggio se ne va col ciclo che c'era già", () => {
+    let doc = conNotaEClasse()
+    const link = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
+    doc = applica(doc, link.recipe)
+    const dopo = classDiagram(applica(doc, deleteClassItems(["Cliente"], [], [])!))
+    expect(dopo.model.relations).toEqual({})
+    expect(Object.keys(dopo.model.notes)).toEqual(["n1"])
+  })
 })

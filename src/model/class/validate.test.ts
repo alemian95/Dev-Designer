@@ -118,3 +118,32 @@ describe("validateClass", () => {
     expect(validateClass(modello([classe("B", { stereotype: "interface", methods: [f] })]))).toEqual([])
   })
 })
+
+describe("ancoraggi delle note", () => {
+  const link = (nota: string, classe: string): ClassRelation =>
+    ({ kind: "note-link", source: end(nota), target: end(classe) })
+
+  const conNota = (relazioni: ClassRelation[], notes: Record<string, { text: string }> = { n1: { text: "x" } }): ClassModel => ({
+    classes: { Cliente: classe("Cliente") },
+    relations: Object.fromEntries(relazioni.map((r, i) => [`r${i}`, r])),
+    notes,
+  })
+
+  it("un ancoraggio sano non produce nessun issue", () => {
+    expect(validateClass(conNota([link("n1", "Cliente")]))).toEqual([])
+  })
+
+  it("ancoraggio verso una classe che non esiste: dangling-relation", () => {
+    const issues = validateClass(conNota([link("n1", "Fantasma")]))
+    expect(issues).toHaveLength(1)
+    expect(issues[0]!.code).toBe("dangling-relation")
+    expect(issues[0]!.message).toContain("Fantasma")
+  })
+
+  it("ancoraggio da una nota che non esiste più: dangling-relation", () => {
+    const issues = validateClass(conNota([link("sparita", "Cliente")]))
+    expect(issues).toHaveLength(1)
+    expect(issues[0]!.code).toBe("dangling-relation")
+    expect(issues[0]!.message).toContain("sparita")
+  })
+})

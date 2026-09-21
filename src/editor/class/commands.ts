@@ -184,14 +184,17 @@ export function deleteClassItems(
   return (draft) => {
     const d = classDiagram(draft)
     for (const key of relationKeys) delete d.model.relations[key]
+    const notes = new Set(noteKeys)
     for (const [key, rel] of Object.entries(d.model.relations)) {
       if (classes.has(rel.source.class) || classes.has(rel.target.class)) delete d.model.relations[key]
+      // Una nota ora **ha** un arco: il suo ancoraggio se ne va con lei. La chiave di una nota sta
+      // in `source.class`, che il confronto qui sopra cerca fra le classi e non trova mai.
+      else if (rel.kind === "note-link" && notes.has(rel.source.class)) delete d.model.relations[key]
     }
     for (const key of classKeys) {
       delete d.model.classes[key]
       delete d.view.nodes[key]
     }
-    // Le note non hanno archi: nessuna relazione da ripulire di rimbalzo.
     for (const key of noteKeys) {
       delete d.model.notes[key]
       delete d.view.nodes[key]

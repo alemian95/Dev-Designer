@@ -97,12 +97,13 @@ describe("parseMysql", () => {
   })
 
   it("i commenti eseguibili si spogliano invece di essere scartati", () => {
-    // `SET NAMES utf8mb4` (senza `=`) non è riconosciuto dalla grammatica di node-sql-parser@5.4.0:
-    // la prova che il contenuto è stato spogliato (non scartato) e passato al parser è che produce
-    // un avviso di "statement non riconosciuto", non che sparisce senza lasciare traccia.
+    // `SET NAMES utf8mb4` (senza `=`) non è riconosciuto dalla grammatica di node-sql-parser@5.4.0.
+    // La prova che il contenuto è stato spogliato (non scartato) e passato al parser è che viene
+    // contato per quello che è, un SET di sessione, e non fra i commenti eseguibili.
     const r = parseMysql("/*!40101 SET NAMES utf8mb4 */;\nCREATE TABLE `t` (`a` int);")
     expect(find(r, "t").columns).toHaveLength(1)
-    expect(r.warnings).toHaveLength(1)
+    expect(r.skipped["set:null"]).toBe(1)
+    expect(r.skipped["commento eseguibile"]).toBeUndefined()
   })
 
   it("ALTER TABLE ADD CONSTRAINT fuori dal CREATE TABLE arriva sulla tabella", () => {
@@ -118,7 +119,9 @@ describe("parseMysql", () => {
   })
 
   it("un chunk non parsabile è un avviso e non fa perdere il resto", () => {
-    const r = parseMysql("CREATE TABLE `ok` (`a` int);\nSET NAMES utf8mb4;\nCREATE TABLE `altra` (`b` int);")
+    // Non un `SET`: quelli sono direttive di sessione, contate in silenzio. Qui serve uno statement
+    // che il parser rifiuta davvero e che l'utente ha ragione di voler sapere.
+    const r = parseMysql("CREATE TABLE `ok` (`a` int);\nCREATE TABLE `rotta` (`a` int NOT;\nCREATE TABLE `altra` (`b` int);")
     expect(r.tables.map((t) => t.name)).toEqual(["ok", "altra"])
     expect(r.warnings).toHaveLength(1)
   })
@@ -137,6 +140,22 @@ describe("parseMysql", () => {
     expect(secondo?.columns.map((c) => c.name)).toEqual(["id", "email"])
     expect(r.warnings).toEqual([])
     expect(r.skipped["use:undefined"]).toBeUndefined()
+  })
+
+  it("la forma phpMyAdmin — chiavi negli ALTER — non lascia avvisi, e dice che cosa ha ignorato", () => {
+    // Un dump di phpMyAdmin apre con `SET NAMES`, che node-sql-parser rifiuta pur accettando gli
+    // altri SET, e tiene chiavi e indici fuori dal CREATE TABLE. Niente di tutto questo è un
+    // problema del documento: nel riepilogo va contato col suo nome, non segnalato come avviso.
+    const r = parseMysql(`/*!40101 SET NAMES utf8mb4 */;
+      CREATE TABLE \`t\` (\`id\` int(11) NOT NULL, \`altro_id\` int(11) NOT NULL);
+      CREATE TABLE \`altro\` (\`id\` int(11) NOT NULL);
+      ALTER TABLE \`t\` ADD PRIMARY KEY (\`id\`), ADD KEY \`idx\` (\`altro_id\`);
+      ALTER TABLE \`t\` MODIFY \`id\` int(11) NOT NULL AUTO_INCREMENT;
+      ALTER TABLE \`t\` ADD CONSTRAINT \`fk\` FOREIGN KEY (\`altro_id\`) REFERENCES \`altro\` (\`id\`);`)
+    expect(r.warnings).toEqual([])
+    expect(find(r, "t").primaryKey).toEqual(["id"])
+    expect(find(r, "t").foreignKeys).toHaveLength(1)
+    expect(r.skipped).toEqual({ "set:null": 1, "add:index": 1, "modify:column": 1 })
   })
 
   it("digerisce la fixture sintetica da 200 tabelle con le sue 199 foreign key", () => {

@@ -31,6 +31,12 @@ const SKIPPED_LABELS: Record<string, string> = {
   "drop:table": "DROP TABLE",
   "insert:undefined": "righe di dati",
   "set:undefined": "SET di sessione",
+  // Le quattro forme che un dump phpMyAdmin porta a decine: senza etichetta uscivano come «8 set
+  // null» e «588 alter altro», cioè chiavi da programmatore lette da chi importa un database.
+  "set:null": "SET di sessione",
+  "transaction:undefined": "blocchi di transazione",
+  "add:index": "indici",
+  "modify:column": "modifiche di colonna",
   "commento eseguibile": "commenti eseguibili",
   "meta-comando psql": "meta-comandi psql",
 }

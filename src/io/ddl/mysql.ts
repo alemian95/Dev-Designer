@@ -32,6 +32,10 @@ interface Definition {
  */
 interface AlterExprItem {
   create_definitions?: Definition
+  /** `"add"`, `"modify"`, `"drop"`… serve solo a dire nel riepilogo che cosa è stato ignorato. */
+  action?: string
+  /** `"index"` per un `ADD KEY`, `"column"` per un `MODIFY`, `"constraint"` per PK/UNIQUE/FK. */
+  resource?: string
 }
 
 interface ColumnType {
@@ -148,7 +152,12 @@ export function parseMysql(ddl: string): DdlParseResult {
     try {
       ast = parser.astify(sql, { database: "MySQL" })
     } catch (e) {
-      warnings.push({ message: `statement non riconosciuto (${sql.slice(0, 60).replace(/\s+/g, " ")}): ${e instanceof Error ? e.message : String(e)}` })
+      // `SET NAMES utf8mb4` è in testa a ogni dump di phpMyAdmin e node-sql-parser non lo accetta,
+      // mentre accetta gli altri `SET`: un avviso lì dice all'utente che qualcosa è andato storto
+      // quando invece è una direttiva di sessione, che il modello scarta comunque. Va contata con le
+      // sue simili, non segnalata.
+      if (/^set\s/i.test(sql)) countSkipped(skipped, "set:null")
+      else warnings.push({ message: `statement non riconosciuto (${sql.slice(0, 60).replace(/\s+/g, " ")}): ${e instanceof Error ? e.message : String(e)}` })
       continue
     }
     // Su un solo statement `astify` restituisce l'oggetto, non un array.
@@ -194,7 +203,10 @@ export function parseMysql(ddl: string): DdlParseResult {
     const exprs = (Array.isArray(alter.expr) ? alter.expr : [alter.expr]) as AlterExprItem[]
     for (const item of exprs) {
       const d = item.create_definitions
-      if (!d || !applyDefinition(table, d)) countSkipped(skipped, "alter:altro")
+      // Ciò che non è PK, UNIQUE o FK va nel riepilogo **con il suo nome**: un dump phpMyAdmin di 240
+      // tabelle ne porta 588 (355 `ADD KEY`, 233 `MODIFY … AUTO_INCREMENT`), e leggere «588 alter
+      // altro» non dice all'utente se ha perso gli indici o le colonne.
+      if (!d || !applyDefinition(table, d)) countSkipped(skipped, `${item.action ?? "alter"}:${item.resource ?? "altro"}`)
     }
   }
 

@@ -638,7 +638,12 @@ due `querySelector` (§7). Il criterio resta quello della spec madre: p95 ≤ 20
 
 ## 16. Fuori scope
 
-Generici (`List<T>`), package, note, classi di associazione, classi annidate,
+Generici (`List<T>`), package, classi di associazione, classi annidate,
 visibilità sui pacchetti, righe di form per membro nel pannello, PlantUML,
 generazione di codice, import da Mermaid o da codice sorgente, documenti
 multi-diagramma, conversione di un documento ER in class diagram.
+
+Le note sono state consegnate dal primo giro di ampiezza (§4 di
+`2026-09-11-class-diagram-ampiezza-design.md`) e l'ancoraggio alla classe da
+`2026-09-21-note-ancorate-design.md`, che chiude anche il §2 qui sopra: `note
+for Cliente` **è** un arco, come quel paragrafo diceva, ed è modellato come tale.

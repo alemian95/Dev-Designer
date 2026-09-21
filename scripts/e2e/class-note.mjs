@@ -1,9 +1,10 @@
 /**
  * End-to-end della nota nel class diagram: strumento «Nota», un click che crea il nodo e apre da sé
  * la sua textarea, un testo su due righe che ne cambia la geometria, un trascinamento con
- * annullamento, un export testo che la mostra come riga `note "…"`.
+ * annullamento, l'ancoraggio a una classe con lo strumento relazione, «Disponi» che la muove, un
+ * export testo che la mostra come riga `note for`.
  *
- * Copre i tre comportamenti che senza un browser vero non esistono, specifici a questo nodo:
+ * Copre i quattro comportamenti che senza un browser vero non esistono, specifici a questo nodo:
  *
  * 1. La `textarea` della nota (`NoteEditor.tsx`) prende il fuoco da sé alla creazione e commette sul
  *    blur, cambiando davvero la geometria del nodo (`noteSize`, `class/geometry.ts`) — nessun test
@@ -13,10 +14,14 @@
  *    `rectOf` risolve anche le chiavi di nota, non solo quelle di classe.
  * 3. L'annullamento di un trascinamento di nota: un solo ⌘Z la rimette esattamente dov'era,
  *    esercitando lo stesso comando (`moveNodes`) delle classi ma su un nodo senza `model.classes`.
+ * 4. L'ancoraggio nota→classe e «Disponi» che sposta la nota accanto alla sua classe: il worker di
+ *    ELK è finto nei test unitari, quindi né il layout vero né il pannello di un ancoraggio
+ *    selezionato (niente menu «Tipo», a differenza delle sei specie fra classi) sono verificati
+ *    altrove che qui.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/class-note.mjs`. `HEADLESS=0` per vedere.
  */
-import { expectMenu, expectNodes, isMainModule, signature, startEnv } from "./helpers.mjs"
+import { expectMenu, expectNodes, isMainModule, nodeRects, overlappingPairs, signature, startEnv } from "./helpers.mjs"
 
 const NOTE_LINE_1 = "Verificare col cliente"
 const NOTE_LINE_2 = "prima del rilascio"
@@ -34,6 +39,21 @@ async function rectByKey(page, key) {
     const r = g.querySelector("rect, path").getBoundingClientRect()
     return { x: r.x, y: r.y, w: r.width, h: r.height }
   }, key)
+}
+
+/**
+ * Rettangolo del nodo il cui testo contiene `name`, in coordinate schermo — copiato da
+ * `class.mjs#rectByName`, che non è esportato da `helpers.mjs`: serve qui per trovare la classe
+ * appena creata (nome di default "class") su cui ancorare la nota.
+ */
+async function rectByName(page, name) {
+  return page.evaluate((name) => {
+    const groups = [...document.querySelectorAll("[data-node-id]")]
+    const g = groups.find((el) => el.textContent.includes(name))
+    if (!g) return null
+    const r = g.querySelector("rect").getBoundingClientRect()
+    return { x: r.x, y: r.y, w: r.width, h: r.height }
+  }, name)
 }
 
 /** Esegue lo scenario in un proprio contesto del browser condiviso. `true` se tutti i passi passano. */
@@ -137,7 +157,44 @@ export async function run(browser, base) {
       }, beforeDrag, { timeout: 5000 })
     })
 
-    await step('«Esporta testo…»: la nota compare come riga `note "…"`', async () => {
+    await step("una classe, e lo strumento relazione ancora la nota alla classe", async () => {
+      await page.getByRole("radio", { name: "Classe" }).click()
+      await page.mouse.click(600, 400)
+      await page.keyboard.press("Escape") // chiude l'editor del nome che la creazione apre da sé
+
+      await page.getByRole("radio", { name: "Relazione" }).click()
+      const nota = await rectByKey(page, key)
+      const classe = await rectByName(page, "class")
+      await page.mouse.move(nota.x + nota.w / 2, nota.y + nota.h / 2)
+      await page.mouse.down()
+      await page.mouse.move(classe.x + classe.w / 2, classe.y + classe.h / 2, { steps: 5 })
+      await page.mouse.up()
+      await page.waitForSelector("[data-edge-id]")
+
+      // L'ancoraggio appena creato è selezionato (`commit-connect`): il pannello dice che cos'è e
+      // **non** offre il menu «Tipo», che appartiene alle sei specie fra classi.
+      await page.getByText("Ancoraggio nota").waitFor()
+      if (await page.getByLabel("Tipo").count() !== 0) throw new Error("il pannello offre il tipo su un ancoraggio")
+    })
+
+    await step("«Disponi»: la nota si muove e non resta sotto nessun nodo", async () => {
+      const before = await signature(page)
+      await page.getByRole("button", { name: "Disponi" }).click()
+      // Stessa attesa e stessa soglia generosa di `layout.mjs`: il worker nasce alla prima
+      // richiesta e elkjs pesa ~1,5 MB.
+      await page.waitForFunction((before) => {
+        const now = [...document.querySelectorAll("[data-node-id]")]
+          .map((g) => `${g.getAttribute("data-node-id")}@${g.getAttribute("transform")}`)
+          .sort()
+          .join("|")
+        return now !== before
+      }, before, { timeout: 30_000 })
+
+      const overlapping = overlappingPairs(await nodeRects(page))
+      if (overlapping.length > 0) throw new Error(`nodi sovrapposti dopo il layout: ${overlapping.join(", ")}`)
+    })
+
+    await step('«Esporta testo…»: la nota compare come riga `note for`', async () => {
       await expectMenu(page, "closed")
       await page.locator("[data-document-menu]").click()
       await expectMenu(page, "open")
@@ -149,10 +206,11 @@ export async function run(browser, base) {
 
       // `noteText` (`io/emit/class-mermaid.ts`) sostituisce l'a capo vero con `<br>`, misurato su
       // mermaid@11 come la sintassi che produce davvero un a capo nella nota (F1): la riga attesa
-      // lo riflette, non più il backslash-n letterale di prima.
-      const expectedLine = `note "${NOTE_LINE_1}<br>${NOTE_LINE_2}"`
+      // lo riflette, non più il backslash-n letterale di prima. `note for class` e non solo `note`:
+      // il passo precedente l'ha ancorata alla classe di default, quindi l'export deve dirlo.
+      const expectedLine = `note for class "${NOTE_LINE_1}<br>${NOTE_LINE_2}"`
       if (!text.includes(expectedLine)) {
-        throw new Error(`la nota non compare nell'export come atteso:\n${text}\n(attesa la riga: ${expectedLine})`)
+        throw new Error(`l'export non ancora la nota alla classe:\n${text}\n(attesa la riga: ${expectedLine})`)
       }
 
       await page.getByRole("button", { name: "Copia" }).click()

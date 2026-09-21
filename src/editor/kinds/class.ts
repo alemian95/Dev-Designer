@@ -6,6 +6,7 @@ import { classDiagram } from "../class-access"
 import {
   addClass,
   addNote,
+  addNoteLink,
   addRelation,
   classLayoutGraph,
   deleteClassItems,
@@ -54,13 +55,13 @@ export function classOps(doc: DevDocument): DiagramOps {
 
     addNote,
 
-    // Una nota non può essere estremo di relazione (§4 della spec): lo strumento relazione la
-    // classifica come `node` alla pari di una classe (stesso `data-node-id`), quindi il controllo
-    // va fatto qui, nel seam che sa cos'è una nota — l'ER non ha note e non deve impararlo.
+    // Una nota non può essere estremo di una relazione fra classi, ma può esserlo di un
+    // **ancoraggio**: è il gesto con cui si dichiara la classe che commenta. `addNoteLink`
+    // normalizza la direzione e torna `null` per nota → nota, che resta senza effetto come prima.
     addEdge: (source, target) => {
-      const notes = diagram().model.notes
-      if (source in notes || target in notes) return null
-      return addRelation(diagram().model.relations, source, target)
+      const model = diagram().model
+      if (source in model.notes || target in model.notes) return addNoteLink(model, source, target)
+      return addRelation(model.relations, source, target)
     },
 
     // Ciascuna delle due specie si riconosce dalla propria mappa, non per esclusione dall'altra:
@@ -76,8 +77,8 @@ export function classOps(doc: DevDocument): DiagramOps {
 
     duplicateNodes: (keys) => duplicateClasses(diagram().model, keys),
 
-    // Le note restano fuori dal grafo: non hanno archi, e ELK le piazzerebbe lontano da ciò che
-    // annotano. «Disponi» le lascia dove sono — il prezzo dichiarato di non averle ancorate (§4).
+    // Il grafo da disporre — classi, note e i loro archi — è tutto in `classLayoutGraph`, che ha
+    // già il docblock per il perché.
     layoutGraph: (): LayoutGraph => classLayoutGraph(diagram()),
 
     validate: (): Issue[] => validateClass(diagram().model),

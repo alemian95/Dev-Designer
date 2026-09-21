@@ -5,7 +5,9 @@ import { classDiagram } from "@/editor/class-access"
 import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { RelationKindSchema, StereotypeSchema, type RelationKind, type Stereotype } from "@/model/class/schema"
+import {
+  CLASS_RELATION_KINDS, RelationKindSchema, StereotypeSchema, type RelationKind, type Stereotype,
+} from "@/model/class/schema"
 import { renameClassWithNotice } from "@/ui/class-rename"
 import { CommitInput } from "@/ui/panels/CommitInput"
 
@@ -37,6 +39,7 @@ const RELATION_LABEL: Record<RelationKind, string> = {
   composition: "Composizione",
   aggregation: "Aggregazione",
   dependency: "Dipendenza",
+  "note-link": "Ancoraggio nota",
 }
 
 function StereotypeSelect({ id, value, onChange }: { id: string; value: Stereotype; onChange: (v: Stereotype) => void }) {
@@ -50,7 +53,7 @@ function StereotypeSelect({ id, value, onChange }: { id: string; value: Stereoty
 function RelationKindSelect({ id, value, onChange }: { id: string; value: RelationKind; onChange: (v: RelationKind) => void }) {
   return (
     <select id={id} value={value} onChange={(e) => onChange(RelationKindSchema.parse(e.target.value))} className="h-8 rounded-md border bg-background px-2 text-sm">
-      {RelationKindSchema.options.map((k) => <option key={k} value={k}>{RELATION_LABEL[k]}</option>)}
+      {CLASS_RELATION_KINDS.map((k) => <option key={k} value={k}>{RELATION_LABEL[k]}</option>)}
     </select>
   )
 }
@@ -119,6 +122,19 @@ function NoteProperties({ noteKey: key }: { noteKey: string }) {
 function RelationProperties({ relationKey: key }: { relationKey: string }) {
   const rel = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[key])
   if (!rel) return null
+  // Un ancoraggio si crea col gesto e si toglie cancellandolo: non ha specie da convertire (il
+  // selettore non lo offre, `CLASS_RELATION_KINDS`), né nome, molteplicità o ruoli che l'export
+  // sappia rappresentare. Il pannello dice che cos'è e a chi punta.
+  if (rel.kind === "note-link") {
+    return (
+      <div className="flex flex-col gap-3 p-3">
+        <p className="text-xs text-muted-foreground">{RELATION_LABEL["note-link"]}</p>
+        <p className="text-sm">
+          La nota commenta <span className="font-medium">{rel.target.class}</span>.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-3 p-3">
       <p className="text-xs text-muted-foreground">{rel.source.class} → {rel.target.class}</p>

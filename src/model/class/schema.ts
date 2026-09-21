@@ -51,8 +51,20 @@ export type ClassNode = z.infer<typeof ClassNodeSchema>
 
 export const RelationKindSchema = z.enum([
   "association", "generalization", "realization", "composition", "aggregation", "dependency",
+  // Settima specie, e l'unica che non collega due classi: il legame fra una nota e la classe che
+  // commenta. `source.class` porta la chiave di una nota, e `multiplicity`/`role` restano vuoti —
+  // un ancoraggio non ha verso, nome né cardinalità. Chi enumera le specie "vere" usa
+  // `ClassRelationKind`, che la esclude per costruzione.
+  "note-link",
 ])
 export type RelationKind = z.infer<typeof RelationKindSchema>
+
+/** Le sei specie che collegano due classi. Esclude l'ancoraggio di una nota. */
+export type ClassRelationKind = Exclude<RelationKind, "note-link">
+
+/** Le sei specie offerte dal selettore del pannello: l'ancoraggio si crea col gesto, non si sceglie. */
+export const CLASS_RELATION_KINDS: readonly ClassRelationKind[] =
+  RelationKindSchema.options.filter((k): k is ClassRelationKind => k !== "note-link")
 
 export const ClassEndSchema = z.object({
   /** Chiave della classe, cioè il suo nome. */
@@ -76,6 +88,15 @@ export const ClassRelationSchema = z.object({
 })
 export type ClassRelation = z.infer<typeof ClassRelationSchema>
 
+/**
+ * Restringe alle sei specie che collegano due classi. Serve dove la differenza conta davvero:
+ * l'emettitore Mermaid (un ancoraggio non è una riga di relazione) e il validatore (la sorgente
+ * di un ancoraggio si cerca fra le note, non fra le classi).
+ */
+export function isClassRelation(rel: ClassRelation): rel is ClassRelation & { kind: ClassRelationKind } {
+  return rel.kind !== "note-link"
+}
+
 // **La convenzione `source`/`target` è deliberatamente la stessa dell'ER**, dove
 // `source` è il lato della foreign key (la figlia) e `target` il referenziato (il
 // padre). Due conseguenze, entrambe volute:
@@ -87,8 +108,9 @@ export type ClassRelation = z.infer<typeof ClassRelationSchema>
 //   si fa di solito, e la convenzione lo risolve prima che si presenti (§7).
 
 /**
- * Una nota è testo libero appoggiato sul canvas. Nessun campo di ancoraggio: §2 della spec taglia
- * `note for Cliente`, che sembra una riga tratteggiata e invece è un arco.
+ * Una nota è testo libero appoggiato sul canvas. Nessun campo di ancoraggio sul suo schema — non
+ * perché manchi (§2 della spec emette `note for Cliente`), ma perché quel legame vive altrove:
+ * è un arco a sé, di specie `note-link` in `model.relations`, non un attributo della nota.
  */
 export const ClassNoteSchema = z.object({ text: z.string() })
 export type ClassNote = z.infer<typeof ClassNoteSchema>

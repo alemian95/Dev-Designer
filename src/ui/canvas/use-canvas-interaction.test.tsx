@@ -11,7 +11,8 @@ import { useCanvasInteraction } from "./use-canvas-interaction"
 /**
  * Il cablaggio degli eventi, cioè quel che è rimasto nell'hook dopo che la macchina a stati se n'è
  * andata in `interaction-runner.ts` (DT-18): pointer capture, rect in cache, rotella, tastiera,
- * smontaggio. Ha bisogno di un DOM per esistere, e questo è l'unico file che ne usa uno.
+ * smontaggio. Ha bisogno di un DOM per esistere — `class-render.test.tsx` è l'altro file che ne usa
+ * uno, per lo stesso motivo su `ClassEdge`.
  *
  * **Tre cose jsdom non le implementa, e vanno messe a mano.** Non sono scorciatoie: due delle tre
  * sono proprio ciò che si vuole osservare.

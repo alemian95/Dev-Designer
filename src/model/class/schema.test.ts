@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest"
 import { DocumentSchema } from "../document"
 import { createErDocument } from "../er/schema"
 import { SCHEMA_VERSION } from "../shared"
-import { ClassDiagramSchema, ClassModelSchema, ClassRelationSchema, createClassDocument } from "./schema"
+import {
+  CLASS_RELATION_KINDS, ClassDiagramSchema, ClassModelSchema, ClassRelationSchema, createClassDocument,
+  isClassRelation, RelationKindSchema,
+} from "./schema"
 
 /** Un diagramma di classi minimo con due classi e una relazione fra loro.
  *  `patch` sovrascrive campi della relazione, per provare i casi rifiutati. */
@@ -96,5 +99,24 @@ describe("note e navigabilità", () => {
     const doc = createClassDocument("Prova", "id-fisso")
     expect(doc.diagram.model.notes).toEqual({})
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
+  })
+})
+
+describe("note-link", () => {
+  const end = (c: string) => ({ class: c, multiplicity: "", role: "" })
+
+  it("è una specie di relazione valida", () => {
+    expect(RelationKindSchema.parse("note-link")).toBe("note-link")
+  })
+
+  it("non è una relazione fra classi: isClassRelation la esclude", () => {
+    expect(isClassRelation({ kind: "note-link", source: end("n1"), target: end("Cliente") })).toBe(false)
+    expect(isClassRelation({ kind: "association", source: end("A"), target: end("B") })).toBe(true)
+  })
+
+  it("non compare fra le specie che il selettore offre: si crea col gesto, non si sceglie", () => {
+    expect(CLASS_RELATION_KINDS).toEqual([
+      "association", "generalization", "realization", "composition", "aggregation", "dependency",
+    ])
   })
 })

@@ -28,3 +28,7 @@ dist-ssr
 # dump reali dell'utente
 spike/fixtures/postgres.sql
 spike/fixtures/mysql.sql
+
+# Scratch dei piani eseguiti con subagent-driven-development: ledger, brief e report
+# di processo, non documentazione del progetto. La storia sta in git, non qui.
+.superpowers/

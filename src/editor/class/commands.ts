@@ -5,7 +5,7 @@ import type { Recipe } from "../document-store"
 import { classDiagram } from "../class-access"
 import { snap, type Point } from "../geometry"
 import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
-import { classSize } from "./geometry"
+import { classSize, noteSize } from "./geometry"
 
 const DUPLICATE_OFFSET = 20
 
@@ -102,6 +102,46 @@ export function addRelation(
   }
 }
 
+/**
+ * L'ancoraggio di una nota alla classe che commenta: una voce di `model.relations` di specie
+ * `note-link`, con la chiave della nota in `source`.
+ *
+ * `null` quando gli estremi sono due note o due classi, e quando la classe non esiste: l'unico
+ * legame che ha senso è nota → classe. La **direzione si normalizza** — in UML quel legame non ha
+ * verso, e chi disegna non deve indovinarlo — e una nota ne ha **al più uno**: un secondo
+ * trascinamento è una correzione, non un'aggiunta.
+ */
+export function addNoteLink(model: ClassModel, a: string, b: string): { key: string; recipe: Recipe } | null {
+  const aIsNote = a in model.notes
+  if (aIsNote === (b in model.notes)) return null
+  const note = aIsNote ? a : b
+  const cls = aIsNote ? b : a
+  if (!(cls in model.classes)) return null
+
+  // Le chiavi che questa aggiunta rimpiazza. Escluse anche dal calcolo di `uniqueKey`, altrimenti
+  // ri-ancorare alla stessa classe produrrebbe un `_2` per collidere con una voce che sta per sparire.
+  const stale = new Set(
+    Object.entries(model.relations)
+      .filter(([, rel]) => rel.kind === "note-link" && rel.source.class === note)
+      .map(([key]) => key),
+  )
+  const survivors = Object.fromEntries(Object.entries(model.relations).filter(([key]) => !stale.has(key)))
+  const key = uniqueKey(survivors, `${note}_${cls}`)
+
+  return {
+    key,
+    recipe: (draft) => {
+      const relations = classDiagram(draft).model.relations
+      for (const old of stale) delete relations[old]
+      relations[key] = {
+        kind: "note-link",
+        source: { class: note, multiplicity: "", role: "" },
+        target: { class: cls, multiplicity: "", role: "" },
+      }
+    },
+  }
+}
+
 export function updateRelation(key: string, mutate: (r: ClassRelation) => void): Recipe {
   return (draft) => {
     const rel = classDiagram(draft).model.relations[key]
@@ -144,14 +184,17 @@ export function deleteClassItems(
   return (draft) => {
     const d = classDiagram(draft)
     for (const key of relationKeys) delete d.model.relations[key]
+    const notes = new Set(noteKeys)
     for (const [key, rel] of Object.entries(d.model.relations)) {
       if (classes.has(rel.source.class) || classes.has(rel.target.class)) delete d.model.relations[key]
+      // Una nota ora **ha** un arco: il suo ancoraggio se ne va con lei. La chiave di una nota sta
+      // in `source.class`, che il confronto qui sopra cerca fra le classi e non trova mai.
+      else if (rel.kind === "note-link" && notes.has(rel.source.class)) delete d.model.relations[key]
     }
     for (const key of classKeys) {
       delete d.model.classes[key]
       delete d.view.nodes[key]
     }
-    // Le note non hanno archi: nessuna relazione da ripulire di rimbalzo.
     for (const key of noteKeys) {
       delete d.model.notes[key]
       delete d.view.nodes[key]
@@ -214,12 +257,20 @@ export function duplicateClasses(model: ClassModel, keys: readonly string[]): { 
  * l'ER (`commands/layout.ts`): le classi senza nodo nella view sono escluse, e le relazioni
  * con un estremo fuori dal grafo sono saltate — a ELK un arco senza uno dei due estremi fa
  * rifiutare l'intero grafo.
+ *
+ * Entrano nel grafo anche tutte le note, ancorate o no. Quella ancorata porta il suo arco
+ * (`note-link`) e quindi ELK la colloca accanto alla classe che commenta; quella libera è un
+ * nodo isolato, ma proprio per questo smette di poter finire sotto un nodo che nel frattempo
+ * si è spostato: prima le note restavano fuori dal grafo e «Disponi» le lasciava dov'erano.
  */
 export function classLayoutGraph(diagram: ClassDiagram): LayoutGraph {
   const nodes: LayoutNode[] = []
   for (const [key, cls] of Object.entries(diagram.model.classes)) {
     const view = diagram.view.nodes[key]
     if (view) nodes.push({ id: key, ...classSize(cls, view.collapsed) })
+  }
+  for (const [key, note] of Object.entries(diagram.model.notes)) {
+    if (diagram.view.nodes[key]) nodes.push({ id: key, ...noteSize(note) })
   }
 
   const present = new Set(nodes.map((n) => n.id))

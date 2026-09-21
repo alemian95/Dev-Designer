@@ -122,6 +122,19 @@ function NoteProperties({ noteKey: key }: { noteKey: string }) {
 function RelationProperties({ relationKey: key }: { relationKey: string }) {
   const rel = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[key])
   if (!rel) return null
+  // Un ancoraggio si crea col gesto e si toglie cancellandolo: non ha specie da convertire (il
+  // selettore non lo offre, `CLASS_RELATION_KINDS`), né nome, molteplicità o ruoli che l'export
+  // sappia rappresentare. Il pannello dice che cos'è e a chi punta.
+  if (rel.kind === "note-link") {
+    return (
+      <div className="flex flex-col gap-3 p-3">
+        <p className="text-xs text-muted-foreground">{RELATION_LABEL["note-link"]}</p>
+        <p className="text-sm">
+          La nota commenta <span className="font-medium">{rel.target.class}</span>.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-3 p-3">
       <p className="text-xs text-muted-foreground">{rel.source.class} → {rel.target.class}</p>

@@ -252,10 +252,22 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
     out.push(...classBlock(node, safeName(key, renamed), unbalanced, braced, nested))
   }
 
+  // L'ancoraggio sta fra le relazioni, non sulla nota: qui si ribalta in una mappa nota → classe,
+  // una passata sola, perché il ciclo qui sotto è ordinato per chiave di nota e non di relazione.
+  const anchorOf = new Map<string, string>()
+  for (const rel of Object.values(model.relations)) {
+    if (rel.kind === "note-link") anchorOf.set(rel.source.class, rel.target.class)
+  }
+
   for (const key of Object.keys(model.notes).sort()) {
     const text = model.notes[key]!.text
     // Una nota vuota non ha niente da dire: `note ""` è rumore nel file emesso.
-    if (text !== "") out.push(`  note "${noteText(text)}"`)
+    if (text === "") continue
+    const anchor = anchorOf.get(key)
+    // Un ancoraggio verso una classe che non esiste esce come nota libera: `note for Fantasma`
+    // sarebbe un file che Mermaid rifiuta, e il pannello problemi segnala già il guasto (§8).
+    const head = anchor !== undefined && anchor in model.classes ? `note for ${safeName(anchor, renamed)}` : "note"
+    out.push(`  ${head} "${noteText(text)}"`)
   }
 
   // Deduplicate: `methodLine` registra lo stesso `Classe.metodo` una volta per parametro e una per

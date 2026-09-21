@@ -370,3 +370,37 @@ describe("tipi che Mermaid non porta com'è", () => {
     expect(avviso.match(/A\.salva/g)).toHaveLength(1)
   })
 })
+
+describe("note ancorate", () => {
+  const end = (c: string) => ({ class: c, multiplicity: "", role: "" })
+  const cliente = classe("Cliente")
+
+  it("la nota ancorata esce come `note for`, la libera resta `note`", () => {
+    const out = emitClassMermaid({
+      classes: { Cliente: cliente },
+      relations: { r0: { kind: "note-link", source: end("n1"), target: end("Cliente") } },
+      notes: { n1: { text: "da rivedere" }, n2: { text: "legenda" } },
+    })
+    expect(out.text).toContain('note for Cliente "da rivedere"')
+    expect(out.text).toContain('note "legenda"')
+  })
+
+  it("l'ancoraggio non esce anche come riga di relazione", () => {
+    const out = emitClassMermaid({
+      classes: { Cliente: cliente },
+      relations: { r0: { kind: "note-link", source: end("n1"), target: end("Cliente") } },
+      notes: { n1: { text: "x" } },
+    })
+    expect(out.text).not.toContain("n1")
+  })
+
+  it("un ancoraggio verso una classe che non c'è esce come nota libera, non come `note for` rotta", () => {
+    const out = emitClassMermaid({
+      classes: { Cliente: cliente },
+      relations: { r0: { kind: "note-link", source: end("n1"), target: end("Fantasma") } },
+      notes: { n1: { text: "x" } },
+    })
+    expect(out.text).toContain('note "x"')
+    expect(out.text).not.toContain("Fantasma")
+  })
+})

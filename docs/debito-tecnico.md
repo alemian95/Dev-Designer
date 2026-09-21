@@ -39,6 +39,11 @@ venti, ed era un test instabile — la cosa peggiore da lasciare in giro il
 giorno dopo aver acceso la CI. L'ultima è un'archiviazione e non una correzione: la voce indicava un
 difetto che non c'è, e ora c'è il test che tiene vero il contratto che conta.
 
+DT-26 e DT-27 sono del 2026-09-21 e non vengono dall'Archivio: vengono da **un
+database vero**, un dump phpMyAdmin di Chamilo da 240 tabelle passato per
+l'import. Nessuna delle due era in lista, e nessuna delle due si sarebbe vista
+su una fixture sintetica — che è uniforme, mentre uno schema reale non lo è mai.
+
 ---
 
 ## Corretti
@@ -536,6 +541,76 @@ quinto della CPU non fa in tempo. È saturazione della macchina, non un difetto:
 in CI gira una suite sola. Si scrive qui perché chi vedrà quel rosso sappia
 cosa guardare.
 
+### DT-26 · una tabella da 42 colonne alzava tutte le righe dell'import
+
+`placeNew` disponeva le entità nuove in una griglia a passo **uniforme**, con la
+cella pari all'entità più grande del lotto. Su un lotto uniforme è invisibile;
+su uno schema vero non lo è. Il dump di Chamilo ha mediana 7 attributi e una
+tabella da 42: la cella diventava 450 × 998 px per tutte e 240, la tela usciva
+7240 × 15038 px — quasi diciassette schermate in altezza — **piena al 12,8 %**.
+Chi importava si trovava un canvas quasi vuoto da percorrere a zoom minimo, e
+non c'era modo di capire che la colpa era di una tabella sola.
+
+Ora le colonne restano allineate (larghezza uniforme: è ciò che le rende
+leggibili) ma la verticale è impacchettata — ogni colonna riprende sotto
+l'ultima entità che ci è finita. Stesso lotto: 4718 px di altezza, **41 % di
+riempimento**, 3,2 volte più basso. Quattro righe di codice, nessuna nuova
+astrazione.
+
+Due test tengono la proprietà: che una sola entità alta non abbassi la riga
+delle altre, e che dentro una colonna due entità non si sovrappongano. Il
+secondo serve perché il passo non è più una costante ma una somma, ed è
+esattamente lì che un errore di un `+ GUTTER` produrrebbe sovrapposizioni.
+
+**Osservato e non chiuso:** l'impacchettamento non bilancia le colonne. Le
+entità restano in ordine di lettura, quindi la colonna che si prende la tabella
+gigante resta più lunga delle altre. Bilanciare vorrebbe dire ordinare per
+altezza — e perdere l'ordine del dump, che è l'unico ordine che chi importa
+riconosce. Non vale il cambio: chi vuole una disposizione vera preme «Disponi».
+
+### DT-27 · il riepilogo dell'import parlava da programmatore, e si allarmava per niente
+
+Lo stesso dump, sulla riga di riepilogo del dialog:
+
+> 240 tabelle, 77 foreign key. Ignorati: 8 **set null**, 2 **transaction**, 588
+> **alter altro** — e «1 avvisi dal parser».
+
+Tre cose sbagliate in una riga sola.
+
+**Le chiavi grezze.** Il docblock di `humanizeSkipped` dice che «una chiave
+ignota non deve mai arrivare grezza all'utente», e ne arrivavano tre su tre.
+`set:null` è la forma che `node-sql-parser` dà a un `SET` (la mappa aveva solo
+`set:undefined`, che è la forma di Postgres), e `alter:altro` era una stringa
+scritta a mano nell'adapter.
+
+**I 588 «alter altro» non erano una cosa sola.** Erano 355 `ADD KEY` e 233
+`MODIFY … AUTO_INCREMENT`: indici e modifiche di colonna, due categorie che
+l'utente ha ragione di voler distinguere — perdere gli indici è atteso, perdere
+le colonne no. Ora l'adapter conta con `action:resource` dell'AST, quindi
+`add:index` e `modify:column`, ed entrambe hanno la loro etichetta.
+
+**L'avviso che non era un avviso.** `SET NAMES utf8mb4` apre ogni dump di
+phpMyAdmin, `node-sql-parser` non lo accetta pur accettando gli altri `SET`, e
+finiva nel `catch` che produce «statement non riconosciuto». Chi importa legge
+un avviso e cerca che cosa ha perso: non aveva perso niente. Ora un `SET` che il
+parser rifiuta si conta fra i SET di sessione, come i suoi simili.
+
+Sul dump reale il referto è: 240 tabelle, 77 foreign key, 9 SET di sessione, 2
+blocchi di transazione, 355 indici, 233 modifiche di colonna, **zero avvisi**.
+
+Due test esistenti usavano `SET NAMES` come esempio di statement non parsabile
+e sono stati riscritti: il primo ora prova che il commento eseguibile è stato
+*spogliato* guardando in quale secchio finisce il contenuto (SET di sessione e
+non «commento eseguibile»), il secondo usa un `CREATE TABLE` troncato, che è
+non parsabile davvero.
+
+**Osservato e non chiuso:** un `MODIFY` che cambiasse il tipo o la nullabilità
+di una colonna continua a essere ignorato, e il modello resta con ciò che dice
+il `CREATE TABLE`. In un dump di phpMyAdmin il `MODIFY` porta solo
+`AUTO_INCREMENT`, che non è modellato; applicarlo per davvero vorrebbe dire
+riscrivere la colonna dall'AST dell'`ALTER`. Ora almeno il riepilogo dice
+quante ne ha viste passare.
+
 ### Minori chiuse il 2026-09-09
 
 Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
@@ -688,6 +763,15 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 - `parse.worker.ts` e `spawn.ts` non hanno test propri e nessun test li
   importa. Il ramo MySQL è coperto end-to-end nel browser; **non** sono
   coperti il caricamento da file e il toggle manuale del dialetto.
+
+- Le etichette del riepilogo sono tutte al plurale: con un solo statement
+  ignorato si legge «1 indici». Renderle concordi vorrebbe dire una forma
+  singolare per ognuna delle venti, per un caso che su un dump vero non capita
+  quasi mai (i conteggi sono a due o tre cifre).
+- Il dump di Chamilo dichiara 77 foreign key su 240 tabelle: le altre relazioni
+  sono implicite (colonne `*_id` senza vincolo). Dedurle dal nome è tentante e
+  sarebbe indovinare — l'import dice ciò che il database dichiara, non ciò che
+  il progettista intendeva.
 
 ### Export testo
 

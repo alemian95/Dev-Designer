@@ -2,9 +2,10 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
-import { classEdgeGeometry, classRect, endLabel, isDashed, isFilled } from "@/editor/class/geometry"
+import { classEdgeGeometry, endLabel, isDashed, isFilled } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import type { Rect } from "@/editor/geometry"
+import { opsFor } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { ClassRelation } from "@/model/class/schema"
 import { registerEdge } from "./dom-registry"
@@ -57,24 +58,27 @@ export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, so
   )
 })
 
-/** Rect di una classe dallo store; useShallow evita un riferimento nuovo a ogni chiamata. */
-function useClassRect(key: string | undefined): Rect | null {
+/**
+ * Rect di un nodo — classe o nota — dallo store, attraverso lo stesso seam che l'export usa
+ * (`opsFor(doc).rectOf`, `src/editor/kinds/ops.ts`) invece di una risoluzione propria che leggeva
+ * solo `model.classes`. Quella copia locale lasciava irrisolto l'estremo di un ancoraggio
+ * nota→classe — il cui `source` è la chiave di una nota — e `ClassEdge` sotto usciva `null`:
+ * l'arco non si montava mai sul canvas dal vivo, anche quando il modello e l'export (che passa già
+ * da `rectOf`) lo disegnavano correttamente. `useShallow` evita comunque un rerender per un
+ * riferimento nuovo: `rectOf` costruisce un oggetto piatto (`{x,y,w,h}`, tutti campi primitivi) a
+ * ogni chiamata, ma `useShallow` confronta chiave per chiave e non per identità dell'oggetto.
+ */
+function useNodeRect(key: string | undefined): Rect | null {
   return useStore(
     documentStore,
-    useShallow((s) => {
-      if (!key) return null
-      const d = classDiagram(s.doc)
-      const cls = d.model.classes[key]
-      const view = d.view.nodes[key]
-      return cls && view ? classRect(cls, view) : null
-    }),
+    useShallow((s) => (key ? opsFor(s.doc).rectOf(key) : null)),
   )
 }
 
 export function ClassEdge({ edgeKey, offset }: { edgeKey: string; offset: number }) {
   const relation = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[edgeKey])
-  const source = useClassRect(relation?.source.class)
-  const target = useClassRect(relation?.target.class)
+  const source = useNodeRect(relation?.source.class)
+  const target = useNodeRect(relation?.target.class)
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
   if (!relation || !source || !target) return null
   return <ClassEdgeView edgeKey={edgeKey} relation={relation} source={source} target={target} selected={selected} offset={offset} />

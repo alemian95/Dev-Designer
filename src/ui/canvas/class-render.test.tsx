@@ -1,10 +1,20 @@
+// @vitest-environment jsdom
+//
+// jsdom e non l'ambiente di default (node): il test su `ClassEdge` in coda al file monta il
+// componente connesso allo store con `react-dom/client`, che ha bisogno di un DOM per esistere.
+// `renderToStaticMarkup` (usato da tutti gli altri test di questo file) funziona comunque sotto
+// jsdom — resta un renderer a stringa, non tocca il DOM — quindi il cambio d'ambiente non li
+// riguarda.
+import { act } from "react"
+import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { classSize } from "@/editor/class/geometry"
+import { documentStore } from "@/editor/document-store"
 import { HEADER_H } from "@/editor/geometry"
-import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
+import { createClassDocument, type ClassNode, type ClassRelation, type RelationKind } from "@/model/class/schema"
 import { ClassNodeView } from "./ClassNode"
-import { ClassEdgeView } from "./ClassEdge"
+import { ClassEdge, ClassEdgeView } from "./ClassEdge"
 import { ClassNoteView } from "./ClassNote"
 
 const cliente: ClassNode = {
@@ -204,5 +214,43 @@ describe("ClassNoteView", () => {
   it("la selezione cambia il contorno, come per le classi", () => {
     const sel = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={nota} view={{ x: 0, y: 0, collapsed: false }} selected={true} />)
     expect(sel).toContain("var(--primary)")
+  })
+})
+
+describe("ClassEdge — connesso allo store", () => {
+  /**
+   * `ClassEdgeView` sopra riceve `source`/`target` già come prop: non passa mai dall'hook che
+   * risolve il rettangolo di un estremo dallo store, quindi non avrebbe mai potuto prendere questo
+   * difetto. `useClassRect` (ora `useNodeRect`, `ClassEdge.tsx`) leggeva il rettangolo solo da
+   * `model.classes`; per un ancoraggio nota→classe il `source` della relazione è la chiave di una
+   * nota, quindi tornava sempre `null` e `ClassEdge` usciva `null` — l'arco non si montava mai sul
+   * canvas dal vivo, anche con un modello e un export corretti (`buildSvg` risolve gli stessi
+   * estremi con `opsFor(doc).rectOf`, che le note le risolve già). Verificato che questo test è
+   * rosso sulla versione precedente di `ClassEdge.tsx` (l'hook che leggeva solo `model.classes`)
+   * prima di scrivere la correzione.
+   */
+  it("un ancoraggio nota→classe monta comunque un arco, non solo un arco fra classi", () => {
+    const doc = createClassDocument("t")
+    doc.diagram.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+    doc.diagram.model.notes["n-1"] = { text: "promemoria" }
+    doc.diagram.model.relations["ancora"] = {
+      kind: "note-link",
+      source: { class: "n-1", multiplicity: "", role: "" },
+      target: { class: "Cliente", multiplicity: "", role: "" },
+    }
+    doc.diagram.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
+    doc.diagram.view.nodes["n-1"] = { x: 200, y: 0, collapsed: false }
+    documentStore.getState().load(doc)
+
+    const container = document.createElement("div")
+    const root = createRoot(container)
+    try {
+      act(() => {
+        root.render(<ClassEdge edgeKey="ancora" offset={0} />)
+      })
+      expect(container.innerHTML).toContain('data-edge-id="ancora"')
+    } finally {
+      root.unmount()
+    }
   })
 })

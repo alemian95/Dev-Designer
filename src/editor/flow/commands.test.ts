@@ -16,6 +16,7 @@ import {
   setNodeLabel,
   setNodeShape,
 } from "./commands"
+import { LANE_PAD } from "./layout"
 
 function docWith(): { doc: DevDocument; lane: string } {
   const doc = createFlowDocument("test", "id-1")
@@ -270,9 +271,14 @@ describe("applyFlowLayout", () => {
     expect(d.view.nodes[a.key]!.x).toBe(10)
     expect(d.view.nodes[b.key]!.x).toBe(20)
     // La y è l'unica cosa che questo passo calcola: senza queste due, una regressione che
-    // perdesse `view.y = p.y` tenendo `view.x = p.x` passerebbe inosservata.
-    expect(d.view.nodes[a.key]!.y).toBe(20)
-    expect(d.view.nodes[b.key]!.y).toBe(204)
+    // perdesse `view.y = p.y` tenendo `view.x = p.x` passerebbe inosservata (resterebbe 999).
+    // Il valore atteso si deriva da `LANE_PAD` e dall'altezza di banda già asserita sotto, non da
+    // un numero letterale: quel numero dipendeva dalla misura provvisoria del Task 5 (160×60) e si
+    // è rotto quando il Task 6 l'ha sostituita con la misura vera (minimo 60×40) — `a` e `c` sono
+    // entrambi in `l1` (righe distinte perché `x` li accavalla), e con la misura vera due righe
+    // minime non spingono più `l1` oltre `LANE_MIN_H`.
+    expect(d.view.nodes[a.key]!.y).toBe(LANE_PAD)
+    expect(d.view.nodes[b.key]!.y).toBe(d.view.lanes[l2]!.y + LANE_PAD)
     // La guardia `if (view)`: il nodo senza voce nella view non ne guadagna una.
     expect(d.view.nodes[c.key]).toBeUndefined()
     // Le bande, non solo le posizioni: la stessa applicazione riscrive entrambe.

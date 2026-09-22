@@ -1,29 +1,18 @@
 import type { DevDocument } from "@/model/document"
-import type { FlowDiagram, FlowShape } from "@/model/flow/schema"
+import type { FlowShape } from "@/model/flow/schema"
 import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes } from "../flow/commands"
+import { laneAt } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
 import { flowLayoutGraph } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
- * Corsia sotto la coordinata y del rilascio. Stub: la geometria delle bande arriva nel Task 6
- * (`editor/flow/geometry.ts`), che sostituisce questo corpo. Finché non c'è, ogni punto risolve
- * sempre alla prima corsia — il test che vuole il comportamento vero è già scritto, `it.todo`, in
- * `kinds/flow.test.ts`, così il Task 6 lo trova rosso e lo accende. `null` è il caso che oggi non
- * può succedere (`FlowModelSchema` impone almeno una corsia) ma che la firma vera dichiarerà
- * comunque, per il punto y fuori da ogni banda: `addNode` lo gestisce già.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- `_y` resta nella firma per il Task 6, che la userà davvero.
-function laneAt(d: FlowDiagram, _y: number): string | null {
-  return d.model.lanes[0]?.id ?? null
-}
-
-/**
  * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts` e `flow/layout.ts`,
- * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `rectOf` ed `edgeGeometry` restano stub — servono
- * la geometria per forma (Task 6), che non esiste ancora — e nessun chiamante li raggiunge prima
- * che quel task colleghi il flowchart al resto dell'editor. `validate` resta stub per un motivo
- * diverso: aspetta le regole di validazione del Task 9, non la geometria.
+ * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `rectOf` ed `edgeGeometry` restano stub: la
+ * geometria per forma esiste da `flow/geometry.ts` (Task 6), ma il piano non ne assegna il
+ * cablaggio qui a nessun task — resta per quando un chiamante reale (selezione, drag, export) la
+ * raggiungerà. `validate` resta stub per un motivo diverso: aspetta le regole di validazione del
+ * Task 9, non la geometria.
  */
 export function flowOps(doc: DevDocument): DiagramOps {
   const diagram = () => flowDiagram(doc)
@@ -32,7 +21,9 @@ export function flowOps(doc: DevDocument): DiagramOps {
     nodeKeys: () => Object.keys(diagram().view.nodes),
 
     rectOf: () => {
-      // ponytail: rimosso nel Task 6
+      // ponytail: non ancora cablato a `flowNodeRect` (`flow/geometry.ts`, Task 6) — il piano non
+      // assegna questo cablaggio a nessun task. Va risolto quando un chiamante vero (selezione,
+      // drag, export) raggiunge il flowchart.
       throw new Error("flowchart: geometria dei nodi non ancora implementata")
     },
 
@@ -42,7 +33,8 @@ export function flowOps(doc: DevDocument): DiagramOps {
         .map(([key, edge]) => ({ key, source: edge.source, target: edge.target })),
 
     edgeGeometry: () => {
-      // ponytail: rimosso nel Task 6
+      // ponytail: non ancora cablato — la geometria degli archi (routing, frecce) non è ancora
+      // stata composta per il flowchart e il piano non assegna questo cablaggio a nessun task.
       throw new Error("flowchart: geometria degli archi non ancora implementata")
     },
 

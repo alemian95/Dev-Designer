@@ -1,17 +1,10 @@
-import { LANE_MIN_H, type FlowDiagram, type FlowNode, type LaneView } from "@/model/flow/schema"
+import { LANE_MIN_H, type FlowDiagram, type LaneView } from "@/model/flow/schema"
 import type { LayoutEdge, LayoutGraph, LayoutNode, LayoutPositions } from "@/model/layout"
+import { flowNodeSize } from "./geometry"
 
 export const LANE_PAD = 20
 export const ROW_GAP = 24
 export const COL_GAP = 24
-
-// ponytail: misura provvisoria in attesa del Task 6, che introduce `flowNodeSize` sulla vera
-// geometria per forma (spec §7). Fino ad allora ogni nodo occupa lo stesso rettangolo: i test di
-// questo file dipendono solo dal fatto che un nodo abbia una dimensione, mai dal suo valore.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- `_node` resta nella firma per il Task 6, che la userà davvero.
-function flowNodeSize(_node: FlowNode): { w: number; h: number } {
-  return { w: 160, h: 60 }
-}
 
 /**
  * Traduce il diagramma nel grafo da disporre, sulla forma di `commands/layout.ts` (ER): i nodi

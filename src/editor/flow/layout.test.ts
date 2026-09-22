@@ -65,13 +65,15 @@ describe("placeInLanes", () => {
   })
 
   // Discrimina due implementazioni sbagliate che i nove test precedenti lasciavano passare:
-  // un'altezza fissa a LANE_MIN_H (che romperebbe con tre righe) e una `y` calcolata come
-  // `indice * LANE_MIN_H` invece che dalle altezze accumulate (l'anti-pattern che `restackLanes`,
-  // editor/flow/commands.ts, vieta). Due corsie, due righe nella prima: la banda deve crescere
-  // oltre il minimo e la seconda corsia deve iniziare esattamente dove finisce la prima.
+  // un'altezza fissa a LANE_MIN_H e una `y` calcolata come `indice * LANE_MIN_H` invece che dalle
+  // altezze accumulate (l'anti-pattern che `restackLanes`, editor/flow/commands.ts, vieta). Due
+  // corsie, **tre** righe nella prima: con le misure vere del Task 6 (minimo 60×40, non più il
+  // segnaposto 160×60) due righe minime restano sotto LANE_MIN_H — il margine che LANE_MIN_H
+  // lascia sopra una singola riga anche alta (una decisione a due righe, spec §7) è largo apposta
+  // — quindi ne servono tre perché la banda debba davvero crescere oltre il minimo.
   it("una corsia le cui righe superano il minimo cresce, e la successiva parte da lì", () => {
-    const d = diagram({ a: { lane: "l1" }, b: { lane: "l1" } }, ["l1", "l2"])
-    const { lanes } = placeInLanes(d, { a: { x: 0, y: 0 }, b: { x: 10, y: 0 } })
+    const d = diagram({ a: { lane: "l1" }, b: { lane: "l1" }, c: { lane: "l1" } }, ["l1", "l2"])
+    const { lanes } = placeInLanes(d, { a: { x: 0, y: 0 }, b: { x: 10, y: 0 }, c: { x: 20, y: 0 } })
     expect(lanes.l1!.h).toBeGreaterThan(LANE_MIN_H)
     expect(lanes.l2!.y).toBe(lanes.l1!.h)
   })

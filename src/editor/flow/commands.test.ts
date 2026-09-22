@@ -187,6 +187,48 @@ describe("moveLane", () => {
   })
 })
 
+describe("restackLanes: la y di una banda è una conseguenza dell'ordine e delle altezze", () => {
+  it("dopo aver cancellato la prima corsia, una nuova banda non si sovrappone a quelle rimaste", () => {
+    const { doc, lane: a } = docWith()
+    let next = apply(doc, addLane("B"))
+    next = apply(next, addLane("C"))
+    const b = fd(next).model.lanes[1]!.id
+    next = apply(next, deleteLane(fd(next).model, a, b)!)
+    next = apply(next, addLane("D"))
+    const d = fd(next)
+    expect(d.model.lanes.map((l) => l.name)).toEqual(["B", "C", "D"])
+    const [bandaB, bandaC, bandaD] = d.model.lanes.map((l) => d.view.lanes[l.id]!)
+    expect(bandaB!.y).toBe(0)
+    expect(bandaC!.y).toBe(bandaB!.y + bandaB!.h)
+    expect(bandaD!.y).toBe(bandaC!.y + bandaC!.h)
+    expect(bandaD!.y).toBe(320)
+  })
+
+  it("moveLane riallinea le bande al nuovo ordine dell'array", () => {
+    const { doc } = docWith()
+    let next = apply(doc, addLane("B"))
+    next = apply(next, addLane("C"))
+    next = apply(next, moveLane(2, 0))
+    const d = fd(next)
+    expect(d.model.lanes.map((l) => l.name)).toEqual(["C", "Corsia 1", "B"])
+    const [bandaC, bandaA, bandaB] = d.model.lanes.map((l) => d.view.lanes[l.id]!)
+    expect(bandaC!.y).toBe(0)
+    expect(bandaA!.y).toBe(bandaC!.y + bandaC!.h)
+    expect(bandaB!.y).toBe(bandaA!.y + bandaA!.h)
+  })
+
+  it("preserva l'altezza di una corsia invece di riazzerarla al minimo", () => {
+    const doc = createFlowDocument("test", "id-1")
+    const laneId = doc.diagram.model.lanes[0]!.id
+    doc.diagram.view.lanes[laneId] = { y: 0, h: 400 }
+    const next = apply(doc, addLane("Corsia 2"))
+    const d = fd(next)
+    expect(d.view.lanes[laneId]).toEqual({ y: 0, h: 400 })
+    const nuova = d.model.lanes[1]!
+    expect(d.view.lanes[nuova.id]!.y).toBe(400)
+  })
+})
+
 describe("duplicateFlowNodes", () => {
   it("copia i nodi con l'offset, nella stessa corsia", () => {
     const { doc, lane } = docWith()

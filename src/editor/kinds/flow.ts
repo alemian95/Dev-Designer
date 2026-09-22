@@ -8,11 +8,13 @@ import type { DiagramOps, EdgeEnds } from "./ops"
  * Corsia sotto la coordinata y del rilascio. Stub: la geometria delle bande arriva nel Task 6
  * (`editor/flow/geometry.ts`), che sostituisce questo corpo. Finché non c'è, ogni punto risolve
  * sempre alla prima corsia — il test che vuole il comportamento vero è già scritto, `it.todo`, in
- * `kinds/flow.test.ts`, così il Task 6 lo trova rosso e lo accende.
+ * `kinds/flow.test.ts`, così il Task 6 lo trova rosso e lo accende. `null` è il caso che oggi non
+ * può succedere (`FlowModelSchema` impone almeno una corsia) ma che la firma vera dichiarerà
+ * comunque, per il punto y fuori da ogni banda: `addNode` lo gestisce già.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `_y` resta nella firma per il Task 6, che la userà davvero.
-function laneAt(d: FlowDiagram, _y: number): string | undefined {
-  return d.model.lanes[0]!.id
+function laneAt(d: FlowDiagram, _y: number): string | null {
+  return d.model.lanes[0]?.id ?? null
 }
 
 /**
@@ -46,7 +48,8 @@ export function flowOps(doc: DevDocument): DiagramOps {
     addNode: (at, variant) => {
       const d = diagram()
       const shape = (variant ?? "process") as FlowShape
-      const lane = laneAt(d, at.y) ?? d.model.lanes[0]!.id
+      const lane = laneAt(d, at.y)
+      if (lane === null) throw new Error("flowchart: il documento non ha nessuna corsia")
       return { ...addFlowNode(at, shape, lane), edit: "body" }
     },
 

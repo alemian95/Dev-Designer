@@ -1,4 +1,4 @@
-import { LANE_MIN_H, type FlowModel, type FlowShape } from "@/model/flow/schema"
+import { LANE_MIN_H, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
 import { snap, type Point } from "../geometry"
@@ -98,14 +98,32 @@ export function duplicateFlowNodes(model: FlowModel, keys: readonly string[]): {
   }
 }
 
-/** Nuova corsia in coda, sotto l'ultima: `y` è la somma delle altezze esistenti, `h` è il minimo. */
+/**
+ * Ricalcola la `y` di ogni banda impilandole nell'ordine di `model.lanes`. La `y` non è un dato:
+ * è una conseguenza dell'ordine dell'array e delle altezze, e tenerla per conto suo l'ha già fatta
+ * divergere tre volte (una banda nuova sopra una esistente dopo una cancellazione, e l'ordine
+ * sullo schermo diverso da quello dell'array dopo uno spostamento). Qui è calcolata in un posto
+ * solo, e i tre comandi che toccano l'ordine o l'insieme delle corsie la richiamano.
+ *
+ * L'altezza **resta un dato**, non derivato: il layout del Task 5 può allargare una corsia per
+ * farci stare le righe, e questa funzione la preserva leggendola da `view.lanes` invece di
+ * riazzerarla al minimo.
+ */
+function restackLanes(d: FlowDiagram): void {
+  let y = 0
+  for (const lane of d.model.lanes) {
+    const h = d.view.lanes[lane.id]?.h ?? LANE_MIN_H
+    d.view.lanes[lane.id] = { y, h }
+    y += h
+  }
+}
+
+/** Nuova corsia in coda, sotto l'ultima: la `y` la assegna `restackLanes`, non un calcolo qui. */
 export function addLane(name: string): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
-    const id = crypto.randomUUID()
-    const y = Object.values(d.view.lanes).reduce((sum, band) => sum + band.h, 0)
-    d.model.lanes.push({ id, name })
-    d.view.lanes[id] = { y, h: LANE_MIN_H }
+    d.model.lanes.push({ id: crypto.randomUUID(), name })
+    restackLanes(d)
   }
 }
 
@@ -122,11 +140,12 @@ export function renameLane(id: string, name: string): Recipe {
  * corsia**, non `id === moveTo`: quest'ultimo è solo il caso degenere in cui spostare i nodi
  * nella corsia che sta per sparire non avrebbe senso in ogni caso.
  *
- * Le tre guardie stanno qui e non dentro la recipe apposta: "un comando che non cambia niente non
- * scrive" (evita una voce di undo fantasma) vale solo se il rifiuto avviene **prima** che la
- * recipe esista, non se la recipe viene comunque dispatchata e poi esce senza scrivere. Per
- * deciderle serve leggere il modello, esattamente come fanno già `addFlowEdge` e
- * `duplicateFlowNodes` — un comando che legge il modello lo riceve, non lo indovina.
+ * Le tre guardie stanno qui e non dentro la recipe: non per evitare una voce di undo fantasma —
+ * `document-store.ts` scarta già le recipe che non producono patch — ma perché così il chiamante
+ * scopre "non si può" *prima* di dispatchare, e può disabilitare il controllo nella UI invece di
+ * offrire un'azione che non fa niente. Per deciderle serve leggere il modello, esattamente come
+ * fanno già `addFlowEdge` e `duplicateFlowNodes` — un comando che legge il modello lo riceve, non
+ * lo indovina.
  */
 export function deleteLane(model: FlowModel, id: string, moveTo: string): Recipe | null {
   if (model.lanes.length <= 1) return null
@@ -143,14 +162,19 @@ export function deleteLane(model: FlowModel, id: string, moveTo: string): Recipe
     for (const node of Object.values(d.model.nodes)) {
       if (node.lane === id) node.lane = moveTo
     }
+    restackLanes(d)
   }
 }
 
 export function moveLane(from: number, to: number): Recipe {
   return (draft) => {
-    const lanes = flowDiagram(draft).model.lanes
+    const d = flowDiagram(draft)
+    const lanes = d.model.lanes
     if (from === to || from < 0 || to < 0 || from >= lanes.length || to >= lanes.length) return
     const [item] = lanes.splice(from, 1)
+    // ponytail: `!` non copre un'incognita — i bound sono controllati due righe sopra, come fa
+    // `moveAttribute` (commands/er.ts:129) per lo stesso motivo.
     lanes.splice(to, 0, item!)
+    restackLanes(d)
   }
 }

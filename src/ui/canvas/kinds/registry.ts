@@ -81,6 +81,9 @@ export function viewFor(type: Diagram["type"]): DiagramView {
       return erView
     case "class":
       return classView
+    case "flow":
+      // ponytail: rimosso nel Task 12
+      throw new Error("flowchart: non ancora implementato")
   }
 }
 

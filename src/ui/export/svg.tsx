@@ -29,6 +29,32 @@ function opsForDiagram(diagram: Diagram) {
   return opsFor({ schemaVersion: SCHEMA_VERSION, id: "export", name: "export", diagram })
 }
 
+/** I nodi grezzi del modello, con nomi di campo diversi per tipo: vedi la nota sopra `buildSvg`. */
+function nodeModelsOf(diagram: Diagram): Record<string, unknown> {
+  switch (diagram.type) {
+    case "er":
+      return diagram.model.entities
+    case "class":
+      return { ...diagram.model.classes, ...diagram.model.notes }
+    case "flow":
+      // ponytail: rimosso nel Task 11
+      throw new Error("flowchart: non ancora implementato")
+  }
+}
+
+/** Gli archi grezzi del modello, stessa ragione di `nodeModelsOf`. */
+function edgeModelsOf(diagram: Diagram): Record<string, unknown> {
+  switch (diagram.type) {
+    case "er":
+      return diagram.model.relationships
+    case "class":
+      return diagram.model.relations
+    case "flow":
+      // ponytail: rimosso nel Task 11
+      throw new Error("flowchart: non ancora implementato")
+  }
+}
+
 /**
  * Serializza il diagramma come SVG autoconsistente. Un renderer solo per entrambi i tipi di
  * diagramma, sopra la giuntura: `nodeKeys`/`rectOf`/`edgesTouching`/`edgeGeometry` di
@@ -38,8 +64,8 @@ function opsForDiagram(diagram: Diagram) {
  * dalle prop e non dallo store — `renderToStaticMarkup` costruisce l'albero fuori dal DOM di
  * React, in un contesto senza store da cui i layer sottoscritti potrebbero leggere.
  *
- * Resta un solo punto dove i nomi dei campi del modello contano — `nodeModels`/`edgeModels` qui
- * sotto — perché `DiagramOps` non espone i record grezzi (non è il suo lavoro: geometria e
+ * Resta un solo punto dove i nomi dei campi del modello contano — `nodeModelsOf`/`edgeModelsOf`
+ * qui sopra — perché `DiagramOps` non espone i record grezzi (non è il suo lavoro: geometria e
  * comandi, non lettura del modello). `diagram.view.nodes` invece è già uniforme fra i due tipi
  * (`NodeViewSchema` condiviso, `model/shared.ts`), quindi non serve distinguerlo.
  *
@@ -48,9 +74,8 @@ function opsForDiagram(diagram: Diagram) {
 export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions): string | null {
   const ops = opsForDiagram(diagram)
   const { NodeView, EdgeView } = viewFor(diagram.type)
-  const nodeModels: Record<string, unknown> =
-    diagram.type === "er" ? diagram.model.entities : { ...diagram.model.classes, ...diagram.model.notes }
-  const edgeModels: Record<string, unknown> = diagram.type === "er" ? diagram.model.relationships : diagram.model.relations
+  const nodeModels = nodeModelsOf(diagram)
+  const edgeModels = edgeModelsOf(diagram)
 
   const keys = ops.nodeKeys()
   const rects = new Map<string, Rect>()

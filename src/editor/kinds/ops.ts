@@ -48,5 +48,8 @@ export function opsFor(doc: DevDocument): DiagramOps {
       return erOps(doc)
     case "class":
       return classOps(doc)
+    case "flow":
+      // ponytail: rimosso nel Task 3
+      throw new Error("flowchart: non ancora implementato")
   }
 }

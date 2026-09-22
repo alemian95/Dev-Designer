@@ -61,19 +61,19 @@ export function placeInLanes(
     const members = Object.entries(diagram.model.nodes)
       .flatMap(([key, node]) => {
         const pos = positions[key]
-        return node.lane === lane.id && pos ? [{ key, pos, size: flowNodeSize(node) }] : []
+        return node.lane === lane.id && pos ? [{ key, pos, size: flowNodeSize(node), row: 0 }] : []
       })
       .sort((a, b) => a.pos.x - b.pos.x || a.pos.y - b.pos.y)
 
     const rows: { end: number; h: number }[] = []
-    const rowOf = new Map<string, number>()
     for (const m of members) {
       let i = rows.findIndex((r) => r.end + COL_GAP <= m.pos.x)
       if (i === -1) i = rows.push({ end: Number.NEGATIVE_INFINITY, h: 0 }) - 1
       const row = rows[i]!
       row.end = m.pos.x + m.size.w
       row.h = Math.max(row.h, m.size.h)
-      rowOf.set(m.key, i)
+      // `i` è l'indice appena trovato o appena spinto due righe sopra, non un'incognita.
+      m.row = i
     }
 
     const tops: number[] = []
@@ -83,7 +83,8 @@ export function placeInLanes(
       y += row.h + ROW_GAP
     }
     for (const m of members) {
-      out[m.key] = { x: m.pos.x, y: tops[rowOf.get(m.key) ?? 0] ?? cursor + LANE_PAD }
+      // `m.row` indicizza `rows`, e `tops` ha un elemento per riga: la stessa garanzia di sopra.
+      out[m.key] = { x: m.pos.x, y: tops[m.row]! }
     }
 
     const used = rows.length === 0 ? 0 : y - ROW_GAP + LANE_PAD - cursor

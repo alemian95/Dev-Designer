@@ -6,6 +6,7 @@ import {
   addFlowEdge,
   addFlowNode,
   addLane,
+  applyFlowLayout,
   deleteFlowItems,
   deleteLane,
   duplicateFlowNodes,
@@ -243,5 +244,35 @@ describe("duplicateFlowNodes", () => {
     expect(d.view.nodes[copyKey]).toEqual({ x: 30, y: 30, collapsed: false })
     // L'originale resta intatto.
     expect(d.model.nodes[n.key]).toEqual({ label: "", shape: "process", lane })
+  })
+})
+
+describe("applyFlowLayout", () => {
+  it("scrive posizioni e bande in una sola applicazione, lasciando stare i nodi assenti dalla view", () => {
+    const { doc, lane: l1 } = docWith()
+    let next = apply(doc, addLane("Corsia 2"))
+    const l2 = fd(next).model.lanes[1]!.id
+    const a = addFlowNode({ x: 0, y: 0 }, "process", l1)
+    next = apply(next, a.recipe)
+    const b = addFlowNode({ x: 0, y: 0 }, "process", l2)
+    next = apply(next, b.recipe)
+    const c = addFlowNode({ x: 0, y: 0 }, "process", l1)
+    next = apply(next, c.recipe)
+    // Un nodo del modello senza voce nella view: come uno che esiste ma non è mai stato disegnato.
+    next = apply(next, (draft) => {
+      delete fd(draft).view.nodes[c.key]
+    })
+
+    const positions = { [a.key]: { x: 10, y: 999 }, [b.key]: { x: 20, y: 999 }, [c.key]: { x: 30, y: 999 } }
+    const after = apply(next, applyFlowLayout(positions))
+    const d = fd(after)
+
+    expect(d.view.nodes[a.key]!.x).toBe(10)
+    expect(d.view.nodes[b.key]!.x).toBe(20)
+    // La guardia `if (view)`: il nodo senza voce nella view non ne guadagna una.
+    expect(d.view.nodes[c.key]).toBeUndefined()
+    // Le bande, non solo le posizioni: la stessa applicazione riscrive entrambe.
+    expect(d.view.lanes[l1]).toBeDefined()
+    expect(d.view.lanes[l2]!.y).toBe(d.view.lanes[l1]!.h)
   })
 })

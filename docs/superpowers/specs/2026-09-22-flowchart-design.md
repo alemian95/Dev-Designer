@@ -389,8 +389,12 @@ Due punti da sorvegliare, entrambi nuovi:
 - il **layer delle bande** è disegno in più sotto ogni frame. Non si ridisegna
   durante il trascinamento di un nodo, quindi non dovrebbe entrare nel gesto: il
   gate lo dirà.
-- il passo delle corsie è O(n) sulle posizioni e gira **solo a «Disponi»**, fuori
-  da ogni gesto.
+- il passo delle corsie è O(n × righe) — la colorazione di intervalli cerca la
+  prima riga libera per ogni nodo, quindi nel caso peggiore, tutti i nodi di
+  una corsia sulla stessa colonna, è O(n²) su quella corsia. Gira **solo a
+  «Disponi»**, fuori da ogni gesto, e alla baseline (N=300, poche righe per
+  corsia in un caso reale) è irrilevante; resta da rivedere se una corsia
+  arrivasse a contenere migliaia di nodi in colonna.
 
 Il generatore di documenti sintetici (`src/perf/stress.ts`) va esteso a produrre
 un flowchart, altrimenti il gate misura il flowchart con un ER.

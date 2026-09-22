@@ -22,8 +22,8 @@ function laneAt(d: FlowDiagram, _y: number): string | null {
  * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts` e `flow/layout.ts`,
  * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `rectOf` ed `edgeGeometry` restano stub — servono
  * la geometria per forma (Task 6), che non esiste ancora — e nessun chiamante li raggiunge prima
- * che quel task colleghi il flowchart al resto dell'editor. `validate` resta stub per lo stesso
- * motivo, in attesa delle regole del Task 9.
+ * che quel task colleghi il flowchart al resto dell'editor. `validate` resta stub per un motivo
+ * diverso: aspetta le regole di validazione del Task 9, non la geometria.
  */
 export function flowOps(doc: DevDocument): DiagramOps {
   const diagram = () => flowDiagram(doc)

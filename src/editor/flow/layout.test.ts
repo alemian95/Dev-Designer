@@ -51,12 +51,29 @@ describe("placeInLanes", () => {
     const d = diagram({ a: { lane: "l1" }, b: { lane: "l1" } }, ["l1"])
     const { positions } = placeInLanes(d, { a: { x: 0, y: 0 }, b: { x: 10, y: 0 } })
     expect(positions.a!.y).not.toBe(positions.b!.y)
+    // La x non si tocca: senza questa coppia, una trasformazione globale della x passerebbe.
+    expect(positions.a!.x).toBe(0)
+    expect(positions.b!.x).toBe(10)
   })
 
   it("due nodi della stessa corsia lontani in x restano sulla stessa riga", () => {
     const d = diagram({ a: { lane: "l1" }, b: { lane: "l1" } }, ["l1"])
     const { positions } = placeInLanes(d, { a: { x: 0, y: 0 }, b: { x: 900, y: 400 } })
     expect(positions.a!.y).toBe(positions.b!.y)
+    expect(positions.a!.x).toBe(0)
+    expect(positions.b!.x).toBe(900)
+  })
+
+  // Discrimina due implementazioni sbagliate che i nove test precedenti lasciavano passare:
+  // un'altezza fissa a LANE_MIN_H (che romperebbe con tre righe) e una `y` calcolata come
+  // `indice * LANE_MIN_H` invece che dalle altezze accumulate (l'anti-pattern che `restackLanes`,
+  // editor/flow/commands.ts, vieta). Due corsie, due righe nella prima: la banda deve crescere
+  // oltre il minimo e la seconda corsia deve iniziare esattamente dove finisce la prima.
+  it("una corsia le cui righe superano il minimo cresce, e la successiva parte da lì", () => {
+    const d = diagram({ a: { lane: "l1" }, b: { lane: "l1" } }, ["l1", "l2"])
+    const { lanes } = placeInLanes(d, { a: { x: 0, y: 0 }, b: { x: 10, y: 0 } })
+    expect(lanes.l1!.h).toBeGreaterThan(LANE_MIN_H)
+    expect(lanes.l2!.y).toBe(lanes.l1!.h)
   })
 
   it("a parità di colonna l'ordine è quello che ELK aveva dato con la y", () => {

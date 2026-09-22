@@ -355,13 +355,13 @@ già nominata.
 ## 12. Test
 
 **Unitari** — modello, validazione ed emettitore Mermaid, come per gli altri due
-tipi. E soprattutto **`adjustLayout`**: è la funzione nuova più delicata e non ha
-bisogno né di worker né di DOM, quindi il posto dove un bug si manifesta come «i
-nodi sono nella corsia sbagliata» è interamente provabile a tavolino. Casi che
-deve coprire: corsia vuota, tutti i nodi in una sola corsia, due nodi che ELK
-mette nella stessa colonna e nella stessa corsia, nodo la cui corsia non esiste
-(non deve accadere per l'invariante §4: il test verifica che la funzione non
-esploda comunque).
+tipi. E soprattutto **`layoutRecipe?(positions): Recipe`**: è la funzione nuova
+più delicata e non ha bisogno né di worker né di DOM, quindi il posto dove un
+bug si manifesta come «i nodi sono nella corsia sbagliata» è interamente
+provabile a tavolino. Casi che deve coprire: corsia vuota, tutti i nodi in una
+sola corsia, due nodi che ELK mette nella stessa colonna e nella stessa
+corsia, nodo la cui corsia non esiste (non deve accadere per l'invariante §4:
+il test verifica che la funzione non esploda comunque).
 
 `edge-routing` va esteso ai casi sinistra→destra (§8).
 

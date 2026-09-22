@@ -11,10 +11,12 @@ import { erOps } from "./er"
 // il tipo di ritorno di `edgesTouching` e i chiamanti lo importano dal contratto.
 export type { EdgeEnds }
 
+/** Dove va il fuoco dopo la creazione: l'header (`name`) o l'editor di testo sul corpo (`body`). */
+export type EditTarget = "name" | "body"
+
 /**
  * Contratto che ogni tipo di diagramma rispetta. Il canvas e le azioni condivise ci parlano
  * attraverso: non sanno cos'è un nodo o un arco per un tipo specifico, solo questi metodi.
- * `addNote` è l'unico opzionale: l'ER non ha note e non lo implementa.
  */
 export interface DiagramOps {
   nodeKeys(): string[]
@@ -22,9 +24,12 @@ export interface DiagramOps {
   rectOf(key: string, at?: Point): Rect | null
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
   edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
-  addNode(at: Point): { key: string; recipe: Recipe }
-  /** Terza specie di nodo, oggi solo nel class diagram. Assente dove il tipo non ha note. */
-  addNote?(at: Point): { key: string; recipe: Recipe }
+  /**
+   * Crea un nodo. `variant` è una stringa opaca per la giuntura: la dichiara `DiagramView.tools` e
+   * la interpreta solo il modulo `kinds/` del tipo che l'ha dichiarata. `edit` dice dove va il
+   * fuoco: sostituisce il caso speciale che `addNote` era prima di questo cambiamento.
+   */
+  addNode(at: Point, variant?: string): { key: string; recipe: Recipe; edit: EditTarget }
   /** `null` quando i due estremi non possono essere collegati: due note (un ancoraggio ha senso
    *  solo verso una classe), o una classe che non esiste. Una nota **e** una classe producono
    *  invece un ancoraggio (`note-link`, spec note ancorate §4). L'ER non ha note e continua a

@@ -176,28 +176,18 @@ export function createInteractionRunner(): InteractionRunner {
         break
       }
       case "create-node": {
-        const { key, recipe } = opsFor(documentStore.getState().doc).addNode(fx.at)
+        const { key, recipe, edit } = opsFor(documentStore.getState().doc).addNode(fx.at, fx.variant)
         documentStore.getState().dispatch(recipe)
         session().setSelection([selId("node", key)])
         session().setTool("select")
-        session().setEditing({ key, target: "name" })
-        break
-      }
-      case "create-note": {
-        const ops = opsFor(documentStore.getState().doc)
-        if (!ops.addNote) break
-        const { key, recipe } = ops.addNote(fx.at)
-        documentStore.getState().dispatch(recipe)
-        session().setSelection([selId("node", key)])
-        session().setTool("select")
-        session().setEditing({ key, target: "body" })
+        session().setEditing({ key, target: edit })
         break
       }
     }
   }
 
   const step = (event: InteractionEvent): void => {
-    const result = reduce(mode, event, { tool: session().tool, selection: session().selection })
+    const result = reduce(mode, event, { tool: session().tool, variant: session().variant ?? undefined, selection: session().selection })
     mode = result.mode
     for (const fx of result.effects) run(fx)
     // Lo snapshot del drag vale per un solo drag: si scarta appena si esce dal modo, commit o annullamento che sia.

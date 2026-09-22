@@ -51,9 +51,10 @@ export function classOps(doc: DevDocument): DiagramOps {
       return rel ? classEdgeGeometry(a, b, rel, classEdgeOffsets(model.relations).get(key) ?? 0) : null
     },
 
-    addNode: (at) => addClass(diagram().model.classes, at),
-
-    addNote,
+    addNode: (at, variant) =>
+      variant === "note"
+        ? { ...addNote(at), edit: "body" }
+        : { ...addClass(diagram().model.classes, at), edit: "name" },
 
     // Una nota non può essere estremo di una relazione fra classi, ma può esserlo di un
     // **ancoraggio**: è il gesto con cui si dichiara la classe che commenta. `addNoteLink`

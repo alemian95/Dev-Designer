@@ -1,6 +1,6 @@
 import { Box, Spline, Square, StickyNote } from "lucide-react"
 import { describe, expect, it } from "vitest"
-import { viewFor } from "./registry"
+import { toolId, viewFor } from "./registry"
 
 /**
  * Fissa il dispatch del registro: la revisione del Task 6 ha lasciato una voce ⚠️ perché nessun
@@ -29,31 +29,41 @@ describe("viewFor", () => {
     // `viewFor` la vista sbagliata qui, silenziosamente.
     expect(er.NodeView).not.toBe(cls.NodeView)
     expect(er.EdgeView).not.toBe(cls.EdgeView)
-    expect(er.tools).toEqual({
-      node: { label: "Entità", key: "e", Icon: Square },
-      edge: { label: "Relazione", key: "r", Icon: Spline },
-    })
-    expect(cls.tools).toEqual({
-      node: { label: "Classe", key: "c", Icon: Box },
-      edge: { label: "Relazione", key: "r", Icon: Spline },
-      note: { label: "Nota", key: "n", Icon: StickyNote },
-    })
+    expect(er.tools).toEqual([
+      { label: "Entità", key: "e", Icon: Square, tool: "node" },
+      { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
+    ])
+    expect(cls.tools).toEqual([
+      { label: "Classe", key: "c", Icon: Box, tool: "node" },
+      { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
+      { label: "Nota", key: "n", Icon: StickyNote, tool: "node", variant: "note" },
+    ])
     expect(er.textFormats).toEqual(["postgres", "mysql", "mermaid"])
     expect(cls.textFormats).toEqual(["class-mermaid"])
   })
 })
 
 describe("terzo strumento", () => {
-  it("la vista delle classi dichiara lo strumento nota, quella ER no", () => {
-    expect(viewFor("class").tools.note).toBeDefined()
-    expect(viewFor("er").tools.note).toBeUndefined()
+  it("la vista delle classi dichiara la variante nota, quella ER no", () => {
+    expect(viewFor("class").tools.some((t) => t.variant === "note")).toBe(true)
+    expect(viewFor("er").tools.some((t) => t.variant === "note")).toBe(false)
   })
 
   it("le scorciatoie dei tre strumenti sono distinte", () => {
-    const t = viewFor("class").tools
-    const keys = [t.node.key, t.edge.key, t.note!.key]
+    const keys = viewFor("class").tools.map((t) => t.key)
     expect(new Set(keys).size).toBe(3)
     // `v` è riservata a «Seleziona» in `use-keyboard-shortcuts.ts`.
     expect(keys).not.toContain("v")
+  })
+})
+
+describe("toolId", () => {
+  it("compone tool e variant quando c'è una variante", () => {
+    expect(toolId({ tool: "node", variant: "note" })).toBe("node:note")
+  })
+
+  it("torna solo il tool quando non c'è variante", () => {
+    expect(toolId({ tool: "node" })).toBe("node")
+    expect(toolId({ tool: "edge" })).toBe("edge")
   })
 })

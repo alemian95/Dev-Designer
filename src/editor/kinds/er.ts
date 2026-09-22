@@ -37,7 +37,7 @@ export function erOps(doc: DevDocument): DiagramOps {
       return rel ? edgeGeometry(a, b, rel, erEdgeOffsets(model.relationships).get(key) ?? 0) : null
     },
 
-    addNode: (at) => addEntity(diagram().model.entities, at),
+    addNode: (at) => ({ ...addEntity(diagram().model.entities, at), edit: "name" }),
 
     addEdge: (source, target) => addRelationship(diagram().model.relationships, source, target),
 

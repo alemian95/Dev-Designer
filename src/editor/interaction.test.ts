@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { IDLE, reduce, type Context, type InteractionEvent, type Mode, type PointerInfo } from "./interaction"
+import { IDLE, reduce, type Context, type Hit, type InteractionEvent, type Mode, type PointerInfo } from "./interaction"
 import { selId } from "./session-store"
 
 const info = (over: Partial<PointerInfo>): PointerInfo => ({
@@ -115,12 +115,6 @@ describe("reduce", () => {
     expect(r.mode).toEqual(IDLE)
   })
 
-  it("tool note: click sul canvas crea la nota", () => {
-    const r = run([down({ world: { x: 12, y: 8 } })], ctx({ tool: "note" }))
-    expect(r.effects).toEqual([{ type: "create-note", at: { x: 12, y: 8 } }])
-    expect(r.mode).toEqual(IDLE)
-  })
-
   it("tool edge: da nodo a nodo committa la connessione", () => {
     const r = run([
       down({ hit: { kind: "node", key: "a" }, world: { x: 0, y: 0 } }),
@@ -144,5 +138,34 @@ describe("reduce", () => {
     const r = run([down({ hit: { kind: "node", key: "a" } }), move({ world: { x: 9, y: 9 } }), { type: "cancel" }])
     expect(r.effects.at(-1)).toEqual({ type: "preview-drag", keys: ["a"], dx: 0, dy: 0 })
     expect(r.mode).toEqual(IDLE)
+  })
+})
+
+describe("strumento nodo con variante", () => {
+  const info = (hit: Hit): PointerInfo => ({
+    screen: { x: 0, y: 0 },
+    world: { x: 10, y: 20 },
+    button: 0,
+    shift: false,
+    alt: false,
+    hit,
+  })
+
+  it("porta la variante nell'effetto di creazione", () => {
+    const step = reduce(
+      IDLE,
+      { type: "down", info: info({ kind: "canvas" }), spaceHeld: false },
+      { tool: "node", variant: "decision", selection: new Set() },
+    )
+    expect(step.effects).toEqual([{ type: "create-node", at: { x: 10, y: 20 }, variant: "decision" }])
+  })
+
+  it("senza variante l'effetto non la porta", () => {
+    const step = reduce(
+      IDLE,
+      { type: "down", info: info({ kind: "canvas" }), spaceHeld: false },
+      { tool: "node", selection: new Set() },
+    )
+    expect(step.effects).toEqual([{ type: "create-node", at: { x: 10, y: 20 }, variant: undefined }])
   })
 })

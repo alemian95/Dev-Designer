@@ -109,14 +109,15 @@ describe("restoreLast", () => {
     const saved = withEntity("salvato", "s1")
     d.db.records.set("s1", record(saved, { fileName: "s1.dd.json", updatedAt: 900, savedToFileAt: 800 }))
     d.db.last = "s1"
-    // `note` esiste solo nel class diagram: se sopravvivesse al mount di un ER, il canvas non
-    // risponderebbe più al click.
-    sessionStore.getState().setTool("note")
+    // La variante "note" esiste solo nel class diagram: se sopravvivesse al mount di un ER, il
+    // canvas non risponderebbe più al click.
+    sessionStore.getState().setTool("node", "note")
     await createDocumentIo(d).restoreLast()
     expect(documentStore.getState().doc).toEqual(saved)
     expect(documentStore.getState().past).toHaveLength(0)
     expect(sessionStore.getState().selection.size).toBe(0)
     expect(sessionStore.getState().tool).toBe("select")
+    expect(sessionStore.getState().variant).toBeNull()
     expect(documentSession.getState()).toMatchObject({ docId: "s1", fileName: "s1.dd.json", lastSavedAt: 800, dirty: true })
   })
 

@@ -38,11 +38,11 @@ export type Effect =
   | { type: "commit-marquee"; rect: Rect; additive: boolean }
   | { type: "preview-connect"; source: string; to: Point | null }
   | { type: "commit-connect"; source: string; target: string }
-  | { type: "create-node"; at: Point }
-  | { type: "create-note"; at: Point }
+  | { type: "create-node"; at: Point; variant?: string }
 
 export interface Context {
   tool: Tool
+  variant?: string
   selection: ReadonlySet<string>
 }
 
@@ -72,10 +72,9 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
   if (info.button !== 0) return { mode: IDLE, effects: [] }
 
   if (ctx.tool === "node") {
-    if (info.hit.kind === "canvas") return { mode: IDLE, effects: [{ type: "create-node", at: info.world }] }
-  }
-  if (ctx.tool === "note") {
-    if (info.hit.kind === "canvas") return { mode: IDLE, effects: [{ type: "create-note", at: info.world }] }
+    if (info.hit.kind === "canvas") {
+      return { mode: IDLE, effects: [{ type: "create-node", at: info.world, variant: ctx.variant }] }
+    }
   }
   if (ctx.tool === "edge") {
     if (info.hit.kind === "node") {

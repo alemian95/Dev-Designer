@@ -107,9 +107,10 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const active = document.activeElement
       if (isTextInput(active)) flushSync(() => active.blur())
       svg.setPointerCapture(e.pointerId)
-      // Gli strumenti nodo e nota aprono un editor già nel down: senza annullare il default il
-      // `mousedown` di compatibilità sposterebbe subito il fuoco sul body e lo richiuderebbe.
-      if (e.button === 1 || session().tool === "node" || session().tool === "note") e.preventDefault()
+      // Lo strumento nodo — nota compresa, che ne è una variante — apre un editor già nel down:
+      // senza annullare il default il `mousedown` di compatibilità sposterebbe subito il fuoco sul
+      // body e lo richiuderebbe.
+      if (e.button === 1 || session().tool === "node") e.preventDefault()
       step({ type: "down", info: info(e), spaceHeld })
     }
     const onPointerMove = (e: PointerEvent) => {

@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import type { Rect } from "@/editor/geometry"
+import type { Tool } from "@/editor/session-store"
 import type { Diagram } from "@/model/document"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { classView } from "./class"
@@ -49,7 +50,19 @@ export interface EdgeViewProps {
  * `buildSvg` (`@/ui/export/svg.tsx`), che gira dentro `renderToStaticMarkup` e uno store non ce
  * l'ha.
  */
-interface ToolDef { label: string; key: string; Icon: LucideIcon }
+export interface ToolDef {
+  label: string
+  key: string
+  Icon: LucideIcon
+  tool: Tool
+  /** Passata ad `addNode`: la forma, per i tipi che ne hanno più d'una. */
+  variant?: string
+}
+
+/** Identità di uno strumento nel ToggleGroup: `tool` da solo non basta quando ci sono più varianti. */
+export function toolId(def: Pick<ToolDef, "tool" | "variant">): string {
+  return def.variant ? `${def.tool}:${def.variant}` : def.tool
+}
 
 export interface DiagramView {
   NodesLayer: ComponentType
@@ -57,12 +70,7 @@ export interface DiagramView {
   NodeView: ComponentType<NodeViewProps>
   EdgeView: ComponentType<EdgeViewProps>
   Properties: ComponentType
-  tools: {
-    node: ToolDef
-    edge: ToolDef
-    /** Terza specie di nodo, oggi solo nel class diagram: l'ER non ha note e non ne dichiara. */
-    note?: ToolDef
-  }
+  tools: ToolDef[]
   textFormats: TextFormat[]
 }
 

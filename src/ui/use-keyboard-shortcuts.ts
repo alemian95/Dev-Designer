@@ -47,9 +47,10 @@ function onKeyDown(e: KeyboardEvent): void {
   else if (mod && key === "0") resetView()
   else if (!mod && (e.key === "Delete" || e.key === "Backspace")) deleteSelection()
   else if (!mod && key === "v") session.setTool("select")
-  else if (!mod && key === tools.node.key) session.setTool("node")
-  else if (!mod && key === tools.edge.key) session.setTool("edge")
-  else if (!mod && tools.note && key === tools.note.key) session.setTool("note")
+  else if (!mod && tools.some((t) => t.key === key)) {
+    const def = tools.find((t) => t.key === key)
+    if (def) session.setTool(def.tool, def.variant ?? null)
+  }
   else if (!mod && key === "f") fitToContent()
   else if (!mod && key === "l") void autoLayout()
   else if (e.key === "Escape") {

@@ -167,11 +167,12 @@ incrociarsi. È un costo inerente alle corsie e non all'approccio — un nodo de
 stare nella corsia del suo attore anche quando ciò genera un incrocio.
 
 **Dove sta il codice.** `DiagramOps` guadagna un metodo opzionale
-`adjustLayout?(positions): LayoutPositions`, identità quando manca — stesso
-stampo che aveva `addNote?`. ER e class non lo implementano. Il flowchart sì, ed
-è una **funzione pura** da posizioni più modello a posizioni: si prova senza
-worker, senza DOM e senza ELK. `autoLayout()` in `ui/layout-actions.ts` non
-cambia forma, guadagna un passaggio fra la risposta del worker e `applyLayout`.
+`layoutRecipe?(positions): Recipe`, che sostituisce la dispatch predefinita
+`applyLayout(positions)` quando c'è. Serve perché il passo delle corsie riscrive
+anche le bande, e due dispatch separate darebbero due passi di undo. Dentro ci
+sta la funzione pura `placeInLanes(diagram, positions)`, che da posizioni e
+modello ricava posizioni corrette e bande: si prova senza worker, senza DOM e
+senza ELK.
 
 **Le bande stanno nella view**, non derivate dalle posizioni dei nodi. Derivarle
 sembrava più elegante, ma una corsia vuota non avrebbe né altezza né bersaglio

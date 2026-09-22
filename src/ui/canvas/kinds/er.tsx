@@ -154,9 +154,9 @@ export const erView: DiagramView = {
   NodeView,
   EdgeView,
   Properties,
-  tools: {
-    node: { label: "Entità", key: "e", Icon: Square },
-    edge: { label: "Relazione", key: "r", Icon: Spline },
-  },
+  tools: [
+    { label: "Entità", key: "e", Icon: Square, tool: "node" },
+    { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
+  ],
   textFormats: ["postgres", "mysql", "mermaid"],
 }

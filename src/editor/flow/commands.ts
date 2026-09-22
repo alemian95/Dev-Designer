@@ -118,20 +118,27 @@ export function renameLane(id: string, name: string): Recipe {
 
 /**
  * Cancella una corsia spostando i suoi nodi in `moveTo`, così l'invariante "ogni nodo ha una
- * corsia esistente" (`model/flow/schema.ts`) non si rompe mai. `null` quando `id === moveTo`: è il
- * solo modo — senza vedere il modello — di riconoscere sia il tentativo insensato di spostare i
- * nodi nella corsia che sta per sparire, sia il caso dell'ultima corsia rimasta, dove `moveTo` non
- * può che essere `id` perché non esiste nessun'altra corsia a cui puntare.
+ * corsia esistente" (`model/flow/schema.ts`) non si rompe mai. Il predicato vero è **l'ultima
+ * corsia**, non `id === moveTo`: quest'ultimo è solo il caso degenere in cui spostare i nodi
+ * nella corsia che sta per sparire non avrebbe senso in ogni caso.
+ *
+ * Le tre guardie stanno qui e non dentro la recipe apposta: "un comando che non cambia niente non
+ * scrive" (evita una voce di undo fantasma) vale solo se il rifiuto avviene **prima** che la
+ * recipe esista, non se la recipe viene comunque dispatchata e poi esce senza scrivere. Per
+ * deciderle serve leggere il modello, esattamente come fanno già `addFlowEdge` e
+ * `duplicateFlowNodes` — un comando che legge il modello lo riceve, non lo indovina.
  */
-export function deleteLane(id: string, moveTo: string): Recipe | null {
+export function deleteLane(model: FlowModel, id: string, moveTo: string): Recipe | null {
+  if (model.lanes.length <= 1) return null
   if (id === moveTo) return null
+  if (!model.lanes.some((l) => l.id === id)) return null
+  if (!model.lanes.some((l) => l.id === moveTo)) return null
   return (draft) => {
     const d = flowDiagram(draft)
-    if (d.model.lanes.length <= 1) return
-    const idx = d.model.lanes.findIndex((l) => l.id === id)
-    if (idx < 0) return
-    if (!d.model.lanes.some((l) => l.id === moveTo)) return
-    d.model.lanes.splice(idx, 1)
+    d.model.lanes.splice(
+      d.model.lanes.findIndex((l) => l.id === id),
+      1,
+    )
     delete d.view.lanes[id]
     for (const node of Object.values(d.model.nodes)) {
       if (node.lane === id) node.lane = moveTo

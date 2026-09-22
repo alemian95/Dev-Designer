@@ -90,24 +90,34 @@ describe("deleteFlowItems", () => {
 
 describe("deleteLane", () => {
   it("rifiuta di cancellare l'ultima corsia: nessun nodo può restare senza", () => {
-    const { lane } = docWith()
-    expect(deleteLane(lane, lane)).toBeNull()
+    const { doc, lane } = docWith()
+    expect(deleteLane(fd(doc).model, lane, lane)).toBeNull()
   })
 
   it("sposta i nodi della corsia cancellata in quella indicata", () => {
     const { doc, lane } = docWith()
     let next = apply(doc, addLane("Corsia 2"))
-    const d0 = next.diagram
-    if (d0.type !== "flow") throw new Error("tipo sbagliato")
-    const seconda = d0.model.lanes[1]!.id
+    const seconda = fd(next).model.lanes[1]!.id
     const n = addFlowNode({ x: 0, y: 0 }, "process", seconda)
     next = apply(next, n.recipe)
-    next = apply(next, deleteLane(seconda, lane)!)
-    const d = next.diagram
-    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    next = apply(next, deleteLane(fd(next).model, seconda, lane)!)
+    const d = fd(next)
     expect(d.model.lanes).toHaveLength(1)
     expect(d.model.nodes[n.key]!.lane).toBe(lane)
     expect(d.view.lanes[seconda]).toBeUndefined()
+  })
+
+  it("su due corsie cancella quella indicata e torna una recipe, non null", () => {
+    const { doc, lane } = docWith()
+    const next = apply(doc, addLane("Corsia 2"))
+    const model = fd(next).model
+    const seconda = model.lanes[1]!.id
+    expect(deleteLane(model, lane, seconda)).not.toBeNull()
+  })
+
+  it("rifiuta anche con un `moveTo` diverso e inesistente: il predicato è \"l'ultima corsia\", non \"id === moveTo\"", () => {
+    const { doc, lane } = docWith()
+    expect(deleteLane(fd(doc).model, lane, "fantasma")).toBeNull()
   })
 })
 

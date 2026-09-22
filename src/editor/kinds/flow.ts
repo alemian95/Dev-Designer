@@ -1,7 +1,8 @@
 import type { DevDocument } from "@/model/document"
 import type { FlowDiagram, FlowShape } from "@/model/flow/schema"
-import { addFlowEdge, addFlowNode, deleteFlowItems, duplicateFlowNodes } from "../flow/commands"
+import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes } from "../flow/commands"
 import { flowDiagram } from "../flow-access"
+import { flowLayoutGraph } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
@@ -18,11 +19,11 @@ function laneAt(d: FlowDiagram, _y: number): string | null {
 }
 
 /**
- * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts`, sulla forma di
- * `kinds/er.ts` e `kinds/class.ts`. `rectOf`, `edgeGeometry`, `layoutGraph` e `validate` restano
- * stub — servono rispettivamente la geometria per forma (Task 6), il grafo da disporre (Task 5) e
- * le regole di validazione (Task 9), nessuna delle quali esiste ancora — e nessun chiamante li
- * raggiunge prima che quei task colleghino il flowchart al resto dell'editor.
+ * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts` e `flow/layout.ts`,
+ * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `rectOf` ed `edgeGeometry` restano stub — servono
+ * la geometria per forma (Task 6), che non esiste ancora — e nessun chiamante li raggiunge prima
+ * che quel task colleghi il flowchart al resto dell'editor. `validate` resta stub per lo stesso
+ * motivo, in attesa delle regole del Task 9.
  */
 export function flowOps(doc: DevDocument): DiagramOps {
   const diagram = () => flowDiagram(doc)
@@ -59,10 +60,9 @@ export function flowOps(doc: DevDocument): DiagramOps {
 
     duplicateNodes: (keys) => duplicateFlowNodes(diagram().model, keys),
 
-    layoutGraph: () => {
-      // ponytail: rimosso nel Task 5
-      throw new Error("flowchart: layout non ancora implementato")
-    },
+    layoutGraph: () => flowLayoutGraph(diagram()),
+
+    layoutRecipe: (positions) => applyFlowLayout(positions),
 
     validate: () => {
       // ponytail: rimosso nel Task 9

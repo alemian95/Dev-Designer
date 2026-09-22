@@ -1,6 +1,6 @@
 import type { DevDocument } from "@/model/document"
 import type { Issue } from "@/model/issue"
-import type { LayoutGraph } from "@/model/layout"
+import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import type { EdgeEnds, EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
@@ -39,6 +39,11 @@ export interface DiagramOps {
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
   layoutGraph(): LayoutGraph
+  /**
+   * Sostituisce la dispatch predefinita `applyLayout(positions)` quando c'è. Serve al flowchart,
+   * che col layout riscrive anche le bande: due dispatch darebbero due passi di undo.
+   */
+  layoutRecipe?(positions: LayoutPositions): Recipe
   validate(): Issue[]
 }
 

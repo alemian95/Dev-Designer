@@ -14,7 +14,7 @@ export interface LayoutNode {
   h: number
 }
 
-/** Un arco **già nel verso del layout**: `source` va sopra, `target` sotto. */
+/** Un arco **già nel verso del layout**: `source` viene prima di `target` lungo la direzione del grafo. */
 export interface LayoutEdge {
   id: string
   source: string

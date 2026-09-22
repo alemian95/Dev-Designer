@@ -1,7 +1,9 @@
 import { LANE_MIN_H, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
+import type { LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
 import { snap, type Point } from "../geometry"
+import { placeInLanes } from "./layout"
 
 const DUPLICATE_OFFSET = 20
 
@@ -176,5 +178,25 @@ export function moveLane(from: number, to: number): Recipe {
     // `moveAttribute` (commands/er.ts:129) per lo stesso motivo.
     lanes.splice(to, 0, item!)
     restackLanes(d)
+  }
+}
+
+/**
+ * Posizioni e bande in **una sola** recipe: due dispatch darebbero due passi di undo per un
+ * gesto solo (spec §5). `placeInLanes` è la funzione pura che fa il lavoro; qui si scrive il
+ * risultato nel documento.
+ */
+export function applyFlowLayout(positions: LayoutPositions): Recipe {
+  return (draft) => {
+    const d = flowDiagram(draft)
+    const placed = placeInLanes(d, positions)
+    for (const [key, p] of Object.entries(placed.positions)) {
+      const view = d.view.nodes[key]
+      if (view) {
+        view.x = p.x
+        view.y = p.y
+      }
+    }
+    d.view.lanes = placed.lanes
   }
 }

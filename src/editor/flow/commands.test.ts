@@ -269,6 +269,10 @@ describe("applyFlowLayout", () => {
 
     expect(d.view.nodes[a.key]!.x).toBe(10)
     expect(d.view.nodes[b.key]!.x).toBe(20)
+    // La y è l'unica cosa che questo passo calcola: senza queste due, una regressione che
+    // perdesse `view.y = p.y` tenendo `view.x = p.x` passerebbe inosservata.
+    expect(d.view.nodes[a.key]!.y).toBe(20)
+    expect(d.view.nodes[b.key]!.y).toBe(204)
     // La guardia `if (view)`: il nodo senza voce nella view non ne guadagna una.
     expect(d.view.nodes[c.key]).toBeUndefined()
     // Le bande, non solo le posizioni: la stessa applicazione riscrive entrambe.

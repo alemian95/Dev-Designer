@@ -1,9 +1,10 @@
-import type { LayoutEdge, LayoutNode, LayoutPositions } from "@/model/layout"
+import type { LayoutDirection, LayoutEdge, LayoutGraph, LayoutNode, LayoutPositions } from "@/model/layout"
 
 export interface LayoutRequest {
   id: number
   nodes: LayoutNode[]
   edges: LayoutEdge[]
+  direction: LayoutDirection
 }
 
 export type LayoutResponse =
@@ -27,7 +28,7 @@ export interface LayoutEngine {
    * rigetta e termina il worker. Chi chiama non deve aspettarsi una risposta utile da ogni
    * richiesta avviata, solo dall'ultima.
    */
-  layout: (nodes: LayoutNode[], edges: LayoutEdge[]) => Promise<LayoutPositions>
+  layout: (graph: LayoutGraph) => Promise<LayoutPositions>
 }
 
 /** 10 s: il massimo misurato è 157 ms su 200 tabelle con `layered DOWN` (ADR 0006), quindi il margine è sessanta volte. */
@@ -92,7 +93,7 @@ export function createLayoutEngine(spawn: () => LayoutWorker, timeoutMs: number 
   }
 
   return {
-    layout: (nodes, edges) =>
+    layout: (graph) =>
       new Promise<LayoutPositions>((resolve, reject) => {
         // Due layout di seguito produrrebbero due voci di undo per un gesto che l'utente ha inteso
         // come uno: il primo si abbandona.
@@ -100,7 +101,7 @@ export function createLayoutEngine(spawn: () => LayoutWorker, timeoutMs: number 
         const id = nextId++
         const timer = setTimeout(() => discard("il motore di layout non ha risposto in tempo"), timeoutMs)
         pending = { id, resolve, reject, timer }
-        ensure().postMessage({ id, nodes, edges })
+        ensure().postMessage({ id, nodes: graph.nodes, edges: graph.edges, direction: graph.direction })
       }),
   }
 }

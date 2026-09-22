@@ -6,6 +6,7 @@ import type { EdgeEnds, EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
 import { classOps } from "./class"
 import { erOps } from "./er"
+import { flowOps } from "./flow"
 
 // `EdgeEnds` sta in `edge-routing.ts`, dove `edgeOffsets` lo consuma; qui si ri-esporta perché è
 // il tipo di ritorno di `edgesTouching` e i chiamanti lo importano dal contratto.
@@ -49,7 +50,6 @@ export function opsFor(doc: DevDocument): DiagramOps {
     case "class":
       return classOps(doc)
     case "flow":
-      // ponytail: rimosso nel Task 3
-      throw new Error("flowchart: non ancora implementato")
+      return flowOps(doc)
   }
 }

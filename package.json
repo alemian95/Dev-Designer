@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "perf": "vite build && node scripts/perf/fps.mjs",
     "e2e": "vite build && node scripts/e2e/run.mjs",
     "preview": "vite preview"

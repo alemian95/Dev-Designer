@@ -19,7 +19,8 @@ nessuno le riscopra come se fossero nuove.
 
 ## Da correggere
 
-Niente, al 2026-09-17. DT-1..DT-6 sono state corrette nel commit `eeca340`,
+Niente, al 2026-09-22, con i cinque gate verdi sull'albero pulito: vedi
+«Prima del flowchart» in fondo all'Archivio. DT-1..DT-6 sono state corrette nel commit `eeca340`,
 DT-7 e le minori aperte dalla revisione di `feat/export-testo` subito dopo;
 restano qui sotto in **Corretti** perché due di esse sono state corrette in un
 posto diverso da quello che questo documento indicava, e la ragione vale più
@@ -1004,6 +1005,50 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
   distingua dal resto del tipo. Chiuderlo richiederebbe un campo `default`
   separato in `ClassAttributeSchema`, con `parseMembers` che lo estrae
   invece di lasciarlo dentro la stringa del tipo.
+
+### Prima del flowchart (2026-09-22)
+
+I gate sono stati eseguiti tutti sull'albero pulito prima di aprire il terzo
+tipo di diagramma: `lint` pulito, 636 test verdi su 44 file, `build` ok, i
+sette scenari e2e PASS, e il gate di prestazione **PASS con p95 peggiore
+9,3 ms** a N=300. Quest'ultimo era la sola misura che la CI non fa e che
+nessuno aveva ripetuto dal 2026-09-13: serve come baseline, perché il
+flowchart tocca canvas e routing condivisi e senza il numero di prima non si
+saprebbe di chi è la colpa di un rosso dopo.
+
+Tre voci di questo Archivio sono state riesaminate perché sembravano
+prerequisiti del flowchart. **Nessuna lo era:**
+
+- **Le etichette di archi diversi che si accavallano.** Il flowchart è il primo
+  tipo in cui l'etichetta sull'arco è contenuto e non decorazione, quindi la
+  voce diventa critica davvero — ma un anti-sovrapposizione globale progettato
+  adesso si progetterebbe senza una sola etichetta vera sotto gli occhi. Si fa
+  dentro il flowchart, contro le sue etichette, non prima.
+- **La guardia «il target è un campo di testo» duplicata** fra
+  `use-canvas-interaction.ts` e `use-keyboard-shortcuts.ts`. Resta dov'è: sta
+  in due hook **condivisi**, non in codice per specie, quindi un terzo tipo non
+  aggiunge una terza copia. La voce originale l'aveva già deciso, e la ragione
+  non è cambiata.
+- **`selection.ts` da estrarre e i due listener `keydown` da unificare.**
+  Refactor puro, stesso motivo: nessuna copia in più con un tipo in più. I due
+  listener trattano entrambi `Escape` e le due risposte oggi sono coerenti —
+  il canvas annulla il gesto in corso, le scorciatoie svuotano selezione e
+  strumento — quindi resta latente solo l'ordine di registrazione.
+
+Quello che **è** un prerequisito è emerso dalla lettura e non era in nessuna
+lista: la giuntura fra tipi è modellata su **due specie di nodo più una nota
+opzionale**. `DiagramView.tools` è `{ node, edge, note? }`
+(`src/ui/canvas/kinds/registry.ts`) e `DiagramOps` ha `addNode(at)` e
+`addNote?(at)` (`src/editor/kinds/ops.ts`): nessuno dei due porta un parametro
+di specie. Il flowchart ne ha sei — start/end, processo, decisione,
+input/output, sottoprocesso, nota. Allargare quelle due forme è il **primo
+task** del piano del flowchart, non un lavoro da fare al buio adesso: i quattro
+`switch` esaustivi (`editor/kinds/ops.ts`, `ui/canvas/kinds/registry.ts`,
+`io/document-io.ts`, `ui/export/actions.ts`) fanno fallire `tsc -b` su ogni
+punto da toccare, quindi il compilatore fa da lista.
+
+Corretto nello stesso giro: `pnpm test` girava con `--passWithNoTests`, e una
+suite sparita per un glob rotto sarebbe passata verde in CI.
 
 ---
 

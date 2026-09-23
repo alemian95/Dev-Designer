@@ -1,4 +1,4 @@
-import { produce } from "immer"
+import { enablePatches, produce, produceWithPatches } from "immer"
 import { describe, expect, it } from "vitest"
 import type { DevDocument } from "@/model/document"
 import { createFlowDocument, type FlowDiagram, type FlowModel } from "@/model/flow/schema"
@@ -18,6 +18,12 @@ import {
   setNodeShape,
 } from "./commands"
 import { LANE_PAD } from "./layout"
+
+// Serve solo a `describe("moveFlowNodes", ...)` più in basso, per leggere se una recipe produce
+// patch: è esattamente la proprietà su cui si regge `document-store.ts:42` per scartare una
+// dispatch, e un `toBe` per riferimento non basta — scrivere una `y` e poi riscriverla uguale a
+// quella di partenza, nella stessa recipe, torna un oggetto **diverso** da Immer ma zero patch.
+enablePatches()
 
 function docWith(): { doc: DevDocument; lane: string } {
   const doc = createFlowDocument("test", "id-1")
@@ -317,13 +323,59 @@ describe("moveFlowNodes", () => {
 
   it("un nodo lasciato fuori da ogni banda resta nella sua corsia e ci rientra", () => {
     const { doc, l1 } = dueCorsie()
-    const n = addFlowNode({ x: 0, y: 20 }, "process", l1)
+    // Creato già a `LANE_PAD`: è dove lo metterebbe `placeInLanes` in prima riga, quindi il
+    // riallineamento lo riporta esattamente dov'era — il caso degenere apposta.
+    const n = addFlowNode({ x: 0, y: LANE_PAD }, "process", l1)
     const conNodo = produce(doc, n.recipe)
-    const next = produce(conNodo, moveFlowNodes([n.key], 0, -500)!)
+    const recipe = moveFlowNodes([n.key], 0, -500)!
+    const [next, patches] = produceWithPatches(conNodo, recipe)
     expect(flow(next).model.nodes[n.key]!.lane).toBe(l1)
     const y = flow(next).view.nodes[n.key]!.y
     expect(y).toBeGreaterThanOrEqual(0)
     expect(y).toBeLessThan(100)
+    // La cosa che conta qui: il nodo torna esattamente dov'era, quindi la recipe non produce
+    // patch. `dispatch` la scarterebbe (`document-store.ts:42`), e senza il ripristino del DOM al
+    // rilascio (`interaction-runner.ts`, `resetDragTargets`) l'anteprima resterebbe scritta lì.
+    expect(patches).toHaveLength(0)
+  })
+
+  it("un nodo fuori da ogni banda, con una y di partenza diversa dal margine, ci rientra comunque — e stavolta la recipe produce patch", () => {
+    const { doc, l1 } = dueCorsie()
+    // A differenza del test sopra, la y di partenza (50) non è già quella del margine: il
+    // riallineamento la cambia davvero, e la recipe qui produce patch — il contrappeso del test
+    // precedente, che copriva solo il caso degenere (patch vuote).
+    const n = addFlowNode({ x: 0, y: 50 }, "process", l1)
+    const conNodo = produce(doc, n.recipe)
+    const recipe = moveFlowNodes([n.key], 0, -500)!
+    const [next, patches] = produceWithPatches(conNodo, recipe)
+    expect(flow(next).model.nodes[n.key]!.lane).toBe(l1)
+    expect(flow(next).view.nodes[n.key]!.y).toBe(LANE_PAD)
+    expect(patches.length).toBeGreaterThan(0)
+  })
+
+  it("il bordo superiore e il centro possono cadere in bande diverse: decide il centro", () => {
+    const { doc, l1, l2 } = dueCorsie()
+    const n = addFlowNode({ x: 0, y: 50 }, "process", l1)
+    const conNodo = produce(doc, n.recipe)
+    // y: 50 → 90. Il nodo (`process`, etichetta vuota) è alto 40: il bordo superiore (90) è
+    // ancora nella banda `l1` ([0, 100)), il centro (90 + 20 = 110) è già in `l2` ([100, 200)).
+    // Un'implementazione che chiedesse a `laneAt` lo spigolo invece del centro (Step 3, regola 2
+    // del brief) passerebbe qui con la corsia sbagliata.
+    const next = produce(conNodo, moveFlowNodes([n.key], 0, 40)!)
+    expect(flow(next).model.nodes[n.key]!.lane).toBe(l2)
+  })
+
+  it("un rilascio sotto l'ultima corsia, partendo dalla prima, resta nella prima e rientra dal basso", () => {
+    const { doc, l1 } = dueCorsie()
+    const n = addFlowNode({ x: 0, y: 20 }, "process", l1)
+    const conNodo = produce(doc, n.recipe)
+    // Il nodo finisce ben sotto `l2` (l'ultima corsia): fuori da ogni banda esattamente come
+    // sopra la prima, ma sul lato opposto. La corsia di partenza è `l1`, non `l2` — non è "la
+    // corsia più vicina", è quella da cui il nodo è partito — e la banda a cui rientra è la sua,
+    // non quella dell'ultima: y = l1.h − LANE_PAD − h = 100 − 20 − 40 = 40.
+    const next = produce(conNodo, moveFlowNodes([n.key], 0, 1000)!)
+    expect(flow(next).model.nodes[n.key]!.lane).toBe(l1)
+    expect(flow(next).view.nodes[n.key]!.y).toBe(40)
   })
 
   it("trascinando più nodi insieme, ognuno prende la corsia dove cade lui", () => {

@@ -1,5 +1,6 @@
 import { Box, Spline, Square, StickyNote } from "lucide-react"
 import { describe, expect, it } from "vitest"
+import { FlowShapeSchema } from "@/model/flow/schema"
 import { toolId, viewFor } from "./registry"
 
 /**
@@ -65,9 +66,18 @@ describe("flowchart", () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it("le sei forme sono varianti dello strumento nodo, l'arco no", () => {
+  /**
+   * `every((t) => t.variant)` controllava solo che la stringa non fosse vuota, non che fosse una
+   * delle sei forme vere: un refuso in `flow.tsx` (es. `"decison"`) avrebbe compilato — `variant`
+   * è una stringa opaca per la giuntura, la interpreta solo `flowOps.addNode` (spec §3) — passato
+   * lint e questo test, e prodotto un nodo con `shapePath` fuori dallo switch esaustivo, cioè
+   * `undefined`: invisibile, e respinto da `FlowShapeSchema` al primo salvataggio. L'insieme delle
+   * varianti deve coincidere esattamente con le forme dello schema, non solo essere non vuoto.
+   */
+  it("le sei varianti del nodo sono esattamente le forme di FlowShapeSchema, l'arco non ne ha una", () => {
     const view = viewFor("flow")
-    expect(view.tools.filter((t) => t.tool === "node").every((t) => t.variant)).toBe(true)
+    const nodeVariants = view.tools.filter((t) => t.tool === "node").map((t) => t.variant)
+    expect(new Set(nodeVariants)).toEqual(new Set(FlowShapeSchema.options))
     expect(view.tools.filter((t) => t.tool === "edge")).toHaveLength(1)
   })
 })

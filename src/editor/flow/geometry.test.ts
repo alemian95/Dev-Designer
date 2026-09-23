@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
-import type { FlowDiagram, FlowNode } from "@/model/flow/schema"
-import { flowNodeSize, laneAt, shapePath } from "./geometry"
+import type { FlowDiagram, FlowEdge, FlowNode } from "@/model/flow/schema"
+import { routeEdge } from "../edge-routing"
+import type { Rect } from "../geometry"
+import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, shapePath } from "./geometry"
 
 const node = (over: Partial<FlowNode> = {}): FlowNode => ({ label: "Verifica", shape: "process", lane: "l1", ...over })
 
@@ -86,5 +88,35 @@ describe("laneAt", () => {
   it("fuori da ogni banda torna null: chi chiama decide, qui non si indovina", () => {
     expect(laneAt(d, -10)).toBeNull()
     expect(laneAt(d, 5000)).toBeNull()
+  })
+})
+
+describe("flowEdgeGeometry", () => {
+  // `y` diversi fra sorgente e bersaglio, non allineati: con due punti soli (linea retta) il primo
+  // segmento e quello centrale coincidono e la proprietà che questi test devono fissare — che
+  // l'etichetta sta sul *primo* segmento, non su quello centrale come in ER e classi (spec §8,
+  // docblock di `flowEdgeGeometry`) — non si distinguerebbe da un copia-incolla della formula di
+  // `edgeGeometry`. Con `y` diversi il router piega due volte e i due punti medi divergono davvero.
+  const source: Rect = { x: 0, y: 0, w: 100, h: 60 }
+  const target: Rect = { x: 300, y: 100, w: 100, h: 60 }
+  const edge = (over: Partial<FlowEdge> = {}): FlowEdge => ({ source: "a", target: "b", label: "", ...over })
+
+  it("l'etichetta cade sul punto medio del primo segmento, non di quello centrale", () => {
+    const route = routeEdge(source, target, false)
+    const p0 = route.points[0]!
+    const p1 = route.points[1]!
+    // Il percorso piega davvero: altrimenti il primo segmento e quello centrale coinciderebbero e
+    // il test passerebbe anche con la formula sbagliata.
+    expect(route.points.length).toBeGreaterThan(2)
+    const geo = flowEdgeGeometry(source, target, edge())
+    expect(geo.label).toEqual({ x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 })
+  })
+
+  it("due archi fra la stessa coppia ereditano offset diversi: le etichette non coincidono", () => {
+    const edges: Readonly<Record<string, FlowEdge>> = { e1: edge(), e2: edge() }
+    const offsets = flowEdgeOffsets(edges)
+    const g1 = flowEdgeGeometry(source, target, edges.e1!, offsets.get("e1") ?? 0)
+    const g2 = flowEdgeGeometry(source, target, edges.e2!, offsets.get("e2") ?? 0)
+    expect(g1.label).not.toEqual(g2.label)
   })
 })

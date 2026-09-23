@@ -3,7 +3,8 @@ import type { LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
 import { snap, type Point } from "../geometry"
-import { placeInLanes } from "./layout"
+import { flowNodeSize, laneAt } from "./geometry"
+import { LANE_PAD, placeInLanes } from "./layout"
 
 const DUPLICATE_OFFSET = 20
 
@@ -20,6 +21,50 @@ export function addFlowNode(at: Point, shape: FlowShape, lane: string): { key: s
       d.model.nodes[key] = { label: "", shape, lane }
       d.view.nodes[key] = { x: snap(at.x), y: snap(at.y), collapsed: false }
     },
+  }
+}
+
+/**
+ * Sposta i nodi come `moveNodes` (`commands/view.ts`) — stesso `snap`, stesso invariante "niente
+ * si muove" quando `dx`/`dy` sono entrambi zero — e in più guarda dove cade il **centro** di
+ * ognuno dopo lo spostamento: se `laneAt` torna una banda diversa da quella di partenza, la scrive
+ * nella stessa recipe, così posizione e corsia sono un solo passo di undo (spec §6).
+ *
+ * Se il centro cade fuori da ogni banda — sopra la prima o sotto l'ultima — la corsia di partenza
+ * non si tocca: la scrive `laneAt` solo quando trova una banda, quindi qui basta non chiamarla.
+ * La `y` però deve rientrare nella banda di partenza lo stesso, agganciata al bordo più vicino con
+ * `LANE_PAD` di margine (`flow/layout.ts`, lo stesso usato per impilare le righe di `placeInLanes`
+ * — un solo valore, non due che potrebbero divergere): un nodo fuori da ogni banda è uno stato che
+ * il modello non ammette (il refine di `FlowModelSchema`), non un caso da sistemare a valle.
+ */
+export function moveFlowNodes(keys: readonly string[], dx: number, dy: number): Recipe | null {
+  if (dx === 0 && dy === 0) return null
+  return (draft) => {
+    const d = flowDiagram(draft)
+    for (const key of keys) {
+      const node = d.model.nodes[key]
+      const view = d.view.nodes[key]
+      if (!node || !view) continue
+
+      view.x = snap(view.x + dx)
+      view.y = snap(view.y + dy)
+
+      const size = flowNodeSize(node)
+      const centerY = view.y + size.h / 2
+      const lane = laneAt(d, centerY)
+      if (lane !== null) {
+        node.lane = lane
+        continue
+      }
+
+      // Fuori da ogni banda: `node.lane` non è cambiato in questo giro, quindi è ancora la corsia
+      // di partenza — e per l'invariante dello schema esiste sempre in `model.lanes`. Se manca la
+      // sua banda in `view.lanes` (non dovrebbe: le due mappe sono tenute allineate da
+      // `restackLanes`) non c'è nulla a cui agganciare la y, quindi si lascia dov'è.
+      const band = d.view.lanes[node.lane]
+      if (!band) continue
+      view.y = centerY < band.y ? snap(band.y + LANE_PAD) : snap(band.y + band.h - LANE_PAD - size.h)
+    }
   }
 }
 

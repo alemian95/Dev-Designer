@@ -1,6 +1,6 @@
 import type { DevDocument } from "@/model/document"
 import type { FlowShape } from "@/model/flow/schema"
-import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes } from "../flow/commands"
+import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes, moveFlowNodes } from "../flow/commands"
 import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, laneAt } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
 import { flowLayoutGraph } from "../flow/layout"
@@ -11,7 +11,9 @@ import type { DiagramOps, EdgeEnds } from "./ops"
  * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `edgeGeometry` è cablato su `flowEdgeGeometry`
  * (`flow/geometry.ts`), sulla stessa forma di `erOps.edgeGeometry` (`kinds/er.ts:34-38`): lo scarto
  * di fascio si legge dal modello intero, non si passa dal chiamante, perché dipende da *tutti* gli
- * archi. `validate` resta stub: aspetta le regole di validazione del Task 9, non la geometria.
+ * archi. `commitDrag` è l'unico tipo di diagramma che lo implementa (spec §6): ER e class restano
+ * senza, e il runner cade su `moveNodes` per loro esattamente come prima. `validate` resta stub:
+ * aspetta le regole di validazione del Task 9, non la geometria.
  */
 export function flowOps(doc: DevDocument): DiagramOps {
   const diagram = () => flowDiagram(doc)
@@ -46,6 +48,8 @@ export function flowOps(doc: DevDocument): DiagramOps {
     },
 
     addEdge: (source, target) => addFlowEdge(diagram().model, source, target),
+
+    commitDrag: (keys, dx, dy) => moveFlowNodes(keys, dx, dy),
 
     deleteItems: (nodeKeys, edgeKeys) => deleteFlowItems(nodeKeys, edgeKeys),
 

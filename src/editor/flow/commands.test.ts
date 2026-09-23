@@ -1,7 +1,7 @@
 import { produce } from "immer"
 import { describe, expect, it } from "vitest"
 import type { DevDocument } from "@/model/document"
-import { createFlowDocument, type FlowModel } from "@/model/flow/schema"
+import { createFlowDocument, type FlowDiagram, type FlowModel } from "@/model/flow/schema"
 import {
   addFlowEdge,
   addFlowNode,
@@ -10,6 +10,7 @@ import {
   deleteFlowItems,
   deleteLane,
   duplicateFlowNodes,
+  moveFlowNodes,
   moveLane,
   renameLane,
   setEdgeLabel,
@@ -284,5 +285,61 @@ describe("applyFlowLayout", () => {
     // Le bande, non solo le posizioni: la stessa applicazione riscrive entrambe.
     expect(d.view.lanes[l1]).toBeDefined()
     expect(d.view.lanes[l2]!.y).toBe(d.view.lanes[l1]!.h)
+  })
+})
+
+/** Due corsie: `l1` da 0 a 100, `l2` da 100 a 200. Bande scritte a mano, non calcolate. */
+function dueCorsie(): { doc: DevDocument; l1: string; l2: string } {
+  const base = createFlowDocument("test", "id-1")
+  const l1 = base.diagram.model.lanes[0]!.id
+  const doc = produce(base, (d) => {
+    const f = d.diagram as FlowDiagram
+    f.model.lanes.push({ id: "l2", name: "Seconda" })
+    f.view.lanes = { [l1]: { y: 0, h: 100 }, l2: { y: 100, h: 100 } }
+  })
+  return { doc, l1, l2: "l2" }
+}
+
+const flow = (doc: DevDocument): FlowDiagram => {
+  if (doc.diagram.type !== "flow") throw new Error("tipo sbagliato")
+  return doc.diagram
+}
+
+describe("moveFlowNodes", () => {
+  it("un nodo trascinato in un'altra banda cambia corsia", () => {
+    const { doc, l1, l2 } = dueCorsie()
+    const n = addFlowNode({ x: 0, y: 20 }, "process", l1)
+    const conNodo = produce(doc, n.recipe)
+    const next = produce(conNodo, moveFlowNodes([n.key], 0, 100)!)
+    expect(flow(next).model.nodes[n.key]!.lane).toBe(l2)
+    expect(flow(next).view.nodes[n.key]!.y).toBe(120)
+  })
+
+  it("un nodo lasciato fuori da ogni banda resta nella sua corsia e ci rientra", () => {
+    const { doc, l1 } = dueCorsie()
+    const n = addFlowNode({ x: 0, y: 20 }, "process", l1)
+    const conNodo = produce(doc, n.recipe)
+    const next = produce(conNodo, moveFlowNodes([n.key], 0, -500)!)
+    expect(flow(next).model.nodes[n.key]!.lane).toBe(l1)
+    const y = flow(next).view.nodes[n.key]!.y
+    expect(y).toBeGreaterThanOrEqual(0)
+    expect(y).toBeLessThan(100)
+  })
+
+  it("trascinando più nodi insieme, ognuno prende la corsia dove cade lui", () => {
+    const { doc, l1, l2 } = dueCorsie()
+    const a = addFlowNode({ x: 0, y: 20 }, "process", l1)
+    const b = addFlowNode({ x: 0, y: 60 }, "process", l1)
+    const conNodi = produce(produce(doc, a.recipe), b.recipe)
+    // +50: `a` da 20 a 70 resta in l1, `b` da 60 a 110 passa in l2.
+    const next = produce(conNodi, moveFlowNodes([a.key, b.key], 0, 50)!)
+    expect(flow(next).model.nodes[a.key]!.lane).toBe(l1)
+    expect(flow(next).model.nodes[b.key]!.lane).toBe(l2)
+  })
+
+  it("un trascinamento che non muove né posizione né corsia non lascia una voce di undo", () => {
+    const { l1 } = dueCorsie()
+    const n = addFlowNode({ x: 0, y: 20 }, "process", l1)
+    expect(moveFlowNodes([n.key], 0, 0)).toBeNull()
   })
 })

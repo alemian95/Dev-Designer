@@ -36,6 +36,13 @@ export interface DiagramOps {
    *  invece un ancoraggio (`note-link`, spec note ancorate §4). L'ER non ha note e continua a
    *  tornare sempre un valore. */
   addEdge(source: string, target: string): { key: string; recipe: Recipe } | null
+  /**
+   * Sostituisce la dispatch predefinita `moveNodes(keys, dx, dy)` al rilascio del drag, quando c'è.
+   * Serve al flowchart, che al commit scrive anche la corsia (spec §6): posizione e corsia in una
+   * sola recipe, un solo passo di undo. Durante il gesto non cambia niente — questo non è nel
+   * percorso di `pointermove`, solo in quello di rilascio (`interaction-runner.ts`, `commit-drag`).
+   */
+  commitDrag?(keys: readonly string[], dx: number, dy: number): Recipe | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
   layoutGraph(): LayoutGraph

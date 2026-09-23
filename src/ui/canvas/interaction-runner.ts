@@ -149,7 +149,8 @@ export function createInteractionRunner(): InteractionRunner {
         previewDrag(dragTargets, fx.dx, fx.dy)
         break
       case "commit-drag": {
-        const recipe = moveNodes(fx.keys, fx.dx, fx.dy)
+        const ops = opsFor(documentStore.getState().doc)
+        const recipe = ops.commitDrag ? ops.commitDrag(fx.keys, fx.dx, fx.dy) : moveNodes(fx.keys, fx.dx, fx.dy)
         if (recipe) documentStore.getState().dispatch(recipe)
         break
       }

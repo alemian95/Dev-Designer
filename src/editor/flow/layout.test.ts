@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { FlowDiagram } from "@/model/flow/schema"
 import { LANE_MIN_H } from "@/model/flow/schema"
-import { flowLayoutGraph, placeInLanes } from "./layout"
+import { flowLayoutGraph, keepNodeInBand, LANE_PAD, placeInLanes } from "./layout"
 
 const node = (lane: string) => ({ label: "x", shape: "process" as const, lane })
 
@@ -98,6 +98,29 @@ describe("placeInLanes", () => {
     const { positions, lanes } = placeInLanes(d, { a: { x: 0, y: 0 } })
     expect(positions.a).toBeUndefined()
     expect(lanes.l1!.h).toBe(LANE_MIN_H)
+  })
+})
+
+describe("keepNodeInBand", () => {
+  const band = { y: 100, h: 100 }
+
+  it("lascia stare una y già dentro i margini", () => {
+    expect(keepNodeInBand(band, 40, 130)).toBe(130)
+  })
+
+  it("riaggancia sopra la banda al margine superiore", () => {
+    expect(keepNodeInBand(band, 40, -500)).toBe(band.y + LANE_PAD)
+  })
+
+  it("riaggancia sotto la banda al margine inferiore", () => {
+    expect(keepNodeInBand(band, 40, 500)).toBe(band.y + band.h - LANE_PAD - 40)
+  })
+
+  it("una banda troppo piccola per i due margini si ripiega sul centro invece di invertire l'intervallo", () => {
+    const piccola = { y: 0, h: 40 }
+    // 2×LANE_PAD (40) + nodeH (20) = 60 > h (40): l'intervallo [min, max] è vuoto (max < min).
+    // Un clamp che non guardasse questo caso tornerebbe `max` (0), non il centro (10).
+    expect(keepNodeInBand(piccola, 20, 999)).toBe(10)
   })
 })
 

@@ -1,5 +1,7 @@
 import { produce } from "immer"
 import { describe, expect, it } from "vitest"
+import { expectLaneInvariant } from "@/editor/flow/lane-invariant"
+import { flowNodeSize } from "@/editor/flow/geometry"
 import type { DevDocument } from "@/model/document"
 import { createFlowDocument, type FlowDiagram } from "@/model/flow/schema"
 import { opsFor } from "./ops"
@@ -74,6 +76,53 @@ describe("flowOps", () => {
     const { key, recipe } = opsFor(doc).addNode({ x: 0, y: 0 }, "process")
     const next = produce(doc, recipe)
     expect(opsFor(next).addEdge(key, "fantasma")).toBeNull()
+  })
+})
+
+/**
+ * C1 (brief della correzione finale): un click fuori da ogni banda non deve più lanciare — da
+ * quando `laneAt` è reale, `null` è il caso normale (sopra la prima banda, o sotto l'ultima di un
+ * documento con un'unica corsia di 160px). La corsia si decide dal punto del click, poi il nodo
+ * rientra nella banda scelta. Questi test vanno in RED sull'implementazione che lancia su `null`.
+ */
+describe("addNode: C1 — fuori da ogni banda risolve alla corsia più vicina, e il nodo vi rientra", () => {
+  it("un click sopra la prima banda risolve alla prima corsia", () => {
+    const { doc, l1 } = dueCorsie()
+    const { key, recipe } = opsFor(doc).addNode({ x: 0, y: -50 }, "process")
+    const next = produce(doc, recipe)
+    expect(laneOf(next, key)).toBe(l1)
+    const d = next.diagram
+    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    expectLaneInvariant(d)
+  })
+
+  it("un click sotto l'ultima banda risolve all'ultima corsia", () => {
+    const { doc, l2 } = dueCorsie()
+    const { key, recipe } = opsFor(doc).addNode({ x: 0, y: 250 }, "process")
+    const next = produce(doc, recipe)
+    expect(laneOf(next, key)).toBe(l2)
+    const d = next.diagram
+    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    expectLaneInvariant(d)
+  })
+
+  /**
+   * L'esempio esatto del brief: un click a y=150 nell'unica banda di un documento nuovo ([0,160)).
+   * Senza il rientro il nodo (h=40) finirebbe a [150,190), a cavallo del bordo della banda — qui
+   * deve restare interamente dentro.
+   */
+  it("un click vicino al bordo inferiore di una banda non fa sconfinare il nodo nella successiva", () => {
+    const doc = createFlowDocument("test", "id-1")
+    const lane = doc.diagram.model.lanes[0]!.id
+    const { key, recipe } = opsFor(doc).addNode({ x: 0, y: 150 }, "process")
+    const next = produce(doc, recipe)
+    const d = next.diagram
+    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    expect(laneOf(next, key)).toBe(lane)
+    const view = d.view.nodes[key]!
+    const size = flowNodeSize(d.model.nodes[key]!)
+    expect(view.y + size.h).toBeLessThanOrEqual(160)
+    expectLaneInvariant(d)
   })
 })
 

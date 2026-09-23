@@ -1,10 +1,30 @@
 import { LANE_MIN_H, type FlowDiagram, type LaneView } from "@/model/flow/schema"
 import type { LayoutEdge, LayoutGraph, LayoutNode, LayoutPositions } from "@/model/layout"
+import { snap } from "../geometry"
 import { flowNodeSize } from "./geometry"
 
 export const LANE_PAD = 20
 export const ROW_GAP = 24
 export const COL_GAP = 24
+
+/**
+ * Riporta `y` dentro `band`, rispettando `LANE_PAD` sopra e sotto l'ingombro del nodo (altezza
+ * `nodeH`): **l'unico posto** che scrive questa formula — prima era duplicata fra il fallback di
+ * `moveFlowNodes` e `setNodeLane` (`flow/commands.ts`), con lo stesso rischio SSOT di ogni
+ * logica scritta due volte. La usa anche `addNode` (`kinds/flow.ts`, C1), `setNodeShape` e
+ * `duplicateFlowNodes` (`flow/commands.ts`), e il rientro dei nodi orfani in `deleteLane` (C2):
+ * ogni punto in cui un comando può lasciare un nodo a cavallo o fuori dalla sua banda.
+ *
+ * Se la banda è troppo bassa per contenere il nodo coi due margini — un caso degenere, una corsia
+ * quasi vuota con un nodo enorme — l'intervallo `[min, max]` si inverte: si ripiega sul centro
+ * della banda invece di tornare un valore fuori da qualunque intervallo sensato.
+ */
+export function keepNodeInBand(band: LaneView, nodeH: number, y: number): number {
+  const min = band.y + LANE_PAD
+  const max = band.y + band.h - LANE_PAD - nodeH
+  if (max < min) return snap(band.y + (band.h - nodeH) / 2)
+  return snap(Math.min(Math.max(y, min), max))
+}
 
 /**
  * Traduce il diagramma nel grafo da disporre, sulla forma di `commands/layout.ts` (ER): i nodi

@@ -19,6 +19,7 @@ import {
   setNodeShape,
 } from "./commands"
 import { flowNodeSize } from "./geometry"
+import { expectLaneInvariant } from "./lane-invariant"
 import { LANE_PAD } from "./layout"
 import { snap } from "@/editor/geometry"
 
@@ -141,6 +142,24 @@ describe("setNodeShape", () => {
     const d = next.diagram
     if (d.type !== "flow") throw new Error("tipo sbagliato")
     expect(d.model.nodes[n.key]).toEqual({ label: "", shape: "decision", lane })
+    expectLaneInvariant(d)
+  })
+
+  /**
+   * Stessa famiglia di C1/C2 (brief, "minori — stesso helper"): una decisione è circa il doppio
+   * del rettangolo omologo (`DECISION_FACTOR`), quindi il cambio di forma può far uscire il
+   * centro del nodo dalla banda. `y: 130` con un `process` vuoto (`h: 40`) tiene il centro (150)
+   * dentro l'unica banda di default ([0, 160)); diventato `decision` (`h: 80`) il centro salirebbe
+   * a 170, fuori da ogni banda — RED sull'implementazione che scrive `node.shape` e basta.
+   */
+  it("il cambio di forma che allarga il nodo lo fa rientrare nella banda", () => {
+    const { doc, lane } = docWith()
+    const n = addFlowNode({ x: 0, y: 130 }, "process", lane)
+    const next = apply(apply(doc, n.recipe), setNodeShape(n.key, "decision"))
+    const d = fd(next)
+    // Banda [0,160): con h=80 l'intervallo utile è [20, 160-20-80] = [20, 60], quindi 130 rientra a 60.
+    expect(d.view.nodes[n.key]!.y).toBe(60)
+    expectLaneInvariant(d)
   })
 })
 
@@ -167,6 +186,7 @@ describe("setNodeLane", () => {
     const view = d.view.nodes[n.key]!
     const size = flowNodeSize(d.model.nodes[n.key]!)
     expect(view.y).toBe(snap(band.y + band.h / 2 - size.h / 2))
+    expectLaneInvariant(d)
   })
 
   it("non fa nulla quando la corsia data è già quella del nodo", () => {
@@ -189,6 +209,24 @@ describe("setEdgeLabel", () => {
     next = apply(next, e.recipe)
     next = apply(next, setEdgeLabel(e.key, "sì"))
     expect(fd(next).model.edges[e.key]!.label).toBe("sì")
+  })
+
+  /**
+   * Regola di dominio spostata dal doppio click (`InlineEditor.tsx`) al comando (minori del brief):
+   * un'etichetta di soli spazi deve valere "nessuna etichetta", altrimenti zittisce silenziosamente
+   * `flow-branch-unlabeled` (`model/flow/validate.ts:71`, confronta `edge.label === ""`).
+   */
+  it("scarta gli spazi ai margini: un'etichetta di soli spazi diventa vuota", () => {
+    const { doc, lane } = docWith()
+    const a = addFlowNode({ x: 0, y: 0 }, "decision", lane)
+    const b = addFlowNode({ x: 200, y: 0 }, "process", lane)
+    let next = apply(apply(doc, a.recipe), b.recipe)
+    const e = addFlowEdge(fd(next).model, a.key, b.key)!
+    next = apply(next, e.recipe)
+    next = apply(next, setEdgeLabel(e.key, "  sì  "))
+    expect(fd(next).model.edges[e.key]!.label).toBe("sì")
+    next = apply(next, setEdgeLabel(e.key, "   "))
+    expect(fd(next).model.edges[e.key]!.label).toBe("")
   })
 })
 
@@ -267,6 +305,110 @@ describe("restackLanes: la y di una banda è una conseguenza dell'ordine e delle
   })
 })
 
+/**
+ * C2: `restackLanes` ricalcola solo la `y` delle bande — i nodi restavano dov'erano, disegnati
+ * nella corsia sbagliata dopo `moveLane` e a volte fuori da ogni banda dopo `deleteLane` (perdita
+ * di dato: `node.lane` veniva riscritto sulla corsia sbagliata al primo drag). Questi test vanno
+ * in RED sull'implementazione che si limita a spostare le bande senza toccare `view.nodes`.
+ */
+describe("C2 — i comandi di corsia spostano anche i nodi, non solo le bande", () => {
+  it("moveLane trasla i nodi della corsia spostata — non li riallinea né li ricentra", () => {
+    const { doc, lane: a } = docWith()
+    let next = apply(doc, addLane("B"))
+    const b = fd(next).model.lanes[1]!.id
+    // Bande di altezza diversa, scritte a mano: un'implementazione che *clampasse* i nodi nella
+    // banda nuova invece di traslarli passerebbe comunque l'invariante di corsia, ma non questo
+    // test — la distanza relativa fra i due nodi di `a` deve restare esattamente 40.
+    next = apply(next, (draft) => {
+      const f = fd(draft)
+      f.view.lanes[a] = { y: 0, h: 100 }
+      f.view.lanes[b] = { y: 100, h: 200 }
+    })
+    const n1 = addFlowNode({ x: 0, y: 20 }, "process", a)
+    const n2 = addFlowNode({ x: 50, y: 60 }, "process", a)
+    next = apply(apply(next, n1.recipe), n2.recipe)
+
+    next = apply(next, moveLane(0, 1)) // "a" passa dopo "b"
+    const d = fd(next)
+    // "a" ora sta sotto "b" (h=200): la sua banda parte da 200, delta = 200 − 0.
+    expect(d.view.lanes[a]!.y).toBe(200)
+    expect(d.view.nodes[n1.key]!.y).toBe(20 + 200)
+    expect(d.view.nodes[n2.key]!.y).toBe(60 + 200)
+    expect(d.view.nodes[n2.key]!.y - d.view.nodes[n1.key]!.y).toBe(40)
+    expectLaneInvariant(d)
+  })
+
+  it("moveLane con tre corsie e nodi in ognuna: l'invariante vale dopo lo spostamento", () => {
+    const { doc, lane: a } = docWith()
+    let next = apply(doc, addLane("B"))
+    next = apply(next, addLane("C"))
+    const b = fd(next).model.lanes[1]!.id
+    const c = fd(next).model.lanes[2]!.id
+    const na = addFlowNode({ x: 0, y: 0 }, "process", a)
+    const nb = addFlowNode({ x: 0, y: 0 }, "decision", b)
+    const nc = addFlowNode({ x: 0, y: 0 }, "process", c)
+    next = apply(apply(apply(next, na.recipe), nb.recipe), nc.recipe)
+    // Ogni nodo dentro la banda della propria corsia, non tutti a y=0: le bande di B e C non
+    // partono dall'origine (default 160px ciascuna), quindi senza questo l'invariante sarebbe
+    // già rotta *prima* di `moveLane`, e il test non proverebbe niente sul comando.
+    next = apply(next, (draft) => {
+      const f = fd(draft)
+      f.view.nodes[na.key]!.y = f.view.lanes[a]!.y + LANE_PAD
+      f.view.nodes[nb.key]!.y = f.view.lanes[b]!.y + LANE_PAD
+      f.view.nodes[nc.key]!.y = f.view.lanes[c]!.y + LANE_PAD
+    })
+    // Ordine invertito: C in testa, A in coda.
+    next = apply(next, moveLane(2, 0))
+    expectLaneInvariant(fd(next))
+  })
+
+  it("deleteLane: i nodi della corsia cancellata rientrano nella banda di destinazione", () => {
+    const { doc } = docWith()
+    let next = apply(doc, addLane("B"))
+    next = apply(next, addLane("C"))
+    const b = fd(next).model.lanes[1]!.id
+    const c = fd(next).model.lanes[2]!.id
+    // Il nodo di C, la terza corsia (banda [320, 480) coi minimi di default), a y=0: fuori da ogni
+    // banda finché C esiste — è la posizione che un nodo creato "a mano" nei test può avere, e che
+    // il brief cita come il caso concreto («il nodo di C resta a y=360, fuori da tutto»).
+    const nc = addFlowNode({ x: 0, y: 0 }, "process", c)
+    next = apply(next, nc.recipe)
+    next = apply(next, deleteLane(fd(next).model, c, b)!)
+    const d = fd(next)
+    expect(d.model.nodes[nc.key]!.lane).toBe(b)
+    expectLaneInvariant(d)
+  })
+
+  it("deleteLane con nodi in più corsie: l'invariante vale su tutte, non solo su quella spostata", () => {
+    const { doc, lane: a } = docWith()
+    let next = apply(doc, addLane("B"))
+    next = apply(next, addLane("C"))
+    const b = fd(next).model.lanes[1]!.id
+    const c = fd(next).model.lanes[2]!.id
+    const na = addFlowNode({ x: 0, y: 0 }, "process", a)
+    const nb = addFlowNode({ x: 0, y: 0 }, "process", b)
+    const nc = addFlowNode({ x: 0, y: 0 }, "decision", c)
+    next = apply(apply(apply(next, na.recipe), nb.recipe), nc.recipe)
+    // Ogni nodo dentro la propria banda, scritto a mano come nelle altre `dueCorsie`.
+    next = apply(next, (draft) => {
+      const f = fd(draft)
+      f.view.nodes[na.key]!.y = f.view.lanes[a]!.y + LANE_PAD
+      f.view.nodes[nb.key]!.y = f.view.lanes[b]!.y + LANE_PAD
+      f.view.nodes[nc.key]!.y = f.view.lanes[c]!.y + LANE_PAD
+    })
+    next = apply(next, deleteLane(fd(next).model, b, a)!)
+    expectLaneInvariant(fd(next))
+  })
+
+  it("addLane con nodi in corsie esistenti: le bande esistenti non si spostano, l'invariante resta valida", () => {
+    const { doc, lane: a } = docWith()
+    const n = addFlowNode({ x: 0, y: LANE_PAD }, "process", a)
+    let next = apply(doc, n.recipe)
+    next = apply(next, addLane("B"))
+    expectLaneInvariant(fd(next))
+  })
+})
+
 describe("duplicateFlowNodes", () => {
   it("copia i nodi con l'offset, nella stessa corsia", () => {
     const { doc, lane } = docWith()
@@ -281,6 +423,26 @@ describe("duplicateFlowNodes", () => {
     expect(d.view.nodes[copyKey]).toEqual({ x: 30, y: 30, collapsed: false })
     // L'originale resta intatto.
     expect(d.model.nodes[n.key]).toEqual({ label: "", shape: "process", lane })
+    expectLaneInvariant(d)
+  })
+
+  /**
+   * `DUPLICATE_OFFSET` (20px) può spingere la copia fuori dalla banda: qui il nodo parte già
+   * vicino al bordo inferiore (y=90, banda di default [0,160), h=40 → intervallo utile [20,100]),
+   * quindi +20 la porterebbe a 110, oltre il margine. RED sull'implementazione che copia `view.y`
+   * senza controllo.
+   */
+  it("la copia che esce dalla banda per l'offset ci rientra, restando nella stessa corsia", () => {
+    const { doc, lane } = docWith()
+    const n = addFlowNode({ x: 10, y: 90 }, "process", lane)
+    const next = apply(doc, n.recipe)
+    const { keys, recipe } = duplicateFlowNodes(fd(next).model, [n.key])
+    const after = apply(next, recipe)
+    const d = fd(after)
+    const copyKey = keys[0]!
+    expect(d.view.nodes[copyKey]!.y).toBe(100)
+    expect(d.model.nodes[copyKey]!.lane).toBe(lane)
+    expectLaneInvariant(d)
   })
 })
 
@@ -348,6 +510,7 @@ describe("moveFlowNodes", () => {
     const next = produce(conNodo, moveFlowNodes([n.key], 0, 100)!)
     expect(flow(next).model.nodes[n.key]!.lane).toBe(l2)
     expect(flow(next).view.nodes[n.key]!.y).toBe(120)
+    expectLaneInvariant(flow(next))
   })
 
   it("un nodo lasciato fuori da ogni banda resta nella sua corsia e ci rientra", () => {
@@ -366,6 +529,7 @@ describe("moveFlowNodes", () => {
     // patch. `dispatch` la scarterebbe (`document-store.ts:42`), e senza il ripristino del DOM al
     // rilascio (`interaction-runner.ts`, `resetDragTargets`) l'anteprima resterebbe scritta lì.
     expect(patches).toHaveLength(0)
+    expectLaneInvariant(flow(next))
   })
 
   it("un nodo fuori da ogni banda, con una y di partenza diversa dal margine, ci rientra comunque — e stavolta la recipe produce patch", () => {
@@ -380,6 +544,7 @@ describe("moveFlowNodes", () => {
     expect(flow(next).model.nodes[n.key]!.lane).toBe(l1)
     expect(flow(next).view.nodes[n.key]!.y).toBe(LANE_PAD)
     expect(patches.length).toBeGreaterThan(0)
+    expectLaneInvariant(flow(next))
   })
 
   it("il bordo superiore e il centro possono cadere in bande diverse: decide il centro", () => {
@@ -392,6 +557,7 @@ describe("moveFlowNodes", () => {
     // del brief) passerebbe qui con la corsia sbagliata.
     const next = produce(conNodo, moveFlowNodes([n.key], 0, 40)!)
     expect(flow(next).model.nodes[n.key]!.lane).toBe(l2)
+    expectLaneInvariant(flow(next))
   })
 
   it("un rilascio sotto l'ultima corsia, partendo dalla prima, resta nella prima e rientra dal basso", () => {
@@ -405,6 +571,7 @@ describe("moveFlowNodes", () => {
     const next = produce(conNodo, moveFlowNodes([n.key], 0, 1000)!)
     expect(flow(next).model.nodes[n.key]!.lane).toBe(l1)
     expect(flow(next).view.nodes[n.key]!.y).toBe(40)
+    expectLaneInvariant(flow(next))
   })
 
   it("trascinando più nodi insieme, ognuno prende la corsia dove cade lui", () => {
@@ -416,6 +583,7 @@ describe("moveFlowNodes", () => {
     const next = produce(conNodi, moveFlowNodes([a.key, b.key], 0, 50)!)
     expect(flow(next).model.nodes[a.key]!.lane).toBe(l1)
     expect(flow(next).model.nodes[b.key]!.lane).toBe(l2)
+    expectLaneInvariant(flow(next))
   })
 
   it("un trascinamento che non muove né posizione né corsia non lascia una voce di undo", () => {

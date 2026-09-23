@@ -19,12 +19,28 @@ const dispatch = (recipe: Recipe | null) => {
 function FlowNodeProperties({ nodeKey: key }: { nodeKey: string }) {
   const node = useStore(documentStore, (s) => flowDiagram(s.doc).model.nodes[key])
   const lanes = useStore(documentStore, useShallow((s) => flowDiagram(s.doc).model.lanes))
+  // Come `NoteProperties` (`ClassProperties.tsx`): finché il doppio click ha aperto `FlowNodeEditor`
+  // su *questo* nodo, il campo qui va in sola lettura — l'editor sul canvas è quello che l'utente
+  // sta guardando, due campi modificabili per lo stesso dato divergerebbero.
+  const editingHere = useStore(sessionStore, (s) => s.editing?.key === key && s.editing.target === "body")
   if (!node) return null
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="grid gap-1">
         <Label htmlFor="flow-node-label">Etichetta</Label>
-        <CommitInput key={node.label} id="flow-node-label" value={node.label} onCommit={(label) => dispatch(setNodeLabel(key, label))} />
+        {/* `textarea`, non `CommitInput`: l'etichetta di un nodo è multiriga per costruzione
+         *  (`FlowNode.tsx` la spezza su `\n`, `flowNodeSize` la misura su quelle righe). Un
+         *  `<input>` a una riga sanitizza gli a capo fuori dal valore appena l'utente lo tocca —
+         *  perdita silenziosa di dati, non solo estetica. Stessa forma di `NoteProperties`. */}
+        <textarea
+          id="flow-node-label"
+          key={node.label}
+          defaultValue={node.label}
+          readOnly={editingHere}
+          onBlur={(e) => dispatch(setNodeLabel(key, e.currentTarget.value))}
+          className="min-h-16 resize-none rounded-md border bg-background p-2 text-sm read-only:opacity-50"
+        />
+        {editingHere && <p className="text-xs text-muted-foreground">Modifica in corso sul canvas.</p>}
       </div>
       <div className="grid gap-1">
         <Label htmlFor="flow-node-shape">Forma</Label>
@@ -124,8 +140,8 @@ function LaneRow({ model, lane, index, nodeCount }: { model: FlowModel; lane: Fl
       <div className="flex items-center gap-1">
         <CommitInput key={lane.name} value={lane.name} aria-label={`Nome corsia ${index + 1}`} onCommit={(name) => dispatch(renameLane(lane.id, name))} className="h-7 text-xs" />
         <span className="ml-auto flex">
-          <Button variant="ghost" size="icon" className="size-6" disabled={index === 0} aria-label="Sposta su" onClick={() => dispatch(moveLane(index, index - 1))}><ArrowUp /></Button>
-          <Button variant="ghost" size="icon" className="size-6" disabled={index === model.lanes.length - 1} aria-label="Sposta giù" onClick={() => dispatch(moveLane(index, index + 1))}><ArrowDown /></Button>
+          <Button variant="ghost" size="icon" className="size-6" disabled={index === 0} aria-label={`Sposta su ${lane.name}`} onClick={() => dispatch(moveLane(index, index - 1))}><ArrowUp /></Button>
+          <Button variant="ghost" size="icon" className="size-6" disabled={index === model.lanes.length - 1} aria-label={`Sposta giù ${lane.name}`} onClick={() => dispatch(moveLane(index, index + 1))}><ArrowDown /></Button>
           <Button variant="ghost" size="icon" className="size-6" disabled={!canDelete} aria-label={`Elimina corsia ${lane.name}`} onClick={startDelete}><Trash2 /></Button>
         </span>
       </div>
@@ -168,7 +184,10 @@ export function FlowLanesPanel() {
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex items-center justify-between">
-        <Label>Corsie</Label>
+        {/* Titolo di sezione, non un'etichetta di campo: `<Label>` di Radix è un `<label>` HTML e
+         *  senza `htmlFor` non è associato a nessun controllo. `IssuesPanel.tsx` titola il proprio
+         *  pannello con un `<h2>` per lo stesso motivo — stessa forma qui. */}
+        <h2 className="text-xs font-semibold uppercase text-muted-foreground">Corsie</h2>
         <Button variant="outline" size="sm" onClick={() => dispatch(addLane(nextLaneName(model.lanes)))}><Plus /> Aggiungi</Button>
       </div>
       <ul className="flex flex-col gap-2">

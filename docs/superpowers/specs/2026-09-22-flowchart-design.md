@@ -399,6 +399,14 @@ Due punti da sorvegliare, entrambi nuovi:
 Il generatore di documenti sintetici (`src/perf/stress.ts`) va esteso a produrre
 un flowchart, altrimenti il gate misura il flowchart con un ER.
 
+**Non rimisurato**, per decisione esplicita di chi ha commissionato il lavoro:
+il passo 3 (estendere `stress.ts`) e il passo 4 (rieseguire `pnpm perf`) sono
+stati cancellati dal piano, sia nella consegna originale sia nella correzione
+finale che l'ha seguita. Il numero di riferimento resta la baseline del
+2026-09-22, che per costruzione non dice niente su un flowchart vero — voce di
+debito in `docs/debito-tecnico.md`, «Flowchart (2026-09-23)», «Il flowchart non
+è nel gate di prestazione».
+
 ## 14. Domande chiuse durante il brainstorming
 
 - Uso primario → **ragionare su branching** e **processi di business** insieme;

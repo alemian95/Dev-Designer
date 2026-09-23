@@ -1166,6 +1166,40 @@ stesso momento in cui si decide**, non quando il piano chiude.
   decisione con due rami ravvicinati — leggibilità, non un dato sbagliato nel
   modello.
 
+### Correzione finale del flowchart (2026-09-23)
+
+Trovate durante il giro di correzione che ha chiuso C1/C2/I1/I2 (registro:
+`.superpowers/sdd/2026-09-22-flowchart/final-fix-report.md`), non corrette
+in quel giro per decisione esplicita del brief — fuori scopo, non
+dimenticanza.
+
+- **L'editor dell'etichetta d'arco è centrato su `label.y` con `FONT_SIZE`,
+  il testo è disegnato a `label.y - 6` con font 11.** `FlowEdgeLabelEditor`
+  (`src/ui/canvas/InlineEditor.tsx`) posiziona l'`<input>` sul punto
+  etichetta usando `HEADER_H`/`FONT_SIZE` (13px), come gli editor di nome
+  di entità e classi; `FlowEdgeView` (`src/ui/canvas/FlowEdge.tsx`) disegna
+  il `<text>` a `y - 6` con `fontSize={11}` — due misure scelte a parte per
+  lo stesso punto, mai riconciliate. Lo scarto è di qualche pixel verticale
+  fra dove l'editor appare e dove il testo statico si legge subito dopo
+  averlo chiuso. Costo-se-sbagliato: cosmetico — un salto minimo alla
+  chiusura dell'editor, non un dato sbagliato.
+- **`applyFlowLayout` non fa `snap` alla griglia come `applyLayout`.**
+  `applyLayout` (`src/editor/commands/view.ts`) allinea alla griglia ogni
+  posizione scritta da un layout (`node.x = snap(p.x - minX + MARGIN)`);
+  `applyFlowLayout` (`src/editor/flow/commands.ts`) scrive `p.x`/`p.y` così
+  come li calcola `placeInLanes` (`src/editor/flow/layout.ts`), senza
+  `snap`. Dopo «Disponi» i nodi di un flowchart possono finire fuori
+  griglia, e il primo trascinamento li fa saltare di qualche pixel per
+  allinearsi — lo stesso sintomo che il docblock di `applyLayout` descrive
+  per il caso che quella funzione previene. `fitToContent`
+  (`src/editor/actions.ts`) ha un limite gemello: usa solo `ops.rectOf` di
+  ogni nodo, ignorando le bande delle corsie (`laneBandExtent`) — un
+  flowchart con una corsia più larga dei nodi che contiene (I1) o una banda
+  vuota sotto `LANE_MIN_W` può centrare la vista senza inquadrare tutta la
+  corsia. Costo-se-sbagliato: un salto di pochi pixel al primo drag dopo
+  «Disponi», e una vista che non inquadra una corsia larga o vuota fino al
+  primo zoom manuale — nessuno dei due perde un dato.
+
 ---
 
 ## Perduto

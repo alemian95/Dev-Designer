@@ -70,7 +70,8 @@ si perde niente.
 
 | | |
 |---|---|
-| `V` · `E`/`C` · `R` · `N` | selezione · nodo (entità/classe) · relazione · nota (solo classi) |
+| `V` · `E` · `R` | selezione (ogni tipo) · entità · relazione (ER) |
+| `C` · `I` · `E` · `R` · `N` | classe · interfaccia · enum · relazione · nota (class diagram) |
 | `1`..`6` · `R` | forma del nodo di flowchart (terminale, processo, decisione, input/output, sottoprocesso, nota) · arco |
 | `F` · `L` | inquadra tutto · disponi |
 | `⌘Z` · `⇧⌘Z` / `⌘Y` · `⌘D` · `⌫` | annulla · ripeti · duplica · elimina |

@@ -1,4 +1,4 @@
-import { Box, Spline, Square, StickyNote } from "lucide-react"
+import { Box, ListOrdered, Spline, Square, SquareDashed, StickyNote } from "lucide-react"
 import { describe, expect, it } from "vitest"
 import { FlowShapeSchema } from "@/model/flow/schema"
 import { toolId, viewFor } from "./registry"
@@ -36,6 +36,8 @@ describe("viewFor", () => {
     ])
     expect(cls.tools).toEqual([
       { label: "Classe", key: "c", Icon: Box, tool: "node" },
+      { label: "Interfaccia", key: "i", Icon: SquareDashed, tool: "node", variant: "interface" },
+      { label: "Enum", key: "e", Icon: ListOrdered, tool: "node", variant: "enum" },
       { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
       { label: "Nota", key: "n", Icon: StickyNote, tool: "node", variant: "note" },
     ])
@@ -50,9 +52,9 @@ describe("terzo strumento", () => {
     expect(viewFor("er").tools.some((t) => t.variant === "note")).toBe(false)
   })
 
-  it("le scorciatoie dei tre strumenti sono distinte", () => {
+  it("le scorciatoie degli strumenti sono distinte", () => {
     const keys = viewFor("class").tools.map((t) => t.key)
-    expect(new Set(keys).size).toBe(3)
+    expect(new Set(keys).size).toBe(keys.length)
     // `v` è riservata a «Seleziona» in `use-keyboard-shortcuts.ts`.
     expect(keys).not.toContain("v")
   })

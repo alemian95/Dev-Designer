@@ -1,3 +1,4 @@
+import { produce } from "immer"
 import { describe, expect, it } from "vitest"
 import type { DevDocument } from "@/model/document"
 import { createClassDocument } from "@/model/class/schema"
@@ -221,5 +222,21 @@ describe("classOps e le note", () => {
     // del Task 3) svuota comunque `view.nodes`, ma lascia la nota orfana in `model.notes`.
     expect(doc.diagram.model.notes["n-1"]).toBeUndefined()
     expect(doc.diagram.model.classes.Cliente).toBeUndefined()
+  })
+})
+
+describe("classOps e gli stereotipi", () => {
+  it.each([
+    [undefined, "class"],
+    ["interface", "interface"],
+    ["enum", "enum"],
+  ] as const)("addNode con variante %s crea una classe %s e apre l'editor del nome", (variant, stereotype) => {
+    const doc = createClassDocument("Prova", "doc-1")
+    const { key, recipe, edit } = opsFor(doc).addNode({ x: 0, y: 0 }, variant)
+    const next = produce(doc, recipe)
+    if (next.diagram.type !== "class") throw new Error("tipo sbagliato")
+    expect(key).toBe(stereotype)
+    expect(next.diagram.model.classes[key]?.stereotype).toBe(stereotype)
+    expect(edit).toBe("name")
   })
 })

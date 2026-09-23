@@ -1,4 +1,4 @@
-import { Box, Spline, StickyNote } from "lucide-react"
+import { Box, ListOrdered, Spline, SquareDashed, StickyNote } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
@@ -74,6 +74,8 @@ export const classView: DiagramView = {
   Properties: ClassProperties,
   tools: [
     { label: "Classe", key: "c", Icon: Box, tool: "node" },
+    { label: "Interfaccia", key: "i", Icon: SquareDashed, tool: "node", variant: "interface" },
+    { label: "Enum", key: "e", Icon: ListOrdered, tool: "node", variant: "enum" },
     { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
     { label: "Nota", key: "n", Icon: StickyNote, tool: "node", variant: "note" },
   ],

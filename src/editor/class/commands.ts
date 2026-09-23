@@ -9,13 +9,18 @@ import { classSize, noteSize } from "./geometry"
 
 const DUPLICATE_OFFSET = 20
 
-export function addClass(classes: Record<string, unknown>, at: Point): { key: string; recipe: Recipe } {
-  const key = uniqueKey(classes, "class")
+/** La chiave provvisoria prende il nome dallo stereotipo («interface», «enum»): l'editor del nome si apre subito. */
+export function addClass(
+  classes: Record<string, unknown>,
+  at: Point,
+  stereotype: Stereotype = "class",
+): { key: string; recipe: Recipe } {
+  const key = uniqueKey(classes, stereotype)
   return {
     key,
     recipe: (draft) => {
       const d = classDiagram(draft)
-      d.model.classes[key] = { name: key, stereotype: "class", attributes: [], methods: [] }
+      d.model.classes[key] = { name: key, stereotype, attributes: [], methods: [] }
       d.view.nodes[key] = { x: snap(at.x), y: snap(at.y), collapsed: false }
     },
   }

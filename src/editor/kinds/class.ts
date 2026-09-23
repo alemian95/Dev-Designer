@@ -1,3 +1,4 @@
+import { StereotypeSchema } from "@/model/class/schema"
 import { validateClass } from "@/model/class/validate"
 import type { DevDocument } from "@/model/document"
 import type { Issue } from "@/model/issue"
@@ -51,10 +52,11 @@ export function classOps(doc: DevDocument): DiagramOps {
       return rel ? classEdgeGeometry(a, b, rel, classEdgeOffsets(model.relations).get(key) ?? 0) : null
     },
 
+    // Ogni variante diversa da «note» è uno stereotipo (`DiagramView.tools`); nessuna variante è «class».
     addNode: (at, variant) =>
       variant === "note"
         ? { ...addNote(at), edit: "body" }
-        : { ...addClass(diagram().model.classes, at), edit: "name" },
+        : { ...addClass(diagram().model.classes, at, StereotypeSchema.catch("class").parse(variant)), edit: "name" },
 
     // Una nota non può essere estremo di una relazione fra classi, ma può esserlo di un
     // **ancoraggio**: è il gesto con cui si dichiara la classe che commenta. `addNoteLink`

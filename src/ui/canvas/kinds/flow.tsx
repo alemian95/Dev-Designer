@@ -53,9 +53,10 @@ function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeV
 
 /**
  * `DiagramView` per il flowchart: cablaggio verso i componenti di questo task, più gli strumenti
- * — sei varianti dello strumento nodo, una per forma, e l'arco. `textFormats` resta vuoto: il
- * formato `flow-mermaid` non ha ancora un emettitore (Task 10), e un formato senza emettitore non
- * deve comparire nel dialogo di export testo (docblock di `TextFormat`, `registry.ts`).
+ * — sei varianti dello strumento nodo, una per forma, e l'arco. `textFormats` elenca
+ * `flow-mermaid` da questo task in poi: `emitFlowMermaid` esiste (`@/io/emit/flow-mermaid.ts`),
+ * quindi il formato può comparire nel dialogo di export testo (docblock di `TextFormat`,
+ * `registry.ts`).
  */
 export const flowView: DiagramView = {
   NodesLayer,
@@ -72,5 +73,5 @@ export const flowView: DiagramView = {
     { label: "Nota", key: "6", Icon: StickyNote, tool: "node", variant: "note" },
     { label: "Arco", key: "r", Icon: Spline, tool: "edge" },
   ],
-  textFormats: [],
+  textFormats: ["flow-mermaid"],
 }

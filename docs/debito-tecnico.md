@@ -1050,6 +1050,122 @@ punto da toccare, quindi il compilatore fa da lista.
 Corretto nello stesso giro: `pnpm test` girava con `--passWithNoTests`, e una
 suite sparita per un glob rotto sarebbe passata verde in CI.
 
+### Flowchart (2026-09-23)
+
+Regola del registro seguita durante questo giro, non applicata a posteriori
+alla sua fine: **un rilievo che si decide di non correggere si scrive nello
+stesso momento in cui si decide**, non quando il piano chiude.
+
+- **Gli archi all'indietro passano sopra i nodi.** Il router ortogonale
+  (`src/editor/edge-routing.ts`) aggancia ai lati del rettangolo di ingombro e
+  traccia il percorso più breve senza sapere che un altro nodo può stargli in
+  mezzo — invariato dall'ER, dove le contro-frecce sono rare e la cosa non si è
+  mai vista. In un flowchart il ciclo è il caso normale, quindi si vede
+  (`ponytail:` sul posto, riga 114, nomina il soffitto: un router con
+  aggiramento — A* sulla griglia dei rettangoli — non è una correzione a
+  questo, è un router nuovo). Rinviato perché quel router nuovo è complessità
+  vera per un limite che si legge subito guardando il disegno.
+  Costo-se-sbagliato: leggibilità, non correttezza — un arco che attraversa un
+  nodo si legge peggio ma il diagramma resta vero; cresce con la densità dei
+  cicli, e su un flowchart fitto di ripetizioni può rendere un ramo
+  all'indietro difficile da distinguere da uno che passa solo vicino.
+- **Gli incroci sull'asse trasversale aumentano** rispetto a un layout senza
+  corsie (spec §5). ELK dispone l'intero grafo ignorando le corsie e poi
+  `placeInLanes` (`src/editor/flow/layout.ts`) corregge solo la y, degradando
+  l'ordinamento di ELK a un ordinamento interno alla banda: la sua riduzione
+  degli incroci sull'asse trasversale si perde nella correzione. È il prezzo
+  della scelta architetturale A della spec (ELK dà il flusso, la corsia dà la
+  trasversale), non un difetto di implementazione — l'alternativa (corsie come
+  nodi composti di ELK) è stata scartata in fase di design perché avrebbe
+  richiesto uno spike proprio. Costo-se-sbagliato: leggibilità su flowchart con
+  molte corsie e molti archi che le attraversano; nessuna misura dice a che
+  densità diventa fastidioso, perché non è mai stata cercata.
+- **Le corsie non si ridimensionano né si riordinano per trascinamento.**
+  `FlowLanesPanel` (`src/ui/panels/FlowProperties.tsx`) sposta una corsia solo
+  con le due frecce su/giù, e l'altezza di ciascuna è sempre il massimo fra il
+  contenuto impilato e il minimo — mai una misura scelta a mano. Deciso fuori
+  scopo dalla spec (§2): due frecce nell'intestazione bastano finché non danno
+  fastidio, e il trascinamento di una corsia intera è un gesto nuovo che
+  tocca lo stesso codice caldo del drag dei nodi. Costo-se-sbagliato: un
+  flowchart con molte corsie che vanno riordinate spesso costringe a
+  cancellare e ricreare invece di trascinare — attrito per chi disegna, non
+  perdita di dati.
+- **Le etichette di archi non in fascio che passano vicini per caso possono
+  accavallarsi.** L'`offset` di fascio (`edgeOffsets`,
+  `src/editor/edge-routing.ts`) separa le etichette di archi **fra la stessa
+  coppia di nodi**, e con flusso a destra eredita gratis anche la separazione
+  degli archi entranti allo stesso nodo da sinistra (spec §8) — è il caso che
+  il class diagram aveva lasciato scoperto e che il flowchart chiude. Resta
+  scoperto il caso di due archi **senza legame** il cui percorso passa vicino
+  per coincidenza geometrica: nessun fascio li conosce come coppia, quindi
+  nessuno scarto li separa. Un anti-sovrapposizione vero sarebbe globale —
+  stessa causa, stesso rinvio della voce gemella in «Class diagram» qui sopra —
+  e si guarda a feature viva, quando ci sarà un flowchart reale sotto gli
+  occhi invece di un caso costruito apposta. Costo-se-sbagliato: due etichette
+  illeggibili in un punto del canvas, raro perché richiede una coincidenza di
+  layout, non sistematico.
+- **Il flowchart non è nel gate di prestazione.** L'ultima misura è la
+  baseline del 2026-09-22, **prima** di questa consegna: p95 peggiore 9,3 ms a
+  N=300 su un documento ER (vedi «Prima del flowchart» qui sopra). Il
+  generatore sintetico (`src/perf/stress.ts`) non genera flowchart — l'estenderlo
+  era il passo 3 del piano di questo task, cancellato insieme alla rimisura
+  (passo 4) per decisione esplicita di chi ha commissionato il lavoro — e il
+  gate non è stato rieseguito. Il percorso di drag fra corsie
+  (`moveFlowNodes`, `src/editor/flow/commands.ts`) e il layer delle bande
+  (`LanesLayer`, `src/ui/canvas/LanesLayer.tsx`, che non si ridisegna durante
+  il trascinamento) sono stati controllati leggendo il
+  codice in tre revisioni separate durante questo piano, non misurati: una
+  lettura non è una misura, per quanto ripetuta. Rinviato per decisione
+  esplicita, non per dimenticanza. Costo-se-sbagliato: una regressione nel
+  drag o nelle bande passerebbe inosservata finché qualcuno non estende
+  `stress.ts` e riesegue `pnpm perf` — servirebbe un flowchart sintetico da N
+  nodi su 4 corsie, con archi che seguono il flusso e qualche ciclo
+  all'indietro (il caso che il router paga, spec §13), non un documento ER
+  travestito. Fino ad allora il numero di riferimento resta quello di prima
+  del flowchart, che per costruzione non dice niente sul flowchart.
+- **Un buco nella regola di raggiungibilità, a livello di spec.** Trovato
+  rileggendo il Task 9: `flow-unreachable` parte dai nodi `terminal` **senza
+  archi entranti** (`entryKeys`, `src/model/flow/validate.ts:86-90`) e il
+  ciclo che segnala i nodi non raggiunti gira solo `if (entryKeys.length > 0)`
+  (riga 90). Se un `terminal` esiste ma ha un arco entrante, `hasTerminal` è
+  vero — quindi `flow-no-terminal` tace, correttamente, un terminale c'è — ma
+  `entryKeys` è vuoto, quindi il diagramma non ha nessun ingresso e il blocco
+  di raggiungibilità non gira **su nessun nodo**: `flow-unreachable` tace
+  anche lui, non perché tutto sia raggiungibile ma perché la sua premessa
+  manca. Nodi orfani altrove nel diagramma non vengono segnalati da nessuna
+  delle due regole. Il commento sul posto (righe 83-85) descrive il
+  comportamento — la regola tace quando la premessa manca — ma non la lettura
+  che qui conta: la premessa può mancare anche con un terminale presente,
+  se quel terminale non è un ingresso vero. Non corretto in questo giro
+  perché è un buco di **regola**, non di codice che tradisce la regola: la
+  correzione è una decisione di design (un secondo codice tipo
+  `flow-terminal-not-entry`? o ridefinire «ingresso»?) che tocca la spec
+  (§9), non una riga. Costo-se-sbagliato: falsi negativi silenziosi — un
+  diagramma con un solo terminale collegato come uscita anziché come ingresso
+  perde la sola rete che il progetto ha contro i frammenti staccati, e chi
+  disegna non ha modo di saperlo dal pannello dei problemi.
+- **Con due o più archi fra la stessa coppia di nodi, l'aggancio di una
+  decisione esce dal rombo.** `routeEdge` (`src/editor/edge-routing.ts`)
+  aggancia al centro del lato del rettangolo di ingombro quando l'`offset` di
+  fascio è zero, e per un rombo quel punto centrale **è** la sua punta (spec
+  §8) — un caso fortunato che non costa codice in più. Con un `offset` diverso
+  da zero (due o più archi fra la stessa coppia) `slide`
+  (`src/editor/edge-routing.ts:109-111`) sposta il punto di aggancio lungo il
+  lato del rettangolo, ma il contorno
+  vero del rombo si allontana da quel lato non appena ci si scosta dal centro:
+  l'aggancio finisce fuori dal rombo, visibilmente scollegato. Stessa classe
+  di limite già accettata per il parallelogramma, che aggancia leggermente
+  fuori dai suoi lati obliqui (spec §8) — qui il caso è più visibile perché
+  richiede due rami di una stessa decisione, che in un flowchart è comune.
+  Rinviato perché correggerlo per il rombo da solo (proiettare l'aggancio sul
+  contorno vero della forma, non sul rettangolo di ingombro) romperebbe la
+  regola unica di `routeEdge` — vede due `Rect` e nulla della forma reale —
+  che tiene il router disaccoppiato da come si disegna ciascuna forma
+  (§8 della spec, stessa ragione per cui il parallelogramma è già accettato).
+  Costo-se-sbagliato: un arco visibilmente staccato dal rombo su una
+  decisione con due rami ravvicinati — leggibilità, non un dato sbagliato nel
+  modello.
+
 ---
 
 ## Perduto

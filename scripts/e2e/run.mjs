@@ -3,14 +3,14 @@
  * build già fatta) e una sola istanza di browser, poi esegue in sequenza — mai in parallelo, perché
  * l'e2e della persistenza esercita il lock fra schede e IndexedDB sulla stessa origine, e due
  * scenari concorrenti se li disturberebbero a vicenda — gli scenari della persistenza, dell'import,
- * dell'export immagini, dell'export testo, dell'auto layout, del class diagram e della sua nota.
- * Ognuno apre il proprio contesto di browser, cosa che isola l'IndexedDB fra loro senza pagare due
- * volte il costo fisso di build, server e avvio del browser (avvio condiviso con
+ * dell'export immagini, dell'export testo, dell'auto layout, del class diagram, della sua nota e del
+ * flowchart. Ognuno apre il proprio contesto di browser, cosa che isola l'IndexedDB fra loro senza
+ * pagare due volte il costo fisso di build, server e avvio del browser (avvio condiviso con
  * `helpers.mjs#startEnv`, la stessa funzione usata dalla guardia di esecuzione diretta di ciascuno
  * scenario). Per lanciare un solo scenario in isolamento, dopo `pnpm build`:
  * `node scripts/e2e/import.mjs`, `node scripts/e2e/persistenza.mjs`, `node scripts/e2e/export.mjs`,
- * `node scripts/e2e/export-testo.mjs`, `node scripts/e2e/layout.mjs`, `node scripts/e2e/class.mjs`
- * o `node scripts/e2e/class-note.mjs`.
+ * `node scripts/e2e/export-testo.mjs`, `node scripts/e2e/layout.mjs`, `node scripts/e2e/class.mjs`,
+ * `node scripts/e2e/class-note.mjs` o `node scripts/e2e/flow.mjs`.
  *
  * Uso: `pnpm e2e`. `HEADLESS=0` per vedere il browser.
  */
@@ -18,6 +18,7 @@ import { run as runClass } from "./class.mjs"
 import { run as runClassNote } from "./class-note.mjs"
 import { run as runExport } from "./export.mjs"
 import { run as runExportTesto } from "./export-testo.mjs"
+import { run as runFlow } from "./flow.mjs"
 import { startEnv } from "./helpers.mjs"
 import { run as runImport } from "./import.mjs"
 import { run as runLayout } from "./layout.mjs"
@@ -35,7 +36,8 @@ try {
   const layoutOk = await runLayout(browser, base)
   const classOk = await runClass(browser, base)
   const classNoteOk = await runClassNote(browser, base)
-  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && classNoteOk
+  const flowOk = await runFlow(browser, base)
+  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && classNoteOk && flowOk
 } catch (e) {
   console.error("\nFALLITO:", e)
 } finally {

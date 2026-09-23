@@ -71,7 +71,16 @@ export interface DiagramView {
   EdgesLayer: ComponentType
   NodeView: ComponentType<NodeViewProps>
   EdgeView: ComponentType<EdgeViewProps>
+  /** Montato solo quando la selezione è esattamente un nodo o esattamente un arco (`PropertiesPanel`). */
   Properties: ComponentType
+  /**
+   * Corpo del pannello **senza nessuna selezione**. Opzionale: se un tipo non lo dichiara,
+   * `PropertiesPanel` mostra la propria frase generica, come faceva prima che questo campo
+   * esistesse — ER e class non lo dichiarano e restano su quella. Il flowchart lo usa per il
+   * pannello delle corsie (spec §11): a differenza di `Properties`, qui non c'è un nodo o un arco
+   * da passare, quindi il componente non prende prop.
+   */
+  EmptyProperties?: ComponentType
   tools: ToolDef[]
   textFormats: TextFormat[]
 }

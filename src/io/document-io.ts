@@ -1,6 +1,7 @@
 import type { DevDocument, Diagram } from "@/model/document"
 import { createClassDocument } from "@/model/class/schema"
 import { createErDocument } from "@/model/er/schema"
+import { createFlowDocument } from "@/model/flow/schema"
 import { parseDocument, toJson } from "@/model/serialize"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore } from "@/editor/session-store"
@@ -33,7 +34,7 @@ export interface DocumentIoDeps {
 export interface DocumentIo {
   /** All'avvio: riapre l'ultimo documento dal buffer, o ne crea uno nuovo. */
   restoreLast(): Promise<void>
-  /** `type` sceglie fra `createErDocument` e `createClassDocument`; il default preserva ogni chiamata esistente. */
+  /** `type` sceglie fra `createErDocument`, `createClassDocument` e `createFlowDocument`; il default preserva ogni chiamata esistente. */
   newDocument(type?: Diagram["type"]): Promise<void>
   openWithPicker(): Promise<void>
   /** Da picker o da upload: il testo passa da `parseDocument`, che è il confine di fiducia. */
@@ -58,8 +59,7 @@ function hasContent(doc: DevDocument): boolean {
     case "class":
       return Object.keys(doc.diagram.model.classes).length > 0
     case "flow":
-      // ponytail: rimosso nel Task 12
-      throw new Error("flowchart: non ancora implementato")
+      return Object.keys(doc.diagram.model.nodes).length > 0
   }
 }
 
@@ -146,8 +146,25 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     }, undefined)
   }
 
+  /**
+   * Uno switch esaustivo e non un ternario: un ternario a due rami per tre tipi di diagramma
+   * cade in silenzio sul ramo sbagliato per il terzo, senza che il compilatore se ne accorga — è
+   * quello che faceva prima di questo cambiamento, e per `"flow"` creava zitto un class diagram.
+   * Un domani un quarto tipo di diagramma farebbe fallire il build qui, non a runtime.
+   */
+  function blankDocument(type: Diagram["type"], name: string): DevDocument {
+    switch (type) {
+      case "er":
+        return createErDocument(name)
+      case "class":
+        return createClassDocument(name)
+      case "flow":
+        return createFlowDocument(name)
+    }
+  }
+
   async function newDocument(type: Diagram["type"] = "er"): Promise<void> {
-    const doc = type === "er" ? createErDocument("Senza titolo") : createClassDocument("Senza titolo")
+    const doc = blankDocument(type, "Senza titolo")
     await activate(doc, { fileName: null, handle: null, lastSavedAt: null, dirty: false }, { savedToFileAt: null })
   }
 

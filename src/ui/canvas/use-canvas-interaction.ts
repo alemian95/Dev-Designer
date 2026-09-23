@@ -136,9 +136,16 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
       const hit = hitTest(el)
+      const diagramType = documentStore.getState().doc.diagram.type
+      // Solo il flowchart ha un'etichetta sull'arco (spec §8): ER non ha testo sugli archi, e le
+      // relazioni di classe si rinominano dal pannello, non con un doppio click sul canvas. Va
+      // prima della guardia `hit.kind !== "node"` qui sotto, che altrimenti la scarterebbe.
+      if (diagramType === "flow" && hit.kind === "edge") {
+        session().setEditing({ key: hit.key, target: "label" })
+        return
+      }
       if (hit.kind !== "node") return
       const headerHit = !!el?.closest("[data-node-header]")
-      const diagramType = documentStore.getState().doc.diagram.type
       if (diagramType === "class") {
         session().setEditing({ key: hit.key, target: classEditTarget(hit.key, headerHit) })
         return

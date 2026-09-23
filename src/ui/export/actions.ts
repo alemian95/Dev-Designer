@@ -14,8 +14,7 @@ function hasNodes(doc: DevDocument): boolean {
     case "class":
       return Object.keys(doc.diagram.model.classes).length > 0
     case "flow":
-      // ponytail: rimosso nel Task 12
-      throw new Error("flowchart: non ancora implementato")
+      return Object.keys(doc.diagram.model.nodes).length > 0
   }
 }
 

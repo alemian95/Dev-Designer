@@ -322,6 +322,13 @@ describe("openRecent e newDocument", () => {
     expect(documentSession.getState()).toMatchObject({ docId: "r1", fileName: "r.dd.json", dirty: false })
   })
 
+  it("newDocument('flow') crea un flowchart, non il class diagram del ramo di default", async () => {
+    const d = deps()
+    const io = createDocumentIo(d)
+    await io.newDocument("flow")
+    expect(documentStore.getState().doc.diagram.type).toBe("flow")
+  })
+
   it("newDocument lascia il precedente in biblioteca", async () => {
     const d = deps()
     const io = createDocumentIo(d)

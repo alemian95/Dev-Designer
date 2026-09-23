@@ -1,5 +1,6 @@
 import { createStore } from "zustand/vanilla"
 import type { Size } from "./geometry"
+import type { EditTarget } from "./kinds/ops"
 import { IDENTITY, type Viewport } from "./viewport"
 
 export type Tool = "select" | "node" | "edge"
@@ -24,13 +25,19 @@ export interface SessionState {
   tool: Tool
   /** Variante dello strumento corrente: la forma, per i tipi che ne hanno più d'una. Opaca qui. */
   variant: string | null
-  /** `name` = rinomina inline dell'header; `body` = editor dei membri (solo classi). */
-  editing: { key: string; target: "name" | "body" } | null
+  /**
+   * `name`/`body` sono `EditTarget`, ciò che `addNode` può aprire (`kinds/ops.ts`) — una creazione
+   * di nodo non apre mai l'etichetta di un arco. `label` è il terzo caso, sempre abbinato alla
+   * chiave di un **arco**: il doppio click su un arco di flowchart lo apre (spec §8), non lo apre
+   * mai `addNode`. Riesporta `EditTarget` invece di ridichiarare il literal `"name" | "body"`, che
+   * altrimenti divergerebbe da quello — due rappresentazioni dello stesso tipo (violazione SSOT).
+   */
+  editing: { key: string; target: EditTarget | "label" } | null
   canvasSize: Size
   setViewport: (viewport: Viewport) => void
   setSelection: (ids: Iterable<string>) => void
   setTool: (tool: Tool, variant?: string | null) => void
-  setEditing: (editing: { key: string; target: "name" | "body" } | null) => void
+  setEditing: (editing: { key: string; target: EditTarget | "label" } | null) => void
   setCanvasSize: (size: Size) => void
 }
 

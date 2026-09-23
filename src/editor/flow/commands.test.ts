@@ -15,9 +15,12 @@ import {
   renameLane,
   setEdgeLabel,
   setNodeLabel,
+  setNodeLane,
   setNodeShape,
 } from "./commands"
+import { flowNodeSize } from "./geometry"
 import { LANE_PAD } from "./layout"
+import { snap } from "@/editor/geometry"
 
 // Serve solo a `describe("moveFlowNodes", ...)` più in basso, per leggere se una recipe produce
 // patch: è esattamente la proprietà su cui si regge `document-store.ts:42` per scartare una
@@ -147,6 +150,32 @@ describe("setNodeLabel", () => {
     const n = addFlowNode({ x: 0, y: 0 }, "process", lane)
     const next = apply(apply(doc, n.recipe), setNodeLabel(n.key, "verifica ordine"))
     expect(fd(next).model.nodes[n.key]!.label).toBe("verifica ordine")
+  })
+})
+
+describe("setNodeLane", () => {
+  it("sposta il nodo nella corsia data e lo ricentra verticalmente nella nuova banda", () => {
+    const { doc, lane } = docWith()
+    let next = apply(doc, addLane("Corsia 2"))
+    const lane2 = fd(next).model.lanes[1]!.id
+    const n = addFlowNode({ x: 0, y: 0 }, "process", lane)
+    next = apply(next, n.recipe)
+    next = apply(next, setNodeLane(n.key, lane2))
+    const d = fd(next)
+    expect(d.model.nodes[n.key]!.lane).toBe(lane2)
+    const band = d.view.lanes[lane2]!
+    const view = d.view.nodes[n.key]!
+    const size = flowNodeSize(d.model.nodes[n.key]!)
+    expect(view.y).toBe(snap(band.y + band.h / 2 - size.h / 2))
+  })
+
+  it("non fa nulla quando la corsia data è già quella del nodo", () => {
+    const { doc, lane } = docWith()
+    const n = addFlowNode({ x: 0, y: 0 }, "process", lane)
+    let next = apply(doc, n.recipe)
+    const before = fd(next).view.nodes[n.key]
+    next = apply(next, setNodeLane(n.key, lane))
+    expect(fd(next).view.nodes[n.key]).toEqual(before)
   })
 })
 

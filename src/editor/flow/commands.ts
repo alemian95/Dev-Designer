@@ -100,6 +100,26 @@ export function setNodeShape(key: string, shape: FlowShape): Recipe {
   }
 }
 
+/**
+ * Cambia la corsia di un nodo dal pannello proprietà — l'alternativa da tastiera al trascinamento
+ * fra corsie di `moveFlowNodes` (spec §11). A differenza di quello, qui non c'è un gesto che porti
+ * già una `y` sensata nella banda di arrivo: il nodo viene da una banda diversa per costruzione
+ * (la guardia sotto esce quando la corsia non cambia), quindi si ricentra sempre verticalmente
+ * nella nuova banda invece di tentare un aggancio al bordo come fa il fallback del drag.
+ */
+export function setNodeLane(key: string, laneId: string): Recipe {
+  return (draft) => {
+    const d = flowDiagram(draft)
+    const node = d.model.nodes[key]
+    const view = d.view.nodes[key]
+    const band = d.view.lanes[laneId]
+    if (!node || !view || !band || node.lane === laneId) return
+    node.lane = laneId
+    const size = flowNodeSize(node)
+    view.y = snap(band.y + band.h / 2 - size.h / 2)
+  }
+}
+
 export function setEdgeLabel(key: string, label: string): Recipe {
   return (draft) => {
     const edge = flowDiagram(draft).model.edges[key]

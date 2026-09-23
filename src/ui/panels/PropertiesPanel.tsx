@@ -24,6 +24,12 @@ function indeterminateArticle(label: string): string {
  * biforca quindi per tipo di diagramma: dove una variante "note" esiste in `tools` (le classi) la
  * frase è scritta per esteso, altrove (l'ER) resta la composizione a due, con le etichette dello
  * strumento nodo semplice e dello strumento arco cercate in `view.tools`.
+ *
+ * **Selezione vuota**: di norma è anche lei neutra rispetto al tipo (la stessa frase sopra, con
+ * `selection.size === 0`). `view.EmptyProperties`, se dichiarato, la sostituisce — solo il
+ * flowchart lo fa, per il pannello delle corsie (spec §11): senza nodo o arco da passare non c'è
+ * niente che serva a `Properties`, quindi è un componente a sé. Una selezione **multipla** non
+ * lo monta comunque: resta sulla frase generica, come oggi.
  */
 export function PropertiesPanel() {
   const selection = useStore(sessionStore, (s) => s.selection)
@@ -32,6 +38,7 @@ export function PropertiesPanel() {
   const edges = selectedKeys(selection, "edge")
   const single = (nodes.length === 1 && edges.length === 0) || (edges.length === 1 && nodes.length === 0)
   if (single) return <view.Properties />
+  if (selection.size === 0 && view.EmptyProperties) return <view.EmptyProperties />
   const nodeLabel = (view.tools.find((t) => t.tool === "node" && !t.variant)?.label ?? "").toLowerCase()
   const edgeLabel = (view.tools.find((t) => t.tool === "edge")?.label ?? "").toLowerCase()
   const vuoto = view.tools.some((t) => t.variant === "note")

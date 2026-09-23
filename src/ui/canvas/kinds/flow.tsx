@@ -1,10 +1,12 @@
-import { Circle, Diamond, Layers, Parentheses, Spline, Square, StickyNote } from "lucide-react"
+import { Spline } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { flowDiagram } from "@/editor/flow-access"
 import { flowEdgeOffsets } from "@/editor/flow/geometry"
 import type { FlowEdge as FlowEdgeModel, FlowNode as FlowNodeModel } from "@/model/flow/schema"
+import { FLOW_SHAPE_ICON, FLOW_SHAPE_LABEL, FLOW_SHAPES } from "@/ui/flow-shapes"
+import { FlowLanesPanel, FlowProperties } from "@/ui/panels/FlowProperties"
 import { FlowEdge, FlowEdgeView } from "../FlowEdge"
 import { FlowNode, FlowNodeView } from "../FlowNode"
 import type { DiagramView, EdgeViewProps, NodeViewProps } from "./registry"
@@ -30,11 +32,6 @@ function EdgesLayer() {
       {Object.keys(edges).map((key) => <FlowEdge key={key} edgeKey={key} offset={offsets.get(key) ?? 0} />)}
     </g>
   )
-}
-
-/** Punta a `null`: `FlowProperties` arriva nel Task 12. */
-function FlowProperties() {
-  return null
 }
 
 /**
@@ -64,13 +61,18 @@ export const flowView: DiagramView = {
   NodeView,
   EdgeView,
   Properties: FlowProperties,
+  EmptyProperties: FlowLanesPanel,
+  // Sei varianti, una per forma: l'ordine e il tasto (`1`..`6`, spec §11) seguono `FLOW_SHAPES`,
+  // cioè l'ordine di `FlowShapeSchema`. Etichetta e icona vengono da `flow-shapes.ts`, non
+  // ridichiarate qui — è la stessa fonte che usa il select del pannello proprietà.
   tools: [
-    { label: "Terminale", key: "1", Icon: Circle, tool: "node", variant: "terminal" },
-    { label: "Processo", key: "2", Icon: Square, tool: "node", variant: "process" },
-    { label: "Decisione", key: "3", Icon: Diamond, tool: "node", variant: "decision" },
-    { label: "Input/Output", key: "4", Icon: Parentheses, tool: "node", variant: "io" },
-    { label: "Sottoprocesso", key: "5", Icon: Layers, tool: "node", variant: "subprocess" },
-    { label: "Nota", key: "6", Icon: StickyNote, tool: "node", variant: "note" },
+    ...FLOW_SHAPES.map((shape, i) => ({
+      label: FLOW_SHAPE_LABEL[shape],
+      key: String(i + 1),
+      Icon: FLOW_SHAPE_ICON[shape],
+      tool: "node" as const,
+      variant: shape,
+    })),
     { label: "Arco", key: "r", Icon: Spline, tool: "edge" },
   ],
   textFormats: ["flow-mermaid"],

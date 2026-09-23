@@ -63,6 +63,7 @@ si perde niente.
 | | |
 |---|---|
 | `V` · `E`/`C` · `R` · `N` | selezione · nodo (entità/classe) · relazione · nota (solo classi) |
+| `1`..`6` · `R` | forma del nodo di flowchart (terminale, processo, decisione, input/output, sottoprocesso, nota) · arco |
 | `F` · `L` | inquadra tutto · disponi |
 | `⌘Z` · `⇧⌘Z` / `⌘Y` · `⌘D` · `⌫` | annulla · ripeti · duplica · elimina |
 | `⌘S` · `⇧⌘S` · `⌘O` | salva · salva con nome · apri |

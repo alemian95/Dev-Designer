@@ -113,6 +113,33 @@ describe("emitFlowMermaid: note omesse", () => {
     expect(warnings.join(" ")).toContain("2")
   })
 
+  /**
+   * Singolare e plurale (minori della correzione finale): il messaggio intero, non solo che
+   * contenga "1" — un'implementazione che scrivesse sempre il plurale ("1 note non sono uscite")
+   * passerebbe un `.toContain("1")` ma non questo confronto esatto.
+   */
+  it("una sola nota: l'avviso è al singolare, per intero", () => {
+    const m = model({
+      nodes: { a: n("x", "process"), n1: n("nota", "note") },
+      edges: {},
+    })
+    const { warnings } = emitFlowMermaid(m)
+    expect(warnings).toContain(
+      "1 nota non è uscita: in Mermaid entrerebbe nel flusso come un nodo qualunque e ne sposterebbe il layout.",
+    )
+  })
+
+  it("due note: l'avviso è al plurale, per intero", () => {
+    const m = model({
+      nodes: { a: n("x", "process"), n1: n("nota", "note"), n2: n("altra", "note") },
+      edges: {},
+    })
+    const { warnings } = emitFlowMermaid(m)
+    expect(warnings).toContain(
+      "2 note non sono uscite: in Mermaid entrerebbero nel flusso come nodi qualunque e ne sposterebbero il layout.",
+    )
+  })
+
   it("una corsia con solo note non emette una subgraph, ma le conta comunque nell'avviso", () => {
     const m = model({
       lanes: [{ id: "l1", name: "vera" }, { id: "l2", name: "solo-note" }],
@@ -131,9 +158,18 @@ describe("emitFlowMermaid: note omesse", () => {
     })
     const { text, warnings } = emitFlowMermaid(m)
     expect(text).not.toContain("-->")
-    const edgeWarnings = warnings.filter((w) => w.includes("arch") && (w.includes("nota") || w.includes("note")))
+    const edgeWarnings = warnings.filter((w) => w.includes("arc") && (w.includes("nota") || w.includes("note")))
     expect(edgeWarnings).toHaveLength(1)
     expect(edgeWarnings[0]).toContain("1")
+  })
+
+  it("un solo arco verso una nota: l'avviso è al singolare, per intero", () => {
+    const m = model({
+      nodes: { a: n("A", "process"), x: n("nota", "note") },
+      edges: { e1: e("a", "x") },
+    })
+    const { warnings } = emitFlowMermaid(m)
+    expect(warnings).toContain("1 arco non è uscito perché tocca una nota: una nota non è un nodo del flusso in Mermaid.")
   })
 
   it("più archi verso note si aggregano in un solo avviso col conteggio, non uno a riga", () => {
@@ -143,9 +179,18 @@ describe("emitFlowMermaid: note omesse", () => {
     })
     const { text, warnings } = emitFlowMermaid(m)
     expect(text).not.toContain("-->")
-    const edgeWarnings = warnings.filter((w) => w.includes("arch") && (w.includes("nota") || w.includes("note")))
+    const edgeWarnings = warnings.filter((w) => w.includes("arc") && (w.includes("nota") || w.includes("note")))
     expect(edgeWarnings).toHaveLength(1)
     expect(edgeWarnings[0]).toContain("2")
+  })
+
+  it("due archi verso note: l'avviso è al plurale, per intero", () => {
+    const m = model({
+      nodes: { a: n("A", "process"), b: n("B", "process"), x: n("nota", "note"), y: n("altra", "note") },
+      edges: { e1: e("a", "x"), e2: e("b", "y") },
+    })
+    const { warnings } = emitFlowMermaid(m)
+    expect(warnings).toContain("2 archi non sono usciti perché toccano una nota: una nota non è un nodo del flusso in Mermaid.")
   })
 })
 

@@ -10,6 +10,7 @@ import {
 } from "@/model/class/schema"
 import { renameClassWithNotice } from "@/ui/class-rename"
 import { CommitInput } from "@/ui/panels/CommitInput"
+import { CommitTextarea } from "@/ui/panels/CommitTextarea"
 
 const dispatch = (recipe: Recipe | null) => {
   if (recipe) documentStore.getState().dispatch(recipe)
@@ -105,12 +106,12 @@ function NoteProperties({ noteKey: key }: { noteKey: string }) {
     <div className="flex flex-col gap-3 p-3">
       <div className="grid gap-1">
         <Label htmlFor="note-text">Testo</Label>
-        <textarea
+        <CommitTextarea
           id="note-text"
           key={note.text}
-          defaultValue={note.text}
+          value={note.text}
           readOnly={editingHere}
-          onBlur={(e) => dispatch(setNoteText(key, e.currentTarget.value))}
+          onCommit={(text) => dispatch(setNoteText(key, text))}
           className="min-h-24 resize-none rounded-md border bg-background p-2 text-sm read-only:opacity-50"
         />
         {editingHere && <p className="text-xs text-muted-foreground">Modifica in corso sul canvas.</p>}

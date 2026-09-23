@@ -103,10 +103,20 @@ export function laneAt(diagram: FlowDiagram, y: number): string | null {
 export const LANE_MARGIN = 40
 
 /**
+ * Larghezza minima di una banda (I1 della correzione finale): senza nodi `rectsBounds` torna
+ * `null` e la banda si riduceva a `2 × LANE_MARGIN` (80px) — visibilmente uno stelo, non una
+ * corsia, per un flowchart appena creato o con una corsia ancora vuota. Accanto a `LANE_MARGIN` e
+ * non altrove: sono le due misure che governano `laneBandExtent`, e tenerle vicine è la ragione
+ * per cui la seconda esiste in questo file e non duplicata in `LanesLayer.tsx`/`svg.tsx`.
+ */
+export const LANE_MIN_W = 640
+
+/**
  * Estensione orizzontale comune a ogni banda: x e larghezza dai limiti dei nodi (`rectsBounds`)
  * più `LANE_MARGIN`, non dal viewport — il viewport dipende da dove sta guardando chi disegna in
  * questo momento, e l'export (`buildSvg`) non ne ha uno affatto (Task 11, spec §5: «la stessa
- * banda nell'app e nell'export»).
+ * banda nell'app e nell'export»). La larghezza non scende mai sotto `LANE_MIN_W`: sotto quella
+ * soglia segue comunque i nodi, mai il contrario.
  *
  * **Unico posto che fa questo calcolo**: `LanesLayerView` (canvas, `ui/canvas/LanesLayer.tsx`) e
  * `buildSvg` (export, `ui/export/svg.tsx`) lo chiamano entrambi invece di ricavare ciascuno la
@@ -119,7 +129,9 @@ export function laneBandExtent(diagram: FlowDiagram): { x: number; w: number } {
     if (view) rects.push(flowNodeRect(node, view))
   }
   const bounds = rectsBounds(rects)
-  return { x: (bounds?.x ?? 0) - LANE_MARGIN, w: (bounds?.w ?? 0) + 2 * LANE_MARGIN }
+  const x = (bounds?.x ?? 0) - LANE_MARGIN
+  const w = Math.max(LANE_MIN_W, (bounds?.w ?? 0) + 2 * LANE_MARGIN)
+  return { x, w }
 }
 
 /** Lunghezza e semilarghezza della freccia piena: l'unico marker dell'arco di flowchart, sempre

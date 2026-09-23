@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { FlowDiagram, FlowEdge, FlowNode } from "@/model/flow/schema"
 import { routeEdge } from "../edge-routing"
 import type { Rect } from "../geometry"
-import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, laneBandExtent, LANE_MARGIN, shapePath } from "./geometry"
+import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, laneBandExtent, LANE_MARGIN, LANE_MIN_W, shapePath } from "./geometry"
 
 const node = (over: Partial<FlowNode> = {}): FlowNode => ({ label: "Verifica", shape: "process", lane: "l1", ...over })
 
@@ -107,21 +107,35 @@ describe("laneBandExtent", () => {
     view: { nodes: { n1: { x: 100, y: 0, collapsed: false } }, lanes: { l1: { y: 0, h: 100 } } },
   })
 
-  it("allarga i limiti dei nodi del margine di corsia su entrambi i lati", () => {
+  it("allarga i limiti dei nodi del margine di corsia su entrambi i lati, quando superano il minimo", () => {
     const d = flowDiagram()
+    // Un solo nodo di 60px non basta a superare `LANE_MIN_W`: il test deve provare che la
+    // larghezza *segue i nodi*, quindi qui ne serve uno abbastanza largo da superarlo davvero.
+    d.model.nodes["n1"] = { label: "un'etichetta lunga abbastanza da superare la larghezza minima della banda", shape: "process", lane: "l1" }
     const { w: nodeW } = flowNodeSize(d.model.nodes["n1"]!)
+    expect(nodeW + 2 * LANE_MARGIN).toBeGreaterThan(LANE_MIN_W)
     const extent = laneBandExtent(d)
     expect(extent.x).toBe(100 - LANE_MARGIN)
     expect(extent.w).toBe(nodeW + 2 * LANE_MARGIN)
   })
 
-  it("senza nodi torna comunque un'estensione finita, non NaN o negativa", () => {
+  /**
+   * I1 della correzione finale: senza nodi (o con nodi piccoli) la banda non si riduce a
+   * `2 × LANE_MARGIN` (80px, uno stelo) — resta larga almeno `LANE_MIN_W`.
+   */
+  it("senza nodi la larghezza non scende sotto LANE_MIN_W", () => {
     const d = flowDiagram()
     d.model.nodes = {}
     d.view.nodes = {}
     const extent = laneBandExtent(d)
     expect(extent.x).toBe(-LANE_MARGIN)
-    expect(extent.w).toBe(2 * LANE_MARGIN)
+    expect(extent.w).toBe(LANE_MIN_W)
+  })
+
+  it("con nodi più stretti del minimo, la larghezza resta comunque LANE_MIN_W", () => {
+    const d = flowDiagram()
+    const extent = laneBandExtent(d)
+    expect(extent.w).toBe(LANE_MIN_W)
   })
 })
 

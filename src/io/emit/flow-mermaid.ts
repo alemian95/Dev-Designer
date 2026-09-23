@@ -131,13 +131,19 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
     )
   }
   if (noteCount > 0) {
+    // Singolare e plurale corretti (minori della correzione finale): a 1 "1 note non sono uscite"
+    // legge come un refuso, non come un conteggio.
     warnings.push(
-      `${noteCount} note non sono uscite: in Mermaid entrerebbero nel flusso come nodi qualunque e ne sposterebbero il layout.`,
+      noteCount === 1
+        ? `1 nota non è uscita: in Mermaid entrerebbe nel flusso come un nodo qualunque e ne sposterebbe il layout.`
+        : `${noteCount} note non sono uscite: in Mermaid entrerebbero nel flusso come nodi qualunque e ne sposterebbero il layout.`,
     )
   }
   if (noteEdgeCount > 0) {
     warnings.push(
-      `${noteEdgeCount} archi non sono usciti perché toccano una nota: una nota non è un nodo del flusso in Mermaid.`,
+      noteEdgeCount === 1
+        ? `1 arco non è uscito perché tocca una nota: una nota non è un nodo del flusso in Mermaid.`
+        : `${noteEdgeCount} archi non sono usciti perché toccano una nota: una nota non è un nodo del flusso in Mermaid.`,
     )
   }
 

@@ -8,9 +8,10 @@ import { documentStore, type Recipe } from "@/editor/document-store"
 import { flowDiagram } from "@/editor/flow-access"
 import { addLane, deleteLane, moveLane, renameLane, setEdgeLabel, setNodeLabel, setNodeLane, setNodeShape } from "@/editor/flow/commands"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { FlowShapeSchema, type FlowModel } from "@/model/flow/schema"
+import { FlowShapeSchema, nextLaneName, type FlowModel } from "@/model/flow/schema"
 import { FLOW_SHAPE_LABEL, FLOW_SHAPES } from "@/ui/flow-shapes"
 import { CommitInput } from "@/ui/panels/CommitInput"
+import { CommitTextarea } from "@/ui/panels/CommitTextarea"
 
 const dispatch = (recipe: Recipe | null) => {
   if (recipe) documentStore.getState().dispatch(recipe)
@@ -28,16 +29,16 @@ function FlowNodeProperties({ nodeKey: key }: { nodeKey: string }) {
     <div className="flex flex-col gap-3 p-3">
       <div className="grid gap-1">
         <Label htmlFor="flow-node-label">Etichetta</Label>
-        {/* `textarea`, non `CommitInput`: l'etichetta di un nodo è multiriga per costruzione
+        {/* `CommitTextarea`, non `CommitInput`: l'etichetta di un nodo è multiriga per costruzione
          *  (`FlowNode.tsx` la spezza su `\n`, `flowNodeSize` la misura su quelle righe). Un
          *  `<input>` a una riga sanitizza gli a capo fuori dal valore appena l'utente lo tocca —
          *  perdita silenziosa di dati, non solo estetica. Stessa forma di `NoteProperties`. */}
-        <textarea
+        <CommitTextarea
           id="flow-node-label"
           key={node.label}
-          defaultValue={node.label}
+          value={node.label}
           readOnly={editingHere}
-          onBlur={(e) => dispatch(setNodeLabel(key, e.currentTarget.value))}
+          onCommit={(text) => dispatch(setNodeLabel(key, text))}
           className="min-h-16 resize-none rounded-md border bg-background p-2 text-sm read-only:opacity-50"
         />
         {editingHere && <p className="text-xs text-muted-foreground">Modifica in corso sul canvas.</p>}
@@ -159,18 +160,6 @@ function LaneRow({ model, lane, index, nodeCount }: { model: FlowModel; lane: Fl
   )
 }
 
-/**
- * Nome proposto per una corsia nuova: «Corsia N», come la prima che crea `createFlowDocument`.
- * `N` non è `lanes.length + 1` da solo — dopo che una cancellazione toglie una corsia di mezzo
- * quel conteggio ripete un nome già in uso (es. resta «Corsia 2», si aggiunge e il conteggio
- * ridà «Corsia 2») — quindi si cerca il primo numero non ancora preso fra i nomi correnti.
- */
-function nextLaneName(lanes: readonly { name: string }[]): string {
-  const used = new Set(lanes.map((l) => l.name))
-  let n = lanes.length + 1
-  while (used.has(`Corsia ${n}`)) n++
-  return `Corsia ${n}`
-}
 
 /**
  * Corpo del pannello proprietà per il flowchart **senza selezione** (spec §11): l'elenco delle

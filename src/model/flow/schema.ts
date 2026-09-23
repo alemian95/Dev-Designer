@@ -66,6 +66,24 @@ export type FlowDocument = DevDocument & { diagram: FlowDiagram }
  */
 export const LANE_MIN_H = 160
 
+/**
+ * Prossimo nome di corsia libero, «Corsia N»: fonte unica per la prima corsia di un documento
+ * nuovo (`createFlowDocument`, qui sotto) e per chi ne aggiunge una dal pannello
+ * (`FlowLanesPanel`, `ui/panels/FlowProperties.tsx`) — prima erano due formule scritte a parte,
+ * che avrebbero potuto divergere (violazione SSOT).
+ *
+ * `N` non è `existing.length + 1` da solo: dopo che una cancellazione toglie una corsia di mezzo
+ * quel conteggio ripete un nome già in uso (es. resta «Corsia 2», se ne aggiunge un'altra e il
+ * conteggio ridà «Corsia 2») — quindi si cerca il primo numero non ancora preso fra i nomi
+ * correnti.
+ */
+export function nextLaneName(existing: readonly { name: string }[]): string {
+  const used = new Set(existing.map((l) => l.name))
+  let n = existing.length + 1
+  while (used.has(`Corsia ${n}`)) n++
+  return `Corsia ${n}`
+}
+
 export function createFlowDocument(name: string, id: string = crypto.randomUUID()): FlowDocument {
   const laneId = crypto.randomUUID()
   return {
@@ -74,7 +92,7 @@ export function createFlowDocument(name: string, id: string = crypto.randomUUID(
     name,
     diagram: {
       type: "flow",
-      model: { lanes: [{ id: laneId, name: "Corsia 1" }], nodes: {}, edges: {} },
+      model: { lanes: [{ id: laneId, name: nextLaneName([]) }], nodes: {}, edges: {} },
       view: { nodes: {}, lanes: { [laneId]: { y: 0, h: LANE_MIN_H } } },
     },
   }

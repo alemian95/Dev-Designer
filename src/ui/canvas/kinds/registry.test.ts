@@ -80,6 +80,26 @@ describe("flowchart", () => {
     expect(new Set(nodeVariants)).toEqual(new Set(FlowShapeSchema.options))
     expect(view.tools.filter((t) => t.tool === "edge")).toHaveLength(1)
   })
+
+  /**
+   * Nessun test fissava la mappa tasto → forma della spec §11 (i tasti derivano dall'ordine di
+   * `FlowShapeSchema`, non scritti a mano in `kinds/flow.tsx`): un refuso nell'ordine dell'enum,
+   * o un `i + 1` diventato `i`, sarebbe passato zitto finché qualcuno non avesse premuto `4` e
+   * trovato la forma sbagliata. La mappa qui è scritta a mano, dalla tabella della spec — non
+   * derivata da `FLOW_SHAPES`, altrimenti il test e l'implementazione condividerebbero lo stesso
+   * errore possibile.
+   */
+  it("la mappa tasto → forma è esattamente quella della spec §11", () => {
+    const view = viewFor("flow")
+    const byKey = new Map(view.tools.map((t) => [t.key, t.variant]))
+    expect(byKey.get("1")).toBe("terminal")
+    expect(byKey.get("2")).toBe("process")
+    expect(byKey.get("3")).toBe("decision")
+    expect(byKey.get("4")).toBe("io")
+    expect(byKey.get("5")).toBe("subprocess")
+    expect(byKey.get("6")).toBe("note")
+    expect(view.tools.find((t) => t.key === "r")).toMatchObject({ tool: "edge" })
+  })
 })
 
 describe("toolId", () => {

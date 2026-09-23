@@ -3,17 +3,12 @@ import { setNoteText } from "@/editor/class/commands"
 import { classDiagram } from "@/editor/class-access"
 import { noteSize } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
-import { FONT_SIZE } from "@/editor/geometry"
 import { sessionStore } from "@/editor/session-store"
-import { worldToScreen } from "@/editor/viewport"
+import { TextEditorOverlay } from "./TextEditorOverlay"
 
 /**
- * Textarea sovrapposta a una nota in editing, posizionata come `MembersEditor` — `worldToScreen`,
- * dimensioni da `noteSize`.
- *
- * **Senza parser, quindi senza i due comportamenti che `MembersEditor` ha dovuto costruire**: non
- * c'è un testo che possa essere rifiutato, quindi nessun rifiuto sul blur e nessuna riapertura col
- * caret su una riga d'errore. Si commette sul blur, Escape chiude scartando.
+ * Overlay dell'editor sulla nota in editing: solo dati e commit, il markup è `TextEditorOverlay`
+ * (I2 della correzione finale — vedi il suo docblock per la ragione dell'estrazione).
  */
 export function NoteEditor() {
   const editing = useStore(sessionStore, (s) => s.editing)
@@ -28,34 +23,21 @@ export function NoteEditor() {
 
   const close = () => sessionStore.getState().setEditing(null)
   const { w, h } = noteSize(note)
-  const tl = worldToScreen(viewport, { x: view.x, y: view.y })
 
   return (
-    <textarea
-      aria-label="Testo della nota"
-      autoFocus
+    <TextEditorOverlay
+      ariaLabel="Testo della nota"
+      x={view.x}
+      y={view.y}
+      w={w}
+      h={h}
+      viewport={viewport}
       defaultValue={note.text}
-      onFocus={(e) => e.currentTarget.select()}
-      onBlur={(e) => {
-        documentStore.getState().dispatch(setNoteText(editing.key, e.currentTarget.value))
+      onCommit={(value) => {
+        documentStore.getState().dispatch(setNoteText(editing.key, value))
         close()
       }}
-      onKeyDown={(e) => {
-        // Escape scarta; Enter no — una nota è multiriga per natura, a differenza di un nome.
-        if (e.key === "Escape") {
-          e.preventDefault()
-          close()
-        }
-      }}
-      style={{
-        position: "absolute",
-        left: tl.x,
-        top: tl.y,
-        width: w * viewport.scale,
-        height: h * viewport.scale,
-        fontSize: FONT_SIZE * viewport.scale,
-      }}
-      className="resize-none rounded border bg-card p-1 font-mono text-foreground outline-none ring-2 ring-primary"
+      onCancel={close}
     />
   )
 }

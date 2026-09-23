@@ -1,18 +1,17 @@
 import type { DevDocument } from "@/model/document"
 import type { FlowShape } from "@/model/flow/schema"
 import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes } from "../flow/commands"
-import { laneAt } from "../flow/geometry"
+import { flowNodeRect, laneAt } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
 import { flowLayoutGraph } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
  * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts` e `flow/layout.ts`,
- * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `rectOf` ed `edgeGeometry` restano stub: la
- * geometria per forma esiste da `flow/geometry.ts` (Task 6), ma il piano non ne assegna il
- * cablaggio qui a nessun task — resta per quando un chiamante reale (selezione, drag, export) la
- * raggiungerà. `validate` resta stub per un motivo diverso: aspetta le regole di validazione del
- * Task 9, non la geometria.
+ * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `edgeGeometry` resta stub: serve il router
+ * ortogonale esteso all'asse orizzontale, che arriva nel Task 7 insieme al resto della resa sul
+ * canvas — scriverlo qui vorrebbe dire cablarlo due volte. `validate` resta stub per un motivo
+ * diverso: aspetta le regole di validazione del Task 9, non la geometria.
  */
 export function flowOps(doc: DevDocument): DiagramOps {
   const diagram = () => flowDiagram(doc)
@@ -20,11 +19,11 @@ export function flowOps(doc: DevDocument): DiagramOps {
   return {
     nodeKeys: () => Object.keys(diagram().view.nodes),
 
-    rectOf: () => {
-      // ponytail: non ancora cablato a `flowNodeRect` (`flow/geometry.ts`, Task 6) — il piano non
-      // assegna questo cablaggio a nessun task. Va risolto quando un chiamante vero (selezione,
-      // drag, export) raggiunge il flowchart.
-      throw new Error("flowchart: geometria dei nodi non ancora implementata")
+    rectOf: (key, at) => {
+      const node = diagram().model.nodes[key]
+      const view = diagram().view.nodes[key]
+      if (!node || !view) return null
+      return flowNodeRect(node, at ? { ...view, ...at } : view)
     },
 
     edgesTouching: (keys): EdgeEnds[] =>
@@ -33,8 +32,7 @@ export function flowOps(doc: DevDocument): DiagramOps {
         .map(([key, edge]) => ({ key, source: edge.source, target: edge.target })),
 
     edgeGeometry: () => {
-      // ponytail: non ancora cablato — la geometria degli archi (routing, frecce) non è ancora
-      // stata composta per il flowchart e il piano non assegna questo cablaggio a nessun task.
+      // ponytail: rimosso nel Task 7
       throw new Error("flowchart: geometria degli archi non ancora implementata")
     },
 

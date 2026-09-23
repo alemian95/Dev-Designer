@@ -76,3 +76,25 @@ describe("flowOps", () => {
     expect(opsFor(next).addEdge(key, "fantasma")).toBeNull()
   })
 })
+
+describe("rectOf", () => {
+  it("torna il rettangolo del nodo alla sua posizione salvata", () => {
+    const doc = createFlowDocument("test", "id-1")
+    const { key, recipe } = opsFor(doc).addNode({ x: 40, y: 40 }, "process")
+    const next = produce(doc, recipe)
+    expect(opsFor(next).rectOf(key)).toEqual({ x: 40, y: 40, w: 60, h: 40 })
+  })
+
+  it("torna null per una chiave inesistente", () => {
+    expect(opsFor(createFlowDocument("test", "id-1")).rectOf("fantasma")).toBeNull()
+  })
+
+  // È il solo caso in cui `at` fa la differenza: l'anteprima del drag lo passa per disegnare il
+  // nodo dove il gesto lo sta portando, non dove sta ancora scritto in `view.nodes`.
+  it("con `at` usa la posizione data, non quella salvata in `view`", () => {
+    const doc = createFlowDocument("test", "id-1")
+    const { key, recipe } = opsFor(doc).addNode({ x: 40, y: 40 }, "process")
+    const next = produce(doc, recipe)
+    expect(opsFor(next).rectOf(key, { x: 200, y: 300 })).toEqual({ x: 200, y: 300, w: 60, h: 40 })
+  })
+})

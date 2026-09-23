@@ -123,6 +123,30 @@ describe("emitFlowMermaid: note omesse", () => {
     expect(text).not.toContain("solo-note")
     expect(warnings.join(" ")).toContain("1")
   })
+
+  it("un arco che tocca una nota non esce, ed è contato in un avviso — non è già coperto da flow-dangling-edge: la nota è un nodo vero del modello", () => {
+    const m = model({
+      nodes: { a: n("A", "process"), x: n("nota", "note") },
+      edges: { e1: e("a", "x") },
+    })
+    const { text, warnings } = emitFlowMermaid(m)
+    expect(text).not.toContain("-->")
+    const edgeWarnings = warnings.filter((w) => w.includes("arch") && (w.includes("nota") || w.includes("note")))
+    expect(edgeWarnings).toHaveLength(1)
+    expect(edgeWarnings[0]).toContain("1")
+  })
+
+  it("più archi verso note si aggregano in un solo avviso col conteggio, non uno a riga", () => {
+    const m = model({
+      nodes: { a: n("A", "process"), b: n("B", "process"), x: n("nota", "note"), y: n("altra", "note") },
+      edges: { e1: e("a", "x"), e2: e("b", "y") },
+    })
+    const { text, warnings } = emitFlowMermaid(m)
+    expect(text).not.toContain("-->")
+    const edgeWarnings = warnings.filter((w) => w.includes("arch") && (w.includes("nota") || w.includes("note")))
+    expect(edgeWarnings).toHaveLength(1)
+    expect(edgeWarnings[0]).toContain("2")
+  })
 })
 
 describe("emitFlowMermaid: escaping", () => {
@@ -160,13 +184,27 @@ describe("emitFlowMermaid: escaping", () => {
     expect(emitFlowMermaid(m).text).toContain('n1 -->|"passo #quot;due#quot;"| n2')
   })
 
-  it("un | nell'etichetta di un arco resta dentro le virgolette, non chiude il delimitatore", () => {
+  it("un | nell'etichetta di un arco esce come entità: senza mermaid installato non si può verificare se il lexer legge il | come delimitatore, un'entità rende la domanda superflua", () => {
     const m = model({
       nodes: { a: n("A", "process"), b: n("B", "process") },
       edges: { e1: e("a", "b", "uno|due") },
     })
     const { text } = emitFlowMermaid(m)
-    expect(text).toContain('n1 -->|"uno|due"| n2')
+    expect(text).toContain('n1 -->|"uno#124;due"| n2')
+    expect(text).not.toContain('"uno|due"')
+  })
+
+  it("un | nell'etichetta di un nodo esce come entità con la stessa regola", () => {
+    const m = model({ nodes: { a: n("uno|due", "process") }, edges: {} })
+    const { text } = emitFlowMermaid(m)
+    expect(text).toContain('n1["uno#124;due"]')
+  })
+
+  it("più | in un'etichetta diventano tutti #124;, non solo il primo", () => {
+    const m = model({ nodes: { a: n("a|b|c", "process") }, edges: {} })
+    const { text } = emitFlowMermaid(m)
+    expect(text).toContain('n1["a#124;b#124;c"]')
+    expect(text).not.toContain("|")
   })
 
   it("un'etichetta vuota esce come stringa vuota fra virgolette, non rompe il nodo", () => {

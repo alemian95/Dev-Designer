@@ -9,8 +9,17 @@ import type { EmitResult } from "./result"
  * di `<`/`>`. A differenza delle note del class diagram l'a capo qui diventa `<br/>` autochiudente:
  * è la forma che la spec (§10) chiede per il flowchart, non `<br>`.
  *
- * Non scappa `[`, `]`, `{`, `}` né `|`: sono le virgolette attorno al testo a proteggerli (spec
- * §10, "il testo va sempre fra virgolette"), non un escape carattere per carattere.
+ * Non scappa `[`, `]`, `{`, `}`: sono le virgolette attorno al testo a proteggerli (spec §10, "il
+ * testo va sempre fra virgolette"), non un escape carattere per carattere.
+ *
+ * `|` invece si scappa come entità (`#124;`), nella stessa lista e nello stesso ordine (dopo `&`,
+ * come tutte le altre): il progetto non ha mermaid installato per misurare se il lexer
+ * dell'etichetta di un arco (`-->|"…"|`) legge un `|` dentro le virgolette come testo o come il
+ * delimitatore che chiude anticipatamente l'etichetta — invece di verificarlo, la domanda si
+ * rende superflua: un'entità non contiene mai il carattere delimitatore, quindi l'uscita è valida
+ * qualunque cosa faccia quel lexer. Vale anche nel testo di un nodo, dove il `|` non avrebbe
+ * bisogno di protezione: una regola sola per tutte le etichette costa meno di un ramo speciale
+ * solo per gli archi.
  */
 function escapeLabel(text: string): string {
   return text
@@ -18,6 +27,7 @@ function escapeLabel(text: string): string {
     .replaceAll("<", "#lt;")
     .replaceAll(">", "#gt;")
     .replaceAll('"', "#quot;")
+    .replaceAll("|", "#124;")
     .replaceAll("\n", "<br/>")
 }
 
@@ -59,6 +69,7 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
   let nextNodeId = 1
   let noteCount = 0
   let hasSubgraph = false
+  let noteEdgeCount = 0
 
   model.lanes.forEach((lane, laneIndex) => {
     const keysInLane = Object.keys(model.nodes)
@@ -97,10 +108,18 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
     const edge = model.edges[key]!
     const sourceId = nodeIdByKey.get(edge.source)
     const targetId = nodeIdByKey.get(edge.target)
-    // Un estremo assente (nota, o chiave che non esiste più) non ha un id da emettere: il pannello
-    // problemi lo segnala già come arco pendente (`validateFlow`, `flow-dangling-edge`); qui si
-    // scarta l'arco invece di produrre una riga con un id mancante.
-    if (sourceId === undefined || targetId === undefined) continue
+    if (sourceId === undefined || targetId === undefined) {
+      // Una nota è comunque un nodo di `model.nodes` — `validateFlow` non la tratta come un
+      // estremo assente, quindi `flow-dangling-edge` non scatta e il pannello problemi tace.
+      // L'unico posto che sa che l'arco è sparito è qui: si conta, per l'avviso aggregato sotto.
+      // Un estremo davvero inesistente (chiave che non è in `model.nodes` per niente) è invece
+      // un invariante rotto che `validateFlow` segnala già come `flow-dangling-edge` — qui non
+      // aggiunge un secondo conteggio, si scarta e basta.
+      const sourceIsNote = model.nodes[edge.source]?.shape === "note"
+      const targetIsNote = model.nodes[edge.target]?.shape === "note"
+      if (sourceIsNote || targetIsNote) noteEdgeCount += 1
+      continue
+    }
     const label = edge.label === "" ? "" : `|"${escapeLabel(edge.label)}"|`
     out.push(`  ${sourceId} -->${label} ${targetId}`)
   }
@@ -114,6 +133,11 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
   if (noteCount > 0) {
     warnings.push(
       `${noteCount} note non sono uscite: in Mermaid entrerebbero nel flusso come nodi qualunque e ne sposterebbero il layout.`,
+    )
+  }
+  if (noteEdgeCount > 0) {
+    warnings.push(
+      `${noteEdgeCount} archi non sono usciti perché toccano una nota: una nota non è un nodo del flusso in Mermaid.`,
     )
   }
 

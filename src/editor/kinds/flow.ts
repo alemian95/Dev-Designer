@@ -1,5 +1,6 @@
 import type { DevDocument } from "@/model/document"
 import type { FlowShape } from "@/model/flow/schema"
+import { validateFlow } from "@/model/flow/validate"
 import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes, moveFlowNodes } from "../flow/commands"
 import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, laneAt } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
@@ -12,8 +13,8 @@ import type { DiagramOps, EdgeEnds } from "./ops"
  * (`flow/geometry.ts`), sulla stessa forma di `erOps.edgeGeometry` (`kinds/er.ts:34-38`): lo scarto
  * di fascio si legge dal modello intero, non si passa dal chiamante, perché dipende da *tutti* gli
  * archi. `commitDrag` è l'unico tipo di diagramma che lo implementa (spec §6): ER e class restano
- * senza, e il runner cade su `moveNodes` per loro esattamente come prima. `validate` resta stub:
- * aspetta le regole di validazione del Task 9, non la geometria.
+ * senza, e il runner cade su `moveNodes` per loro esattamente come prima. `validate` è cablato su
+ * `validateFlow` (`model/flow/validate.ts`, spec §9).
  */
 export function flowOps(doc: DevDocument): DiagramOps {
   const diagram = () => flowDiagram(doc)
@@ -59,8 +60,6 @@ export function flowOps(doc: DevDocument): DiagramOps {
 
     layoutRecipe: (positions) => applyFlowLayout(positions),
 
-    // ponytail: nessuna regola finché non arrivano quelle del Task 9 — un pannello che non trova
-    // niente è meglio di uno che esplode, ma finché è così un flowchart risulta sempre valido.
-    validate: () => [],
+    validate: () => validateFlow(diagram().model),
   }
 }

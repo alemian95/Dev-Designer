@@ -3,6 +3,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createErDocument } from "@/model/er/schema"
+import { createFlowDocument } from "@/model/flow/schema"
 import { documentStore } from "@/editor/document-store"
 import { sessionStore } from "@/editor/session-store"
 import { IDENTITY } from "@/editor/viewport"
@@ -253,6 +254,36 @@ describe("il resto del cablaggio", () => {
   it("il doppio click fuori dall'header di un'entità non apre niente", () => {
     // Nell'ER il corpo non ha un formato di testo: il doppio click rinomina solo sull'header.
     sotto = nodo
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
+    expect(sessionStore.getState().editing).toBeNull()
+  })
+
+  it("il doppio click su un arco di flowchart apre l'etichetta (spec §8)", () => {
+    documentStore.getState().load(createFlowDocument("f", "f"))
+    documentStore.getState().dispatch((draft) => {
+      const d = draft.diagram
+      if (d.type !== "flow") return
+      const lane = d.model.lanes[0]!.id
+      d.model.nodes["a"] = { label: "", shape: "process", lane }
+      d.model.nodes["b"] = { label: "", shape: "process", lane }
+      d.view.nodes["a"] = { x: 0, y: 0, collapsed: false }
+      d.view.nodes["b"] = { x: 200, y: 0, collapsed: false }
+      d.model.edges["e1"] = { source: "a", target: "b", label: "" }
+    })
+    const arco = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    arco.setAttribute("data-edge-id", "e1")
+    svg.append(arco)
+    sotto = arco
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
+    expect(sessionStore.getState().editing).toEqual({ key: "e1", target: "label" })
+  })
+
+  it("il doppio click su un arco in un ER non apre niente: niente etichette sugli archi", () => {
+    // Guardia invariata per gli altri tipi: `hit.kind !== "node"` esce prima di aprire qualunque cosa.
+    const arco = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    arco.setAttribute("data-edge-id", "rel")
+    svg.append(arco)
+    sotto = arco
     svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
     expect(sessionStore.getState().editing).toBeNull()
   })

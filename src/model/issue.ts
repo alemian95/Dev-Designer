@@ -6,6 +6,9 @@ export type IssueCode =
   // riaprire questo file, e una union chiusa dà l'esaustività a tsc)
   | "class-name-clash" | "duplicate-member" | "dangling-relation"
   | "generalization-cycle" | "abstract-method-in-concrete-class"
+  // flowchart
+  | "flow-dangling-edge" | "flow-decision-arity" | "flow-dead-end"
+  | "flow-unreachable" | "flow-branch-unlabeled" | "flow-no-terminal"
 
 export type IssueSeverity = "error" | "warning"
 

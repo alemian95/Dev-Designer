@@ -3,17 +3,20 @@ import type { LucideIcon } from "lucide-react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import type { Rect } from "@/editor/geometry"
+import type { Tool } from "@/editor/session-store"
 import type { Diagram } from "@/model/document"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { classView } from "./class"
 import { erView } from "./er"
+import { flowView } from "./flow"
 
 /**
- * Formati emessi dall'export testo. `class-mermaid` è dichiarato già qui perché il Task 14
- * userà questa stessa union, ma nessuna `DiagramView` di oggi lo elenca in `textFormats`: un
- * formato senza emettitore non deve comparire nel dialogo.
+ * Formati emessi dall'export testo. `class-mermaid` e `flow-mermaid` sono dichiarati già qui
+ * perché più task consumano questa stessa union prima che l'emettitore esista, ma nessuna
+ * `DiagramView` li elenca in `textFormats` finché il proprio emettitore non c'è: un formato senza
+ * emettitore non deve comparire nel dialogo. `flow-mermaid` lo guadagna il Task 10.
  */
-export type TextFormat = "postgres" | "mysql" | "mermaid" | "class-mermaid"
+export type TextFormat = "postgres" | "mysql" | "mermaid" | "class-mermaid" | "flow-mermaid"
 
 /**
  * Props di `DiagramView.NodeView`: `node` arriva come `unknown` perché il registro è lo stesso
@@ -49,20 +52,36 @@ export interface EdgeViewProps {
  * `buildSvg` (`@/ui/export/svg.tsx`), che gira dentro `renderToStaticMarkup` e uno store non ce
  * l'ha.
  */
-interface ToolDef { label: string; key: string; Icon: LucideIcon }
+export interface ToolDef {
+  label: string
+  key: string
+  Icon: LucideIcon
+  tool: Tool
+  /** Passata ad `addNode`: la forma, per i tipi che ne hanno più d'una. */
+  variant?: string
+}
+
+/** Identità di uno strumento nel ToggleGroup: `tool` da solo non basta quando ci sono più varianti. */
+export function toolId(def: Pick<ToolDef, "tool" | "variant">): string {
+  return def.variant ? `${def.tool}:${def.variant}` : def.tool
+}
 
 export interface DiagramView {
   NodesLayer: ComponentType
   EdgesLayer: ComponentType
   NodeView: ComponentType<NodeViewProps>
   EdgeView: ComponentType<EdgeViewProps>
+  /** Montato solo quando la selezione è esattamente un nodo o esattamente un arco (`PropertiesPanel`). */
   Properties: ComponentType
-  tools: {
-    node: ToolDef
-    edge: ToolDef
-    /** Terza specie di nodo, oggi solo nel class diagram: l'ER non ha note e non ne dichiara. */
-    note?: ToolDef
-  }
+  /**
+   * Corpo del pannello **senza nessuna selezione**. Opzionale: se un tipo non lo dichiara,
+   * `PropertiesPanel` mostra la propria frase generica, come faceva prima che questo campo
+   * esistesse — ER e class non lo dichiarano e restano su quella. Il flowchart lo usa per il
+   * pannello delle corsie (spec §11): a differenza di `Properties`, qui non c'è un nodo o un arco
+   * da passare, quindi il componente non prende prop.
+   */
+  EmptyProperties?: ComponentType
+  tools: ToolDef[]
   textFormats: TextFormat[]
 }
 
@@ -73,6 +92,8 @@ export function viewFor(type: Diagram["type"]): DiagramView {
       return erView
     case "class":
       return classView
+    case "flow":
+      return flowView
   }
 }
 

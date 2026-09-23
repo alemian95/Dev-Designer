@@ -23,8 +23,9 @@ export async function autoLayout(): Promise<void> {
 
   documentSession.getState().patch({ layingOut: true })
   try {
-    const positions = await layoutEngine.layout(graph.nodes, graph.edges)
-    documentStore.getState().dispatch(applyLayout(positions))
+    const positions = await layoutEngine.layout(graph)
+    const ops = opsFor(documentStore.getState().doc)
+    documentStore.getState().dispatch(ops.layoutRecipe ? ops.layoutRecipe(positions) : applyLayout(positions))
     // Anche se il layout non ha cambiato niente: la vista si adatta comunque, ed è ciò che
     // l'utente ha chiesto premendo il pulsante.
     fitToContent()

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import type { LayoutEdge, LayoutNode } from "@/model/layout"
+import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
 import { createLayoutEngine, type LayoutRequest, type LayoutResponse, type LayoutWorker } from "./client"
 
 const NODES: LayoutNode[] = [{ id: "a", w: 160, h: 50 }, { id: "b", w: 160, h: 50 }]
 const EDGES: LayoutEdge[] = [{ id: "e", source: "a", target: "b" }]
+const GRAPH: LayoutGraph = { nodes: NODES, edges: EDGES, direction: "DOWN" }
 const POSITIONS = { a: { x: 0, y: 0 }, b: { x: 0, y: 110 } }
 
 /** Worker finto: registra le richieste e lascia al test il momento in cui rispondere. */
@@ -41,8 +42,8 @@ describe("createLayoutEngine", () => {
   it("risolve con le posizioni del worker", async () => {
     const w = new FakeWorker()
     const engine = createLayoutEngine(() => w)
-    const pending = engine.layout(NODES, EDGES)
-    expect(w.sent[0]).toMatchObject({ id: 1, nodes: NODES, edges: EDGES })
+    const pending = engine.layout(GRAPH)
+    expect(w.sent[0]).toMatchObject({ id: 1, nodes: NODES, edges: EDGES, direction: "DOWN" })
     w.reply({ id: 1, ok: true, positions: POSITIONS })
     await expect(pending).resolves.toEqual(POSITIONS)
   })
@@ -50,7 +51,7 @@ describe("createLayoutEngine", () => {
   it("rigetta col messaggio quando il worker riporta un errore", async () => {
     const w = new FakeWorker()
     const engine = createLayoutEngine(() => w)
-    const pending = engine.layout(NODES, EDGES)
+    const pending = engine.layout(GRAPH)
     w.reply({ id: 1, ok: false, message: "grafo rifiutato" })
     await expect(pending).rejects.toThrow("grafo rifiutato")
   })
@@ -58,7 +59,7 @@ describe("createLayoutEngine", () => {
   it("un errore di caricamento rigetta invece di lasciare la promessa appesa", async () => {
     const w = new FakeWorker()
     const engine = createLayoutEngine(() => w)
-    const pending = engine.layout(NODES, EDGES)
+    const pending = engine.layout(GRAPH)
     w.emit("error", new Event("error"))
     await expect(pending).rejects.toThrow(/non è stato caricato/)
   })
@@ -67,7 +68,7 @@ describe("createLayoutEngine", () => {
     vi.useFakeTimers()
     const w = new FakeWorker()
     const engine = createLayoutEngine(() => w, 1000)
-    const pending = engine.layout(NODES, EDGES)
+    const pending = engine.layout(GRAPH)
     vi.advanceTimersByTime(1000)
     await expect(pending).rejects.toThrow(/non ha risposto in tempo/)
     expect(w.terminated).toBe(true)
@@ -76,7 +77,7 @@ describe("createLayoutEngine", () => {
   it("un messaggio illeggibile rigetta ma il worker resta valido", async () => {
     const w = new FakeWorker()
     const engine = createLayoutEngine(() => w)
-    const pending = engine.layout(NODES, EDGES)
+    const pending = engine.layout(GRAPH)
     w.emit("messageerror", new Event("messageerror"))
     await expect(pending).rejects.toThrow(/illeggibile/)
     // A differenza di un errore di caricamento o di un timeout, un singolo messaggio
@@ -91,8 +92,8 @@ describe("createLayoutEngine", () => {
       workers.push(w)
       return w
     })
-    const first = engine.layout(NODES, EDGES)
-    const second = engine.layout(NODES, [])
+    const first = engine.layout(GRAPH)
+    const second = engine.layout({ nodes: NODES, edges: [], direction: "DOWN" })
     await expect(first).rejects.toThrow(/abbandonato/)
     expect(workers[0]?.terminated).toBe(true)
     // Il worker abbandonato è inutilizzabile: la seconda richiesta ne ha fatto nascere uno pulito.
@@ -104,11 +105,18 @@ describe("createLayoutEngine", () => {
   it("scarta la risposta in ritardo di una richiesta abbandonata", async () => {
     const w = new FakeWorker()
     const engine = createLayoutEngine(() => w)
-    const pending = engine.layout(NODES, EDGES)
+    const pending = engine.layout(GRAPH)
     w.reply({ id: 1, ok: true, positions: POSITIONS })
     await expect(pending).resolves.toEqual(POSITIONS)
     // Nessuna richiesta in volo: una risposta che arriva ora non deve far esplodere niente.
     expect(() => w.reply({ id: 1, ok: true, positions: POSITIONS })).not.toThrow()
+  })
+
+  it("la direzione del grafo arriva al worker dentro la richiesta", () => {
+    const w = new FakeWorker()
+    const engine = createLayoutEngine(() => w)
+    void engine.layout({ nodes: [{ id: "a", w: 10, h: 10 }], edges: [], direction: "RIGHT" })
+    expect(w.sent[0]!.direction).toBe("RIGHT")
   })
 
   it("riusa il worker fra due layout consecutivi", async () => {
@@ -118,10 +126,10 @@ describe("createLayoutEngine", () => {
       workers.push(w)
       return w
     })
-    const first = engine.layout(NODES, EDGES)
+    const first = engine.layout(GRAPH)
     workers[0]?.reply({ id: 1, ok: true, positions: POSITIONS })
     await first
-    const second = engine.layout(NODES, EDGES)
+    const second = engine.layout(GRAPH)
     workers[0]?.reply({ id: 2, ok: true, positions: POSITIONS })
     await second
     // Avviare elkjs costa: il worker si tiene finché non fallisce.

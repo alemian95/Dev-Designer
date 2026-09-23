@@ -1,4 +1,4 @@
-import { Box, ChevronDown, ClipboardCopy, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, Save, SaveAll, Square } from "lucide-react"
+import { Box, ChevronDown, ClipboardCopy, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, Save, SaveAll, Square, Workflow } from "lucide-react"
 import { useState, type ChangeEvent } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
@@ -59,6 +59,7 @@ export function DocumentMenu() {
             <DropdownMenuSubContent>
               <DropdownMenuItem onSelect={() => void documentIo.newDocument("er")}><Square /> Diagramma ER</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => void documentIo.newDocument("class")}><Box /> Class diagram</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void documentIo.newDocument("flow")}><Workflow /> Flowchart</DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuItem onSelect={requestOpen}><FolderOpen /> Apri… <DropdownMenuShortcut>⌘O</DropdownMenuShortcut></DropdownMenuItem>

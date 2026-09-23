@@ -98,6 +98,35 @@ function previewDrag(targets: DragTargets, dx: number, dy: number): void {
   }
 }
 
+/**
+ * Riporta nodi e archi di `targets` alle posizioni di partenza, senza il filtro dell'inquadratura
+ * di `previewDrag` — qui serve **tutto**, non solo ciò che si vede: gira una volta sola al
+ * rilascio, non a ogni frame, e su ciò che il gesto ha davvero toccato, quindi il costo è quello
+ * della selezione trascinata, non del documento intero.
+ *
+ * Serve solo al ramo `commitDrag` (flowchart, spec §6), dove la posizione scritta al rilascio può
+ * differire da quella dell'anteprima: se il centro del nodo cade fuori da ogni banda, il comando
+ * lo riallinea alla sua banda di partenza, e quel riallineamento può riportarlo **esattamente**
+ * dov'era prima del drag. In quel caso `documentStore.dispatch` non produce patch per quel nodo
+ * (e per gli archi che lo toccano), React non ridisegna niente perché per lei nulla è cambiato, e
+ * il `transform` scritto a mano dall'anteprima — fermo all'ultima posizione del puntatore, non a
+ * quella di partenza — resterebbe sul DOM. Scrivendo qui le posizioni di partenza *prima* della
+ * dispatch, il DOM è già corretto se la dispatch non fa nulla, e viene comunque sovrascritto da
+ * React se la fa. `moveNodes` (ER, classi) non ne ha bisogno: lì la posizione confermata è sempre
+ * uguale a quella dell'anteprima, quindi la divergenza che questa funzione ripara non si presenta.
+ */
+function resetDragTargets(targets: DragTargets): void {
+  const ops = opsFor(documentStore.getState().doc)
+  for (const node of targets.nodes) setNodePosition(node.key, node.x, node.y)
+  for (const edge of targets.edges) {
+    const a = targets.rects.get(edge.source)
+    const b = targets.rects.get(edge.target)
+    if (!a || !b) continue
+    const geo = ops.edgeGeometry(edge.key, a, b)
+    if (geo) setEdgeGeometry(edge.key, geo)
+  }
+}
+
 function nodeCenter(key: string): Point | null {
   const r = opsFor(documentStore.getState().doc).rectOf(key)
   return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : null
@@ -149,7 +178,9 @@ export function createInteractionRunner(): InteractionRunner {
         previewDrag(dragTargets, fx.dx, fx.dy)
         break
       case "commit-drag": {
-        const recipe = moveNodes(fx.keys, fx.dx, fx.dy)
+        const ops = opsFor(documentStore.getState().doc)
+        if (ops.commitDrag && dragTargets) resetDragTargets(dragTargets)
+        const recipe = ops.commitDrag ? ops.commitDrag(fx.keys, fx.dx, fx.dy) : moveNodes(fx.keys, fx.dx, fx.dy)
         if (recipe) documentStore.getState().dispatch(recipe)
         break
       }
@@ -176,28 +207,18 @@ export function createInteractionRunner(): InteractionRunner {
         break
       }
       case "create-node": {
-        const { key, recipe } = opsFor(documentStore.getState().doc).addNode(fx.at)
+        const { key, recipe, edit } = opsFor(documentStore.getState().doc).addNode(fx.at, fx.variant)
         documentStore.getState().dispatch(recipe)
         session().setSelection([selId("node", key)])
         session().setTool("select")
-        session().setEditing({ key, target: "name" })
-        break
-      }
-      case "create-note": {
-        const ops = opsFor(documentStore.getState().doc)
-        if (!ops.addNote) break
-        const { key, recipe } = ops.addNote(fx.at)
-        documentStore.getState().dispatch(recipe)
-        session().setSelection([selId("node", key)])
-        session().setTool("select")
-        session().setEditing({ key, target: "body" })
+        session().setEditing({ key, target: edit })
         break
       }
     }
   }
 
   const step = (event: InteractionEvent): void => {
-    const result = reduce(mode, event, { tool: session().tool, selection: session().selection })
+    const result = reduce(mode, event, { tool: session().tool, variant: session().variant ?? undefined, selection: session().selection })
     mode = result.mode
     for (const fx of result.effects) run(fx)
     // Lo snapshot del drag vale per un solo drag: si scarta appena si esce dal modo, commit o annullamento che sia.

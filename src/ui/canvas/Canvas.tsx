@@ -1,7 +1,9 @@
 import { useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/geometry"
+import { FlowNodeEditor } from "./FlowNodeEditor"
 import { InlineEditor } from "./InlineEditor"
 import { useDiagramView } from "./kinds/registry"
+import { LanesLayer } from "./LanesLayer"
 import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
 import { Overlay } from "./Overlay"
@@ -29,6 +31,10 @@ export function Canvas({ children }: { children?: ReactNode }) {
         </defs>
         <ViewportGroup>
           <rect data-canvas x={-GRID_EXTENT} y={-GRID_EXTENT} width={2 * GRID_EXTENT} height={2 * GRID_EXTENT} fill="url(#dd-grid)" />
+          {/* Le corsie non sono un `DiagramView.NodesLayer`: sono un terzo layer che solo il
+              flowchart popola (spec §5). `LanesLayer` verifica da sé il tipo di diagramma e torna
+              `null` sugli altri (Task 11) — il canvas non lo sa più, legge solo `DiagramView`. */}
+          <LanesLayer />
           <EdgesLayer />
           <NodesLayer />
           {children}
@@ -38,6 +44,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
       <InlineEditor />
       <MembersEditor />
       <NoteEditor />
+      <FlowNodeEditor />
     </div>
   )
 }

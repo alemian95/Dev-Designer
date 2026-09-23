@@ -172,13 +172,14 @@ describe("classOps e le note", () => {
     expect(opsFor(docConNota()).edgesTouching(new Set(["n-1"]))).toEqual([])
   })
 
-  it("addNote produce una chiave nuova e un recipe che la crea", () => {
+  it("addNode con la variante \"note\" produce una chiave nuova e un recipe che la crea", () => {
     const doc = docConNota()
-    const { key, recipe } = opsFor(doc).addNote!({ x: 40, y: 40 })
+    const { key, recipe, edit } = opsFor(doc).addNode({ x: 40, y: 40 }, "note")
     recipe(doc)
     const ops = opsFor(doc)
     expect(ops.nodeKeys()).toContain(key)
     expect(doc.diagram.model.notes[key]).toBeDefined()
+    expect(edit).toBe("body")
   })
 
   it("layoutGraph include la nota libera insieme alla classe", () => {

@@ -13,6 +13,8 @@ function hasNodes(doc: DevDocument): boolean {
       return Object.keys(doc.diagram.model.entities).length > 0
     case "class":
       return Object.keys(doc.diagram.model.classes).length > 0
+    case "flow":
+      return Object.keys(doc.diagram.model.nodes).length > 0
   }
 }
 

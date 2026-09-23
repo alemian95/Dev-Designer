@@ -285,5 +285,5 @@ export function classLayoutGraph(diagram: ClassDiagram): LayoutGraph {
     if (present.has(source) && present.has(target)) edges.push({ id: key, source, target })
   }
 
-  return { nodes, edges }
+  return { nodes, edges, direction: "DOWN" }
 }

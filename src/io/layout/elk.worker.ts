@@ -15,13 +15,12 @@ declare const self: {
 }
 
 /**
- * Le opzioni sono una decisione del progetto (ADR 0006), non un parametro di chi chiama: `layered`
- * perché è l'unico algoritmo misurato che non sovrappone i nodi e sta sotto i 320 ms a 200 tabelle,
- * `DOWN` perché dà metà dell'area di `RIGHT` e mette i padri in alto.
+ * Algoritmo e spaziature sono una decisione del progetto (ADR 0006) e non un parametro di chi
+ * chiama. La **direzione** sì: è una proprietà del tipo di diagramma (ADR 0007), e arriva nella
+ * richiesta.
  */
 const OPTIONS = {
   "elk.algorithm": "layered",
-  "elk.direction": "DOWN",
   "elk.spacing.nodeNode": "40",
   "elk.layered.spacing.nodeNodeBetweenLayers": "60",
 }
@@ -39,12 +38,12 @@ const OPTIONS = {
 const elk = new ELK({ workerFactory: () => new ElkWorker() })
 
 self.onmessage = (event) => {
-  const { id, nodes, edges } = event.data
+  const { id, nodes, edges, direction } = event.data
   const run = async (): Promise<LayoutResponse> => {
     try {
       const graph: ElkNode = {
         id: "root",
-        layoutOptions: OPTIONS,
+        layoutOptions: { ...OPTIONS, "elk.direction": direction },
         children: nodes.map((n) => ({ id: n.id, width: n.w, height: n.h })),
         edges: edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
       }

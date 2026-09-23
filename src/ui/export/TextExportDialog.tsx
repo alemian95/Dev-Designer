@@ -7,33 +7,42 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
+import { flowDiagram } from "@/editor/flow-access"
 import { emitDdl } from "@/io/emit/ddl"
 import type { Dialect } from "@/io/ddl/schema"
 import { emitClassMermaid } from "@/io/emit/class-mermaid"
 import { emitMermaid } from "@/io/emit/er-mermaid"
+import { emitFlowMermaid } from "@/io/emit/flow-mermaid"
 import type { EmitResult } from "@/io/emit/result"
 import { documentSession } from "@/io/document-session"
 import { download } from "@/io/file"
 import type { ClassModel } from "@/model/class/schema"
 import type { ErModel } from "@/model/er/schema"
+import type { FlowModel } from "@/model/flow/schema"
 import { useDiagramView, type TextFormat } from "@/ui/canvas/kinds/registry"
 import { documentFileName } from "./file-name"
 
-type Format = Dialect | "mermaid" | "class-mermaid"
+type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid"
 
-/** Il modello del documento aperto, marcato col tipo di diagramma: due `Record` diversi
- *  (`ErModel`/`ClassModel`) non si distinguono da soli, e `emit` sotto ne ha bisogno per scegliere
- *  l'emettitore senza un cast. */
-type ModelState = { kind: "er"; model: ErModel } | { kind: "class"; model: ClassModel } | null
+/** Il modello del documento aperto, marcato col tipo di diagramma: tre `Record` diversi
+ *  (`ErModel`/`ClassModel`/`FlowModel`) non si distinguono da soli, e `emit` sotto ne ha bisogno
+ *  per scegliere l'emettitore senza un cast. */
+type ModelState =
+  | { kind: "er"; model: ErModel }
+  | { kind: "class"; model: ClassModel }
+  | { kind: "flow"; model: FlowModel }
+  | null
 
 /**
  * Sceglie l'emettitore in base al tipo di modello e, per l'ER, al formato scelto. Il ramo finale
- * (`class-mermaid` su un modello ER) non può accadere — `erView.textFormats` non lo elenca mai fra
- * le opzioni — ma resta per rendere la funzione totale senza un cast su `format`.
+ * (`class-mermaid`/`flow-mermaid` su un modello che non è il proprio) non può accadere — ogni
+ * `*View.textFormats` non elenca mai il formato di un altro tipo fra le opzioni — ma resta per
+ * rendere la funzione totale senza un cast su `format`.
  */
 function emit(state: ModelState, format: Format): EmitResult {
   if (!state) return { text: "", warnings: [] }
   if (state.kind === "class") return emitClassMermaid(state.model)
+  if (state.kind === "flow") return emitFlowMermaid(state.model)
   if (format === "mermaid") return emitMermaid(state.model)
   if (format === "postgres" || format === "mysql") return emitDdl(state.model, format)
   return { text: "", warnings: [] }
@@ -51,6 +60,7 @@ const FORMATS: Record<Format, { label: string; extension: string }> = {
   mysql: { label: "MySQL", extension: "sql" },
   mermaid: { label: "Mermaid", extension: "mmd" },
   "class-mermaid": { label: "Mermaid", extension: "mmd" },
+  "flow-mermaid": { label: "Mermaid flowchart", extension: "mmd" },
 }
 
 /** `view.textFormats` è tipato su tutta la union: qui si mostra solo chi ha un emettitore. */
@@ -63,16 +73,18 @@ function hasEmitter(format: TextFormat): format is Format {
  * Testo diverso per tipo di diagramma — quello ER parla del round trip col dump SQL, quello class
  * elenca gli elementi UML che §16 della spec mette fuori scopo (non se ne inventano altri).
  */
-const MODEL_LIMITS: Record<"er" | "class", string> = {
+const MODEL_LIMITS: Record<"er" | "class" | "flow", string> = {
   er: "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale.",
   class: "Il modello non rappresenta generici, package, note, classi di associazione, classi annidate e visibilità di pacchetto.",
+  flow: "Le note non hanno equivalente in Mermaid, e le corsie diventano riquadri (subgraph) invece di bande orizzontali vere.",
 }
 
 /** Stessa idea di `MODEL_LIMITS`, per la descrizione del dialogo: menziona il DDL solo quando è
  *  davvero fra i formati offerti (`erView.textFormats`), non su ogni tipo di diagramma. */
-const DIALOG_DESCRIPTION: Record<"er" | "class", string> = {
+const DIALOG_DESCRIPTION: Record<"er" | "class" | "flow", string> = {
   er: "Il DDL dello schema o il diagramma in Mermaid.",
   class: "Il diagramma in Mermaid.",
+  flow: "Il diagramma in Mermaid.",
 }
 
 /**
@@ -94,6 +106,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
     useShallow((s): ModelState =>
       s.doc.diagram.type === "er" ? { kind: "er", model: erDiagram(s.doc).model } :
       s.doc.diagram.type === "class" ? { kind: "class", model: classDiagram(s.doc).model } :
+      s.doc.diagram.type === "flow" ? { kind: "flow", model: flowDiagram(s.doc).model } :
       null),
   )
   const view = useDiagramView()

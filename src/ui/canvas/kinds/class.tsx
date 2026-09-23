@@ -72,10 +72,10 @@ export const classView: DiagramView = {
   NodeView,
   EdgeView,
   Properties: ClassProperties,
-  tools: {
-    node: { label: "Classe", key: "c", Icon: Box },
-    edge: { label: "Relazione", key: "r", Icon: Spline },
-    note: { label: "Nota", key: "n", Icon: StickyNote },
-  },
+  tools: [
+    { label: "Classe", key: "c", Icon: Box, tool: "node" },
+    { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
+    { label: "Nota", key: "n", Icon: StickyNote, tool: "node", variant: "note" },
+  ],
   textFormats: ["class-mermaid"],
 }

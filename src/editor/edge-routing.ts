@@ -111,6 +111,10 @@ function slide(at: number, min: number, size: number, offset: number): number {
   return clamp(at + offset, min + inset, min + size - inset)
 }
 
+// ponytail: il router non evita gli ostacoli, quindi un arco all'indietro passa sopra i nodi che
+// trova. Invisibile in ER e class, dove le contro-frecce sono rare; normale nel flowchart, dove il
+// ciclo è il caso comune. Alzarlo significa un router con aggiramento (A* su griglia dei
+// rettangoli), non una correzione a questo.
 /**
  * Routing ortogonale con al più due pieghe, senza evitamento ostacoli (spec §4.3).
  *
@@ -202,7 +206,8 @@ export interface EdgeGeometry {
   d: string
   sourceMarker: string
   targetMarker: string
-  /** Punto medio del segmento centrale, per l'etichetta. */
+  /** Punto per l'etichetta: il segmento centrale per ER e classi (`edgeGeometry`,
+   *  `classEdgeGeometry`), il primo per il flowchart (`flowEdgeGeometry`) — vedi lì il perché. */
   label: Point
   /** Capi per le molteplicità testuali: solo nei class diagram, l'ER non li popola. */
   sourceEnd?: Point

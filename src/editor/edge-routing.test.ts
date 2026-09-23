@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Relationship } from "@/model/er/schema"
-import { BUNDLE_GAP, crowsFootPath, edgeGeometry, edgeOffsets, pathFromPoints, routeEdge } from "./edge-routing"
+import { BUNDLE_GAP, crowsFootPath, edgeGeometry, edgeOffsets, LEFT, pathFromPoints, RIGHT, routeEdge } from "./edge-routing"
 
 const rel: Relationship = {
   source: { entity: "a", attributes: [], cardinality: "many" },
@@ -49,6 +49,27 @@ describe("routeEdge", () => {
     // `targetDir` dichiarano, e il marker vi si appoggia.
     expect(primo.x).toBe(100)
     expect(ultimo.y).toBe(0)
+  })
+})
+
+describe("routeEdge da sinistra a destra", () => {
+  it("esce a destra della sorgente ed entra a sinistra del bersaglio", () => {
+    const a = { x: 0, y: 0, w: 100, h: 60 }
+    const b = { x: 300, y: 0, w: 100, h: 60 }
+    const route = routeEdge(a, b, false)
+    expect(route.sourceDir).toEqual(RIGHT)
+    expect(route.targetDir).toEqual(LEFT)
+  })
+
+  it("un arco all'indietro esce comunque con un percorso ortogonale valido", () => {
+    const a = { x: 300, y: 0, w: 100, h: 60 }
+    const b = { x: 0, y: 0, w: 100, h: 60 }
+    const route = routeEdge(a, b, false)
+    expect(route.points.length).toBeGreaterThanOrEqual(2)
+    for (let i = 1; i < route.points.length; i++) {
+      const p = route.points[i - 1]!, q = route.points[i]!
+      expect(p.x === q.x || p.y === q.y).toBe(true)
+    }
   })
 })
 

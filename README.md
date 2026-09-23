@@ -1,6 +1,6 @@
 # Dev Designer
 
-Editor web di diagrammi per sviluppatori: **ER** e **UML class diagram**.
+Editor web di diagrammi per sviluppatori: **ER**, **UML class diagram** e **flowchart**.
 
 Nessun backend, nessun account, niente da configurare: il documento vive nel browser e si apre e si
 salva come file, come in un editor di testo. Il deploy è automatico su Vercel a ogni push su
@@ -25,6 +25,14 @@ inline con doppio click, undo/redo su ogni azione.
   aggregazione, dipendenza), ciascuna con la punta e il tratto giusti, più le note. Una nota può
   dichiarare la classe che commenta — un tratteggio senza punta, con lo strumento relazione — e il
   legame esce nell'export Mermaid come `note for`; «Disponi» tiene la nota accanto alla sua classe.
+- **Flowchart**: sei forme di nodo (terminale, processo, decisione, input/output, sottoprocesso,
+  nota) organizzate in **corsie** — bande orizzontali con un nome, una per attore — e archi
+  etichettabili col doppio click. «Disponi» dispone il flusso con ELK in direzione `RIGHT` (ADR
+  0007) e poi corregge solo l'asse trasversale per far stare ogni nodo nella banda della sua
+  corsia; trascinare un nodo in un'altra corsia scrive posizione e corsia in un solo passo di
+  undo. Sei regole di validazione (archi penzolanti, decisioni con meno di due uscite, vicoli
+  ciechi, nodi irraggiungibili, rami senza etichetta, nessun terminale) e export Mermaid
+  `flowchart LR` con una `subgraph` per corsia.
 
 La **validazione è live**: i problemi del documento compaiono in un pannello mentre si disegna, non a
 un comando esplicito.
@@ -44,7 +52,7 @@ migrazione non scombina il lavoro di disposizione.
 - **Immagini**: SVG e PNG del diagramma intero, più «Copia PNG» negli appunti. Escono sempre col tema
   chiaro — finiscono in README e PR, che hanno fondo chiaro — e col font incorporato nel file.
 - **Testo**: DDL PostgreSQL, DDL MySQL e Mermaid `erDiagram` per l'ER; Mermaid `classDiagram` per le
-  classi. Da copiare negli appunti o scaricare.
+  classi; Mermaid `flowchart LR` per il flowchart. Da copiare negli appunti o scaricare.
 
 ### Il documento è un file
 
@@ -63,6 +71,7 @@ si perde niente.
 | | |
 |---|---|
 | `V` · `E`/`C` · `R` · `N` | selezione · nodo (entità/classe) · relazione · nota (solo classi) |
+| `1`..`6` · `R` | forma del nodo di flowchart (terminale, processo, decisione, input/output, sottoprocesso, nota) · arco |
 | `F` · `L` | inquadra tutto · disponi |
 | `⌘Z` · `⇧⌘Z` / `⌘Y` · `⌘D` · `⌫` | annulla · ripeti · duplica · elimina |
 | `⌘S` · `⇧⌘S` · `⌘O` | salva · salva con nome · apri |
@@ -71,9 +80,9 @@ si perde niente.
 
 ## Limiti noti
 
-**Non ci sono flowchart e sequence diagram.** La spec originale ne prevedeva quattro tipi: ne sono
-stati consegnati due. La giuntura per aggiungerli esiste già (union sul tipo di diagramma, registro
-`kinds/`), ma il lavoro non è fatto.
+**Non c'è il sequence diagram.** La spec originale prevedeva quattro tipi: ne sono stati consegnati
+tre — ER, class diagram e flowchart. La giuntura per aggiungerne un quarto esiste già (union sul tipo
+di diagramma, registro `kinds/`), ma il lavoro non è fatto.
 
 **È uno strumento da desktop.** Il canvas disabilita i gesti touch del browser: su tablet e telefono
 non si usa. Sviluppato e collaudato su Chrome; su Firefox e Safari manca la File System Access API e
@@ -82,7 +91,8 @@ mano su quei browser.
 
 **Scala misurata fino a 600 entità**, con il criterio «p95 del tempo di frame ≤ 20 ms in build di
 produzione» rispettato su tutti e sei gli scenari di gesto — vedi [la misura](docs/perf/2026-09-13-gate-verde.md).
-Oltre non è misurato.
+Oltre non è misurato, e la misura è sull'ER: **il flowchart non è nel gate di prestazione**, vedi
+[debito tecnico](docs/debito-tecnico.md).
 
 Limiti puntuali, ciascuno con la sua ragione scritta:
 
@@ -93,6 +103,25 @@ Limiti puntuali, ciascuno con la sua ragione scritta:
   emette la forma meno peggio, con un avviso). Fuori scopo dichiarato: package, classi di
   associazione, classi annidate, PlantUML, generazione di codice, import da Mermaid o da codice
   sorgente, documenti multi-diagramma.
+- **Flowchart**:
+  - **Gli archi all'indietro passano sopra i nodi**: il router è ortogonale ma non evita gli
+    ostacoli, e in un flowchart il ciclo è il caso normale, non quello raro che è in ER e class.
+  - **Gli incroci sull'asse trasversale aumentano** rispetto a un layout senza corsie: è il prezzo
+    di tenere ogni nodo nella corsia del suo attore — ELK dispone il flusso ignorando le corsie, e
+    la sua riduzione degli incroci sull'asse trasversale si perde quando una banda lo corregge.
+  - **Le corsie escono come riquadri in Mermaid**, non come bande orizzontali vere: Mermaid non ha
+    un costrutto per bande, solo per contenitori annidati (`subgraph`). Avviso nel dialogo di
+    export.
+  - **Le note non escono in Mermaid**: entrerebbero nel flusso come un nodo qualunque e ne
+    sposterebbero il layout, cioè mentirebbero. Avviso nel dialogo di export.
+  - **Il rombo è grande** a parità di testo: deve contenere il rettangolo del testo lungo la
+    diagonale, quindi occupa circa il doppio di un processo con lo stesso contenuto — le decisioni
+    vanno scritte corte.
+  - **Con due o più archi fra la stessa coppia di nodi, l'aggancio di una decisione esce dal
+    rombo**: lo scarto di fascio fra archi paralleli sposta il punto di aggancio lungo il lato del
+    rettangolo di ingombro, e per un rombo quel lato coincide con la sua punta solo esattamente al
+    centro — la stessa classe di limite già accettata per il parallelogramma, che aggancia
+    leggermente fuori dai suoi lati obliqui.
 
 Tutto il resto sta in [debito tecnico](docs/debito-tecnico.md), che è il registro dei difetti noti e
 delle semplificazioni accettate, con il motivo di ogni rinvio.
@@ -111,7 +140,9 @@ delle semplificazioni accettate, con il motivo di ogni rinvio.
 - Canvas SVG scritto a mano, un componente React per nodo.
 - Import DDL: `libpg-query` (WASM) per PostgreSQL, `node-sql-parser` per MySQL/MariaDB, in worker.
 - Auto layout: `elkjs` in un worker. Le rotte degli archi non vengono da ELK: il router ortogonale le
-  ricalcola dai rettangoli a ogni render, al worker si chiedono solo le posizioni dei nodi.
+  ricalcola dai rettangoli a ogni render, al worker si chiedono solo le posizioni dei nodi. La
+  direzione è una proprietà del tipo di diagramma (ADR 0007): `DOWN` per ER e class diagram, `RIGHT`
+  per il flowchart, che dispone lungo le sue corsie invece che verso il basso.
 - Test con Vitest, lint con ESLint 10.
 
 ### Comandi
@@ -135,11 +166,11 @@ significano niente. Il deploy su Vercel parte dal push: perché aspetti la CI va
 ### Test end-to-end
 
 ```bash
-pnpm e2e       # sette scenari provati in un browser vero
+pnpm e2e       # otto scenari provati in un browser vero
 ```
 
 Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
-condivisi dai sette scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock fra
+condivisi dagli otto scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock fra
 schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a vicenda) —
 ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
 
@@ -157,9 +188,10 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
 - **Export testo**: apre il dialog dalla voce di menu, controlla i tre formati, copia negli appunti e
   scarica.
 - **Auto layout**: sposta un nodo dove il layout non lo metterebbe, clicca «Disponi», verifica che le
-  posizioni cambino e che nessuna coppia di nodi si sovrapponga, poi annulla con ⌘Z. È il solo
-  collaudo che prova che **elkjs si carica davvero**: i test unitari usano un worker finto, quindi un
-  bundle che non si risolve nel worker passerebbe tutta la suite e fallirebbe solo qui.
+  posizioni cambino e che nessuna coppia di nodi si sovrapponga, poi annulla con ⌘Z. Insieme allo
+  scenario del flowchart, è uno dei due soli collaudi che provano che **elkjs si carica davvero**: i
+  test unitari usano un worker finto, quindi un bundle che non si risolve nel worker passerebbe tutta
+  la suite e fallirebbe solo qui.
 - **Class diagram**: crea due classi, apre l'editor dei membri con un doppio click sul corpo e ne
   verifica il commit sul blur (geometria compresa), scrive un testo non valido e verifica che
   l'editor resti aperto col testo intatto, collega le due classi con una generalizzazione e verifica
@@ -169,10 +201,19 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   ⌘Z, la ancora a una classe con lo strumento relazione — verificando che il pannello dica
   «Ancoraggio nota» e non offra il menu «Tipo» — poi «Disponi» e verifica che non resti sotto nessun
   nodo, e infine verifica che esca come riga `note for` nell'export Mermaid.
+- **Flowchart**: crea un flowchart, aggiunge una seconda corsia dal pannello, tre nodi di forme
+  diverse (un terminale e un processo nella prima corsia, una decisione nella seconda), collega due
+  nodi e scrive l'etichetta sull'arco col doppio click. «Disponi» verifica che ogni nodo stia nella
+  banda della sua corsia e che nessuna coppia si sovrapponga — l'altro collaudo, insieme all'auto
+  layout, che prova che elkjs si carica davvero. Poi trascina un nodo nell'altra corsia con eventi di
+  mouse veri e verifica che ci resti, un solo ⌘Z lo rimette nella corsia di prima **e** dov'era —
+  posizione e corsia sono un passo unico di undo (spec §6), ed è la sola asserzione di tutta la
+  suite che li controlla insieme — e infine esporta in Mermaid e verifica che compaiano una
+  `subgraph`, un rombo `{"…"}` e l'etichetta sull'arco.
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei sette scenari non regge.
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno degli otto scenari non regge.
 
 ### Misura prestazioni
 

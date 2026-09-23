@@ -30,5 +30,5 @@ export function layoutGraph(diagram: ErDiagram): LayoutGraph {
 
   // Le relazioni disegnate a mano (`attributes` vuoto, ADR 0003) non sono distinte: sono archi come
   // gli altri, e ignorarle disporrebbe il diagramma senza connessioni che l'utente vede.
-  return { nodes, edges }
+  return { nodes, edges, direction: "DOWN" }
 }

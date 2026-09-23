@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { FlowDiagram, FlowEdge, FlowNode } from "@/model/flow/schema"
 import { routeEdge } from "../edge-routing"
 import type { Rect } from "../geometry"
-import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, shapePath } from "./geometry"
+import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, laneBandExtent, LANE_MARGIN, shapePath } from "./geometry"
 
 const node = (over: Partial<FlowNode> = {}): FlowNode => ({ label: "Verifica", shape: "process", lane: "l1", ...over })
 
@@ -88,6 +88,40 @@ describe("laneAt", () => {
   it("fuori da ogni banda torna null: chi chiama decide, qui non si indovina", () => {
     expect(laneAt(d, -10)).toBeNull()
     expect(laneAt(d, 5000)).toBeNull()
+  })
+})
+
+describe("laneBandExtent", () => {
+  /**
+   * Unico posto che calcola x e larghezza delle bande: sia `LanesLayerView` (canvas) sia
+   * `buildSvg` (export) lo chiamano, invece di ricavare ciascuno la propria versione — la ragione
+   * del Task 11, spec §5 ("la stessa banda nell'app e nell'export").
+   */
+  const flowDiagram = (): FlowDiagram => ({
+    type: "flow",
+    model: {
+      lanes: [{ id: "l1", name: "a" }],
+      nodes: { n1: { label: "x", shape: "process", lane: "l1" } },
+      edges: {},
+    },
+    view: { nodes: { n1: { x: 100, y: 0, collapsed: false } }, lanes: { l1: { y: 0, h: 100 } } },
+  })
+
+  it("allarga i limiti dei nodi del margine di corsia su entrambi i lati", () => {
+    const d = flowDiagram()
+    const { w: nodeW } = flowNodeSize(d.model.nodes["n1"]!)
+    const extent = laneBandExtent(d)
+    expect(extent.x).toBe(100 - LANE_MARGIN)
+    expect(extent.w).toBe(nodeW + 2 * LANE_MARGIN)
+  })
+
+  it("senza nodi torna comunque un'estensione finita, non NaN o negativa", () => {
+    const d = flowDiagram()
+    d.model.nodes = {}
+    d.view.nodes = {}
+    const extent = laneBandExtent(d)
+    expect(extent.x).toBe(-LANE_MARGIN)
+    expect(extent.w).toBe(2 * LANE_MARGIN)
   })
 })
 

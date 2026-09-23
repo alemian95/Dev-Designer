@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
+import { laneBandExtent } from "@/editor/flow/geometry"
 import type { ClassDiagram } from "@/model/class/schema"
 import type { ErDiagram } from "@/model/er/schema"
+import type { FlowDiagram } from "@/model/flow/schema"
 import { buildSvg, EXPORT_PADDING } from "./svg"
 
 /** Diagramma minimo: due entità distanti, una relazione fra loro. */
@@ -363,5 +365,87 @@ describe("buildSvg (class diagram)", () => {
     const svg = buildSvg(d, { vars })!
     expect(svg).toContain('data-node-id="n-1"')
     expect(svg).toContain(">da rivedere<")
+  })
+})
+
+/**
+ * Due corsie: "Cliente" con un nodo, "Backoffice" **vuota** e con una banda più alta di quanto un
+ * nodo giustificherebbe (`h: 440` contro i 160 minimi) — è il caso che il docblock di `LanesLayer`
+ * e la spec §10 citano esplicitamente: una banda vuota o più alta dei suoi nodi non deve uscire
+ * tagliata dall'export.
+ */
+function flowDiagramWithTwoLanes(): FlowDiagram {
+  return {
+    type: "flow",
+    model: {
+      lanes: [
+        { id: "l1", name: "Cliente" },
+        { id: "l2", name: "Backoffice" },
+      ],
+      nodes: {
+        n1: { label: "Inizio", shape: "terminal", lane: "l1" },
+      },
+      edges: {},
+    },
+    view: {
+      nodes: {
+        n1: { x: 100, y: 20, collapsed: false },
+      },
+      lanes: {
+        l1: { y: 0, h: 160 },
+        l2: { y: 160, h: 440 },
+      },
+    },
+  }
+}
+
+describe("buildSvg (flowchart)", () => {
+  it("l'SVG di un flowchart contiene le bande delle corsie e il loro nome", () => {
+    const svg = buildSvg(flowDiagramWithTwoLanes(), { vars, fontFace: "" })!
+    expect(svg).toContain('data-layer="lanes"')
+    expect(svg).toContain("Cliente")
+  })
+
+  it("le bande stanno prima dei nodi nel documento, così restano sotto", () => {
+    const svg = buildSvg(flowDiagramWithTwoLanes(), { vars, fontFace: "" })!
+    expect(svg.indexOf('data-layer="lanes"')).toBeLessThan(svg.indexOf('data-layer="nodes"'))
+  })
+
+  /**
+   * Pin dell'SSOT del Task 11: `buildSvg` non ha una propria copia della formula che allarga i
+   * limiti dei nodi del margine di corsia — chiama `laneBandExtent` (`@/editor/flow/geometry.ts`),
+   * la stessa funzione che chiama `LanesLayer` per disegnare le bande nel canvas. Un'implementazione
+   * che avesse ricopiato `LANE_MARGIN` o il calcolo dei bounds dentro `svg.tsx` invece di riusare
+   * `laneBandExtent` passerebbe comunque i due test sopra (la banda ci sarebbe, con un nome), ma
+   * potrebbe uscire con un `x`/`width` diverso da quello che l'app disegna il giorno che una delle
+   * due copie cambia senza l'altra — questo test lo impedisce confrontando il numero, non solo la
+   * presenza del layer.
+   */
+  it("la geometria della banda nell'export è quella di laneBandExtent, non una copia", () => {
+    const d = flowDiagramWithTwoLanes()
+    const svg = buildSvg(d, { vars, fontFace: "" })!
+    const { x, w } = laneBandExtent(d)
+    const lanesLayer = /<g data-layer="lanes">.*?<\/g>\s*<\/g>/s.exec(svg)?.[0]
+    expect(lanesLayer).toBeDefined()
+    const rect = /<rect x="([^"]+)"[^>]*width="([^"]+)"/.exec(lanesLayer!)
+    expect(rect).not.toBeNull()
+    expect(Number(rect![1])).toBe(x)
+    expect(Number(rect![2])).toBe(w)
+  })
+
+  it("una banda vuota o più alta dei suoi nodi non esce tagliata dal viewBox", () => {
+    const d = flowDiagramWithTwoLanes()
+    const svg = buildSvg(d, { vars, fontFace: "" })!
+    const [, y, , h] = /viewBox="([^"]+)"/.exec(svg)![1]!.split(" ").map(Number) as [number, number, number, number]
+    const emptyBand = d.view.lanes["l2"]!
+    // Coi soli rettangoli dei nodi il viewBox si fermerebbe molto più in alto (il nodo unico sta a
+    // y=20, alto poche decine di pixel): includere le bande nei bounds è l'unico modo per arrivare
+    // fin qui.
+    expect(y + h).toBeGreaterThanOrEqual(emptyBand.y + emptyBand.h)
+  })
+
+  it("restituisce null su un flowchart senza nodi né corsie disegnabili", () => {
+    const empty: FlowDiagram = { type: "flow", model: { lanes: [], nodes: {}, edges: {} }, view: { nodes: {}, lanes: {} } }
+    expect(buildSvg(empty, { vars })).toBeNull()
   })
 })

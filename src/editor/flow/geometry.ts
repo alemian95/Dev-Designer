@@ -2,7 +2,7 @@ import type { FlowDiagram, FlowEdge, FlowNode, FlowShape } from "@/model/flow/sc
 import type { NodeView } from "@/model/shared"
 import { notePath } from "../class/geometry"
 import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
-import { CHAR_W, GRID, PAD_X, ROW_H, type Point, type Rect, type Size } from "../geometry"
+import { CHAR_W, GRID, PAD_X, rectsBounds, ROW_H, type Point, type Rect, type Size } from "../geometry"
 
 /**
  * Un rombo che deve contenere il rettangolo `w × h` del testo di un processo omologo ha bisogno di
@@ -96,6 +96,30 @@ export function laneAt(diagram: FlowDiagram, y: number): string | null {
     if (band && y >= band.y && y < band.y + band.h) return lane.id
   }
   return null
+}
+
+/** Margine oltre l'ingombro dei nodi: una banda che finisse esattamente al bordo dell'ultimo nodo
+ *  lo toccherebbe, e un nodo appena creato sul bordo sinistro sembrerebbe a cavallo del contorno. */
+export const LANE_MARGIN = 40
+
+/**
+ * Estensione orizzontale comune a ogni banda: x e larghezza dai limiti dei nodi (`rectsBounds`)
+ * più `LANE_MARGIN`, non dal viewport — il viewport dipende da dove sta guardando chi disegna in
+ * questo momento, e l'export (`buildSvg`) non ne ha uno affatto (Task 11, spec §5: «la stessa
+ * banda nell'app e nell'export»).
+ *
+ * **Unico posto che fa questo calcolo**: `LanesLayerView` (canvas, `ui/canvas/LanesLayer.tsx`) e
+ * `buildSvg` (export, `ui/export/svg.tsx`) lo chiamano entrambi invece di ricavare ciascuno la
+ * propria versione — due copie della stessa formula divergono il giorno che una delle due cambia.
+ */
+export function laneBandExtent(diagram: FlowDiagram): { x: number; w: number } {
+  const rects: Rect[] = []
+  for (const [key, node] of Object.entries(diagram.model.nodes)) {
+    const view = diagram.view.nodes[key]
+    if (view) rects.push(flowNodeRect(node, view))
+  }
+  const bounds = rectsBounds(rects)
+  return { x: (bounds?.x ?? 0) - LANE_MARGIN, w: (bounds?.w ?? 0) + 2 * LANE_MARGIN }
 }
 
 /** Lunghezza e semilarghezza della freccia piena: l'unico marker dell'arco di flowchart, sempre

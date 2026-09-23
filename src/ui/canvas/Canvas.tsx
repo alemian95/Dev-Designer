@@ -1,6 +1,4 @@
 import { useRef, type ReactNode } from "react"
-import { useStore } from "zustand"
-import { documentStore } from "@/editor/document-store"
 import { FONT_SIZE, GRID } from "@/editor/geometry"
 import { FlowNodeEditor } from "./FlowNodeEditor"
 import { InlineEditor } from "./InlineEditor"
@@ -22,9 +20,6 @@ export function Canvas({ children }: { children?: ReactNode }) {
   // I layer vengono dal registro: con un solo tipo di diagramma sono sempre NodesLayer/EdgesLayer
   // di `layers.tsx`, ma il canvas non lo sa più — legge `DiagramView`, non un modulo fisso.
   const { NodesLayer, EdgesLayer } = useDiagramView()
-  // Le corsie non sono un `DiagramView.NodesLayer`: sono un terzo layer che solo il flowchart
-  // popola (spec §5), montato qui e non nel registro perché nessun altro tipo ne ha bisogno.
-  const type = useStore(documentStore, (s) => s.doc.diagram.type)
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -36,7 +31,10 @@ export function Canvas({ children }: { children?: ReactNode }) {
         </defs>
         <ViewportGroup>
           <rect data-canvas x={-GRID_EXTENT} y={-GRID_EXTENT} width={2 * GRID_EXTENT} height={2 * GRID_EXTENT} fill="url(#dd-grid)" />
-          {type === "flow" && <LanesLayer />}
+          {/* Le corsie non sono un `DiagramView.NodesLayer`: sono un terzo layer che solo il
+              flowchart popola (spec §5). `LanesLayer` verifica da sé il tipo di diagramma e torna
+              `null` sugli altri (Task 11) — il canvas non lo sa più, legge solo `DiagramView`. */}
+          <LanesLayer />
           <EdgesLayer />
           <NodesLayer />
           {children}

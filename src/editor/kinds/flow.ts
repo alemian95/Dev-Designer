@@ -55,6 +55,8 @@ export function flowOps(doc: DevDocument): DiagramOps {
 
     layoutRecipe: (positions) => applyFlowLayout(positions),
 
+    // ponytail: nessuna regola finché non arrivano quelle del Task 9 — un pannello che non trova
+    // niente è meglio di uno che esplode, ma finché è così un flowchart risulta sempre valido.
     validate: () => [],
   }
 }

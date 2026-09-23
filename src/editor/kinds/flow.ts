@@ -1,17 +1,17 @@
 import type { DevDocument } from "@/model/document"
 import type { FlowShape } from "@/model/flow/schema"
 import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes } from "../flow/commands"
-import { flowNodeRect, laneAt } from "../flow/geometry"
+import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, laneAt } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
 import { flowLayoutGraph } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
  * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts` e `flow/layout.ts`,
- * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `edgeGeometry` resta stub: serve il router
- * ortogonale esteso all'asse orizzontale, che arriva nel Task 7 insieme al resto della resa sul
- * canvas — scriverlo qui vorrebbe dire cablarlo due volte. `validate` resta stub per un motivo
- * diverso: aspetta le regole di validazione del Task 9, non la geometria.
+ * sulla forma di `kinds/er.ts` e `kinds/class.ts`. `edgeGeometry` è cablato su `flowEdgeGeometry`
+ * (`flow/geometry.ts`), sulla stessa forma di `erOps.edgeGeometry` (`kinds/er.ts:34-38`): lo scarto
+ * di fascio si legge dal modello intero, non si passa dal chiamante, perché dipende da *tutti* gli
+ * archi. `validate` resta stub: aspetta le regole di validazione del Task 9, non la geometria.
  */
 export function flowOps(doc: DevDocument): DiagramOps {
   const diagram = () => flowDiagram(doc)
@@ -31,9 +31,10 @@ export function flowOps(doc: DevDocument): DiagramOps {
         .filter(([, edge]) => keys.has(edge.source) || keys.has(edge.target))
         .map(([key, edge]) => ({ key, source: edge.source, target: edge.target })),
 
-    edgeGeometry: () => {
-      // ponytail: rimosso nel Task 7
-      throw new Error("flowchart: geometria degli archi non ancora implementata")
+    edgeGeometry: (key, a, b) => {
+      const model = diagram().model
+      const edge = model.edges[key]
+      return edge ? flowEdgeGeometry(a, b, edge, flowEdgeOffsets(model.edges).get(key) ?? 0) : null
     },
 
     addNode: (at, variant) => {
@@ -54,9 +55,6 @@ export function flowOps(doc: DevDocument): DiagramOps {
 
     layoutRecipe: (positions) => applyFlowLayout(positions),
 
-    validate: () => {
-      // ponytail: rimosso nel Task 9
-      throw new Error("flowchart: validazione non ancora implementata")
-    },
+    validate: () => [],
   }
 }

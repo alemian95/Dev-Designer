@@ -138,14 +138,22 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const hit = hitTest(el)
       if (hit.kind !== "node") return
       const headerHit = !!el?.closest("[data-node-header]")
-      // Il corpo si apre come testo solo nelle classi: nell'ER non esiste un formato di testo per
-      // gli attributi, e aprire una textarea sarebbe una feature non chiesta — lì il contratto DOM
-      // basta da solo, il doppio click rinomina solo quando cade sull'header.
-      if (documentStore.getState().doc.diagram.type !== "class") {
-        if (headerHit) session().setEditing({ key: hit.key, target: "name" })
+      const diagramType = documentStore.getState().doc.diagram.type
+      if (diagramType === "class") {
+        session().setEditing({ key: hit.key, target: classEditTarget(hit.key, headerHit) })
         return
       }
-      session().setEditing({ key: hit.key, target: classEditTarget(hit.key, headerHit) })
+      // Un nodo di flowchart non ha un nome distinto dal corpo, come una nota del class diagram:
+      // qualunque punto del nodo apre l'editor di testo (spec §7, «geometria ed editor inline si
+      // riusano»), a differenza dell'header che l'ER usa per il nome dell'entità.
+      if (diagramType === "flow") {
+        session().setEditing({ key: hit.key, target: "body" })
+        return
+      }
+      // Nell'ER non esiste un formato di testo per gli attributi, e aprire una textarea sarebbe
+      // una feature non chiesta: il contratto DOM basta da solo, il doppio click rinomina solo
+      // quando cade sull'header.
+      if (headerHit) session().setEditing({ key: hit.key, target: "name" })
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTextInput(e.target)) return

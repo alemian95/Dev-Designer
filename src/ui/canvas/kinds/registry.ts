@@ -8,13 +8,15 @@ import type { Diagram } from "@/model/document"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { classView } from "./class"
 import { erView } from "./er"
+import { flowView } from "./flow"
 
 /**
- * Formati emessi dall'export testo. `class-mermaid` è dichiarato già qui perché il Task 14
- * userà questa stessa union, ma nessuna `DiagramView` di oggi lo elenca in `textFormats`: un
- * formato senza emettitore non deve comparire nel dialogo.
+ * Formati emessi dall'export testo. `class-mermaid` e `flow-mermaid` sono dichiarati già qui
+ * perché più task consumano questa stessa union prima che l'emettitore esista, ma nessuna
+ * `DiagramView` li elenca in `textFormats` finché il proprio emettitore non c'è: un formato senza
+ * emettitore non deve comparire nel dialogo. `flow-mermaid` lo guadagna il Task 10.
  */
-export type TextFormat = "postgres" | "mysql" | "mermaid" | "class-mermaid"
+export type TextFormat = "postgres" | "mysql" | "mermaid" | "class-mermaid" | "flow-mermaid"
 
 /**
  * Props di `DiagramView.NodeView`: `node` arriva come `unknown` perché il registro è lo stesso
@@ -82,8 +84,7 @@ export function viewFor(type: Diagram["type"]): DiagramView {
     case "class":
       return classView
     case "flow":
-      // ponytail: rimosso nel Task 12
-      throw new Error("flowchart: non ancora implementato")
+      return flowView
   }
 }
 

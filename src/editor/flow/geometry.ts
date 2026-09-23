@@ -1,7 +1,8 @@
-import type { FlowDiagram, FlowNode, FlowShape } from "@/model/flow/schema"
+import type { FlowDiagram, FlowEdge, FlowNode, FlowShape } from "@/model/flow/schema"
 import type { NodeView } from "@/model/shared"
 import { notePath } from "../class/geometry"
-import { CHAR_W, PAD_X, ROW_H, type Rect, type Size } from "../geometry"
+import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
+import { CHAR_W, GRID, PAD_X, ROW_H, type Point, type Rect, type Size } from "../geometry"
 
 /**
  * Un rombo che deve contenere il rettangolo `w × h` del testo di un processo omologo ha bisogno di
@@ -25,7 +26,10 @@ const MIN_NODE_H = 40
 export function flowNodeSize(node: FlowNode): Size {
   const lines = node.label.split("\n")
   const chars = Math.max(0, ...lines.map((l) => l.length))
-  const w = Math.max(MIN_NODE_W, Math.ceil(chars * CHAR_W + 2 * PAD_X))
+  // Arrotondata alla griglia come `entitySize`, `classSize` e `noteSize`: il bordo sinistro di un
+  // nodo è già sulla griglia (`snap`, alla creazione e al drag), e senza questo arrotondamento
+  // quello destro non lo sarebbe — visibile ora che il nodo si disegna davvero (Task 7).
+  const w = Math.max(MIN_NODE_W, Math.ceil((chars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
   const h = Math.max(MIN_NODE_H, lines.length * ROW_H)
   return node.shape === "decision" ? { w: w * DECISION_FACTOR, h: h * DECISION_FACTOR } : { w, h }
 }
@@ -93,3 +97,48 @@ export function laneAt(diagram: FlowDiagram, y: number): string | null {
   }
   return null
 }
+
+/** Lunghezza e semilarghezza della freccia piena: l'unico marker dell'arco di flowchart, sempre
+ *  sul target. A differenza del crow's foot dell'ER e della punta UML delle classi, un flowchart
+ *  non distingue specie di arco — una sola forma basta. */
+const FLOW_ARROW_LEN = 10
+const FLOW_ARROW_HALF_W = 5
+
+function filledArrowPath(at: Point, dir: Dir): string {
+  const px = -dir.y
+  const py = dir.x
+  const p = (d: number, s: number): Point => ({ x: at.x + dir.x * d + px * s, y: at.y + dir.y * d + py * s })
+  return `${pathFromPoints([at, p(FLOW_ARROW_LEN, -FLOW_ARROW_HALF_W), p(FLOW_ARROW_LEN, FLOW_ARROW_HALF_W)])} Z`
+}
+
+/**
+ * Tutta la geometria di un arco di flowchart, da due rettangoli e l'arco — stesso ruolo di
+ * `classEdgeGeometry` (`class/geometry.ts`) e di `edgeGeometry` (`edge-routing.ts`) per l'ER: un
+ * solo posto che compone `routeEdge` e il marker, perché sia il render statico (`FlowEdgeView`)
+ * sia l'anteprima del drag (`flowOps.edgeGeometry`, via `dom-registry.setEdgeGeometry`) devono
+ * disegnare lo stesso arco.
+ *
+ * **L'etichetta sta sul primo segmento, non su quello centrale come per ER e classi.** Con
+ * flusso a destra gli archi entranti arrivano tutti dal lato sinistro del bersaglio: il primo
+ * segmento parte dall'attacco che `routeEdge` ha già spostato dell'`offset` di fascio, quindi
+ * l'etichetta eredita gratis la separazione che il fascio ha calcolato, invece di chiederne una
+ * propria (spec §8).
+ */
+export function flowEdgeGeometry(source: Rect, target: Rect, edge: FlowEdge, offset = 0): EdgeGeometry {
+  const route = routeEdge(source, target, edge.source === edge.target, offset)
+  const pts = route.points
+  const p0 = pts[0]!
+  const p1 = pts[1]!
+  return {
+    d: pathFromPoints(pts),
+    sourceMarker: "",
+    targetMarker: filledArrowPath(pts[pts.length - 1]!, route.targetDir),
+    label: { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 },
+  }
+}
+
+/** Gemella di `erEdgeOffsets`/`classEdgeOffsets`: stessa ragione, `source`/`target` già piatti e
+ *  non annidati in un capo come nell'ER o nelle classi. */
+export const flowEdgeOffsets = memoOnIdentity((edges: Readonly<Record<string, FlowEdge>>) =>
+  edgeOffsets(Object.entries(edges).map(([key, e]) => ({ key, source: e.source, target: e.target }))),
+)

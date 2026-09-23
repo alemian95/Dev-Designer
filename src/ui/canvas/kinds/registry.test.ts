@@ -57,6 +57,21 @@ describe("terzo strumento", () => {
   })
 })
 
+describe("flowchart", () => {
+  it("il flowchart dichiara sette strumenti, tutti con chiave distinta", () => {
+    const view = viewFor("flow")
+    expect(view.tools).toHaveLength(7)
+    const keys = view.tools.map((t) => t.key)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it("le sei forme sono varianti dello strumento nodo, l'arco no", () => {
+    const view = viewFor("flow")
+    expect(view.tools.filter((t) => t.tool === "node").every((t) => t.variant)).toBe(true)
+    expect(view.tools.filter((t) => t.tool === "edge")).toHaveLength(1)
+  })
+})
+
 describe("toolId", () => {
   it("compone tool e variant quando c'è una variante", () => {
     expect(toolId({ tool: "node", variant: "note" })).toBe("node:note")

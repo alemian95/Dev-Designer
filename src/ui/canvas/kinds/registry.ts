@@ -1,22 +1,12 @@
 import type { ComponentType } from "react"
-import type { LucideIcon } from "lucide-react"
-import { useStore } from "zustand"
-import { documentStore } from "@/editor/document-store"
+import { Spline, type LucideIcon } from "lucide-react"
 import type { Rect } from "@/editor/geometry"
 import type { Tool } from "@/editor/session-store"
-import type { Diagram } from "@/model/document"
+import type { Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { classView } from "./class"
 import { erView } from "./er"
 import { flowView } from "./flow"
-
-/**
- * Formati emessi dall'export testo. `class-mermaid` e `flow-mermaid` sono dichiarati già qui
- * perché più task consumano questa stessa union prima che l'emettitore esista, ma nessuna
- * `DiagramView` li elenca in `textFormats` finché il proprio emettitore non c'è: un formato senza
- * emettitore non deve comparire nel dialogo. `flow-mermaid` lo guadagna il Task 10.
- */
-export type TextFormat = "postgres" | "mysql" | "mermaid" | "class-mermaid" | "flow-mermaid"
 
 /**
  * Props di `DiagramView.NodeView`: `node` arriva come `unknown` perché il registro è lo stesso
@@ -57,13 +47,32 @@ export interface ToolDef {
   key: string
   Icon: LucideIcon
   tool: Tool
-  /** Passata ad `addNode`: la forma, per i tipi che ne hanno più d'una. */
+  /** Famiglia in cui lo strumento crea: `null` per Collega, che non crea nodi. */
+  family: Family | null
+  /** Passata ad `addNode`: la forma, per le famiglie che ne hanno più d'una. */
   variant?: string
 }
 
-/** Identità di uno strumento nel ToggleGroup: `tool` da solo non basta quando ci sono più varianti. */
-export function toolId(def: Pick<ToolDef, "tool" | "variant">): string {
-  return def.variant ? `${def.tool}:${def.variant}` : def.tool
+/**
+ * Identità di uno strumento nel ToggleGroup. La famiglia serve: «Nota di classe» e «Nota di flusso»
+ * sono entrambe `node` con variante `note`, e senza la famiglia avrebbero lo stesso id.
+ */
+export function toolId(def: Pick<ToolDef, "tool" | "family" | "variant">): string {
+  return [def.tool, def.family, def.variant].filter(Boolean).join(":")
+}
+
+/**
+ * Lo strumento per collegare, uno solo per tutte le famiglie: il tipo di arco lo decidono gli
+ * estremi (`CanvasOps.addEdge`), non lo strumento.
+ */
+export const LINK_TOOL: ToolDef = { label: "Collega", key: "r", Icon: Spline, tool: "edge", family: null }
+
+/** Nome del gruppo della sidebar: è anche il nome accessibile del `role="group"`. */
+export const FAMILY_LABEL: Record<Family, string> = { er: "ER", class: "Classi", flow: "Flusso" }
+
+/** Gli strumenti del canvas nell'ordine della sidebar: famiglia per famiglia, poi Collega. «Seleziona» non è qui: non crea niente. */
+export function canvasTools(families: readonly Family[]): ToolDef[] {
+  return [...families.flatMap((family) => viewFor(family).tools), LINK_TOOL]
 }
 
 export interface DiagramView {
@@ -71,23 +80,18 @@ export interface DiagramView {
   EdgesLayer: ComponentType
   NodeView: ComponentType<NodeViewProps>
   EdgeView: ComponentType<EdgeViewProps>
-  /** Montato solo quando la selezione è esattamente un nodo o esattamente un arco (`PropertiesPanel`). */
-  Properties: ComponentType
   /**
-   * Corpo del pannello **senza nessuna selezione**. Opzionale: se un tipo non lo dichiara,
-   * `PropertiesPanel` mostra la propria frase generica, come faceva prima che questo campo
-   * esistesse — ER e class non lo dichiarano e restano su quella. Il flowchart lo usa per il
-   * pannello delle corsie (spec §11): a differenza di `Properties`, qui non c'è un nodo o un arco
-   * da passare, quindi il componente non prende prop.
+   * Montato solo quando la selezione è esattamente un nodo o esattamente un arco (`PropertiesPanel`).
+   * Senza selezione il pannello non chiede niente alle famiglie: il solo corpo possibile è quello
+   * delle corsie, e lo decide `PropertiesPanel` dalla presenza di nodi di flusso.
    */
-  EmptyProperties?: ComponentType
+  Properties: ComponentType
   tools: ToolDef[]
-  textFormats: TextFormat[]
 }
 
-/** Chiuso sul tipo: neutro rispetto a cosa contiene ogni vista, non guarda dentro nessuna di esse. */
-export function viewFor(type: Diagram["type"]): DiagramView {
-  switch (type) {
+/** Chiuso sulla famiglia: neutro rispetto a cosa contiene ogni vista, non guarda dentro nessuna di esse. */
+export function viewFor(family: Family): DiagramView {
+  switch (family) {
     case "er":
       return erView
     case "class":
@@ -97,8 +101,3 @@ export function viewFor(type: Diagram["type"]): DiagramView {
   }
 }
 
-/** Hook: legge il tipo di diagramma corrente dallo store e ne ricava la vista. */
-export function useDiagramView(): DiagramView {
-  const type = useStore(documentStore, (s) => s.doc.diagram.type)
-  return viewFor(type)
-}

@@ -5,6 +5,7 @@ import { documentStore } from "@/editor/document-store"
 import { edgeGeometry } from "@/editor/edge-routing"
 import { erDiagram } from "@/editor/er-access"
 import { entityRect } from "@/editor/er/geometry"
+import { qualify } from "@/editor/families"
 import type { Rect } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { Relationship } from "@/model/er/schema"
@@ -21,14 +22,15 @@ interface Props {
 }
 
 export const RelationshipEdgeView = memo(function RelationshipEdgeView({ edgeKey, relationship, source, target, selected, offset }: Props) {
+  const id = qualify("er", edgeKey)
   const geo = edgeGeometry(source, target, relationship, offset)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   return (
     <g
-      data-edge-id={edgeKey}
+      data-edge-id={id}
       ref={(el) => {
-        registerEdge(edgeKey, el)
-        return () => registerEdge(edgeKey, null)
+        registerEdge(id, el)
+        return () => registerEdge(id, null)
       }}
     >
       <path data-edge-hit d={geo.d} fill="none" stroke="transparent" strokeWidth={12} />
@@ -62,7 +64,7 @@ export function RelationshipEdge({ edgeKey, offset }: { edgeKey: string; offset:
   const relationship = useStore(documentStore, (s) => erDiagram(s.doc).model.relationships[edgeKey])
   const source = useEntityRect(relationship?.source.entity)
   const target = useEntityRect(relationship?.target.entity)
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", qualify("er", edgeKey))))
   if (!relationship || !source || !target) return null
   return <RelationshipEdgeView edgeKey={edgeKey} relationship={relationship} source={source} target={target} selected={selected} offset={offset} />
 }

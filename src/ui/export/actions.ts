@@ -1,21 +1,15 @@
 import fontUrl from "@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url"
 import { documentStore } from "@/editor/document-store"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { download } from "@/io/file"
 import type { DevDocument } from "@/model/document"
 import { documentFileName } from "./file-name"
 import { svgToPng } from "./png"
 import { buildSvg } from "./svg"
 
-/** Vero se il diagramma ha almeno un nodo, ER o classe: il caso vuoto di `copyPng`. */
+/** Vero se il documento ha almeno un nodo, in qualunque famiglia: il caso vuoto di `copyPng`. */
 function hasNodes(doc: DevDocument): boolean {
-  switch (doc.diagram.type) {
-    case "er":
-      return Object.keys(doc.diagram.model.entities).length > 0
-    case "class":
-      return Object.keys(doc.diagram.model.classes).length > 0
-    case "flow":
-      return Object.keys(doc.diagram.model.nodes).length > 0
-  }
+  return canvasOps(doc).nodeKeys().length > 0
 }
 
 /**
@@ -112,24 +106,24 @@ function loadFontFace(): Promise<string | undefined> {
 }
 
 async function currentSvg(): Promise<string | null> {
-  // `buildSvg` fa il proprio switch sul tipo: non serve più narrowing qui, solo il documento.
-  return buildSvg(documentStore.getState().doc.diagram, { vars: readLightVars(), fontFace: await loadFontFace() })
+  // `buildSvg` scorre le famiglie del documento da sé: non serve più narrowing qui, solo il documento.
+  return buildSvg(documentStore.getState().doc, { vars: readLightVars(), fontFace: await loadFontFace() })
 }
 
-/** Esporta il diagramma come SVG. Non fa nulla se non c'è nessuna entità. */
+/** Esporta il diagramma come SVG. Non fa nulla se non c'è nessun nodo. */
 export async function exportSvg(): Promise<void> {
   const svg = await currentSvg()
   if (svg) download(documentFileName("svg"), svg, "image/svg+xml")
 }
 
-/** Esporta il diagramma come PNG a 2×. Non fa nulla se non c'è nessuna entità. */
+/** Esporta il diagramma come PNG a 2×. Non fa nulla se non c'è nessun nodo. */
 export async function exportPng(): Promise<void> {
   const svg = await currentSvg()
   if (svg) download(documentFileName("png"), await svgToPng(svg), "image/png")
 }
 
 /**
- * Copia il diagramma come PNG negli appunti. Non fa nulla se non c'è nessuna entità.
+ * Copia il diagramma come PNG negli appunti. Non fa nulla se non c'è nessun nodo.
  *
  * Dove `ClipboardItem` non esiste (contesto non sicuro, browser vecchi) si ricade sul download:
  * l'immagine si ottiene comunque, in un passo in più.
@@ -145,7 +139,7 @@ export function copyPng(): Promise<void> {
   // dell'utente è già finito quando `write` parte, e così font e rasterizzazione restano dentro il
   // gesto. Chrome accetta entrambe le forme.
   const png = currentSvg().then((svg) => {
-    if (!svg) throw new Error("PNG non generato: nessuna entità con una posizione")
+    if (!svg) throw new Error("PNG non generato: nessun nodo con una posizione")
     return svgToPng(svg)
   })
   return navigator.clipboard.write([new ClipboardItem({ "image/png": png })])

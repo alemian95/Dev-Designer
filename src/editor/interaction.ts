@@ -1,3 +1,4 @@
+import type { Family } from "@/model/family"
 import type { Point, Rect } from "./geometry"
 import { selId, selectedKeys, type Tool } from "./session-store"
 
@@ -38,10 +39,11 @@ export type Effect =
   | { type: "commit-marquee"; rect: Rect; additive: boolean }
   | { type: "preview-connect"; source: string; to: Point | null }
   | { type: "commit-connect"; source: string; target: string }
-  | { type: "create-node"; at: Point; variant?: string }
+  | { type: "create-node"; at: Point; family: Family; variant?: string }
 
 export interface Context {
   tool: Tool
+  family?: Family | null
   variant?: string
   selection: ReadonlySet<string>
 }
@@ -72,8 +74,8 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
   if (info.button !== 0) return { mode: IDLE, effects: [] }
 
   if (ctx.tool === "node") {
-    if (info.hit.kind === "canvas") {
-      return { mode: IDLE, effects: [{ type: "create-node", at: info.world, variant: ctx.variant }] }
+    if (info.hit.kind === "canvas" && ctx.family) {
+      return { mode: IDLE, effects: [{ type: "create-node", at: info.world, family: ctx.family, variant: ctx.variant }] }
     }
   }
   if (ctx.tool === "edge") {

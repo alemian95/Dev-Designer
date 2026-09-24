@@ -1,19 +1,20 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
 import { deleteSelection, duplicateSelection, fitToContent, selectAllNodes, zoomBy } from "./actions"
 import { documentStore } from "./document-store"
 import { erDiagram } from "./er-access"
+import { qualify } from "./families"
 import { selId, sessionStore } from "./session-store"
 import { IDENTITY } from "./viewport"
 
 describe("actions", () => {
   beforeEach(() => {
-    const doc = createErDocument("t", "t")
+    const doc = createDocument("t", "t")
     for (const [key, x] of [["a", 0], ["b", 300]] as const) {
-      doc.diagram.model.entities[key] = { name: key, attributes: [] }
-      doc.diagram.view.nodes[key] = { x, y: 0, collapsed: true }
+      doc.diagram.er.model.entities[key] = { name: key, attributes: [] }
+      doc.diagram.er.view.nodes[key] = { x, y: 0, collapsed: true }
     }
-    doc.diagram.model.relationships.r = {
+    doc.diagram.er.model.relationships.r = {
       source: { entity: "a", attributes: [], cardinality: "many" },
       target: { entity: "b", attributes: [], cardinality: "one" },
       identifying: false,
@@ -24,11 +25,11 @@ describe("actions", () => {
 
   it("selectAllNodes seleziona solo i nodi", () => {
     selectAllNodes()
-    expect([...sessionStore.getState().selection].sort()).toEqual([selId("node", "a"), selId("node", "b")])
+    expect([...sessionStore.getState().selection].sort()).toEqual([selId("node", qualify("er", "a")), selId("node", qualify("er", "b"))])
   })
 
   it("deleteSelection elimina e svuota la selezione", () => {
-    sessionStore.getState().setSelection([selId("node", "a")])
+    sessionStore.getState().setSelection([selId("node", qualify("er", "a"))])
     deleteSelection()
     expect(erDiagram(documentStore.getState().doc).model.entities.a).toBeUndefined()
     expect(erDiagram(documentStore.getState().doc).model.relationships.r).toBeUndefined()
@@ -36,9 +37,9 @@ describe("actions", () => {
   })
 
   it("duplicateSelection seleziona le copie", () => {
-    sessionStore.getState().setSelection([selId("node", "a"), selId("edge", "r")])
+    sessionStore.getState().setSelection([selId("node", qualify("er", "a")), selId("edge", qualify("er", "r"))])
     duplicateSelection()
-    expect([...sessionStore.getState().selection]).toEqual([selId("node", "a_copy")])
+    expect([...sessionStore.getState().selection]).toEqual([selId("node", qualify("er", "a_copy"))])
   })
 
   it("fitToContent inquadra le entità; zoomBy scala attorno al centro", () => {

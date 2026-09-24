@@ -10,8 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { documentStore } from "@/editor/document-store"
 import { laneBandExtent } from "@/editor/flow/geometry"
-import { createErDocument } from "@/model/er/schema"
-import { createFlowDocument, type FlowDocument } from "@/model/flow/schema"
+import { createDocument, type DevDocument } from "@/model/document"
 import { LanesLayer, LanesLayerView } from "./LanesLayer"
 
 describe("LanesLayerView", () => {
@@ -39,8 +38,12 @@ describe("LanesLayerView", () => {
 })
 
 describe("LanesLayer — connesso allo store", () => {
-  it("un documento non-flow non monta nessun layer di corsie", () => {
-    documentStore.getState().load(createErDocument("t"))
+  it("un documento senza nodi di flusso non monta le corsie, anche se il modello ne ha una", () => {
+    const doc = createDocument("t")
+    doc.diagram.er.model.entities["utenti"] = { name: "utenti", attributes: [] }
+    doc.diagram.er.view.nodes["utenti"] = { x: 0, y: 0, collapsed: false }
+    expect(doc.diagram.flow.model.lanes).toHaveLength(1)
+    documentStore.getState().load(doc)
     const container = document.createElement("div")
     const root = createRoot(container)
     try {
@@ -54,10 +57,10 @@ describe("LanesLayer — connesso allo store", () => {
   })
 
   it("un flowchart monta le bande con la stessa estensione di laneBandExtent", () => {
-    const doc: FlowDocument = createFlowDocument("t")
-    const laneId = doc.diagram.model.lanes[0]!.id
-    doc.diagram.model.nodes["n1"] = { label: "avvio", shape: "terminal", lane: laneId }
-    doc.diagram.view.nodes["n1"] = { x: 200, y: 10, collapsed: false }
+    const doc: DevDocument = createDocument("t")
+    const laneId = doc.diagram.flow.model.lanes[0]!.id
+    doc.diagram.flow.model.nodes["n1"] = { label: "avvio", shape: "terminal", lane: laneId }
+    doc.diagram.flow.view.nodes["n1"] = { x: 200, y: 10, collapsed: false }
     documentStore.getState().load(doc)
 
     const container = document.createElement("div")
@@ -68,7 +71,7 @@ describe("LanesLayer — connesso allo store", () => {
       })
       expect(container.innerHTML).toContain('data-layer="lanes"')
       expect(container.innerHTML).toContain(">Corsia 1<")
-      const { x, w } = laneBandExtent(doc.diagram)
+      const { x, w } = laneBandExtent(doc.diagram.flow)
       expect(container.innerHTML).toContain(`x="${x}"`)
       expect(container.innerHTML).toContain(`width="${w}"`)
     } finally {

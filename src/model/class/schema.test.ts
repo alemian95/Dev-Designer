@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { DocumentSchema } from "../document"
-import { createErDocument } from "../er/schema"
+import { createDocument, DocumentSchema } from "../document"
 import { SCHEMA_VERSION } from "../shared"
 import {
-  CLASS_RELATION_KINDS, ClassDiagramSchema, ClassModelSchema, ClassRelationSchema, createClassDocument,
+  CLASS_RELATION_KINDS, ClassDiagramSchema, ClassModelSchema, ClassRelationSchema,
   isClassRelation, RelationKindSchema,
 } from "./schema"
 
@@ -11,7 +10,6 @@ import {
  *  `patch` sovrascrive campi della relazione, per provare i casi rifiutati. */
 function diagrammaConRelazione(patch: Record<string, unknown>) {
   return {
-    type: "class",
     model: {
       classes: {
         Ordine: { name: "Ordine", stereotype: "class", attributes: [], methods: [] },
@@ -32,19 +30,18 @@ function diagrammaConRelazione(patch: Record<string, unknown>) {
 }
 
 describe("schema del class diagram", () => {
-  it("un documento classe appena creato valida contro DocumentSchema", () => {
-    expect(DocumentSchema.safeParse(createClassDocument("prova")).success).toBe(true)
+  it("un documento appena creato valida contro DocumentSchema", () => {
+    expect(DocumentSchema.safeParse(createDocument("prova")).success).toBe(true)
   })
 
   it("la chiave di una classe è il suo nome, e il modello non la ricontrolla", () => {
-    const doc = createClassDocument("prova")
-    doc.diagram.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+    const doc = createDocument("prova")
+    doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
   })
 
   it("uno stereotipo fuori dai quattro è rifiutato", () => {
     const r = ClassDiagramSchema.safeParse({
-      type: "class",
       model: { classes: { X: { name: "X", stereotype: "trait", attributes: [], methods: [] } }, relations: {}, notes: {} },
       view: { nodes: {} },
     })
@@ -59,8 +56,8 @@ describe("schema del class diagram", () => {
   })
 
   it("un attributo con tipo vuoto è legale: è così che si scrive un valore di enum", () => {
-    const doc = createClassDocument("prova")
-    doc.diagram.model.classes["Stato"] = {
+    const doc = createDocument("prova")
+    doc.diagram.class.model.classes["Stato"] = {
       name: "Stato", stereotype: "enum",
       attributes: [{ name: "IN_CORSO", type: "", visibility: "public", isStatic: false }],
       methods: [],
@@ -68,12 +65,14 @@ describe("schema del class diagram", () => {
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
   })
 
-  it("i documenti ER continuano a validare: la union è allargata, non cambiata", () => {
-    const er = createErDocument("prova")
-    expect(DocumentSchema.safeParse(er).success).toBe(true)
-    // La versione è quella corrente: la migrazione 1 → 2 tocca solo il class diagram.
-    expect(SCHEMA_VERSION).toBe(2)
-    expect(er.schemaVersion).toBe(SCHEMA_VERSION)
+  it("classi ed entità nello stesso documento validano insieme: ogni parte ha il suo schema", () => {
+    const doc = createDocument("prova")
+    doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+    doc.diagram.er.model.entities["clienti"] = { name: "clienti", attributes: [] }
+    expect(DocumentSchema.safeParse(doc).success).toBe(true)
+    // La versione è quella corrente: la migrazione 3 → 4 aggiunge i collegamenti fra famiglie.
+    expect(SCHEMA_VERSION).toBe(4)
+    expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })
 
@@ -95,9 +94,9 @@ describe("note e navigabilità", () => {
     expect(ClassRelationSchema.parse({ ...rel, navigable: true }).navigable).toBe(true)
   })
 
-  it("createClassDocument nasce con notes vuoto e alla versione corrente", () => {
-    const doc = createClassDocument("Prova", "id-fisso")
-    expect(doc.diagram.model.notes).toEqual({})
+  it("createDocument nasce con le note di classe vuote e alla versione corrente", () => {
+    const doc = createDocument("Prova", "id-fisso")
+    expect(doc.diagram.class.model.notes).toEqual({})
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })

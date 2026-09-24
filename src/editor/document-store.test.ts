@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
 import { documentStore, HISTORY_LIMIT } from "./document-store"
 import { erDiagram } from "./er-access"
 
@@ -13,7 +13,7 @@ const addEntity = (key: string) => (draft: Parameters<typeof erDiagram>[0]) => {
 const initialDoc = documentStore.getState().doc
 
 describe("documentStore", () => {
-  beforeEach(() => documentStore.getState().load(createErDocument("t", "t")))
+  beforeEach(() => documentStore.getState().load(createDocument("t", "t")))
 
   it("dispatch applica la modifica e la mette nella pila undo", () => {
     expect(documentStore.getState().dispatch(addEntity("a"))).toBe(true)

@@ -9,6 +9,8 @@ export type IssueCode =
   // flowchart
   | "flow-dangling-edge" | "flow-decision-arity" | "flow-dead-end"
   | "flow-unreachable" | "flow-branch-unlabeled" | "flow-no-terminal"
+  // collegamenti fra famiglie
+  | "link-dangling" | "class-maps-multiple" | "link-attribute-missing" | "link-type-mismatch" | "link-unmappable"
 
 export type IssueSeverity = "error" | "warning"
 

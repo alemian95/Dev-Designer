@@ -1,6 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema, SCHEMA_VERSION } from "../shared"
-import type { DevDocument } from "../document"
+import { Identifier, NodeViewSchema } from "../shared"
 
 export const CardinalitySchema = z.enum(["one", "zero-or-one", "many", "zero-or-many"])
 export type Cardinality = z.infer<typeof CardinalitySchema>
@@ -62,19 +61,12 @@ export const ErViewSchema = z.object({ nodes: z.record(z.string(), NodeViewSchem
 export type ErView = z.infer<typeof ErViewSchema>
 
 export const ErDiagramSchema = z.object({
-  type: z.literal("er"),
   model: ErModelSchema,
   view: ErViewSchema,
 })
 export type ErDiagram = z.infer<typeof ErDiagramSchema>
 
-export type ErDocument = DevDocument & { diagram: ErDiagram }
-
-export function createErDocument(name: string, id: string = crypto.randomUUID()): ErDocument {
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    id,
-    name,
-    diagram: { type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } },
-  }
+/** Una parte ER vuota: la forma di una famiglia senza elementi (spec §3). */
+export function emptyErDiagram(): ErDiagram {
+  return { model: { entities: {}, relationships: {} }, view: { nodes: {} } }
 }

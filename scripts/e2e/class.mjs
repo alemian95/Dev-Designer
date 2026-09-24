@@ -76,14 +76,11 @@ export async function run(browser, base) {
     await page.goto(base)
     await page.waitForSelector("[data-canvas]")
 
-    await step("«Nuovo ▸ Class diagram»: il canvas è vuoto", async () => {
+    await step("Nuovo documento: il canvas è vuoto", async () => {
       await expectMenu(page, "closed")
       await page.locator("[data-document-menu]").click()
       await expectMenu(page, "open")
-      // Sottomenu (Task 13): `pickFromMenu` chiude tutto dopo un solo click, quindi qui — come in
-      // `persistenza.mjs` — si apre a mano e si sceglie il tipo nel sottomenu.
-      await page.getByRole("menuitem", { name: "Nuovo" }).click()
-      await page.getByRole("menuitem", { name: "Class diagram" }).click()
+      await page.getByRole("menuitem", { name: "Nuovo documento" }).click()
       await expectMenu(page, "closed")
       await expectNodes(page, 0)
     })
@@ -94,7 +91,7 @@ export async function run(browser, base) {
       // Primo nodo. La creazione apre già l'editor del nome (vedi nota in testa al file): si scrive
       // il nome lì, non con un doppio click separato — su una classe ancora senza membri il doppio
       // click aprirebbe comunque il corpo, mai il nome.
-      await page.getByRole("radio", { name: "Classe" }).click()
+      await page.getByRole("radio", { name: "Classe", exact: true }).click()
       await page.mouse.click(canvas.x + 250, canvas.y + 150)
       await expectNodes(page, 1)
       await nameInput.waitFor()
@@ -103,7 +100,7 @@ export async function run(browser, base) {
       await nameInput.waitFor({ state: "detached" })
 
       // Secondo nodo: resta col nome di default, verrà rinominato Cliente più avanti.
-      await page.getByRole("radio", { name: "Classe" }).click()
+      await page.getByRole("radio", { name: "Classe", exact: true }).click()
       await page.mouse.click(canvas.x + 650, canvas.y + 150)
       await expectNodes(page, 2)
       await nameInput.waitFor()
@@ -177,7 +174,7 @@ export async function run(browser, base) {
       // relazione il down apre la connessione sul primo nodo toccato e l'up la commette sul
       // secondo — `addRelation(source, target)` in `class/commands.ts`. È l'ordine che conta per il
       // passo 8: la generalizzazione mette il `target` (il padre) a sinistra nell'export.
-      await page.getByRole("radio", { name: "Relazione" }).click()
+      await page.getByRole("radio", { name: "Collega" }).click()
       const personaRect = await rectByName(page, "Persona")
       const clienteRect2 = await rectByName(page, "Cliente")
       await page.mouse.move(clienteRect2.x + clienteRect2.w / 2, clienteRect2.y + clienteRect2.h / 2)

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest"
+import { createDocument } from "./document"
 import { SCHEMA_VERSION } from "./shared"
-import { createErDocument } from "./er/schema"
 import { runMigrations, migrateDocument, type Migration } from "./migrations"
 import { parseDocument, toJson } from "./serialize"
 
 describe("toJson", () => {
   it("ordina le chiavi in modo stabile e termina con newline", () => {
-    const doc = createErDocument("Prova", "doc-1")
-    doc.diagram.model.entities.zeta = { name: "zeta", attributes: [] }
-    doc.diagram.model.entities.alpha = { name: "alpha", attributes: [] }
+    const doc = createDocument("Prova", "doc-1")
+    doc.diagram.er.model.entities.zeta = { name: "zeta", attributes: [] }
+    doc.diagram.er.model.entities.alpha = { name: "alpha", attributes: [] }
     const json = toJson(doc)
     expect(json.indexOf('"alpha"')).toBeLessThan(json.indexOf('"zeta"'))
     expect(json.indexOf('"diagram"')).toBeLessThan(json.indexOf('"id"'))
@@ -16,12 +16,12 @@ describe("toJson", () => {
   })
 
   it("il round trip restituisce un documento uguale", () => {
-    const doc = createErDocument("Prova", "doc-1")
-    doc.diagram.model.entities.users = {
+    const doc = createDocument("Prova", "doc-1")
+    doc.diagram.er.model.entities.users = {
       name: "users",
       attributes: [{ name: "id", type: "int", primaryKey: true, foreignKey: false, nullable: false, unique: false }],
     }
-    doc.diagram.view.nodes.users = { x: 10, y: 20, collapsed: false }
+    doc.diagram.er.view.nodes.users = { x: 10, y: 20, collapsed: false }
     const result = parseDocument(toJson(doc))
     expect(result).toEqual({ ok: true, document: doc })
   })
@@ -33,7 +33,7 @@ describe("parseDocument", () => {
   })
 
   it("rifiuta una versione più recente di quella supportata", () => {
-    const doc = { ...createErDocument("x", "id"), schemaVersion: SCHEMA_VERSION + 1 }
+    const doc = { ...createDocument("x", "id"), schemaVersion: SCHEMA_VERSION + 1 }
     const result = parseDocument(JSON.stringify(doc))
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toMatch(/più recente/)
@@ -47,7 +47,7 @@ describe("parseDocument", () => {
 
 describe("migrateDocument", () => {
   it("non tocca un documento già alla versione corrente", () => {
-    const doc = createErDocument("x", "id")
+    const doc = createDocument("x", "id")
     expect(migrateDocument(doc)).toEqual({ ok: true, value: doc })
   })
 

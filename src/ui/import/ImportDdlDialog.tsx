@@ -7,6 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { importEr } from "@/editor/commands/import"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
+import { nodeRects } from "@/editor/kinds/canvas-ops"
 import { detectDialect } from "@/io/ddl/detect"
 import { mapToEr } from "@/io/ddl/map"
 import { createParser, type DdlParser } from "@/io/ddl/parse-client"
@@ -93,9 +94,9 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
   // Iscrizione e non `getState()`: il render deve essere puro, e dopo un import la lista si riaggiorna.
   const doc = useStore(documentStore, (s) => s.doc)
-  // `erDiagram` solleva su un documento di classi: l'import DDL è un'entrata solo ER (§2 della
-  // spec del class diagram), quindi qui non c'è nulla di "già presente" da segnalare.
-  const present = new Set(doc.diagram.type === "er" ? Object.keys(erDiagram(doc).model.entities) : [])
+  // La parte ER c'è sempre, vuota in un documento senza entità: l'import scrive lì, qualunque altra
+  // famiglia il documento contenga, e «già presente» si misura solo sulle entità.
+  const present = new Set(Object.keys(erDiagram(doc).model.entities))
   // Iscrizione, non lettura una tantum: la sola lettura può sopravvenire mentre il dialog è aperto
   // (un'altra scheda prende il controllo), e lo stato deve reagire, non essere letto una sola volta.
   const readOnly = useStore(documentSession, (s) => s.readOnly)
@@ -143,9 +144,9 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
     // `documentStore.dispatch` non ha guardie proprie). L'analisi resta permessa: è innocua, non scrive.
     if (stage.kind !== "pronto" || documentSession.getState().readOnly) return
     const tables = stage.result.tables.filter((t) => chosen.has(keyOf(t)))
-    const model = erDiagram(documentStore.getState().doc).model
-    const { entities, relationships, warnings } = mapToEr({ tables, model })
-    documentStore.getState().dispatch(importEr(entities, relationships))
+    const doc = documentStore.getState().doc
+    const { entities, relationships, warnings } = mapToEr({ tables, model: erDiagram(doc).model })
+    documentStore.getState().dispatch(importEr(entities, relationships, nodeRects(doc)))
     setStage({ kind: "fatto", tables: Object.keys(entities).length, relationships: relationships.length, warnings })
   }
 

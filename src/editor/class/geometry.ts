@@ -99,8 +99,8 @@ const DIAMOND_HALF_W = 5
 const ARROW_LEN = 10
 const ARROW_HALF_W = 5
 
-/** Freccia aperta: due segmenti che convergono su `at`. La usano la dipendenza e l'associazione navigabile. */
-function openArrowPath(at: Point, dir: Dir): string {
+/** Freccia aperta: due segmenti che convergono su `at`. La usano la dipendenza, l'associazione navigabile e i collegamenti fra famiglie. */
+export function openArrowPath(at: Point, dir: Dir): string {
   const px = -dir.y
   const py = dir.x
   const p = (d: number, s: number): Point => ({ x: at.x + dir.x * d + px * s, y: at.y + dir.y * d + py * s })

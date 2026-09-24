@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { DevDocument } from "@/model/document"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument, type DevDocument } from "@/model/document"
 import { parseDocument, toJson } from "@/model/serialize"
 import { addEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
@@ -76,7 +75,7 @@ function recordingAutosave() {
 }
 
 const withEntity = (name: string, id: string): DevDocument => {
-  const doc = createErDocument(name, id)
+  const doc = createDocument(name, id)
   const { recipe } = addEntity({}, { x: 0, y: 0 })
   documentStore.getState().load(doc)
   documentStore.getState().dispatch(recipe)
@@ -88,7 +87,7 @@ const record = (doc: DevDocument, over: Partial<DocumentRecord> = {}): DocumentR
 })
 
 beforeEach(() => {
-  documentStore.getState().load(createErDocument("iniziale", "init"))
+  documentStore.getState().load(createDocument("iniziale", "init"))
   sessionStore.getState().setSelection(["entity:x"])
   documentSession.getState().patch({ docId: "", fileName: null, handle: null, dirty: false, readOnly: false, lastSavedAt: null, persistence: "ok", notice: null })
 })
@@ -109,21 +108,22 @@ describe("restoreLast", () => {
     const saved = withEntity("salvato", "s1")
     d.db.records.set("s1", record(saved, { fileName: "s1.dd.json", updatedAt: 900, savedToFileAt: 800 }))
     d.db.last = "s1"
-    // La variante "note" esiste solo nel class diagram: se sopravvivesse al mount di un ER, il
-    // canvas non risponderebbe più al click.
-    sessionStore.getState().setTool("node", "note")
+    // Lo strumento attivo (qui la nota di classe) non sopravvive all'apertura di un altro
+    // documento: si riparte da «Seleziona», senza famiglia né variante.
+    sessionStore.getState().setTool("node", "class", "note")
     await createDocumentIo(d).restoreLast()
     expect(documentStore.getState().doc).toEqual(saved)
     expect(documentStore.getState().past).toHaveLength(0)
     expect(sessionStore.getState().selection.size).toBe(0)
     expect(sessionStore.getState().tool).toBe("select")
+    expect(sessionStore.getState().family).toBeNull()
     expect(sessionStore.getState().variant).toBeNull()
     expect(documentSession.getState()).toMatchObject({ docId: "s1", fileName: "s1.dd.json", lastSavedAt: 800, dirty: true })
   })
 
   it("un record mai salvato su file è sporco solo se ha contenuto", async () => {
     const d = deps()
-    const empty = createErDocument("vuoto", "e1")
+    const empty = createDocument("vuoto", "e1")
     d.db.records.set("e1", record(empty))
     d.db.last = "e1"
     await createDocumentIo(d).restoreLast()
@@ -132,7 +132,7 @@ describe("restoreLast", () => {
 
   it("un record illeggibile produce un documento nuovo e un avviso", async () => {
     const d = deps()
-    d.db.records.set("bad", { ...record(createErDocument("x", "bad")), json: "{ non json" })
+    d.db.records.set("bad", { ...record(createDocument("x", "bad")), json: "{ non json" })
     d.db.last = "bad"
     await createDocumentIo(d).restoreLast()
     expect(documentStore.getState().doc.id).not.toBe("bad")
@@ -169,7 +169,7 @@ describe("openFile", () => {
 
   it("con un buffer più recente e conferma, ripristina il buffer e resta sporco", async () => {
     const d = deps()
-    const fromFile = createErDocument("doc", "b1")
+    const fromFile = createDocument("doc", "b1")
     const buffered = withEntity("doc", "b1")
     d.db.records.set("b1", record(buffered, { updatedAt: 900, savedToFileAt: 800 }))
     await createDocumentIo(d).openFile({ name: "doc.dd.json", text: toJson(fromFile), handle: null })
@@ -180,7 +180,7 @@ describe("openFile", () => {
 
   it("con un buffer più recente e rifiuto, apre il file", async () => {
     const d = deps({ confirm: vi.fn(() => false) })
-    const fromFile = createErDocument("doc", "b2")
+    const fromFile = createDocument("doc", "b2")
     d.db.records.set("b2", record(withEntity("doc", "b2"), { updatedAt: 900, savedToFileAt: 800 }))
     await createDocumentIo(d).openFile({ name: "doc.dd.json", text: toJson(fromFile), handle: null })
     expect(documentStore.getState().doc).toEqual(fromFile)
@@ -203,6 +203,20 @@ describe("openFile", () => {
     d.db.records.set("b3", record(doc, { updatedAt: 900, savedToFileAt: 800 }))
     await createDocumentIo(d).openFile({ name: "doc.dd.json", text: toJson(doc), handle: null })
     expect(d.confirm).not.toHaveBeenCalled()
+  })
+
+  it("riaprire lo stesso file v2 non chiede di ripristinare modifiche che non ci sono", async () => {
+    // L'orologio avanza a ogni lettura, come quello vero: il record scritto alla prima apertura
+    // ha `updatedAt` successivo a `savedToFileAt`.
+    let t = 1000
+    const d = deps({ now: () => t++ })
+    const { er } = withEntity("vecchio", "v2doc").diagram
+    const text = JSON.stringify({ schemaVersion: 2, id: "v2doc", name: "vecchio", diagram: { type: "er", ...er } })
+    const io = createDocumentIo(d)
+    await io.openFile({ name: "vecchio.dd.json", text, handle: null })
+    await io.openFile({ name: "vecchio.dd.json", text, handle: null })
+    expect(d.confirm).not.toHaveBeenCalled()
+    expect(documentSession.getState().dirty).toBe(false)
   })
 })
 
@@ -322,11 +336,12 @@ describe("openRecent e newDocument", () => {
     expect(documentSession.getState()).toMatchObject({ docId: "r1", fileName: "r.dd.json", dirty: false })
   })
 
-  it("newDocument('flow') crea un flowchart, non il class diagram del ramo di default", async () => {
+  it("newDocument crea un documento con le tre famiglie e i collegamenti vuoti", async () => {
     const d = deps()
     const io = createDocumentIo(d)
-    await io.newDocument("flow")
-    expect(documentStore.getState().doc.diagram.type).toBe("flow")
+    await io.newDocument()
+    const doc = documentStore.getState().doc
+    expect(Object.keys(doc.diagram).sort()).toEqual(["class", "er", "flow", "links"])
   })
 
   it("newDocument lascia il precedente in biblioteca", async () => {
@@ -360,7 +375,7 @@ describe("seconda scheda", () => {
     const buffered = withEntity("doc", "s2")
     const rec = record(buffered, { updatedAt: 900, savedToFileAt: 800 })
     d.db.records.set("s2", rec)
-    const fromFile = createErDocument("doc", "s2")
+    const fromFile = createDocument("doc", "s2")
     await createDocumentIo(d).openFile({ name: "doc.dd.json", text: toJson(fromFile), handle: null })
     expect(documentSession.getState().readOnly).toBe(true)
     expect(documentStore.getState().doc).toEqual(fromFile)
@@ -386,7 +401,7 @@ describe("cambio documento", () => {
     const io = createDocumentIo(d)
     const saved = withEntity("recente", "c1")
     d.db.records.set("c1", record(saved, { updatedAt: 900, savedToFileAt: 900 }))
-    documentStore.getState().load(createErDocument("uscente", "out"))
+    documentStore.getState().load(createDocument("uscente", "out"))
     await io.openRecent("c1")
     expect(flushed).toEqual(["out"])
     expect(documentStore.getState().doc).toEqual(saved)
@@ -399,7 +414,7 @@ describe("cambio documento", () => {
     const saved = withEntity("salvato", "c2")
     d.db.records.set("c2", record(saved, { updatedAt: 900, savedToFileAt: 900 }))
     d.db.last = "c2"
-    documentStore.getState().load(createErDocument("uscente", "out"))
+    documentStore.getState().load(createDocument("uscente", "out"))
     await io.restoreLast()
     expect(flushed).toEqual(["out"])
     expect(documentStore.getState().doc).toEqual(saved)
@@ -418,7 +433,7 @@ describe("takeControl", () => {
     d.db.last = "t1"
     await io.restoreLast()
     // Nel frattempo il db è avanzato: se `takeControl` rimontasse, il documento cambierebbe.
-    d.db.records.set("t1", record(createErDocument("più recente", "t1"), { updatedAt: 1200, savedToFileAt: 900 }))
+    d.db.records.set("t1", record(createDocument("più recente", "t1"), { updatedAt: 1200, savedToFileAt: 900 }))
     await io.takeControl()
     expect(documentSession.getState().notice).toContain("non risponde")
     expect(documentSession.getState().docId).toBe("t1")
@@ -429,7 +444,7 @@ describe("takeControl", () => {
     const d = deps()
     const io = createDocumentIo(d)
     const ceded = withEntity("ceduto", "t2")
-    const older = createErDocument("ceduto", "t2")
+    const older = createDocument("ceduto", "t2")
     d.db.records.set("t2", record(older, { updatedAt: 500, savedToFileAt: 500 }))
     d.db.last = "t2"
     await io.restoreLast()

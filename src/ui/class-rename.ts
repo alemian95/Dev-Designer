@@ -1,5 +1,7 @@
 import { renameClass } from "@/editor/class/commands"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
+import { followRename } from "@/editor/links/commands"
 import { selId, sessionStore } from "@/editor/session-store"
 import { documentSession } from "@/io/document-session"
 
@@ -19,8 +21,9 @@ export function renameClassWithNotice(key: string, name: string): boolean {
     return false
   }
   if (newName === key) return true
-  if (documentStore.getState().dispatch(recipe)) {
-    sessionStore.getState().setSelection([selId("node", newName)])
+  // I collegamenti seguono la chiave nuova nella stessa recipe: un passo di annulla (spec 4a §4).
+  if (documentStore.getState().dispatch(followRename(recipe, "class", key, newName))) {
+    sessionStore.getState().setSelection([selId("node", qualify("class", newName))])
     return true
   }
   documentSession.getState().patch({ notice: `Esiste già una classe "${newName}": il nome non è stato cambiato.` })

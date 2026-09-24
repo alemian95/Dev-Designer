@@ -1,33 +1,28 @@
 import { useStore } from "zustand"
 import { fitToContent } from "@/editor/actions"
-import { applyLayout } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
-import { opsFor } from "@/editor/kinds/ops"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
+import { layoutAll } from "@/editor/layout-pack"
 import { layoutEngine } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
 
 /**
- * Dispone il diagramma: grafo → worker → una sola dispatch → vista adattata.
+ * Dispone il canvas: un layout per famiglia → blocchi in fila → una sola dispatch → vista adattata.
  *
- * Un fallimento del worker non tocca il documento: o arrivano le posizioni o non se ne applica
- * nessuna, perché un layout a metà è peggio di quello di prima. L'avviso passa dalla barra che
- * esiste già.
+ * Un fallimento del worker non tocca il documento: o arrivano le posizioni di tutte le famiglie o
+ * non se ne applica nessuna, perché un layout a metà è peggio di quello di prima. L'avviso passa
+ * dalla barra che esiste già.
  */
 export async function autoLayout(): Promise<void> {
   const session = documentSession.getState()
   if (session.layingOut || session.readOnly) return
-  const graph = opsFor(documentStore.getState().doc).layoutGraph()
-  // Con meno di due nodi non c'è niente da disporre, e il pulsante è già disabilitato: questa è la
-  // guardia per la scorciatoia da tastiera, che non ha uno stato disabilitato.
-  if (graph.nodes.length < 2) return
+  // Guardia per la scorciatoia da tastiera, che non ha uno stato disabilitato.
+  if (canvasOps(documentStore.getState().doc).nodeKeys().length < 2) return
 
   documentSession.getState().patch({ layingOut: true })
   try {
-    const positions = await layoutEngine.layout(graph)
-    const ops = opsFor(documentStore.getState().doc)
-    documentStore.getState().dispatch(ops.layoutRecipe ? ops.layoutRecipe(positions) : applyLayout(positions))
-    // Anche se il layout non ha cambiato niente: la vista si adatta comunque, ed è ciò che
-    // l'utente ha chiesto premendo il pulsante.
+    const recipe = await layoutAll(documentStore.getState().doc, (g) => layoutEngine.layout(g))
+    if (recipe) documentStore.getState().dispatch(recipe)
     fitToContent()
   } catch {
     documentSession.getState().patch({ notice: "Non è stato possibile disporre il diagramma." })
@@ -40,7 +35,7 @@ export async function autoLayout(): Promise<void> {
 export function useCanAutoLayout(): boolean {
   // I selettori restituiscono booleani, non il documento: così il pulsante non si ridisegna a ogni
   // modifica del diagramma, ma solo quando la risposta cambia.
-  const hasEnoughNodes = useStore(documentStore, (s) => opsFor(s.doc).nodeKeys().length > 1)
+  const hasEnoughNodes = useStore(documentStore, (s) => canvasOps(s.doc).nodeKeys().length > 1)
   const readOnly = useStore(documentSession, (s) => s.readOnly)
   const layingOut = useStore(documentSession, (s) => s.layingOut)
   return hasEnoughNodes && !readOnly && !layingOut

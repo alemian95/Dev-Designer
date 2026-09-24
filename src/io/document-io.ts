@@ -1,9 +1,8 @@
-import type { DevDocument, Diagram } from "@/model/document"
-import { createClassDocument } from "@/model/class/schema"
-import { createErDocument } from "@/model/er/schema"
-import { createFlowDocument } from "@/model/flow/schema"
+import { createDocument, type DevDocument } from "@/model/document"
+import { FAMILIES } from "@/model/family"
 import { parseDocument, toJson } from "@/model/serialize"
 import { documentStore } from "@/editor/document-store"
+import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { sessionStore } from "@/editor/session-store"
 import type { Autosave } from "./autosave"
 import type { DocumentDb, DocumentRecord } from "./db"
@@ -34,8 +33,8 @@ export interface DocumentIoDeps {
 export interface DocumentIo {
   /** All'avvio: riapre l'ultimo documento dal buffer, o ne crea uno nuovo. */
   restoreLast(): Promise<void>
-  /** `type` sceglie fra `createErDocument`, `createClassDocument` e `createFlowDocument`; il default preserva ogni chiamata esistente. */
-  newDocument(type?: Diagram["type"]): Promise<void>
+  /** Un documento vuoto: le tre famiglie senza elementi. */
+  newDocument(): Promise<void>
   openWithPicker(): Promise<void>
   /** Da picker o da upload: il testo passa da `parseDocument`, che è il confine di fiducia. */
   openFile(opened: OpenedFile): Promise<void>
@@ -54,15 +53,13 @@ type Mounted = Pick<DocumentSessionState, "fileName" | "handle" | "lastSavedAt" 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 const isNotFound = (e: unknown): boolean => e instanceof DOMException && e.name === "NotFoundError"
 
+/**
+ * Il documento ha almeno un nodo, in qualunque famiglia: la definizione è quella di
+ * `familyHasContent`, la stessa di export e canvas. Una nota di classe da sola conta come
+ * contenuto, come ogni altro nodo.
+ */
 function hasContent(doc: DevDocument): boolean {
-  switch (doc.diagram.type) {
-    case "er":
-      return Object.keys(doc.diagram.model.entities).length > 0
-    case "class":
-      return Object.keys(doc.diagram.model.classes).length > 0
-    case "flow":
-      return Object.keys(doc.diagram.model.nodes).length > 0
-  }
+  return FAMILIES.some((f) => familyHasContent(doc, f))
 }
 
 /** Il record ha lavoro non ancora scritto su file. Un documento mai salvato è "sporco" solo se ha contenuto. */
@@ -116,9 +113,8 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
   }
 
   /**
-   * Mette il documento negli store. La selezione e l'editing si azzerano: le chiavi erano di un altro
-   * documento. Anche lo strumento, che non ha chiavi ma un tipo di diagramma: `note` esiste solo nel
-   * class diagram e resterebbe attivo su un ER, dove il click sul canvas non farebbe nulla.
+   * Mette il documento negli store. Selezione, editing e strumento si azzerano: le chiavi selezionate
+   * o in modifica, e la famiglia dello strumento attivo, erano del documento uscente.
    */
   function mount(doc: DevDocument, s: Mounted): void {
     documentStore.getState().load(doc)
@@ -148,26 +144,8 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     }, undefined)
   }
 
-  /**
-   * Uno switch esaustivo e non un ternario: un ternario a due rami per tre tipi di diagramma
-   * cade in silenzio sul ramo sbagliato per il terzo, senza che il compilatore se ne accorga — è
-   * quello che faceva prima di questo cambiamento, e per `"flow"` creava zitto un class diagram.
-   * Un domani un quarto tipo di diagramma farebbe fallire il build qui, non a runtime.
-   */
-  function blankDocument(type: Diagram["type"], name: string): DevDocument {
-    switch (type) {
-      case "er":
-        return createErDocument(name)
-      case "class":
-        return createClassDocument(name)
-      case "flow":
-        return createFlowDocument(name)
-    }
-  }
-
-  async function newDocument(type: Diagram["type"] = "er"): Promise<void> {
-    const doc = blankDocument(type, "Senza titolo")
-    await activate(doc, { fileName: null, handle: null, lastSavedAt: null, dirty: false }, { savedToFileAt: null })
+  async function newDocument(): Promise<void> {
+    await activate(createDocument("Senza titolo"), { fileName: null, handle: null, lastSavedAt: null, dirty: false }, { savedToFileAt: null })
   }
 
   async function restoreLast(): Promise<void> {
@@ -200,8 +178,10 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     let lastSavedAt: number | null = now()
     let dirty = false
     // Stesso id già in biblioteca con lavoro non salvato: è il recupero dopo un crash, e decide l'utente.
+    // Il buffer si confronta con la forma canonica del documento letto, non col testo del file: un
+    // file di una versione precedente, migrato, non è mai uguale al buffer carattere per carattere.
     const existing = await safe(() => db.get(doc.id), undefined)
-    if (existing && existing.json !== opened.text) {
+    if (existing && existing.json !== toJson(parsed.document)) {
       const buffered = parseDocument(existing.json)
       if (buffered.ok && hasUnsaved(existing, buffered.document)) {
         const restore = confirm(`"${doc.name}" ha modifiche non salvate nel browser, più recenti del file. Ripristinarle?\n\nAnnulla per aprire il file com'è.`)

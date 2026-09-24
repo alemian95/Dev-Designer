@@ -1,21 +1,19 @@
 import type { DevDocument } from "@/model/document"
+import type { Family } from "@/model/family"
 import type { LayoutPositions } from "@/model/layout"
 import type { NodeView } from "@/model/shared"
 import type { Recipe } from "../document-store"
 import { snap } from "../geometry"
 
-/** Distanza dall'origine del risultato: un diagramma appiccicato al bordo (0, 0) si legge male. */
-const MARGIN = 40
-
-/** La view del diagramma, qualunque sia il tipo: `view.nodes` è la proprietà comune della union e ha la stessa forma nei due membri. */
-export function diagramView(doc: DevDocument): { nodes: Record<string, NodeView> } {
-  return doc.diagram.view
+/** La view di una famiglia: `view.nodes` ha la stessa forma in tutte. */
+export function diagramView(doc: DevDocument, family: Family): { nodes: Record<string, NodeView> } {
+  return doc.diagram[family].view
 }
 
-export function moveNodes(keys: readonly string[], dx: number, dy: number): Recipe | null {
+export function moveNodes(family: Family, keys: readonly string[], dx: number, dy: number): Recipe | null {
   if (dx === 0 && dy === 0) return null
   return (draft) => {
-    const d = diagramView(draft)
+    const d = diagramView(draft, family)
     for (const key of keys) {
       const node = d.nodes[key]
       if (!node) continue
@@ -25,27 +23,28 @@ export function moveNodes(keys: readonly string[], dx: number, dy: number): Reci
   }
 }
 
-export function setCollapsed(key: string, collapsed: boolean): Recipe {
+export function setCollapsed(family: Family, key: string, collapsed: boolean): Recipe {
   return (draft) => {
-    const node = diagramView(draft).nodes[key]
+    const node = diagramView(draft, family).nodes[key]
     if (node) node.collapsed = collapsed
   }
 }
 
 /**
- * Scrive le posizioni calcolate nella view, in una sola recipe: un ⌘Z rimette tutte quelle di prima.
+ * Scrive le posizioni ricevute nella view della famiglia, in una sola recipe: un ⌘Z rimette tutte quelle di prima.
  *
- * Le coordinate di ELK partono dalla sua origine e sono float. Qui si traslano perché il risultato
- * parta da `MARGIN` e si allineano alla griglia, come ogni altra posizione dell'app — una posizione
- * fuori griglia si nota al primo trascinamento, che riallinea il nodo di qualche pixel.
+ * Le coordinate arrivano già nel punto in cui devono cadere — l'origine la decide `packBlocks`
+ * (`layout-pack.ts`), che impacchetta i blocchi delle famiglie in fila — qui si scrivono e si
+ * allineano alla griglia, come ogni altra posizione dell'app: una posizione fuori griglia si nota al
+ * primo trascinamento, che riallinea il nodo di qualche pixel.
  *
  * Le chiavi che nella view non esistono più (l'entità è stata cancellata mentre il worker
  * calcolava) si ignorano: il nodo non si ricrea. Riscrivere lo stesso valore non genera patch —
  * Immer confronta i primitivi — quindi un secondo layout identico non aggiunge una voce di undo.
  */
-export function applyLayout(positions: LayoutPositions): Recipe {
+export function applyLayout(family: Family, positions: LayoutPositions): Recipe {
   return (draft) => {
-    const d = diagramView(draft)
+    const d = diagramView(draft, family)
     // Il nodo si prende qui e non nel ciclo: il filtro «la chiave esiste» e la lettura del nodo sono
     // la stessa domanda, e tenerle insieme la fa rispondere al tipo invece che a un commento.
     const entries = Object.entries(positions).flatMap(([key, p]) => {
@@ -54,11 +53,9 @@ export function applyLayout(positions: LayoutPositions): Recipe {
     })
     if (entries.length === 0) return
 
-    const minX = Math.min(...entries.map(({ p }) => p.x))
-    const minY = Math.min(...entries.map(({ p }) => p.y))
     for (const { node, p } of entries) {
-      node.x = snap(p.x - minX + MARGIN)
-      node.y = snap(p.y - minY + MARGIN)
+      node.x = snap(p.x)
+      node.y = snap(p.y)
     }
   }
 }

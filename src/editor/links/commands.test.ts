@@ -1,0 +1,124 @@
+import { beforeEach, describe, expect, it } from "vitest"
+import { createDocument, type DevDocument } from "@/model/document"
+import { renameEntity } from "../commands/er"
+import { documentStore } from "../document-store"
+import { connectAcross, deleteLinks, followRename, linksTouching, retargetLinks } from "./commands"
+
+const state = () => documentStore.getState()
+const links = () => state().doc.diagram.links
+
+/** Un'entità `ordini`, una seconda entità `clienti`, e una classe, un'interfaccia, un enum e una nota. */
+function documento(): DevDocument {
+  const doc = createDocument("t", "t")
+  // Un oggetto nuovo per nodo: una view condivisa fra due chiavi diventerebbe un alias nel documento.
+  const at = () => ({ x: 0, y: 0, collapsed: false })
+  for (const name of ["ordini", "clienti"]) {
+    doc.diagram.er.model.entities[name] = { name, attributes: [] }
+    doc.diagram.er.view.nodes[name] = at()
+  }
+  for (const [name, stereotype] of [["Ordine", "class"], ["Pagabile", "interface"], ["Stato", "enum"]] as const) {
+    doc.diagram.class.model.classes[name] = { name, stereotype, attributes: [], methods: [] }
+    doc.diagram.class.view.nodes[name] = at()
+  }
+  doc.diagram.class.model.notes["n1"] = { text: "" }
+  doc.diagram.class.view.nodes["n1"] = at()
+  return doc
+}
+
+beforeEach(() => state().load(documento()))
+
+describe("connectAcross", () => {
+  it("classe → entità crea «mappa su» da classe a entità", () => {
+    const r = connectAcross(state().doc, "class/Ordine", "er/ordini")
+    if (r.type !== "created") throw new Error(`atteso created, arrivato ${r.type}`)
+    expect(r.key.startsWith("link/")).toBe(true)
+    state().dispatch(r.recipe)
+    expect(Object.values(links())).toEqual([{ kind: "maps-to", source: "class/Ordine", target: "er/ordini" }])
+  })
+
+  it("entità → classe dà lo stesso collegamento, nel verso del tipo", () => {
+    const r = connectAcross(state().doc, "er/ordini", "class/Ordine")
+    if (r.type !== "created") throw new Error(`atteso created, arrivato ${r.type}`)
+    state().dispatch(r.recipe)
+    expect(Object.values(links())).toEqual([{ kind: "maps-to", source: "class/Ordine", target: "er/ordini" }])
+  })
+
+  it("una coppia senza tipo è rifiutata, con le famiglie nell'ordine del gesto", () => {
+    expect(connectAcross(state().doc, "flow/n1", "er/ordini")).toEqual({
+      type: "rejected",
+      notice: "Non esiste un collegamento fra un nodo di flusso e un'entità.",
+    })
+    expect(connectAcross(state().doc, "class/Ordine", "flow/n1")).toEqual({
+      type: "rejected",
+      notice: "Non esiste un collegamento fra una classe e un nodo di flusso.",
+    })
+  })
+
+  it("un'interfaccia, un enum e una nota non si mappano su una tabella", () => {
+    expect(connectAcross(state().doc, "class/Pagabile", "er/ordini")).toEqual({ type: "rejected", notice: "Un'interfaccia non si mappa su una tabella." })
+    expect(connectAcross(state().doc, "er/ordini", "class/Stato")).toEqual({ type: "rejected", notice: "Un enum non si mappa su una tabella." })
+    expect(connectAcross(state().doc, "class/n1", "er/ordini")).toEqual({ type: "rejected", notice: "Una nota non si mappa su una tabella." })
+  })
+
+  it("un secondo gesto fra gli stessi nodi seleziona quello che c'è", () => {
+    const first = connectAcross(state().doc, "class/Ordine", "er/ordini")
+    if (first.type !== "created") throw new Error("atteso created")
+    state().dispatch(first.recipe)
+    expect(connectAcross(state().doc, "er/ordini", "class/Ordine")).toEqual({ type: "existing", key: first.key })
+  })
+
+  it("verso un'altra entità nasce un secondo collegamento: il problema lo dice la validazione", () => {
+    for (const target of ["er/ordini", "er/clienti"]) {
+      const r = connectAcross(state().doc, "class/Ordine", target)
+      if (r.type !== "created") throw new Error("atteso created")
+      state().dispatch(r.recipe)
+    }
+    expect(Object.keys(links())).toHaveLength(2)
+  })
+})
+
+/** Mette nel documento un collegamento `l1` da `class/Ordine` a `er/ordini`. */
+function collega() {
+  state().dispatch((draft) => {
+    draft.diagram.links["l1"] = { kind: "maps-to", source: "class/Ordine", target: "er/ordini" }
+  })
+}
+
+describe("retargetLinks e followRename", () => {
+  it("retargetLinks sposta gli estremi che nominano la chiave vecchia", () => {
+    collega()
+    state().dispatch(retargetLinks("er/ordini", "er/righe"))
+    expect(links()["l1"]!.target).toBe("er/righe")
+  })
+
+  it("la rinomina porta con sé il collegamento, in un solo passo di annulla", () => {
+    collega()
+    const past = state().past.length
+    expect(state().dispatch(followRename(renameEntity("ordini", "righe")!, "er", "ordini", "righe"))).toBe(true)
+    expect(links()["l1"]!.target).toBe("er/righe")
+    expect(state().past.length).toBe(past + 1)
+    state().undo()
+    expect(links()["l1"]!.target).toBe("er/ordini")
+  })
+
+  it("una rinomina che collide non sposta niente", () => {
+    // Review Focus 1: `renameEntity` su un nome già preso è una recipe che non scrive.
+    collega()
+    expect(state().dispatch(followRename(renameEntity("ordini", "clienti")!, "er", "ordini", "clienti"))).toBe(false)
+    expect(links()["l1"]!.target).toBe("er/ordini")
+  })
+})
+
+describe("deleteLinks e linksTouching", () => {
+  it("deleteLinks toglie solo i collegamenti dati", () => {
+    collega()
+    state().dispatch(deleteLinks(["l1"]))
+    expect(links()).toEqual({})
+  })
+
+  it("linksTouching dà i collegamenti con un estremo fra le chiavi", () => {
+    collega()
+    expect(linksTouching(links(), new Set(["er/ordini"]))).toEqual([["l1", links()["l1"]]])
+    expect(linksTouching(links(), new Set(["er/clienti"]))).toEqual([])
+  })
+})

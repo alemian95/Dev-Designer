@@ -1,6 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema, SCHEMA_VERSION } from "../shared"
-import type { DevDocument } from "../document"
+import { Identifier, NodeViewSchema } from "../shared"
 
 /** Le cinque forme della notazione più la nota. La nota è una forma e non una specie: a
  *  differenza di quella del class diagram non si àncora a niente, è un riquadro con del testo. */
@@ -50,25 +49,22 @@ export const FlowViewSchema = z.object({
 export type FlowView = z.infer<typeof FlowViewSchema>
 
 export const FlowDiagramSchema = z.object({
-  type: z.literal("flow"),
   model: FlowModelSchema,
   view: FlowViewSchema,
 })
 export type FlowDiagram = z.infer<typeof FlowDiagramSchema>
 
-export type FlowDocument = DevDocument & { diagram: FlowDiagram }
-
 /**
  * Altezza minima di una corsia, e altezza di una appena creata: contiene qualunque forma con
  * un'etichetta di due righe, rombo compreso. Sta nel modello e non nel layout perché la usano
- * entrambi — `createFlowDocument` qui e `placeInLanes` in `editor/flow/layout.ts` — e due costanti
+ * entrambi — `emptyFlowDiagram` qui e `placeInLanes` in `editor/flow/layout.ts` — e due costanti
  * con lo stesso valore divergono il giorno che qualcuno ne cambia una.
  */
 export const LANE_MIN_H = 160
 
 /**
  * Prossimo nome di corsia libero, «Corsia N»: fonte unica per la prima corsia di un documento
- * nuovo (`createFlowDocument`, qui sotto) e per chi ne aggiunge una dal pannello
+ * nuovo (`emptyFlowDiagram`, qui sotto) e per chi ne aggiunge una dal pannello
  * (`FlowLanesPanel`, `ui/panels/FlowProperties.tsx`) — prima erano due formule scritte a parte,
  * che avrebbero potuto divergere (violazione SSOT).
  *
@@ -84,16 +80,11 @@ export function nextLaneName(existing: readonly { name: string }[]): string {
   return `Corsia ${n}`
 }
 
-export function createFlowDocument(name: string, id: string = crypto.randomUUID()): FlowDocument {
+/** Una parte di flusso vuota: una corsia sola, perché `lanes` è `.min(1)` (spec §3). */
+export function emptyFlowDiagram(): FlowDiagram {
   const laneId = crypto.randomUUID()
   return {
-    schemaVersion: SCHEMA_VERSION,
-    id,
-    name,
-    diagram: {
-      type: "flow",
-      model: { lanes: [{ id: laneId, name: nextLaneName([]) }], nodes: {}, edges: {} },
-      view: { nodes: {}, lanes: { [laneId]: { y: 0, h: LANE_MIN_H } } },
-    },
+    model: { lanes: [{ id: laneId, name: nextLaneName([]) }], nodes: {}, edges: {} },
+    view: { nodes: {}, lanes: { [laneId]: { y: 0, h: LANE_MIN_H } } },
   }
 }

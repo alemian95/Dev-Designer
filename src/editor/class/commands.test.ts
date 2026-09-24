@@ -1,6 +1,7 @@
 import { produce } from "immer"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createClassDocument, type ClassAttribute, type ClassDocument } from "@/model/class/schema"
+import { createDocument, type DevDocument } from "@/model/document"
+import type { ClassAttribute } from "@/model/class/schema"
 import { classDiagram } from "../class-access"
 import { documentStore, type Recipe } from "../document-store"
 import {
@@ -17,7 +18,7 @@ import {
 
 /** Applica una recipe a un documento senza passare dallo store: comodo per i test che non
  *  hanno bisogno di undo/redo, solo del documento risultante. */
-function applica(doc: ClassDocument, recipe: Recipe): ClassDocument {
+function applica(doc: DevDocument, recipe: Recipe): DevDocument {
   return produce(doc, recipe)
 }
 
@@ -25,8 +26,7 @@ const state = () => documentStore.getState()
 
 /** Il diagramma di classi dello store. Solleva se il documento è di un altro tipo. */
 function cd() {
-  const d = state().doc.diagram
-  if (d.type !== "class") throw new Error(`atteso un class diagram, trovato ${d.type}`)
+  const d = state().doc.diagram.class
   return d
 }
 
@@ -34,12 +34,12 @@ const id: ClassAttribute = { name: "id", type: "int", visibility: "public", isSt
 
 describe("comandi delle classi", () => {
   beforeEach(() => {
-    const doc = createClassDocument("t", "t")
-    doc.diagram.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [id], methods: [] }
-    doc.diagram.model.classes["Persona"] = { name: "Persona", stereotype: "abstract", attributes: [], methods: [] }
-    doc.diagram.view.nodes["Cliente"] = { x: 0, y: 100, collapsed: false }
-    doc.diagram.view.nodes["Persona"] = { x: 0, y: 0, collapsed: false }
-    doc.diagram.model.relations["r1"] = {
+    const doc = createDocument("t", "t")
+    doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [id], methods: [] }
+    doc.diagram.class.model.classes["Persona"] = { name: "Persona", stereotype: "abstract", attributes: [], methods: [] }
+    doc.diagram.class.view.nodes["Cliente"] = { x: 0, y: 100, collapsed: false }
+    doc.diagram.class.view.nodes["Persona"] = { x: 0, y: 0, collapsed: false }
+    doc.diagram.class.model.relations["r1"] = {
       kind: "generalization",
       source: { class: "Cliente", multiplicity: "", role: "" },
       target: { class: "Persona", multiplicity: "", role: "" },
@@ -140,49 +140,49 @@ describe("comandi delle classi", () => {
 })
 
 describe("comandi delle note", () => {
-  const vuoto = () => createClassDocument("Prova", "doc-1")
+  const vuoto = () => createDocument("Prova", "doc-1")
 
   it("addNote crea la nota e la sua view, con una chiave che non è il testo", () => {
     const doc = vuoto()
     const { key, recipe } = addNote({ x: 37, y: 52 })
     const dopo = applica(doc, recipe)
-    expect(dopo.diagram.model.notes[key]).toEqual({ text: "" })
+    expect(dopo.diagram.class.model.notes[key]).toEqual({ text: "" })
     // Snappata alla griglia come le classi.
-    expect(dopo.diagram.view.nodes[key]).toEqual({ x: 40, y: 50, collapsed: false })
+    expect(dopo.diagram.class.view.nodes[key]).toEqual({ x: 40, y: 50, collapsed: false })
   })
 
   it("setNoteText scrive il testo e non tocca altro", () => {
     const { key, recipe } = addNote({ x: 0, y: 0 })
     const doc = applica(vuoto(), recipe)
     const dopo = applica(doc, setNoteText(key, "prima\nseconda"))
-    expect(dopo.diagram.model.notes[key]!.text).toBe("prima\nseconda")
+    expect(dopo.diagram.class.model.notes[key]!.text).toBe("prima\nseconda")
   })
 
   it("setNoteText su una chiave che non esiste non scrive niente", () => {
     const doc = vuoto()
-    expect(applica(doc, setNoteText("assente", "x")).diagram.model.notes).toEqual({})
+    expect(applica(doc, setNoteText("assente", "x")).diagram.class.model.notes).toEqual({})
   })
 
   it("deleteClassItems cancella la nota e la sua view", () => {
     const { key, recipe } = addNote({ x: 0, y: 0 })
     const doc = applica(vuoto(), recipe)
     const dopo = applica(doc, deleteClassItems([], [], [key])!)
-    expect(dopo.diagram.model.notes).toEqual({})
-    expect(dopo.diagram.view.nodes[key]).toBeUndefined()
+    expect(dopo.diagram.class.model.notes).toEqual({})
+    expect(dopo.diagram.class.view.nodes[key]).toBeUndefined()
   })
 
   it("deleteClassItems su una classe non tocca una nota indipendente", () => {
     // Copre il caso che il test precedente non tocca: la nota non ha archi, ma va comunque
     // provato che cancellare una classe non la trascina via di rimbalzo.
     const base = vuoto()
-    base.diagram.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
-    base.diagram.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
+    base.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+    base.diagram.class.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
     const { key, recipe } = addNote({ x: 0, y: 0 })
     const doc = applica(base, recipe)
     const dopo = applica(doc, deleteClassItems(["Cliente"], [], [])!)
-    expect(dopo.diagram.model.classes["Cliente"]).toBeUndefined()
-    expect(dopo.diagram.model.notes[key]).toEqual({ text: "" })
-    expect(dopo.diagram.view.nodes[key]).toEqual({ x: 0, y: 0, collapsed: false })
+    expect(dopo.diagram.class.model.classes["Cliente"]).toBeUndefined()
+    expect(dopo.diagram.class.model.notes[key]).toEqual({ text: "" })
+    expect(dopo.diagram.class.view.nodes[key]).toEqual({ x: 0, y: 0, collapsed: false })
   })
 
   it("deleteClassItems torna null solo se non c'è niente da cancellare, note comprese", () => {
@@ -193,19 +193,19 @@ describe("comandi delle note", () => {
   it("duplicateClasses copia anche le note, con una chiave nuova e lo scarto", () => {
     const { key, recipe } = addNote({ x: 100, y: 100 })
     const doc = applica(applica(vuoto(), recipe), setNoteText(key, "promemoria"))
-    const { keys, recipe: dup } = duplicateClasses(doc.diagram.model, [key])
+    const { keys, recipe: dup } = duplicateClasses(doc.diagram.class.model, [key])
     const dopo = applica(doc, dup)
     expect(keys).toHaveLength(1)
     expect(keys[0]).not.toBe(key)
-    expect(dopo.diagram.model.notes[keys[0]!]).toEqual({ text: "promemoria" })
-    expect(dopo.diagram.view.nodes[keys[0]!]!.x).toBe(120)
+    expect(dopo.diagram.class.model.notes[keys[0]!]).toEqual({ text: "promemoria" })
+    expect(dopo.diagram.class.view.nodes[keys[0]!]!.x).toBe(120)
   })
 })
 
 describe("addNoteLink", () => {
   /** Un documento con una classe "Cliente" e una nota "n1", entrambe con una view. */
-  function conNotaEClasse(): ClassDocument {
-    const doc = createClassDocument("d", "id")
+  function conNotaEClasse(): DevDocument {
+    const doc = createDocument("d", "id")
     return produce(doc, (d) => {
       const cd = classDiagram(d)
       cd.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }

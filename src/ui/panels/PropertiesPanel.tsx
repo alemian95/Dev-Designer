@@ -1,52 +1,45 @@
 import { useStore } from "zustand"
+import { documentStore } from "@/editor/document-store"
+import { linkId, splitKey } from "@/editor/families"
+import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { useDiagramView } from "@/ui/canvas/kinds/registry"
-
-/**
- * Articolo indeterminativo davanti a un'etichetta, con l'elisione davanti a vocale (`un'entità`,
- * non `una entità`). Le etichette di `tools` sono tutte sostantivi femminili nei due tipi di
- * diagramma di oggi (entità/classe, relazione): se un terzo tipo introducesse un'etichetta
- * maschile, questa funzione andrebbe estesa, non aggirata.
- */
-function indeterminateArticle(label: string): string {
-  return /^[aeiou]/i.test(label) ? "un'" : "una "
-}
+import { viewFor } from "@/ui/canvas/kinds/registry"
+import { FlowLanesPanel } from "./FlowProperties"
+import { LinkProperties } from "./LinkProperties"
 
 /**
  * Cornice, non contenuto: decide *se* c'è qualcosa da mostrare (esattamente un nodo o un arco
- * selezionato) e in tal caso monta `view.Properties`, il corpo specifico del tipo di diagramma
- * corrente. Il caso «niente selezionato» — zero o più selezioni miste — non dipende dal tipo,
- * quindi resta qui, ma la frase sì: «nodo» e «arco» sono il vocabolario di `SelectionKind`, non
- * quello dell'utente.
+ * selezionato) e in tal caso monta il `Properties` della famiglia di quell'elemento, letta dal
+ * prefisso della sua chiave. Il caso «niente selezionato» — zero o più selezioni miste — non
+ * dipende dal tipo, quindi resta qui, con una frase unica: da quando gli strumenti sono per famiglia (Task 2) e
+ * «Collega» è comune a tutte, non c'è più un'etichetta di nodo/arco singola da comporre per tipo.
  *
- * La frase composta (`Seleziona una X o una Y.`) reggeva due strumenti; con la nota come variante
- * in più non regge più — comporla per tre voci produrrebbe una lista innaturale in italiano. Si
- * biforca quindi per tipo di diagramma: dove una variante "note" esiste in `tools` (le classi) la
- * frase è scritta per esteso, altrove (l'ER) resta la composizione a due, con le etichette dello
- * strumento nodo semplice e dello strumento arco cercate in `view.tools`.
- *
- * **Selezione vuota**: di norma è anche lei neutra rispetto al tipo (la stessa frase sopra, con
- * `selection.size === 0`). `view.EmptyProperties`, se dichiarato, la sostituisce — solo il
- * flowchart lo fa, per il pannello delle corsie (spec §11): senza nodo o arco da passare non c'è
- * niente che serva a `Properties`, quindi è un componente a sé. Una selezione **multipla** non
- * lo monta comunque: resta sulla frase generica, come oggi.
+ * **Selezione vuota**: la frase generica c'è sempre (spec §10), e se il flusso ha almeno un nodo
+ * sotto di lei compare anche il pannello delle corsie (`FlowLanesPanel`, spec §11), nello stesso
+ * ordine in cui compaiono le bande sul canvas (`LanesLayer`): le corsie esistono sempre nel
+ * modello, ma si vedono solo quando c'è un nodo di flusso. Una selezione **multipla** non monta
+ * mai le corsie: resta sulla sola frase generica, come oggi.
  */
 export function PropertiesPanel() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const view = useDiagramView()
+  const hasFlowNodes = useStore(documentStore, (s) => familyHasContent(s.doc, "flow"))
   const nodes = selectedKeys(selection, "node")
   const edges = selectedKeys(selection, "edge")
   const single = (nodes.length === 1 && edges.length === 0) || (edges.length === 1 && nodes.length === 0)
-  if (single) return <view.Properties />
-  if (selection.size === 0 && view.EmptyProperties) return <view.EmptyProperties />
-  const nodeLabel = (view.tools.find((t) => t.tool === "node" && !t.variant)?.label ?? "").toLowerCase()
-  const edgeLabel = (view.tools.find((t) => t.tool === "edge")?.label ?? "").toLowerCase()
-  const vuoto = view.tools.some((t) => t.variant === "note")
-    ? "Seleziona una classe, una relazione o una nota."
-    : `Seleziona ${indeterminateArticle(nodeLabel)}${nodeLabel} o ${indeterminateArticle(edgeLabel)}${edgeLabel}.`
+  if (single) {
+    const key = (nodes[0] ?? edges[0])!
+    // Un collegamento non ha famiglia: si riconosce prima di `splitKey`, che lo rifiuterebbe.
+    const link = linkId(key)
+    if (link !== null) return <LinkProperties key={link} linkId={link} />
+    const { Properties } = viewFor(splitKey(key).family)
+    return <Properties />
+  }
   return (
-    <p className="p-3 text-sm text-muted-foreground">
-      {selection.size === 0 ? vuoto : `${selection.size} elementi selezionati`}
-    </p>
+    <>
+      <p className="p-3 text-sm text-muted-foreground">
+        {selection.size === 0 ? "Seleziona un elemento sul canvas." : `${selection.size} elementi selezionati`}
+      </p>
+      {selection.size === 0 && hasFlowNodes && <FlowLanesPanel />}
+    </>
   )
 }

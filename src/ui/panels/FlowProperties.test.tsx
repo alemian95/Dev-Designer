@@ -7,11 +7,12 @@
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { createDocument } from "@/model/document"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { addFlowNode, setNodeLabel } from "@/editor/flow/commands"
 import { selId, sessionStore } from "@/editor/session-store"
-import { createFlowDocument } from "@/model/flow/schema"
 import { FlowProperties } from "./FlowProperties"
 
 // Senza questo, React avvisa che l'ambiente "non supporta act(...)" e non garantisce che gli
@@ -40,7 +41,7 @@ function editAndBlur(el: HTMLInputElement | HTMLTextAreaElement, value: string):
 }
 
 beforeEach(() => {
-  documentStore.getState().load(createFlowDocument("t", "t"))
+  documentStore.getState().load(createDocument("t", "t"))
   sessionStore.getState().setSelection([])
   sessionStore.getState().setEditing(null)
   container = document.createElement("div")
@@ -59,7 +60,7 @@ describe("FlowNodeProperties: campo etichetta", () => {
     const { key, recipe } = addFlowNode({ x: 0, y: 0 }, "process", lane)
     documentStore.getState().dispatch(recipe)
     documentStore.getState().dispatch(setNodeLabel(key, "verifica\nordine"))
-    sessionStore.getState().setSelection([selId("node", key)])
+    sessionStore.getState().setSelection([selId("node", qualify("flow", key))])
 
     act(() => root.render(<FlowProperties />))
     const field = container.querySelector<HTMLInputElement | HTMLTextAreaElement>("#flow-node-label")

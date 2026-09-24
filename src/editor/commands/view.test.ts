@@ -1,32 +1,32 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
 import type { LayoutPositions } from "@/model/layout"
 import { documentStore } from "../document-store"
 import { applyLayout, diagramView, moveNodes, setCollapsed } from "./view"
 
 const state = () => documentStore.getState()
-const view = () => diagramView(state().doc)
+const view = () => diagramView(state().doc, "er")
 
 /** Un documento ER con due nodi in posizioni note. I nomi sono inventati. */
 function docConDueNodi() {
-  const doc = createErDocument("prova")
-  doc.diagram.model.entities["cliente"] = { name: "cliente", attributes: [] }
-  doc.diagram.model.entities["ordine"] = { name: "ordine", attributes: [] }
-  doc.diagram.view.nodes["cliente"] = { x: 0, y: 0, collapsed: false }
-  doc.diagram.view.nodes["ordine"] = { x: 100, y: 0, collapsed: false }
+  const doc = createDocument("prova")
+  doc.diagram.er.model.entities["cliente"] = { name: "cliente", attributes: [] }
+  doc.diagram.er.model.entities["ordine"] = { name: "ordine", attributes: [] }
+  doc.diagram.er.view.nodes["cliente"] = { x: 0, y: 0, collapsed: false }
+  doc.diagram.er.view.nodes["ordine"] = { x: 100, y: 0, collapsed: false }
   return doc
 }
 
 describe("moveNodes condiviso", () => {
   it("sposta e snappa senza sapere che tipo di diagramma sia", () => {
     const doc = docConDueNodi()
-    moveNodes(["cliente"], 13, 27)!(doc)
-    expect(doc.diagram.view.nodes["cliente"]).toEqual({ x: 10, y: 30, collapsed: false })
-    expect(doc.diagram.view.nodes["ordine"]!.x).toBe(100)
+    moveNodes("er", ["cliente"], 13, 27)!(doc)
+    expect(doc.diagram.er.view.nodes["cliente"]).toEqual({ x: 10, y: 30, collapsed: false })
+    expect(doc.diagram.er.view.nodes["ordine"]!.x).toBe(100)
   })
 
   it("uno spostamento nullo non produce recipe", () => {
-    expect(moveNodes(["cliente"], 0, 0)).toBeNull()
+    expect(moveNodes("er", ["cliente"], 0, 0)).toBeNull()
   })
 
   describe("con documentStore", () => {
@@ -40,7 +40,7 @@ describe("moveNodes condiviso", () => {
     })
 
     it("un dispatch sposta più chiavi insieme, ciascuna con il suo snap", () => {
-      state().dispatch(moveNodes(["cliente", "ordine"], 23, -7)!)
+      state().dispatch(moveNodes("er", ["cliente", "ordine"], 23, -7)!)
       expect(view().nodes["cliente"]).toMatchObject({ x: 20, y: -10 })
       expect(view().nodes["ordine"]).toMatchObject({ x: 120, y: -10 })
     })
@@ -55,18 +55,18 @@ describe("setCollapsed condiviso", () => {
   })
 
   it("un dispatch imposta collapsed sul nodo", () => {
-    state().dispatch(setCollapsed("cliente", true))
+    state().dispatch(setCollapsed("er", "cliente", true))
     expect(view().nodes["cliente"]?.collapsed).toBe(true)
   })
 })
 
 describe("applyLayout condiviso", () => {
-  it("trasla dal minimo e ignora le posizioni di nodi che non esistono", () => {
+  it("scrive le posizioni ricevute, allineate alla griglia, e ignora le posizioni di nodi che non esistono", () => {
     const doc = docConDueNodi()
-    applyLayout({ cliente: { x: 500, y: 500 }, ordine: { x: 600, y: 500 }, fantasma: { x: 0, y: 0 } })(doc)
-    expect(doc.diagram.view.nodes["cliente"]).toEqual({ x: 40, y: 40, collapsed: false })
-    expect(doc.diagram.view.nodes["ordine"]).toEqual({ x: 140, y: 40, collapsed: false })
-    expect(doc.diagram.view.nodes["fantasma"]).toBeUndefined()
+    applyLayout("er", { cliente: { x: 13, y: 27 }, ordine: { x: 600, y: 500 }, fantasma: { x: 0, y: 0 } })(doc)
+    expect(doc.diagram.er.view.nodes["cliente"]).toEqual({ x: 10, y: 30, collapsed: false })
+    expect(doc.diagram.er.view.nodes["ordine"]).toEqual({ x: 600, y: 500, collapsed: false })
+    expect(doc.diagram.er.view.nodes["fantasma"]).toBeUndefined()
   })
 
   describe("con documentStore", () => {
@@ -79,14 +79,14 @@ describe("applyLayout condiviso", () => {
       state().load(docConDueNodi())
     })
 
-    it("trasla a (40, 40) e allinea alla griglia da 10", () => {
-      expect(state().dispatch(applyLayout(positions))).toBe(true)
-      expect(view().nodes["cliente"]).toEqual({ x: 40, y: 40, collapsed: false })
-      expect(view().nodes["ordine"]).toEqual({ x: 240, y: 240, collapsed: false })
+    it("scrive le posizioni ricevute, allineate alla griglia da 10", () => {
+      expect(state().dispatch(applyLayout("er", positions))).toBe(true)
+      expect(view().nodes["cliente"]).toEqual({ x: 10, y: 10, collapsed: false })
+      expect(view().nodes["ordine"]).toEqual({ x: 210, y: 210, collapsed: false })
     })
 
     it("una sola voce di undo per tutto il layout", () => {
-      state().dispatch(applyLayout(positions))
+      state().dispatch(applyLayout("er", positions))
       expect(state().past).toHaveLength(1)
       state().undo()
       expect(view().nodes["cliente"]).toEqual({ x: 0, y: 0, collapsed: false })
@@ -94,20 +94,20 @@ describe("applyLayout condiviso", () => {
     })
 
     it("riapplicare le stesse posizioni non produce una voce di undo fantasma", () => {
-      state().dispatch(applyLayout(positions))
-      expect(state().dispatch(applyLayout(positions))).toBe(false)
+      state().dispatch(applyLayout("er", positions))
+      expect(state().dispatch(applyLayout("er", positions))).toBe(false)
       expect(state().past).toHaveLength(1)
     })
 
     it("ignora una chiave che nel frattempo non esiste più, senza toccare le altre", () => {
       const withGhost: LayoutPositions = { ...positions, sparita: { x: 999, y: 999 } }
-      expect(state().dispatch(applyLayout(withGhost))).toBe(true)
+      expect(state().dispatch(applyLayout("er", withGhost))).toBe(true)
       expect(view().nodes["sparita"]).toBeUndefined()
-      expect(view().nodes["cliente"]).toEqual({ x: 40, y: 40, collapsed: false })
+      expect(view().nodes["cliente"]).toEqual({ x: 10, y: 10, collapsed: false })
     })
 
     it("nessuna posizione applicabile: nessuna modifica", () => {
-      expect(state().dispatch(applyLayout({ sparita: { x: 1, y: 2 } }))).toBe(false)
+      expect(state().dispatch(applyLayout("er", { sparita: { x: 1, y: 2 } }))).toBe(false)
     })
   })
 })

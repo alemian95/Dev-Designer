@@ -1,0 +1,60 @@
+import { describe, expect, it } from "vitest"
+import { editingIn, familySelectedKeys, linkId, linkKey, qualify, splitKey } from "./families"
+import { selId } from "./session-store"
+
+describe("qualify / splitKey", () => {
+  it("si invertono l'una con l'altra", () => {
+    expect(qualify("er", "public.utenti")).toBe("er/public.utenti")
+    expect(splitKey("er/public.utenti")).toEqual({ family: "er", key: "public.utenti" })
+  })
+
+  it("una chiave interna con / resta intatta", () => {
+    // Review Focus 1: si taglia al primo `/`, e il nome della famiglia non ne contiene mai.
+    expect(splitKey(qualify("class", "Ordine/Riga"))).toEqual({ family: "class", key: "Ordine/Riga" })
+  })
+
+  it("una chiave senza famiglia valida è un errore, non un'ipotesi", () => {
+    expect(() => splitKey("utenti")).toThrow()
+    expect(() => splitKey("sequence/x")).toThrow()
+  })
+})
+
+describe("familySelectedKeys", () => {
+  it("dà le chiavi di un tipo e di una famiglia, senza prefisso", () => {
+    const selection = new Set([selId("node", "er/a"), selId("node", "flow/n1"), selId("edge", "er/r1"), selId("node", "er/b")])
+    expect(familySelectedKeys(selection, "node", "er")).toEqual(["a", "b"])
+    expect(familySelectedKeys(selection, "edge", "er")).toEqual(["r1"])
+    expect(familySelectedKeys(selection, "node", "class")).toEqual([])
+  })
+
+  it("salta i collegamenti: non appartengono a nessuna famiglia", () => {
+    // Review Focus 4: senza il salto, `splitKey` lancerebbe su `link/l1`.
+    const selection = new Set([selId("edge", linkKey("l1")), selId("edge", "er/r1")])
+    expect(familySelectedKeys(selection, "edge", "er")).toEqual(["r1"])
+  })
+})
+
+describe("linkKey / linkId", () => {
+  it("si invertono l'una con l'altra", () => {
+    expect(linkKey("l1")).toBe("link/l1")
+    expect(linkId(linkKey("l1"))).toBe("l1")
+  })
+
+  it("linkId su una chiave di famiglia dà null", () => {
+    expect(linkId("er/utenti")).toBeNull()
+    expect(linkId("class/link")).toBeNull()
+  })
+
+  it("una chiave di collegamento non è una chiave di famiglia", () => {
+    expect(() => splitKey(linkKey("l1"))).toThrow()
+  })
+})
+
+describe("editingIn", () => {
+  it("dà l'editing senza prefisso solo alla sua famiglia", () => {
+    const editing = { key: "flow/n1", target: "body" as const }
+    expect(editingIn(editing, "flow")).toEqual({ key: "n1", target: "body" })
+    expect(editingIn(editing, "class")).toBeNull()
+    expect(editingIn(null, "flow")).toBeNull()
+  })
+})

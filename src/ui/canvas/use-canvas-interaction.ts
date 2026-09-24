@@ -2,6 +2,7 @@ import { useEffect, type RefObject } from "react"
 import { flushSync } from "react-dom"
 import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
+import { linkId, splitKey } from "@/editor/families"
 import type { Point } from "@/editor/geometry"
 import type { Hit, PointerInfo } from "@/editor/interaction"
 import { sessionStore } from "@/editor/session-store"
@@ -136,24 +137,30 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
       const hit = hitTest(el)
-      const diagramType = documentStore.getState().doc.diagram.type
+      if (hit.kind === "canvas") return
+      // Un collegamento fra famiglie non ha niente da modificare sul canvas (spec 4a §7), e la sua
+      // chiave non ha una famiglia: `splitKey` la rifiuterebbe.
+      if (linkId(hit.key) !== null) return
+      // La famiglia viene dal prefisso della chiave colpita. `setEditing` riceve la chiave con il
+      // prefisso, `classEditTarget` quella senza, perché legge il modello di famiglia.
+      const { family, key } = splitKey(hit.key)
       // Solo il flowchart ha un'etichetta sull'arco (spec §8): ER non ha testo sugli archi, e le
       // relazioni di classe si rinominano dal pannello, non con un doppio click sul canvas. Va
       // prima della guardia `hit.kind !== "node"` qui sotto, che altrimenti la scarterebbe.
-      if (diagramType === "flow" && hit.kind === "edge") {
+      if (family === "flow" && hit.kind === "edge") {
         session().setEditing({ key: hit.key, target: "label" })
         return
       }
       if (hit.kind !== "node") return
       const headerHit = !!el?.closest("[data-node-header]")
-      if (diagramType === "class") {
-        session().setEditing({ key: hit.key, target: classEditTarget(hit.key, headerHit) })
+      if (family === "class") {
+        session().setEditing({ key: hit.key, target: classEditTarget(key, headerHit) })
         return
       }
       // Un nodo di flowchart non ha un nome distinto dal corpo, come una nota del class diagram:
       // qualunque punto del nodo apre l'editor di testo (spec §7, «geometria ed editor inline si
       // riusano»), a differenza dell'header che l'ER usa per il nome dell'entità.
-      if (diagramType === "flow") {
+      if (family === "flow") {
         session().setEditing({ key: hit.key, target: "body" })
         return
       }

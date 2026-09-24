@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { DocumentSchema } from "./document"
+import { DocumentSchema, createDocument } from "./document"
 import { SCHEMA_VERSION } from "./shared"
-import { createErDocument, entityKey, ErModelSchema } from "./er/schema"
+import { entityKey, ErModelSchema } from "./er/schema"
 
 describe("document schema", () => {
-  it("un documento ER nuovo è valido", () => {
-    const doc = createErDocument("Prova", "doc-1")
+  it("un documento nuovo, con le tre famiglie vuote, è valido", () => {
+    const doc = createDocument("Prova", "doc-1")
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
   })
@@ -23,8 +23,12 @@ describe("document schema", () => {
     expect(ErModelSchema.safeParse(model).success).toBe(false)
   })
 
-  it("rifiuta un tipo di diagramma sconosciuto", () => {
-    const doc = { ...createErDocument("x", "id"), diagram: { type: "mindmap" } }
+  it("rifiuta un documento il cui diagramma non ha le tre parti er, class e flow", () => {
+    const doc = { ...createDocument("x", "id"), diagram: { type: "mindmap" } }
     expect(DocumentSchema.safeParse(doc).success).toBe(false)
+  })
+
+  it("createDocument nasce senza collegamenti", () => {
+    expect(createDocument("x", "id").diagram.links).toEqual({})
   })
 })

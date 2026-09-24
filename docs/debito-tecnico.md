@@ -53,6 +53,29 @@ DT-29 è del 2026-09-21 come le precedenti tre, ma viene dal giro delle note
 ancorate e chiude le due voci d'Archivio sull'ancoraggio e sul layout delle
 note, il cui rimedio comune si è rivelato essere un arco, non un campo nuovo.
 
+DT-30 è del 2026-09-24, dalla review finale del piano dei collegamenti
+tipizzati fra famiglie (`.superpowers/sdd/2026-09-24-collegamenti-tipizzati/`):
+un limite noto della tabella dei tipi, lasciato aperto perché il caso che lo
+tocca non si è ancora presentato.
+
+### DT-30 · `char`/`character` danno solo la categoria string: un uuid MySQL può produrre un falso `link-type-mismatch`
+
+La tabella dei tipi SQL di
+[types.ts](../src/model/links/types.ts:32) mette `char`/`character` (con
+`varchar` e gli altri tipi testuali) nella sola categoria `string`. In
+PostgreSQL non è un problema: chi vuole un uuid usa il tipo nativo `uuid`, già
+mappato su `["uuid", "string"]`. In MySQL, che non ha un tipo uuid nativo, la
+convenzione comune è una colonna `char(36)`: una classe con un attributo
+`uuid` collegata a quella colonna riceve un `link-type-mismatch` («non è
+compatibile»), anche se il valore che ci finisce dentro è esattamente un uuid.
+
+Non si corregge ora perché nessuna fixture né il dump reale importato finora
+(Chamilo, DT-26/DT-27) usa questa convenzione: aggiungerla sulla fiducia
+rischierebbe l'errore opposto, un vero mismatch fra un `char` generico e un
+`uuid` che passa silenzioso. Si corregge dando a `char`/`character`
+`["string", "uuid"]` — la stessa forma di `json`/`jsonb`, poco sopra nella
+stessa mappa — quando un caso reale lo chiede.
+
 ---
 
 ## Corretti
@@ -1199,6 +1222,43 @@ dimenticanza.
   corsia. Costo-se-sbagliato: un salto di pochi pixel al primo drag dopo
   «Disponi», e una vista che non inquadra una corsia larga o vuota fino al
   primo zoom manuale — nessuno dei due perde un dato.
+
+### Canvas unificato (2026-09-24)
+
+Limiti accettati scrivendo il primo giro del canvas unificato — un solo documento con le tre
+famiglie (`doc.diagram = { er, class, flow }`), chiavi con prefisso `famiglia/` in tutto lo stack.
+Nessuno dei quattro tocca la correttezza del modello: sono margini di questo giro, non difetti
+scoperti dopo.
+
+- **Le bande delle corsie possono passare sotto entità e classi.**
+  `laneBandExtent` (`src/editor/flow/geometry.ts`) calcola x e larghezza dai soli nodi di flusso, con
+  un margine e un minimo (`LANE_MIN_W`): finché «Disponi» non ha ancora messo le tre famiglie in fila
+  — subito dopo aver creato un nodo di flusso vicino a un'entità o a una classe, per esempio — la
+  banda può disegnarsi sopra un nodo di un'altra famiglia, che non le appartiene e non dovrebbe
+  starci sotto. Un passo dedicato a restringere l'estensione della banda a ciò che effettivamente
+  condivide lo spazio col resto del documento risolverebbe il caso, ma non è stato scritto in questo
+  giro.
+- **Il pannello delle corsie compare solo dal primo nodo di flusso, quindi non si possono preparare
+  le corsie prima.** `FlowLanesPanel` (`src/ui/panels/FlowProperties.tsx`) e le sue bande
+  (`LanesLayer`) seguono entrambi `familyHasContent(doc, "flow")` (spec §5, §10): chi vuole disegnare
+  un flowchart deve prima piazzare una forma qualsiasi con lo strumento, e solo allora può nominare o
+  aggiungere corsie. Le corsie esistono comunque nel modello fin dalla creazione del documento
+  (`lanes` è `.min(1)`), quindi non è un dato mancante — è un ordine di lavoro imposto dall'interfaccia
+  che un utente abituato a preparare prima la struttura di un diagramma potrebbe non aspettarsi.
+- **Due note, quella di classe e quella di flusso, restano due implementazioni separate.** Lo stesso
+  editor di testo aperto dalla creazione (spec §7) e la stessa forma concettuale — un rettangolo di
+  testo libero, senza campi — vivono in due schemi e due componenti che non condividono codice al di
+  là delle primitive comuni del canvas. Unificarle chiederebbe di far emergere una nozione di «nota»
+  comune alle famiglie, che oggi non esiste e che nessuna delle due sole occorrenze giustifica da
+  sola (DRY: due copie non sono ancora una duplicazione da correggere).
+- **«Disponi» mette le famiglie in fila senza ragionare sulla vicinanza.** `packBlocks`
+  (`src/editor/layout-pack.ts`) impacchetta i blocchi da sinistra a destra nell'ordine canonico
+  (`er`, `class`, `flow`), allineati in alto: non guarda se un arco collega un nodo di una famiglia a
+  un nodo di un'altra — cosa che oggi non può succedere, «Collega» rifiuta un arco fra famiglie
+  diverse — né se un utente vorrebbe due blocchi vicini per motivi che il documento non registra. Da
+  rivalutare con lo step 4 della roadmap, i collegamenti tipizzati fra famiglie (spec del canvas
+  unificato, §1): un layout che ragionasse sulla vicinanza avrebbe bisogno di sapere cosa, fra due
+  blocchi, li rende vicini.
 
 ---
 

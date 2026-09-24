@@ -1,4 +1,5 @@
 import type { DevDocument } from "@/model/document"
+import type { Family } from "@/model/family"
 import type { Issue } from "@/model/issue"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
@@ -37,7 +38,7 @@ export interface DiagramOps {
    *  tornare sempre un valore. */
   addEdge(source: string, target: string): { key: string; recipe: Recipe } | null
   /**
-   * Sostituisce la dispatch predefinita `moveNodes(keys, dx, dy)` al rilascio del drag, quando c'è.
+   * Sostituisce la dispatch predefinita `moveNodes(family, keys, dx, dy)` al rilascio del drag, quando c'è.
    * Serve al flowchart, che al commit scrive anche la corsia (spec §6): posizione e corsia in una
    * sola recipe, un solo passo di undo. Durante il gesto non cambia niente — questo non è nel
    * percorso di `pointermove`, solo in quello di rilascio (`interaction-runner.ts`, `commit-drag`).
@@ -47,16 +48,16 @@ export interface DiagramOps {
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
   layoutGraph(): LayoutGraph
   /**
-   * Sostituisce la dispatch predefinita `applyLayout(positions)` quando c'è. Serve al flowchart,
+   * Sostituisce la dispatch predefinita `applyLayout(family, positions)` quando c'è. Serve al flowchart,
    * che col layout riscrive anche le bande: due dispatch darebbero due passi di undo.
    */
   layoutRecipe?(positions: LayoutPositions): Recipe
   validate(): Issue[]
 }
 
-/** Chiuso sullo snapshot: il chiamante lo ricrea a ogni lettura dello store. */
-export function opsFor(doc: DevDocument): DiagramOps {
-  switch (doc.diagram.type) {
+/** Le `DiagramOps` di una famiglia del documento, chiuse sullo snapshot. Chiavi senza prefisso. */
+export function familyOps(doc: DevDocument, family: Family): DiagramOps {
+  switch (family) {
     case "er":
       return erOps(doc)
     case "class":

@@ -1,7 +1,8 @@
 /**
- * End-to-end del flowchart: crea un flowchart, aggiunge una seconda corsia, tre nodi di forme
- * diverse, collega due nodi e scrive l'etichetta sull'arco col doppio click, dispone, trascina un
- * nodo nell'altra corsia con eventi veri, annulla con un solo ⌘Z e esporta in Mermaid.
+ * End-to-end del flowchart: da un documento nuovo, senza corsie visibili, crea un primo nodo con
+ * cui la banda compare, aggiunge una seconda corsia, altri due nodi di forme diverse, collega due
+ * nodi e scrive l'etichetta sull'arco col doppio click, dispone, trascina un nodo nell'altra corsia
+ * con eventi veri, annulla con un solo ⌘Z e esporta in Mermaid.
  *
  * Copre le tre cose che senza un browser vero non esistono, tutte specifiche a questo tipo di
  * diagramma (spec §5, §6):
@@ -93,27 +94,20 @@ export async function run(browser, base) {
     await page.goto(base)
     await page.waitForSelector("[data-canvas]")
 
-    await step("«Nuovo ▸ Flowchart»: il canvas è vuoto e c'è una corsia sola", async () => {
+    await step("Nuovo documento: il canvas è vuoto e nessuna corsia è visibile", async () => {
       await expectMenu(page, "closed")
       await page.locator("[data-document-menu]").click()
       await expectMenu(page, "open")
-      await page.getByRole("menuitem", { name: "Nuovo" }).click()
-      await page.getByRole("menuitem", { name: "Flowchart" }).click()
+      await page.getByRole("menuitem", { name: "Nuovo documento" }).click()
       await expectMenu(page, "closed")
       await expectNodes(page, 0)
-      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 1)
-    })
-
-    await step("aggiungi una seconda corsia dal pannello", async () => {
-      // Con selezione vuota il pannello proprietà è già `FlowLanesPanel` (`PropertiesPanel.tsx`):
-      // nessun click per raggiungerlo, il pulsante «Aggiungi» è già a schermo.
-      await page.getByRole("button", { name: "Aggiungi" }).click()
-      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 2)
+      // La corsia c'è nel modello (`lanes` è `.min(1)`), ma si vede solo con un nodo di flusso (spec §5).
+      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 0)
     })
 
     const canvas = await page.locator("svg.dd-canvas").boundingBox()
 
-    await step("tre nodi di forme diverse: terminale e processo nella prima corsia, decisione nella seconda", async () => {
+    await step("il primo nodo, un terminale nella prima corsia: la banda compare con lui", async () => {
       // La creazione apre già l'editor del testo (spec §7, stesso editor della nota di classe):
       // si scrive lì, non con un doppio click separato.
       await page.getByRole("radio", { name: "Terminale" }).click()
@@ -123,7 +117,22 @@ export async function run(browser, base) {
       await nodeTextEditor.fill("Inizio")
       await nodeTextEditor.blur()
       await nodeTextEditor.waitFor({ state: "detached" })
+      // La prima banda (y 0–160) compare con il primo nodo di flusso, e il nodo ci sta dentro.
+      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 1)
+      const [band0] = await laneBandRects(page)
+      if (!withinBand(await rectByLabel(page, "Inizio"), band0)) throw new Error("«Inizio» non è nato nella prima corsia")
+    })
 
+    await step("aggiungi una seconda corsia dal pannello", async () => {
+      // Il pannello delle corsie (`FlowLanesPanel`, `PropertiesPanel.tsx`) compare solo con la
+      // selezione vuota e un nodo di flusso nel documento: il terminale appena creato è selezionato,
+      // quindi prima si deseleziona con Escape.
+      await page.keyboard.press("Escape")
+      await page.getByRole("button", { name: "Aggiungi" }).click()
+      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 2)
+    })
+
+    await step("altri due nodi di forme diverse: processo nella prima corsia, decisione nella seconda", async () => {
       // `exact`: "Processo" senza vincolo combacerebbe anche con "Sottoprocesso" (substring match
       // di default di Playwright su `name`).
       await page.getByRole("radio", { name: "Processo", exact: true }).click()
@@ -156,7 +165,7 @@ export async function run(browser, base) {
     })
 
     await step("collega Inizio a Processo A e scrivi l'etichetta sull'arco col doppio click", async () => {
-      await page.getByRole("radio", { name: "Arco" }).click()
+      await page.getByRole("radio", { name: "Collega" }).click()
       const inizio = await rectByLabel(page, "Inizio")
       const processo = await rectByLabel(page, "Processo A")
       await page.mouse.move(inizio.x + inizio.w / 2, inizio.y + inizio.h / 2)

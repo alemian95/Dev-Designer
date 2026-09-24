@@ -1,6 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema, SCHEMA_VERSION } from "../shared"
-import type { DevDocument } from "../document"
+import { Identifier, NodeViewSchema } from "../shared"
 
 export const VisibilitySchema = z.enum(["public", "private", "protected", "package"])
 export type Visibility = z.infer<typeof VisibilitySchema>
@@ -129,19 +128,12 @@ export type ClassModel = z.infer<typeof ClassModelSchema>
 // La `view` riusa `NodeViewSchema` così com'è: `{x, y, collapsed}`, dove
 // `collapsed` mostra il solo header. Nessun terzo stato «solo attributi».
 export const ClassDiagramSchema = z.object({
-  type: z.literal("class"),
   model: ClassModelSchema, // { classes: Record<string, ClassNode>, relations: Record<string, ClassRelation>, notes: Record<string, ClassNote> }
   view: z.object({ nodes: z.record(z.string(), NodeViewSchema) }),
 })
 export type ClassDiagram = z.infer<typeof ClassDiagramSchema>
 
-export type ClassDocument = DevDocument & { diagram: ClassDiagram }
-
-export function createClassDocument(name: string, id: string = crypto.randomUUID()): ClassDocument {
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    id,
-    name,
-    diagram: { type: "class", model: { classes: {}, relations: {}, notes: {} }, view: { nodes: {} } },
-  }
+/** Una parte di classi vuota: la forma di una famiglia senza elementi (spec §3). */
+export function emptyClassDiagram(): ClassDiagram {
+  return { model: { classes: {}, relations: {}, notes: {} }, view: { nodes: {} } }
 }

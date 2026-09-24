@@ -2,6 +2,7 @@ import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { flowDiagram } from "@/editor/flow-access"
+import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { laneBandExtent } from "@/editor/flow/geometry"
 import { PAD_X } from "@/editor/geometry"
 import type { Lane, LaneView } from "@/model/flow/schema"
@@ -42,35 +43,23 @@ export function LanesLayerView({ lanes, bands, x, w }: Props) {
   )
 }
 
-const EMPTY_LANES: Lane[] = []
-const EMPTY_BANDS: Record<string, LaneView> = {}
-
 /**
  * Componente connesso: monta `LanesLayerView` con le corsie dello store, sotto senza z-index,
  * **prima** di nodi e archi (`Canvas.tsx`) — le bande non si ridisegnano durante il trascinamento
  * di un nodo, il drag scrive solo il DOM dei nodi e degli archi toccati (`dom-registry.ts`).
  *
- * `null` sui documenti non-flow: il controllo stava in `Canvas.tsx` (Task 7), che ora legge solo
- * `DiagramView` e non sa più che tipo di diagramma sta disegnando — ogni componente che ha bisogno
- * del tipo lo verifica per conto proprio, come già fanno `NoteEditor`/`FlowNodeEditor`.
- *
- * Ogni selettore verifica il tipo per primo e torna un valore stabile senza leggere `model.nodes`
- * come se fosse un flowchart: su un ER o un class diagram, `flowDiagram(s.doc)` lancerebbe, e
- * iterare `model.nodes` di un altro tipo per calcolare bande non ha senso. Così un documento
- * non-flow non paga il giro su `laneBandExtent` a ogni cambiamento dello store.
+ * Le corsie esistono sempre nel modello, ma si vedono solo quando c'è un nodo di flusso (spec §5):
+ * un documento senza flusso non mostra una banda vuota. La stessa regola decide il pannello delle
+ * corsie (`PropertiesPanel`) e le bande dell'export (`buildSvg`), tutte da `familyHasContent`.
  */
 export function LanesLayer() {
-  const type = useStore(documentStore, (s) => s.doc.diagram.type)
-  const lanes = useStore(documentStore, (s) => (s.doc.diagram.type === "flow" ? flowDiagram(s.doc).model.lanes : EMPTY_LANES))
-  const bands = useStore(documentStore, (s) => (s.doc.diagram.type === "flow" ? flowDiagram(s.doc).view.lanes : EMPTY_BANDS))
+  const hasFlowNodes = useStore(documentStore, (s) => familyHasContent(s.doc, "flow"))
+  const lanes = useStore(documentStore, (s) => flowDiagram(s.doc).model.lanes)
+  const bands = useStore(documentStore, (s) => flowDiagram(s.doc).view.lanes)
   // `useShallow`: `laneBandExtent` costruisce un oggetto nuovo a ogni chiamata, come `rectOf`
   // (`ClassEdge.tsx`) — senza, ogni cambiamento nel documento, anche fuori dalle corsie,
   // ridisegnerebbe le bande.
-  const extent = useStore(
-    documentStore,
-    useShallow((s) => (s.doc.diagram.type === "flow" ? laneBandExtent(flowDiagram(s.doc)) : { x: 0, w: 0 })),
-  )
-
-  if (type !== "flow") return null
+  const extent = useStore(documentStore, useShallow((s) => laneBandExtent(flowDiagram(s.doc))))
+  if (!hasFlowNodes) return null
   return <LanesLayerView lanes={lanes} bands={bands} x={extent.x} w={extent.w} />
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createFlowDocument, FlowModelSchema, nextLaneName } from "./schema"
+import { emptyFlowDiagram, FlowModelSchema, nextLaneName } from "./schema"
 
 const lane = { id: "l1", name: "Cliente" }
 const node = { label: "Verifica", shape: "process" as const, lane: "l1" }
@@ -34,19 +34,18 @@ describe("FlowModelSchema", () => {
   })
 })
 
-describe("createFlowDocument", () => {
+describe("emptyFlowDiagram", () => {
   it("nasce con una corsia sola, nessun nodo e la banda già nella view", () => {
-    const doc = createFlowDocument("Processo", "id-1")
-    expect(doc.diagram.type).toBe("flow")
-    expect(doc.diagram.model.lanes).toHaveLength(1)
-    expect(doc.diagram.model.nodes).toEqual({})
-    const laneId = doc.diagram.model.lanes[0]!.id
-    expect(doc.diagram.view.lanes[laneId]).toEqual({ y: 0, h: 160 })
+    const flow = emptyFlowDiagram()
+    expect(FlowModelSchema.safeParse(flow.model).success).toBe(true)
+    expect(flow.model.lanes).toHaveLength(1)
+    expect(flow.model.nodes).toEqual({})
+    const laneId = flow.model.lanes[0]!.id
+    expect(flow.view.lanes[laneId]).toEqual({ y: 0, h: 160 })
   })
 
   it("chiama nextLaneName per il nome della prima corsia: «Corsia 1», non un letterale ridondante", () => {
-    const doc = createFlowDocument("Processo", "id-1")
-    expect(doc.diagram.model.lanes[0]!.name).toBe("Corsia 1")
+    expect(emptyFlowDiagram().model.lanes[0]!.name).toBe("Corsia 1")
   })
 })
 

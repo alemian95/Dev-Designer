@@ -110,8 +110,8 @@ describe("reduce", () => {
   })
 
   it("tool node: click sul canvas crea il nodo", () => {
-    const r = run([down({ world: { x: 12, y: 8 } })], ctx({ tool: "node" }))
-    expect(r.effects).toEqual([{ type: "create-node", at: { x: 12, y: 8 } }])
+    const r = run([down({ world: { x: 12, y: 8 } })], ctx({ tool: "node", family: "er" }))
+    expect(r.effects).toEqual([{ type: "create-node", at: { x: 12, y: 8 }, family: "er", variant: undefined }])
     expect(r.mode).toEqual(IDLE)
   })
 
@@ -155,17 +155,22 @@ describe("strumento nodo con variante", () => {
     const step = reduce(
       IDLE,
       { type: "down", info: info({ kind: "canvas" }), spaceHeld: false },
-      { tool: "node", variant: "decision", selection: new Set() },
+      { tool: "node", family: "flow", variant: "decision", selection: new Set() },
     )
-    expect(step.effects).toEqual([{ type: "create-node", at: { x: 10, y: 20 }, variant: "decision" }])
+    expect(step.effects).toEqual([{ type: "create-node", at: { x: 10, y: 20 }, family: "flow", variant: "decision" }])
   })
 
   it("senza variante l'effetto non la porta", () => {
     const step = reduce(
       IDLE,
       { type: "down", info: info({ kind: "canvas" }), spaceHeld: false },
-      { tool: "node", selection: new Set() },
+      { tool: "node", family: "er", selection: new Set() },
     )
-    expect(step.effects).toEqual([{ type: "create-node", at: { x: 10, y: 20 }, variant: undefined }])
+    expect(step.effects).toEqual([{ type: "create-node", at: { x: 10, y: 20 }, family: "er", variant: undefined }])
+  })
+
+  it("senza famiglia lo strumento nodo non crea niente", () => {
+    const step = reduce(IDLE, down({ hit: { kind: "canvas" }, world: { x: 10, y: 20 } }), ctx({ tool: "node", family: null }))
+    expect(step.effects.some((e) => e.type === "create-node")).toBe(false)
   })
 })

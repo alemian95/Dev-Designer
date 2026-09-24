@@ -1,7 +1,7 @@
 import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
-import { entityRect, entitySize } from "../er/geometry"
+import { entitySize } from "../er/geometry"
 import { rectsBounds, snap, type Point, type Rect } from "../geometry"
 import { uniqueKey } from "./er"
 
@@ -17,9 +17,12 @@ const GUTTER = 40
  * 15038 px piena al 12,8 %. Impacchettata è 4718 px e piena al 41 %.
  *
  * L'origine sta sotto tutto ciò che è già sul canvas, così un import non copre mai il lavoro
- * esistente. Non è auto layout: è una disposizione leggibile e trascinabile.
+ * esistente. `occupied` sono i rettangoli di **tutte** le famiglie (entità, classi, nodi di flusso),
+ * come li dà `nodeRects`: il canvas è uno solo, e le entità non sono le sole a occuparlo. Il diagramma
+ * ER serve solo a riconoscere le entità già presenti, che tengono il loro posto.
+ * Non è auto layout: è una disposizione leggibile e trascinabile.
  */
-export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram): Record<string, Point> {
+export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram, occupied: readonly Rect[]): Record<string, Point> {
   const fresh = Object.entries(entities).filter(([key]) => !(key in diagram.view.nodes))
   if (fresh.length === 0) return {}
 
@@ -27,13 +30,7 @@ export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram): 
   const cellW = snap(Math.max(...sizes.map((s) => s.w)) + GUTTER)
   const cols = Math.ceil(Math.sqrt(fresh.length))
 
-  const existing: Rect[] = Object.entries(diagram.view.nodes)
-    .map(([key, view]) => {
-      const entity = diagram.model.entities[key]
-      return entity ? entityRect(entity, view) : null
-    })
-    .filter((r): r is Rect => r !== null)
-  const bounds = rectsBounds(existing)
+  const bounds = rectsBounds(occupied)
   const originX = snap(bounds ? bounds.x : GUTTER)
   const originY = snap(bounds ? bounds.y + bounds.h + GUTTER : GUTTER)
 
@@ -52,13 +49,15 @@ export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram): 
 
 /**
  * Innesta le entità e le relazioni importate nel documento aperto, in un solo comando: un ⌘Z annulla
- * tutto l'import. Una tabella che c'è già viene sostituita e tiene la posizione.
+ * tutto l'import. Una tabella che c'è già viene sostituita e tiene la posizione. `occupied` è lo
+ * spazio già preso sul canvas, di ogni famiglia: il chiamante lo legge con `nodeRects(doc)` dal
+ * documento su cui farà il dispatch, e la recipe resta una funzione del solo draft e dei suoi argomenti.
  */
-export function importEr(entities: Record<string, Entity>, relationships: readonly Relationship[]): Recipe {
+export function importEr(entities: Record<string, Entity>, relationships: readonly Relationship[], occupied: readonly Rect[]): Recipe {
   return (draft) => {
     const d = erDiagram(draft)
-    // Prima delle mutazioni: le posizioni si calcolano sui bounds di ciò che c'è ora.
-    const positions = placeNew(entities, d)
+    // Prima delle mutazioni: le entità già presenti si riconoscono su ciò che c'è ora.
+    const positions = placeNew(entities, d, occupied)
 
     for (const [key, entity] of Object.entries(entities)) {
       d.model.entities[key] = entity

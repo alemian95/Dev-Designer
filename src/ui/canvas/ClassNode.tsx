@@ -3,6 +3,7 @@ import { useStore } from "zustand"
 import { classDiagram } from "@/editor/class-access"
 import { classSize, hasStereotypeLine, STEREO_H } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import { HEADER_H, PAD_X, ROW_H } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import { memberLines, type MemberLine } from "@/model/class/members"
@@ -52,6 +53,7 @@ function MemberRow({ line, y }: { line: MemberLine; y: number }) {
  * compartimento farebbe slittare la colonna dei due punti anche nell'altro.
  */
 export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, selected }: Props) {
+  const id = qualify("class", nodeKey)
   const { w, h } = classSize(node, view.collapsed)
   const stereo = hasStereotypeLine(node)
   const headerH = HEADER_H + (stereo ? STEREO_H : 0)
@@ -64,11 +66,11 @@ export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, 
 
   return (
     <g
-      data-node-id={nodeKey}
+      data-node-id={id}
       transform={`translate(${view.x} ${view.y})`}
       ref={(el) => {
-        registerNode(nodeKey, el)
-        return () => registerNode(nodeKey, null)
+        registerNode(id, el)
+        return () => registerNode(id, null)
       }}
     >
       <rect width={w} height={h} rx={4} fill="var(--card)" stroke={selected ? "var(--primary)" : "var(--border)"} strokeWidth={selected ? 2 : 1} />
@@ -111,7 +113,7 @@ export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, 
 export function ClassNode({ nodeKey }: { nodeKey: string }) {
   const node = useStore(documentStore, (s) => classDiagram(s.doc).model.classes[nodeKey])
   const view = useStore(documentStore, (s) => classDiagram(s.doc).view.nodes[nodeKey])
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", nodeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", qualify("class", nodeKey))))
   if (!node || !view) return null
   return <ClassNodeView nodeKey={nodeKey} node={node} view={view} selected={selected} />
 }

@@ -4,8 +4,9 @@ import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
 import { classEdgeGeometry, endLabel, isDashed, isFilled } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import type { Rect } from "@/editor/geometry"
-import { opsFor } from "@/editor/kinds/ops"
+import { familyOps } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { ClassRelation } from "@/model/class/schema"
 import { registerEdge } from "./dom-registry"
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, source, target, selected, offset }: Props) {
+  const id = qualify("class", edgeKey)
   const geo = classEdgeGeometry(source, target, relation, offset)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   // Molteplicità e ruolo nella stessa etichetta, una per capo: `endLabel` è la stessa funzione su
@@ -29,10 +31,10 @@ export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, so
   const targetLabel = endLabel(relation.target)
   return (
     <g
-      data-edge-id={edgeKey}
+      data-edge-id={id}
       ref={(el) => {
-        registerEdge(edgeKey, el)
-        return () => registerEdge(edgeKey, null)
+        registerEdge(id, el)
+        return () => registerEdge(id, null)
       }}
     >
       <path data-edge-hit d={geo.d} fill="none" stroke="transparent" strokeWidth={12} />
@@ -60,9 +62,9 @@ export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, so
 
 /**
  * Rect di un nodo — classe o nota — dallo store, attraverso lo stesso seam che l'export usa
- * (`opsFor(doc).rectOf`, `src/editor/kinds/ops.ts`) invece di una risoluzione propria che leggeva
- * solo `model.classes`. Quella copia locale lasciava irrisolto l'estremo di un ancoraggio
- * nota→classe — il cui `source` è la chiave di una nota — e `ClassEdge` sotto usciva `null`:
+ * (`familyOps(doc, "class").rectOf`, `src/editor/kinds/ops.ts`) invece di una risoluzione propria
+ * che leggeva solo `model.classes`. Quella copia locale lasciava irrisolto l'estremo di un
+ * ancoraggio nota→classe — il cui `source` è la chiave di una nota — e `ClassEdge` sotto usciva `null`:
  * l'arco non si montava mai sul canvas dal vivo, anche quando il modello e l'export (che passa già
  * da `rectOf`) lo disegnavano correttamente. `useShallow` evita comunque un rerender per un
  * riferimento nuovo: `rectOf` costruisce un oggetto piatto (`{x,y,w,h}`, tutti campi primitivi) a
@@ -71,7 +73,7 @@ export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, so
 function useNodeRect(key: string | undefined): Rect | null {
   return useStore(
     documentStore,
-    useShallow((s) => (key ? opsFor(s.doc).rectOf(key) : null)),
+    useShallow((s) => (key ? familyOps(s.doc, "class").rectOf(key) : null)),
   )
 }
 
@@ -79,7 +81,7 @@ export function ClassEdge({ edgeKey, offset }: { edgeKey: string; offset: number
   const relation = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[edgeKey])
   const source = useNodeRect(relation?.source.class)
   const target = useNodeRect(relation?.target.class)
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", qualify("class", edgeKey))))
   if (!relation || !source || !target) return null
   return <ClassEdgeView edgeKey={edgeKey} relation={relation} source={source} target={target} selected={selected} offset={offset} />
 }

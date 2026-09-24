@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
-import { opsFor } from "@/editor/kinds/ops"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { Issue } from "@/model/issue"
 
@@ -12,15 +12,15 @@ function select(issue: Issue) {
 
 export function IssuesPanel() {
   const doc = useStore(documentStore, (s) => s.doc)
-  // La dipendenza è ristretta al modello di proposito: un commit di drag riscrive `view.nodes` e
-  // cambia la referenza di `doc`, lasciando `doc.diagram.model` (campo comune della union, neutro
-  // per tipo) uguale a prima. Rivalidare in quel caso non troverebbe niente di diverso —
-  // `validateEr` costa un giro su tutte le relazioni per ogni entità — quindi il ricalcolo resta
-  // legato al solo modello, non a ogni dispatch sul documento.
+  // La dipendenza è ristretta ai modelli di proposito: tre modelli, uno per famiglia, più i collegamenti,
+  // ognuno stabile finché non cambia. Un commit di drag riscrive una `view` e cambia la referenza
+  // di `doc`, lasciando i tre modelli uguali a prima. Rivalidare in quel caso non troverebbe niente
+  // di diverso — `validateEr` costa un giro su tutte le relazioni per ogni entità — quindi il
+  // ricalcolo resta legato ai soli modelli, non a ogni dispatch sul documento.
   const issues = useMemo(
-    () => opsFor(doc).validate(),
+    () => canvasOps(doc).validate(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `doc` è usato sopra di proposito senza essere qui: vedi il commento prima di `useMemo`.
-    [doc.diagram.model],
+    [doc.diagram.er.model, doc.diagram.class.model, doc.diagram.flow.model, doc.diagram.links],
   )
   return (
     <section className="border-t">

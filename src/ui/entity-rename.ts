@@ -1,5 +1,7 @@
 import { renameEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
+import { followRename } from "@/editor/links/commands"
 import { selId, sessionStore } from "@/editor/session-store"
 import { documentSession } from "@/io/document-session"
 import { entityKey } from "@/model/er/schema"
@@ -29,8 +31,9 @@ export function renameEntityWithNotice(key: string, name: string, schema?: strin
   const newKey = entityKey({ name: newName, schema: newSchema })
   if (newKey === key) return true
 
-  if (documentStore.getState().dispatch(recipe)) {
-    sessionStore.getState().setSelection([selId("node", newKey)])
+  // I collegamenti seguono la chiave nuova nella stessa recipe: un passo di annulla (spec 4a §4).
+  if (documentStore.getState().dispatch(followRename(recipe, "er", key, newKey))) {
+    sessionStore.getState().setSelection([selId("node", qualify("er", newKey))])
     return true
   }
   documentSession.getState().patch({ notice: `Esiste già un'entità "${newKey}": il nome non è stato cambiato.` })

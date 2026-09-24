@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Plus, Spline, Square, X } from "lucide-react"
+import { ArrowDown, ArrowUp, Plus, Square, X } from "lucide-react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -6,7 +6,8 @@ import { addAttribute, moveAttribute, removeAttribute, updateAttribute, updateRe
 import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
-import { selectedKeys, sessionStore } from "@/editor/session-store"
+import { familySelectedKeys } from "@/editor/families"
+import { sessionStore } from "@/editor/session-store"
 import { CardinalitySchema, type Attribute, type Cardinality, type Entity, type Relationship } from "@/model/er/schema"
 import { renameEntityWithNotice } from "@/ui/entity-rename"
 import { EntityNodeView } from "@/ui/canvas/EntityNode"
@@ -73,7 +74,7 @@ function EntityProperties({ entityKey: key }: { entityKey: string }) {
         <Label htmlFor="entity-schema">Schema</Label>
         <CommitInput key={entity.schema ?? ""} id="entity-schema" value={entity.schema ?? ""} onCommit={(schema) => rename(entity.name, schema)} placeholder="(nessuno)" />
       </div>
-      <Flag label="Collassata" checked={view.collapsed} onChange={(v) => dispatch(setCollapsed(key, v))} />
+      <Flag label="Collassata" checked={view.collapsed} onChange={(v) => dispatch(setCollapsed("er", key, v))} />
       <div className="flex items-center justify-between">
         <Label>Attributi</Label>
         <Button variant="outline" size="sm" onClick={() => dispatch(addAttribute(key))}><Plus /> Aggiungi</Button>
@@ -127,9 +128,9 @@ function RelationshipProperties({ relationshipKey: key }: { relationshipKey: str
  */
 function Properties() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const entities = selectedKeys(selection, "node")
+  const entities = familySelectedKeys(selection, "node", "er")
   if (entities.length === 1) return <EntityProperties key={entities[0]} entityKey={entities[0]!} />
-  const relationships = selectedKeys(selection, "edge")
+  const relationships = familySelectedKeys(selection, "edge", "er")
   return <RelationshipProperties key={relationships[0]} relationshipKey={relationships[0]!} />
 }
 
@@ -154,9 +155,5 @@ export const erView: DiagramView = {
   NodeView,
   EdgeView,
   Properties,
-  tools: [
-    { label: "Entità", key: "e", Icon: Square, tool: "node" },
-    { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
-  ],
-  textFormats: ["postgres", "mysql", "mermaid"],
+  tools: [{ label: "Entità", key: "e", Icon: Square, tool: "node", family: "er" }],
 }

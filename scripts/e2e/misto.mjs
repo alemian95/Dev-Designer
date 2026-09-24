@@ -1,13 +1,13 @@
 /**
  * End-to-end del canvas unificato: un'entità, una classe e un nodo di flusso nello stesso documento.
  * Prova quello che senza un browser vero non esiste: che le chiavi del DOM portino la famiglia, che
- * Collega fra famiglie diverse non faccia niente mentre dentro una famiglia collega, che il documento
- * misto sopravviva a un ricaricamento, che Disponi metta le famiglie in fila senza sovrapposizioni, e
- * che l'export testo offra i formati di tutte e tre.
+ * Collega fra un'entità e un nodo di flusso non crei niente e lo dica, mentre dentro una famiglia
+ * collega, che il documento misto sopravviva a un ricaricamento, che Disponi metta le famiglie in
+ * fila senza sovrapposizioni, e che l'export testo offra i formati di tutte e tre.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/misto.mjs`. `HEADLESS=0` per vedere.
  */
-import { expectMenu, expectNodes, isMainModule, nodeRects, overlappingPairs, pickFromMenu, signature, startEnv } from "./helpers.mjs"
+import { expectMenu, expectNodes, expectText, isMainModule, nodeRects, overlappingPairs, pickFromMenu, signature, startEnv } from "./helpers.mjs"
 
 /** Centro in coordinate schermo del primo nodo la cui chiave inizia con `prefix`. */
 async function centerOf(page, prefix, index = 0) {
@@ -73,11 +73,11 @@ export async function run(browser, base) {
       if (ids.join(",") !== "class,er,flow") throw new Error(`famiglie inattese: ${ids.join(",")}`)
     })
 
-    await step("Collega fra un'entità e una classe non crea niente", async () => {
+    await step("Collega fra un'entità e un nodo di flusso non crea niente, e lo dice", async () => {
       await page.keyboard.press("r")
-      await drag(page, await centerOf(page, "er/"), await centerOf(page, "class/"))
-      await page.waitForTimeout(300)
-      if ((await page.locator("[data-edge-id]").count()) !== 0) throw new Error("è nato un arco fra due famiglie")
+      await drag(page, await centerOf(page, "er/"), await centerOf(page, "flow/"))
+      await expectText(page, "[data-notice-bar]", "Non esiste un collegamento fra un'entità e un nodo di flusso.")
+      if ((await page.locator("[data-edge-id]").count()) !== 0) throw new Error("è nato un arco fra due famiglie senza tipo")
       await page.keyboard.press("Escape")
     })
 

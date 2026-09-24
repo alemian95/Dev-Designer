@@ -2,7 +2,7 @@ import { useEffect, type RefObject } from "react"
 import { flushSync } from "react-dom"
 import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
-import { splitKey } from "@/editor/families"
+import { linkId, splitKey } from "@/editor/families"
 import type { Point } from "@/editor/geometry"
 import type { Hit, PointerInfo } from "@/editor/interaction"
 import { sessionStore } from "@/editor/session-store"
@@ -138,6 +138,9 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       const el = elementAt(e)
       const hit = hitTest(el)
       if (hit.kind === "canvas") return
+      // Un collegamento fra famiglie non ha niente da modificare sul canvas (spec 4a §7), e la sua
+      // chiave non ha una famiglia: `splitKey` la rifiuterebbe.
+      if (linkId(hit.key) !== null) return
       // La famiglia viene dal prefisso della chiave colpita. `setEditing` riceve la chiave con il
       // prefisso, `classEditTarget` quella senza, perché legge il modello di famiglia.
       const { family, key } = splitKey(hit.key)

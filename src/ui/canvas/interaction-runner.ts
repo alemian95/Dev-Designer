@@ -5,6 +5,7 @@ import { canvasOps } from "@/editor/kinds/canvas-ops"
 import type { EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import { panBy, visibleWorldRect } from "@/editor/viewport"
+import { documentSession } from "@/io/document-session"
 import { setEdgeGeometry, setNodePosition, showConnect, showMarquee } from "./dom-registry"
 
 /**
@@ -199,8 +200,15 @@ export function createInteractionRunner(): InteractionRunner {
         showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
         break
       case "commit-connect": {
+        // `null`: dentro una famiglia i due nodi non si collegano (nota → nota), e non c'è niente da
+        // dire. Un rifiuto fra famiglie invece si spiega nella barra degli avvisi, e lo strumento resta
+        // attivo per riprovare (spec 4a §4). Un collegamento già presente si seleziona soltanto.
         const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target)
-        if (!result || result.type === "rejected") break
+        if (!result) break
+        if (result.type === "rejected") {
+          documentSession.getState().patch({ notice: result.notice })
+          break
+        }
         if (result.type === "created") documentStore.getState().dispatch(result.recipe)
         session().setSelection([selId("edge", result.key)])
         session().setTool("select")

@@ -12,6 +12,7 @@ import { HEADER_H, MIN_W } from "@/editor/geometry"
 import type { InteractionEvent, PointerInfo } from "@/editor/interaction"
 import { selId, sessionStore } from "@/editor/session-store"
 import { IDENTITY } from "@/editor/viewport"
+import { documentSession } from "@/io/document-session"
 import { registerEdge, registerNode } from "./dom-registry"
 import { createInteractionRunner } from "./interaction-runner"
 
@@ -285,5 +286,62 @@ describe("il rilascio del flowchart", () => {
     expect(flowDiagram(documentStore.getState().doc).model.nodes[added.key]!.lane).toBe(l2)
 
     registerNode(qualify("flow", added.key), null)
+  })
+})
+
+describe("Collega fra famiglie", () => {
+  /** Un'entità `ordini` e un'interfaccia `Pagabile`, lontane fra loro. */
+  function documentoMisto(): DevDocument {
+    const doc = createDocument("m", "m")
+    doc.diagram.er.model.entities["ordini"] = entita("ordini")
+    doc.diagram.er.view.nodes["ordini"] = { x: 0, y: 0, collapsed: false }
+    for (const [name, stereotype] of [["Ordine", "class"], ["Pagabile", "interface"]] as const) {
+      doc.diagram.class.model.classes[name] = { name, stereotype, attributes: [], methods: [] }
+      doc.diagram.class.view.nodes[name] = { x: 400, y: name === "Ordine" ? 0 : 300, collapsed: false }
+    }
+    return doc
+  }
+
+  /** Il gesto Collega da `source` a `target`, con lo strumento attivo. */
+  function collega(source: string, target: string) {
+    sessionStore.getState().setTool("edge")
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "node", key: source } }))
+    runner.step(muovi({ world: { x: 10, y: 10 } }))
+    runner.step(su({ hit: { kind: "node", key: target } }))
+  }
+
+  beforeEach(() => {
+    documentStore.getState().load(documentoMisto())
+    documentSession.getState().patch({ notice: null })
+  })
+
+  afterEach(() => {
+    sessionStore.getState().setTool("select")
+    documentSession.getState().patch({ notice: null })
+  })
+
+  it("un rifiuto mostra l'avviso, non crea niente e lascia lo strumento attivo", () => {
+    collega(qualify("class", "Pagabile"), qualify("er", "ordini"))
+    expect(documentSession.getState().notice).toBe("Un'interfaccia non si mappa su una tabella.")
+    expect(documentStore.getState().doc.diagram.links).toEqual({})
+    expect(sessionStore.getState().tool).toBe("edge")
+  })
+
+  it("un collegamento nuovo si crea e si seleziona", () => {
+    collega(qualify("class", "Ordine"), qualify("er", "ordini"))
+    const [id] = Object.keys(documentStore.getState().doc.diagram.links)
+    expect([...sessionStore.getState().selection]).toEqual([selId("edge", `link/${id}`)])
+    expect(sessionStore.getState().tool).toBe("select")
+  })
+
+  it("un collegamento già presente si seleziona, senza un passo di annulla in più", () => {
+    collega(qualify("class", "Ordine"), qualify("er", "ordini"))
+    const past = documentStore.getState().past.length
+    sessionStore.getState().setSelection([])
+    collega(qualify("er", "ordini"), qualify("class", "Ordine"))
+    const [id] = Object.keys(documentStore.getState().doc.diagram.links)
+    expect(documentStore.getState().past.length).toBe(past)
+    expect([...sessionStore.getState().selection]).toEqual([selId("edge", `link/${id}`)])
   })
 })

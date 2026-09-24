@@ -302,6 +302,24 @@ describe("il resto del cablaggio", () => {
     expect(documentStore.getState().past.length).toBe(storia)
   })
 
+  it("il doppio click su un collegamento non apre niente e non lancia", () => {
+    // Review Focus 3: `splitKey` su `link/…` lancerebbe dentro il listener.
+    const errori: unknown[] = []
+    const onError = (e: ErrorEvent) => {
+      errori.push(e.error)
+      e.preventDefault()
+    }
+    window.addEventListener("error", onError)
+    const arco = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    arco.setAttribute("data-edge-id", "link/l1")
+    svg.append(arco)
+    sotto = arco
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
+    window.removeEventListener("error", onError)
+    expect(errori).toEqual([])
+    expect(sessionStore.getState().editing).toBeNull()
+  })
+
   it("lo smontaggio stacca tutti i listener, su svg e su window", () => {
     act(() => root.unmount())
     giu()

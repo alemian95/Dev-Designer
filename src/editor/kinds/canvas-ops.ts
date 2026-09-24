@@ -1,18 +1,25 @@
 import type { DevDocument } from "@/model/document"
 import { FAMILIES, type Family } from "@/model/family"
 import type { Issue } from "@/model/issue"
+import { validateLinks } from "@/model/links/validate"
 import { moveNodes } from "../commands/view"
 import type { Recipe } from "../document-store"
 import type { EdgeGeometry } from "../edge-routing"
-import { qualify, splitKey } from "../families"
+import { linkId, linkKey, qualify, splitKey } from "../families"
 import type { Point, Rect } from "../geometry"
+import { connectAcross, deleteLinks, linksTouching, type ConnectResult } from "../links/commands"
+import { linkGeometry } from "../links/geometry"
 import { familyOps, type EdgeEnds, type EditTarget } from "./ops"
 
+export type { ConnectResult }
+
 /**
- * Il solo contratto con cui canvas e azioni condivise parlano: gli stessi metodi di `DiagramOps`,
- * ma su **chiavi con prefisso** e su tutte le famiglie del documento. Ogni chiamata va alla famiglia
- * della chiave, e le chiavi che tornano riprendono il prefisso. Le famiglie non vedono mai il
- * prefisso (spec §4).
+ * Il solo contratto con cui canvas e azioni condivise parlano: gli stessi metodi di `DiagramOps`, ma
+ * su **chiavi con prefisso**, su tutte le famiglie del documento e sui collegamenti fra famiglie
+ * (chiavi `link/…`, spec 4a §4). Ogni chiamata va alla famiglia della chiave, e le chiavi che tornano
+ * riprendono il prefisso. Le famiglie non vedono mai il prefisso (spec §4).
+ *
+ * Le chiavi `link/…` si riconoscono con `linkId` **prima** di `splitKey`, che le rifiuta.
  */
 export interface CanvasOps {
   nodeKeys(): string[]
@@ -20,13 +27,17 @@ export interface CanvasOps {
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
   edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
   addNode(at: Point, family: Family, variant?: string): { key: string; recipe: Recipe; edit: EditTarget }
-  /** `null` fra famiglie diverse: i collegamenti fra famiglie arrivano con lo step 4. */
-  addEdge(source: string, target: string): { key: string; recipe: Recipe } | null
+  /**
+   * Dentro una famiglia: l'arco della famiglia, oppure `null` se i due nodi non si possono collegare
+   * (due note). Fra famiglie diverse: un collegamento tipizzato creato, uno già presente da
+   * selezionare, oppure un rifiuto con il suo avviso (`connectAcross`).
+   */
+  addEdge(source: string, target: string): ConnectResult | null
   /** Una recipe sola per tutta la selezione, anche mista: un passo di annulla. */
   commitDrag(keys: readonly string[], dx: number, dy: number): Recipe | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
-  /** Solo le famiglie con contenuto: una famiglia vuota non ha problemi da segnalare. */
+  /** Solo le famiglie con contenuto: una famiglia vuota non ha problemi da segnalare. Poi i collegamenti. */
   validate(): Issue[]
 }
 
@@ -64,14 +75,18 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       return ops(family).rectOf(key, at)
     },
 
-    edgesTouching: (keys) =>
-      [...byFamily(keys)].flatMap(([f, ks]) =>
+    edgesTouching: (keys) => [
+      ...[...byFamily(keys)].flatMap(([f, ks]) =>
         ops(f)
           .edgesTouching(new Set(ks))
           .map((e) => ({ key: qualify(f, e.key), source: qualify(f, e.source), target: qualify(f, e.target) })),
       ),
+      ...linksTouching(doc.diagram.links, keys).map(([id, l]) => ({ key: linkKey(id), source: l.source, target: l.target })),
+    ],
 
     edgeGeometry: (qualified, a, b) => {
+      const id = linkId(qualified)
+      if (id !== null) return doc.diagram.links[id] ? linkGeometry(a, b) : null
       const { family, key } = splitKey(qualified)
       return ops(family).edgeGeometry(key, a, b)
     },
@@ -84,9 +99,9 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     addEdge: (source, target) => {
       const a = splitKey(source)
       const b = splitKey(target)
-      if (a.family !== b.family) return null
+      if (a.family !== b.family) return connectAcross(doc, source, target)
       const created = ops(a.family).addEdge(a.key, b.key)
-      return created && { ...created, key: qualify(a.family, created.key) }
+      return created ? { type: "created" as const, key: qualify(a.family, created.key), recipe: created.recipe } : null
     },
 
     commitDrag: (keys, dx, dy) =>
@@ -98,10 +113,18 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       ),
 
     deleteItems: (nodeKeys, edgeKeys) => {
+      // I collegamenti selezionati, e quelli che toccano un nodo eliminato: nella stessa recipe delle
+      // famiglie, così un solo annulla riporta indietro tutto (spec 4a §4, «Coerenza»).
+      const selectedLinks = edgeKeys.flatMap((k) => linkId(k) ?? [])
+      const cascade = linksTouching(doc.diagram.links, new Set(nodeKeys)).map(([id]) => id)
+      const linkIds = [...new Set([...selectedLinks, ...cascade])]
       const nodes = byFamily(nodeKeys)
-      const edges = byFamily(edgeKeys)
+      const edges = byFamily(edgeKeys.filter((k) => linkId(k) === null))
       const touched = new Set([...nodes.keys(), ...edges.keys()])
-      return combine([...touched].map((f) => ops(f).deleteItems(nodes.get(f) ?? [], edges.get(f) ?? [])))
+      return combine([
+        ...[...touched].map((f) => ops(f).deleteItems(nodes.get(f) ?? [], edges.get(f) ?? [])),
+        linkIds.length > 0 ? deleteLinks(linkIds) : null,
+      ])
     },
 
     duplicateNodes: (keys) => {
@@ -112,8 +135,8 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       return { keys: parts.flatMap((p) => p.keys), recipe: combine(parts.map((p) => p.recipe)) ?? NOOP }
     },
 
-    validate: () =>
-      FAMILIES.filter((f) => familyHasContent(doc, f)).flatMap((f) =>
+    validate: () => [
+      ...FAMILIES.filter((f) => familyHasContent(doc, f)).flatMap((f) =>
         ops(f)
           .validate()
           .map((issue) => ({
@@ -122,6 +145,9 @@ export function canvasOps(doc: DevDocument): CanvasOps {
             ...(issue.edge !== undefined && { edge: qualify(f, issue.edge) }),
           })),
       ),
+      // `validateLinks` dà l'id senza namespace, e la chiave della classe già con prefisso.
+      ...validateLinks(doc).map((issue) => ({ ...issue, ...(issue.edge !== undefined && { edge: linkKey(issue.edge) }) })),
+    ],
   }
 }
 

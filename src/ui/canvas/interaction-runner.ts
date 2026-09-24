@@ -199,12 +199,9 @@ export function createInteractionRunner(): InteractionRunner {
         showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
         break
       case "commit-connect": {
-        // `null` oggi significa solo nota → nota, o un estremo che non esiste (contratto in
-        // `DiagramOps.addEdge`, §4): nessuna selezione, nessun dispatch. Trascinare una relazione
-        // fra due note non fa nulla — comportamento voluto, non un caso da segnalare all'utente.
         const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target)
-        if (!result) break
-        documentStore.getState().dispatch(result.recipe)
+        if (!result || result.type === "rejected") break
+        if (result.type === "created") documentStore.getState().dispatch(result.recipe)
         session().setSelection([selId("edge", result.key)])
         session().setTool("select")
         break

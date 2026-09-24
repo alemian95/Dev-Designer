@@ -51,14 +51,17 @@ describe("canvasOps (una famiglia)", () => {
     expect(canvasOps(state().doc).nodeKeys()).toContain(key)
   })
 
-  it("addEdge fra due nodi della stessa famiglia collega, fra famiglie diverse no", () => {
+  it("addEdge fra due nodi della stessa famiglia collega, fra due famiglie senza tipo rifiuta", () => {
     const { a, b } = erConDueEntita()
     const ops = canvasOps(state().doc)
     const r = ops.addEdge(`er/${a}`, `er/${b}`)
-    expect(r?.key.startsWith("er/")).toBe(true)
+    expect(r?.type === "created" && r.key.startsWith("er/")).toBe(true)
     // Basta la chiave per il rifiuto, che avviene prima di interrogare la famiglia: il caso con un
     // nodo di flusso vero è in «famiglie mescolate», sotto.
-    expect(ops.addEdge(`er/${a}`, "flow/n1")).toBeNull()
+    expect(ops.addEdge(`er/${a}`, "flow/n1")).toEqual({
+      type: "rejected",
+      notice: "Non esiste un collegamento fra un'entità e un nodo di flusso.",
+    })
   })
 
   it("deleteItems e duplicateNodes accettano e restituiscono chiavi con prefisso", () => {
@@ -122,13 +125,13 @@ describe("canvasOps (famiglie mescolate)", () => {
     expect(canvasOps(state().doc).nodeKeys().sort()).toEqual([entity.key, node.key].sort())
   })
 
-  it("Collega fra un'entità e un nodo di flusso non crea niente", () => {
+  it("Collega fra un'entità e un nodo di flusso non crea niente, e dice perché", () => {
     state().load(createDocument("t", "t"))
     const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
     state().dispatch(entity.recipe)
     const node = canvasOps(state().doc).addNode({ x: 400, y: 40 }, "flow", "process")
     state().dispatch(node.recipe)
-    expect(canvasOps(state().doc).addEdge(entity.key, node.key)).toBeNull()
+    expect(canvasOps(state().doc).addEdge(entity.key, node.key)?.type).toBe("rejected")
   })
 
   it("commitDrag misto: una recipe, ogni famiglia con la sua regola", () => {
@@ -146,5 +149,68 @@ describe("canvasOps (famiglie mescolate)", () => {
     expect(canvasOps(state().doc).rectOf(entity.key)!.x).toBe(20)
     expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(xBefore + 20)
     expect(flowDiagram(state().doc).model.nodes[flowKey]!.lane).toBe(laneBefore)
+  })
+})
+
+describe("canvasOps (collegamenti)", () => {
+  /** Un'entità e una classe create coi comandi veri, e il collegamento fra le due. */
+  function collegati() {
+    state().load(createDocument("t", "t"))
+    const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
+    state().dispatch(entity.recipe)
+    const cls = canvasOps(state().doc).addNode({ x: 400, y: 0 }, "class", "class")
+    state().dispatch(cls.recipe)
+    const link = canvasOps(state().doc).addEdge(cls.key, entity.key)
+    if (link?.type !== "created") throw new Error("atteso created")
+    state().dispatch(link.recipe)
+    return { entity: entity.key, cls: cls.key, link: link.key }
+  }
+
+  it("addEdge fra classe ed entità crea il collegamento, in qualunque verso", () => {
+    const { entity, cls, link } = collegati()
+    expect(link.startsWith("link/")).toBe(true)
+    expect(canvasOps(state().doc).addEdge(entity, cls)).toEqual({ type: "existing", key: link })
+  })
+
+  it("edgesTouching include i collegamenti, con chiave link/", () => {
+    const { entity, cls, link } = collegati()
+    expect(canvasOps(state().doc).edgesTouching(new Set([entity]))).toEqual([{ key: link, source: cls, target: entity }])
+  })
+
+  it("edgeGeometry disegna un collegamento, e un id che non c'è dà null", () => {
+    const { entity, cls, link } = collegati()
+    const ops = canvasOps(state().doc)
+    expect(ops.edgeGeometry(link, ops.rectOf(cls)!, ops.rectOf(entity)!)).not.toBeNull()
+    expect(ops.edgeGeometry("link/fantasma", ops.rectOf(cls)!, ops.rectOf(entity)!)).toBeNull()
+  })
+
+  it("deleteItems di un collegamento elimina solo lui", () => {
+    const { entity, cls, link } = collegati()
+    state().dispatch(canvasOps(state().doc).deleteItems([], [link])!)
+    expect(state().doc.diagram.links).toEqual({})
+    expect(canvasOps(state().doc).nodeKeys().sort()).toEqual([cls, entity].sort())
+  })
+
+  it("deleteItems di un'entità elimina anche il collegamento, in un solo passo di annulla", () => {
+    // Review Focus 5.
+    const { entity, link } = collegati()
+    const past = state().past.length
+    state().dispatch(canvasOps(state().doc).deleteItems([entity], [])!)
+    expect(state().doc.diagram.links).toEqual({})
+    expect(state().past.length).toBe(past + 1)
+    state().undo()
+    expect(canvasOps(state().doc).nodeKeys()).toContain(entity)
+    expect(Object.keys(state().doc.diagram.links).map((id) => `link/${id}`)).toEqual([link])
+  })
+
+  it("validate aggiunge i problemi dei collegamenti, con obiettivo link/", () => {
+    const { link } = collegati()
+    // Un attributo della classe senza colonna nell'entità: un avviso certo.
+    state().dispatch((draft) => {
+      const cls = Object.values(draft.diagram.class.model.classes)[0]!
+      cls.attributes.push({ name: "note", type: "string", visibility: "public", isStatic: false })
+    })
+    const issues = canvasOps(state().doc).validate()
+    expect(issues.some((i) => i.code === "link-attribute-missing" && i.edge === link)).toBe(true)
   })
 })

@@ -33,6 +33,11 @@ inline con doppio click, undo/redo su ogni azione.
   undo. Sei regole di validazione (archi penzolanti, decisioni con meno di due uscite, vicoli
   ciechi, nodi irraggiungibili, rami senza etichetta, nessun terminale) e export Mermaid
   `flowchart LR` con una `subgraph` per corsia.
+- **Collegamenti fra famiglie**: una classe si collega a un'entità con «mappa su» — lo strumento
+  Collega, trascinando in qualunque verso — e l'app verifica che ogni attributo della classe abbia la
+  sua colonna (`createdAt` e `created_at` sono lo stesso campo) e un tipo compatibile, e che una
+  classe non mappi su più tabelle. Il collegamento segue le rinomine e sparisce con i suoi nodi. Fra
+  due famiglie che non hanno un tipo di collegamento, il gesto lo dice invece di non fare niente.
 
 La **validazione è live**: i problemi del documento compaiono in un pannello mentre si disegna, non a
 un comando esplicito.
@@ -217,15 +222,20 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   suite che li controlla insieme — e infine esporta in Mermaid e verifica che compaiano una
   `subgraph`, un rombo `{"…"}` e l'etichetta sull'arco.
 - **Canvas misto**: crea un'entità, una classe e un nodo di flusso nello stesso documento e verifica
-  che le chiavi del DOM portino il prefisso di famiglia, che «Collega» fra un'entità e una classe non
-  crei niente mentre dentro la stessa famiglia colleghi (una seconda entità), che il documento misto
-  sopravviva a un ricaricamento, che «Disponi» metta le tre famiglie in fila da sinistra a destra
-  senza sovrapposizioni, e che «Esporta testo…» offra i formati di tutte e tre — PostgreSQL, MySQL,
-  Mermaid ER, Mermaid classi, Mermaid flowchart.
+  che le chiavi del DOM portino il prefisso di famiglia, che «Collega» fra un'entità e un nodo di
+  flusso non crei niente e lo dica, mentre dentro la stessa famiglia colleghi (una seconda entità),
+  che il documento misto sopravviva a un ricaricamento, che «Disponi» metta le tre famiglie in fila
+  da sinistra a destra senza sovrapposizioni, e che «Esporta testo…» offra i formati di tutte e tre —
+  PostgreSQL, MySQL, Mermaid ER, Mermaid classi, Mermaid flowchart.
+- **Collegamenti**: crea un'entità `ordini` con la colonna `totale` e una classe `Ordine` con
+  `totale` e `note`, le collega con «mappa su» e verifica che il pannello Problemi segnali solo
+  `Ordine.note`. Poi rinomina l'entità e verifica che il collegamento resti attaccato, ricarica,
+  elimina il collegamento con Canc, e infine prova a collegare un'interfaccia all'entità e verifica
+  l'avviso.
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei nove scenari non regge.
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei dieci scenari non regge.
 
 ### Misura prestazioni
 

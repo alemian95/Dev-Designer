@@ -7,6 +7,7 @@ import { NoticeBar } from "./NoticeBar"
 import { IssuesPanel } from "./panels/IssuesPanel"
 import { PropertiesPanel } from "./panels/PropertiesPanel"
 import { Toolbar } from "./Toolbar"
+import { ToolSidebar } from "./ToolSidebar"
 import { useKeyboardShortcuts } from "./use-keyboard-shortcuts"
 
 export default function App() {
@@ -20,7 +21,8 @@ export default function App() {
         <Toolbar />
         <NoticeBar />
         {/* Sola lettura: un velo sul contenuto, la barra sopra resta cliccabile (spec §5). */}
-        <div className={cn("grid min-h-0 flex-1 grid-cols-[1fr_320px]", readOnly && "pointer-events-none select-none opacity-70")}>
+        <div className={cn("grid min-h-0 flex-1 grid-cols-[auto_1fr_320px]", readOnly && "pointer-events-none select-none opacity-70")}>
+          <ToolSidebar />
           <Canvas />
           <aside className="flex min-h-0 flex-col border-l">
             <div className="min-h-0 flex-1 overflow-auto"><PropertiesPanel /></div>

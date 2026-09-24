@@ -9,10 +9,11 @@ import { act } from "react"
 import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
+import { createDocument } from "@/model/document"
 import { classSize } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import { HEADER_H } from "@/editor/geometry"
-import { createClassDocument, type ClassNode, type ClassRelation, type RelationKind } from "@/model/class/schema"
+import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import { ClassNodeView } from "./ClassNode"
 import { ClassEdge, ClassEdgeView } from "./ClassEdge"
 import { ClassNoteView } from "./ClassNote"
@@ -225,21 +226,21 @@ describe("ClassEdge — connesso allo store", () => {
    * `model.classes`; per un ancoraggio nota→classe il `source` della relazione è la chiave di una
    * nota, quindi tornava sempre `null` e `ClassEdge` usciva `null` — l'arco non si montava mai sul
    * canvas dal vivo, anche con un modello e un export corretti (`buildSvg` risolve gli stessi
-   * estremi con `opsFor(doc).rectOf`, che le note le risolve già). Verificato che questo test è
+   * estremi con `familyOps(doc, "class").rectOf`, che le note le risolve già). Verificato che questo test è
    * rosso sulla versione precedente di `ClassEdge.tsx` (l'hook che leggeva solo `model.classes`)
    * prima di scrivere la correzione.
    */
   it("un ancoraggio nota→classe monta comunque un arco, non solo un arco fra classi", () => {
-    const doc = createClassDocument("t")
-    doc.diagram.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
-    doc.diagram.model.notes["n-1"] = { text: "promemoria" }
-    doc.diagram.model.relations["ancora"] = {
+    const doc = createDocument("t")
+    doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+    doc.diagram.class.model.notes["n-1"] = { text: "promemoria" }
+    doc.diagram.class.model.relations["ancora"] = {
       kind: "note-link",
       source: { class: "n-1", multiplicity: "", role: "" },
       target: { class: "Cliente", multiplicity: "", role: "" },
     }
-    doc.diagram.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
-    doc.diagram.view.nodes["n-1"] = { x: 200, y: 0, collapsed: false }
+    doc.diagram.class.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
+    doc.diagram.class.view.nodes["n-1"] = { x: 200, y: 0, collapsed: false }
     documentStore.getState().load(doc)
 
     const container = document.createElement("div")

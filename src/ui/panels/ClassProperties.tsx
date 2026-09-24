@@ -75,7 +75,7 @@ function ClassNodeProperties({ classKey: key }: { classKey: string }) {
         <Label htmlFor="class-stereotype">Stereotipo</Label>
         <StereotypeSelect id="class-stereotype" value={cls.stereotype} onChange={(stereotype) => dispatch(setStereotype(key, stereotype))} />
       </div>
-      <Flag label="Collassata" checked={view.collapsed} onChange={(v) => dispatch(setCollapsed(key, v))} />
+      <Flag label="Collassata" checked={view.collapsed} onChange={(v) => dispatch(setCollapsed("class", key, v))} />
       <div className="grid gap-1">
         <Label>Membri</Label>
         {/* Sola lettura, deliberatamente: nessuna riga di form per membro (§10 della spec). */}

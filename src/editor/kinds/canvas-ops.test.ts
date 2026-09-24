@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
 import { addEntity, addRelationship, removeAttribute } from "../commands/er"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
@@ -9,11 +9,10 @@ const state = () => documentStore.getState()
 
 /**
  * Due entità e una relazione, create coi comandi veri. Le chiavi le sceglie `addEntity`. Passa da
- * `erDiagram` e non da `doc.diagram.model`: così il file resta valido anche dopo il Task 5, dove
- * l'accessor legge la parte `er`.
+ * `erDiagram`, l'accessor della parte ER, e non legge il documento a mano.
  */
 function erConDueEntita() {
-  state().load(createErDocument("t", "t"))
+  state().load(createDocument("t", "t"))
   const a = addEntity(erDiagram(state().doc).model.entities, { x: 0, y: 0 })
   state().dispatch(a.recipe)
   const b = addEntity(erDiagram(state().doc).model.entities, { x: 300, y: 0 })
@@ -23,7 +22,7 @@ function erConDueEntita() {
   return { a: a.key, b: b.key, rel: rel.key }
 }
 
-beforeEach(() => state().load(createErDocument("t", "t")))
+beforeEach(() => state().load(createDocument("t", "t")))
 
 describe("canvasOps (una famiglia)", () => {
   it("nodeKeys e edgesTouching danno chiavi con prefisso", () => {
@@ -55,8 +54,8 @@ describe("canvasOps (una famiglia)", () => {
     const ops = canvasOps(state().doc)
     const r = ops.addEdge(`er/${a}`, `er/${b}`)
     expect(r?.key.startsWith("er/")).toBe(true)
-    // Nella fase A non esiste un secondo nodo di un'altra famiglia; basta la chiave per il rifiuto,
-    // che avviene prima di interrogare la famiglia.
+    // Basta la chiave per il rifiuto, che avviene prima di interrogare la famiglia: il caso con un
+    // nodo di flusso vero è in «famiglie mescolate», sotto.
     expect(ops.addEdge(`er/${a}`, "flow/n1")).toBeNull()
   })
 
@@ -93,5 +92,42 @@ describe("familyHasContent", () => {
     expect(familyHasContent(state().doc, "er")).toBe(false)
     erConDueEntita()
     expect(familyHasContent(state().doc, "er")).toBe(true)
+  })
+})
+
+describe("canvasOps (famiglie mescolate)", () => {
+  it("deleteItems misto: un solo passo di annulla", () => {
+    state().load(createDocument("t", "t"))
+    const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
+    state().dispatch(entity.recipe)
+    const node = canvasOps(state().doc).addNode({ x: 400, y: 40 }, "flow", "process")
+    state().dispatch(node.recipe)
+    const past = state().past.length
+    state().dispatch(canvasOps(state().doc).deleteItems([entity.key, node.key], [])!)
+    expect(canvasOps(state().doc).nodeKeys()).toEqual([])
+    expect(state().past.length).toBe(past + 1)
+    state().undo()
+    expect(canvasOps(state().doc).nodeKeys().sort()).toEqual([entity.key, node.key].sort())
+  })
+
+  it("Collega fra un'entità e un nodo di flusso non crea niente", () => {
+    state().load(createDocument("t", "t"))
+    const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
+    state().dispatch(entity.recipe)
+    const node = canvasOps(state().doc).addNode({ x: 400, y: 40 }, "flow", "process")
+    state().dispatch(node.recipe)
+    expect(canvasOps(state().doc).addEdge(entity.key, node.key)).toBeNull()
+  })
+
+  it("commitDrag misto: una recipe, ogni famiglia con la sua regola", () => {
+    state().load(createDocument("t", "t"))
+    const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
+    state().dispatch(entity.recipe)
+    const node = canvasOps(state().doc).addNode({ x: 400, y: 40 }, "flow", "process")
+    state().dispatch(node.recipe)
+    const past = state().past.length
+    state().dispatch(canvasOps(state().doc).commitDrag([entity.key, node.key], 20, 0)!)
+    expect(state().past.length).toBe(past + 1)
+    expect(canvasOps(state().doc).rectOf(entity.key)!.x).toBe(20)
   })
 })

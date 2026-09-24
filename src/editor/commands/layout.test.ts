@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument, type Attribute } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
+import type { Attribute } from "@/model/er/schema"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import { HEADER_H, ROW_H } from "../geometry"
@@ -19,19 +20,19 @@ const attr = (name: string, over: Partial<Attribute> = {}): Attribute => ({
 
 describe("layout automatico", () => {
   beforeEach(() => {
-    const doc = createErDocument("t", "t")
-    doc.diagram.model.entities.cliente = {
+    const doc = createDocument("t", "t")
+    doc.diagram.er.model.entities.cliente = {
       name: "cliente",
       attributes: [attr("id", { primaryKey: true }), attr("etichetta")],
     }
-    doc.diagram.view.nodes.cliente = { x: 0, y: 0, collapsed: false }
-    doc.diagram.model.entities.ordine = {
+    doc.diagram.er.view.nodes.cliente = { x: 0, y: 0, collapsed: false }
+    doc.diagram.er.model.entities.ordine = {
       name: "ordine",
       attributes: [attr("id", { primaryKey: true }), attr("cliente_id", { foreignKey: true })],
     }
-    doc.diagram.view.nodes.ordine = { x: 500, y: 500, collapsed: false }
+    doc.diagram.er.view.nodes.ordine = { x: 500, y: 500, collapsed: false }
     // `source` è la figlia (lato della foreign key), `target` il padre referenziato.
-    doc.diagram.model.relationships.ordine_cliente = {
+    doc.diagram.er.model.relationships.ordine_cliente = {
       source: { entity: "ordine", attributes: ["cliente_id"], cardinality: "many" },
       target: { entity: "cliente", attributes: ["id"], cardinality: "one" },
       identifying: false,

@@ -74,7 +74,7 @@ function EntityProperties({ entityKey: key }: { entityKey: string }) {
         <Label htmlFor="entity-schema">Schema</Label>
         <CommitInput key={entity.schema ?? ""} id="entity-schema" value={entity.schema ?? ""} onCommit={(schema) => rename(entity.name, schema)} placeholder="(nessuno)" />
       </div>
-      <Flag label="Collassata" checked={view.collapsed} onChange={(v) => dispatch(setCollapsed(key, v))} />
+      <Flag label="Collassata" checked={view.collapsed} onChange={(v) => dispatch(setCollapsed("er", key, v))} />
       <div className="flex items-center justify-between">
         <Label>Attributi</Label>
         <Button variant="outline" size="sm" onClick={() => dispatch(addAttribute(key))}><Plus /> Aggiungi</Button>
@@ -156,5 +156,4 @@ export const erView: DiagramView = {
   EdgeView,
   Properties,
   tools: [{ label: "Entità", key: "e", Icon: Square, tool: "node", family: "er" }],
-  textFormats: ["postgres", "mysql", "mermaid"],
 }

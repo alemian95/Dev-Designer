@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
 import { deleteSelection, duplicateSelection, fitToContent, selectAllNodes, zoomBy } from "./actions"
 import { documentStore } from "./document-store"
 import { erDiagram } from "./er-access"
@@ -9,12 +9,12 @@ import { IDENTITY } from "./viewport"
 
 describe("actions", () => {
   beforeEach(() => {
-    const doc = createErDocument("t", "t")
+    const doc = createDocument("t", "t")
     for (const [key, x] of [["a", 0], ["b", 300]] as const) {
-      doc.diagram.model.entities[key] = { name: key, attributes: [] }
-      doc.diagram.view.nodes[key] = { x, y: 0, collapsed: true }
+      doc.diagram.er.model.entities[key] = { name: key, attributes: [] }
+      doc.diagram.er.view.nodes[key] = { x, y: 0, collapsed: true }
     }
-    doc.diagram.model.relationships.r = {
+    doc.diagram.er.model.relationships.r = {
       source: { entity: "a", attributes: [], cardinality: "many" },
       target: { entity: "b", attributes: [], cardinality: "one" },
       identifying: false,

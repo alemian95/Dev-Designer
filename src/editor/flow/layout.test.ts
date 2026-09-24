@@ -7,7 +7,6 @@ const node = (lane: string) => ({ label: "x", shape: "process" as const, lane })
 
 function diagram(nodes: Record<string, { lane: string }>, lanes: string[]): FlowDiagram {
   return {
-    type: "flow",
     model: {
       lanes: lanes.map((id) => ({ id, name: id })),
       nodes: Object.fromEntries(Object.entries(nodes).map(([k, v]) => [k, node(v.lane)])),
@@ -127,7 +126,6 @@ describe("keepNodeInBand", () => {
 describe("flowLayoutGraph", () => {
   function graphDiagram(over: Partial<FlowDiagram["model"]> = {}, view: Partial<FlowDiagram["view"]> = {}): FlowDiagram {
     return {
-      type: "flow",
       model: { lanes: [{ id: "l1", name: "l1" }], nodes: {}, edges: {}, ...over },
       view: { nodes: {}, lanes: {}, ...view },
     }

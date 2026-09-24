@@ -1,7 +1,6 @@
 import { applyPatches, enablePatches, freeze, produceWithPatches, type Patch } from "immer"
 import { createStore } from "zustand/vanilla"
-import type { DevDocument } from "@/model/document"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument, type DevDocument } from "@/model/document"
 
 enablePatches()
 
@@ -34,7 +33,7 @@ export interface DocumentState {
 }
 
 export const documentStore = createStore<DocumentState>()((set, get) => ({
-  doc: freezeDoc(createErDocument("Senza titolo")),
+  doc: freezeDoc(createDocument("Senza titolo")),
   past: [],
   future: [],
   dispatch: (recipe) => {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
 import { addEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
@@ -29,7 +29,7 @@ let autosave: Autosave | null = null
 
 beforeEach(() => {
   vi.useFakeTimers()
-  documentStore.getState().load(createErDocument("t", "doc-1"))
+  documentStore.getState().load(createDocument("t", "doc-1"))
   documentSession.getState().patch({ docId: "doc-1", fileName: "t.dd.json", handle: null, dirty: false, readOnly: false, lastSavedAt: 100, persistence: "ok", notice: null })
 })
 
@@ -68,7 +68,7 @@ describe("startAutosave", () => {
   it("load non è un comando: non sporca e non scrive", async () => {
     const db = fakeDb()
     autosave = startAutosave({ db })
-    documentStore.getState().load(createErDocument("altro", "doc-2"))
+    documentStore.getState().load(createDocument("altro", "doc-2"))
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS * 2)
     expect(documentSession.getState().dirty).toBe(false)
     expect(db.put).not.toHaveBeenCalled()

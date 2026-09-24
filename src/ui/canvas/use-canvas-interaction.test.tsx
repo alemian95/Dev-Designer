@@ -2,8 +2,7 @@
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createErDocument } from "@/model/er/schema"
-import { createFlowDocument } from "@/model/flow/schema"
+import { createDocument } from "@/model/document"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
 import { selId, sessionStore } from "@/editor/session-store"
@@ -95,10 +94,9 @@ beforeEach(() => {
     disconnect() { callback = null }
   }
 
-  documentStore.getState().load(createErDocument("t", "t"))
+  documentStore.getState().load(createDocument("t", "t"))
   documentStore.getState().dispatch((draft) => {
-    const d = draft.diagram
-    if (d.type !== "er") return
+    const d = draft.diagram.er
     d.model.entities["a"] = { name: "a", attributes: [] }
     d.view.nodes["a"] = { x: 0, y: 0, collapsed: false }
   })
@@ -260,10 +258,9 @@ describe("il resto del cablaggio", () => {
   })
 
   it("il doppio click su un arco di flowchart apre l'etichetta (spec §8)", () => {
-    documentStore.getState().load(createFlowDocument("f", "f"))
+    documentStore.getState().load(createDocument("f", "f"))
     documentStore.getState().dispatch((draft) => {
-      const d = draft.diagram
-      if (d.type !== "flow") return
+      const d = draft.diagram.flow
       const lane = d.model.lanes[0]!.id
       d.model.nodes["a"] = { label: "", shape: "process", lane }
       d.model.nodes["b"] = { label: "", shape: "process", lane }

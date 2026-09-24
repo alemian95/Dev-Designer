@@ -1,9 +1,5 @@
 import type { ComponentType } from "react"
 import { Spline, type LucideIcon } from "lucide-react"
-import { useStore } from "zustand"
-import { useShallow } from "zustand/react/shallow"
-import { documentStore } from "@/editor/document-store"
-import { documentFamilies } from "@/editor/families"
 import type { Rect } from "@/editor/geometry"
 import type { Tool } from "@/editor/session-store"
 import type { Family } from "@/model/family"
@@ -11,14 +7,6 @@ import type { NodeView as NodeViewModel } from "@/model/shared"
 import { classView } from "./class"
 import { erView } from "./er"
 import { flowView } from "./flow"
-
-/**
- * Formati emessi dall'export testo. `class-mermaid` e `flow-mermaid` sono dichiarati già qui
- * perché più task consumano questa stessa union prima che l'emettitore esista, ma nessuna
- * `DiagramView` li elenca in `textFormats` finché il proprio emettitore non c'è: un formato senza
- * emettitore non deve comparire nel dialogo. `flow-mermaid` lo guadagna il Task 10.
- */
-export type TextFormat = "postgres" | "mysql" | "mermaid" | "class-mermaid" | "flow-mermaid"
 
 /**
  * Props di `DiagramView.NodeView`: `node` arriva come `unknown` perché il registro è lo stesso
@@ -92,18 +80,13 @@ export interface DiagramView {
   EdgesLayer: ComponentType
   NodeView: ComponentType<NodeViewProps>
   EdgeView: ComponentType<EdgeViewProps>
-  /** Montato solo quando la selezione è esattamente un nodo o esattamente un arco (`PropertiesPanel`). */
-  Properties: ComponentType
   /**
-   * Corpo del pannello **senza nessuna selezione**. Opzionale: se un tipo non lo dichiara,
-   * `PropertiesPanel` mostra la propria frase generica, come faceva prima che questo campo
-   * esistesse — ER e class non lo dichiarano e restano su quella. Il flowchart lo usa per il
-   * pannello delle corsie (spec §11): a differenza di `Properties`, qui non c'è un nodo o un arco
-   * da passare, quindi il componente non prende prop.
+   * Montato solo quando la selezione è esattamente un nodo o esattamente un arco (`PropertiesPanel`).
+   * Senza selezione il pannello non chiede niente alle famiglie: il solo corpo possibile è quello
+   * delle corsie, e lo decide `PropertiesPanel` dalla presenza di nodi di flusso.
    */
-  EmptyProperties?: ComponentType
+  Properties: ComponentType
   tools: ToolDef[]
-  textFormats: TextFormat[]
 }
 
 /** Chiuso sulla famiglia: neutro rispetto a cosa contiene ogni vista, non guarda dentro nessuna di esse. */
@@ -118,7 +101,3 @@ export function viewFor(family: Family): DiagramView {
   }
 }
 
-/** Le famiglie del documento aperto (fase A: il suo tipo). Il Task 5 la sostituisce con `FAMILIES`. */
-export function useDocumentFamilies(): readonly Family[] {
-  return useStore(documentStore, useShallow((s) => documentFamilies(s.doc)))
-}

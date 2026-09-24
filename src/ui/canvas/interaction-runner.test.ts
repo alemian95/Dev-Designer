@@ -1,7 +1,7 @@
 import { produce } from "immer"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { createErDocument, type Entity, type ErDocument } from "@/model/er/schema"
-import { createFlowDocument, type FlowDiagram } from "@/model/flow/schema"
+import { createDocument, type DevDocument } from "@/model/document"
+import type { Entity } from "@/model/er/schema"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { qualify } from "@/editor/families"
@@ -56,10 +56,10 @@ const H = HEADER_H
  * - `unCapoDentro` (entra–lontana): un estremo solo è in vista, e tanto basta.
  * - `sottoTutto` (lontana–lontanissima): resta tutto sotto lo schermo.
  */
-function documento(): ErDocument {
-  const doc = createErDocument("t", "t")
-  const m = doc.diagram.model
-  const v = doc.diagram.view
+function documento(): DevDocument {
+  const doc = createDocument("t", "t")
+  const m = doc.diagram.er.model
+  const v = doc.diagram.er.view
   for (const [key, y] of [["dentro", 100], ["entra", 1000], ["lontana", 2000], ["lontanissima", 3000]] as const) {
     m.entities[key] = entita(key)
     v.nodes[key] = { x: 100, y, collapsed: false }
@@ -221,10 +221,10 @@ describe("il rilascio del flowchart", () => {
   })
 
   it("un nodo riallineato esattamente dov'era non lascia il DOM fermo all'anteprima", () => {
-    // Una sola corsia (`createFlowDocument`), banda [0, 160): un nodo in prima riga, a
+    // Una sola corsia (`emptyFlowDiagram`, via `createDocument`), banda [0, 160): un nodo in prima riga, a
     // `y = LANE_PAD`, è dove lo metterebbe `placeInLanes` — lo scenario del revisore.
-    const base = createFlowDocument("t", "t")
-    const laneId = base.diagram.model.lanes[0]!.id
+    const base = createDocument("t", "t")
+    const laneId = base.diagram.flow.model.lanes[0]!.id
     const added = addFlowNode({ x: 100, y: LANE_PAD }, "process", laneId)
     const doc = produce(base, added.recipe)
     documentStore.getState().load(doc)
@@ -256,11 +256,11 @@ describe("il rilascio del flowchart", () => {
   })
 
   it("il cablaggio: il rilascio in un'altra corsia passa da commitDrag, non da moveNodes", () => {
-    const base = createFlowDocument("t", "t")
-    const l1 = base.diagram.model.lanes[0]!.id
+    const base = createDocument("t", "t")
+    const l1 = base.diagram.flow.model.lanes[0]!.id
     const l2 = crypto.randomUUID()
     let doc = produce(base, (d) => {
-      const f = d.diagram as FlowDiagram
+      const f = d.diagram.flow
       f.model.lanes.push({ id: l2, name: "Seconda" })
       f.view.lanes = { [l1]: { y: 0, h: 100 }, [l2]: { y: 100, h: 100 } }
     })

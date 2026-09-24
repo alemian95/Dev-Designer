@@ -92,7 +92,7 @@ function FlowEdgeProperties({ edgeKey: key }: { edgeKey: string }) {
  * esattamente un arco — stessa forma di `ClassProperties`/`kinds/er.tsx`: la cornice
  * (`PropertiesPanel`) garantisce che sia l'uno o l'altro, qui basta distinguere quale.
  * Il terzo caso, nessuna selezione, non passa da qui: è `FlowLanesPanel`, montato da
- * `DiagramView.EmptyProperties` — un nodo o un arco da passare qui non c'è.
+ * `PropertiesPanel` quando il flusso ha nodi — un nodo o un arco da passare qui non c'è.
  */
 export function FlowProperties() {
   const selection = useStore(sessionStore, (s) => s.selection)

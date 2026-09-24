@@ -1,4 +1,3 @@
-import type { DevDocument } from "@/model/document"
 import { FAMILIES, type Family } from "@/model/family"
 import { parseSelId, type SelectionKind, type SessionState } from "./session-store"
 
@@ -41,12 +40,4 @@ export function editingIn(editing: SessionState["editing"], family: Family): { k
   if (!editing) return null
   const split = splitKey(editing.key)
   return split.family === family ? { key: split.key, target: editing.target } : null
-}
-
-/**
- * Le famiglie presenti nel documento. **Solo per la fase A** del piano: finché il documento ha un
- * tipo, è quel tipo. Il Task 5 la rimuove e i chiamanti usano `FAMILIES`.
- */
-export function documentFamilies(doc: DevDocument): readonly Family[] {
-  return [doc.diagram.type]
 }

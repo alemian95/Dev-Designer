@@ -1,8 +1,10 @@
 import type { DevDocument } from "@/model/document"
 import type { FlowDiagram } from "@/model/flow/schema"
 
-/** Il diagramma come flowchart. Chi chiama sa già che lo è: lo garantisce `opsFor`. */
+/**
+ * La parte di flusso del documento: c'è sempre, con almeno una corsia anche quando non ha nodi
+ * (`lanes` è `.min(1)`). Nessun guard: la presenza la garantisce lo schema, non chi chiama.
+ */
 export function flowDiagram(doc: DevDocument): FlowDiagram {
-  if (doc.diagram.type !== "flow") throw new Error("il documento non è un flowchart")
-  return doc.diagram
+  return doc.diagram.flow
 }

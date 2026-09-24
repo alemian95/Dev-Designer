@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument, type Attribute } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
+import type { Attribute } from "@/model/er/schema"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import {
@@ -30,18 +31,18 @@ const attr = (name: string, over: Partial<Attribute> = {}): Attribute => ({
 
 describe("comandi ER", () => {
   beforeEach(() => {
-    const doc = createErDocument("t", "t")
-    doc.diagram.model.entities.users = {
+    const doc = createDocument("t", "t")
+    doc.diagram.er.model.entities.users = {
       name: "users",
       attributes: [attr("id", { primaryKey: true }), attr("email")],
     }
-    doc.diagram.view.nodes.users = { x: 0, y: 0, collapsed: false }
-    doc.diagram.model.entities.posts = {
+    doc.diagram.er.view.nodes.users = { x: 0, y: 0, collapsed: false }
+    doc.diagram.er.model.entities.posts = {
       name: "posts",
       attributes: [attr("id", { primaryKey: true }), attr("user_id", { foreignKey: true })],
     }
-    doc.diagram.view.nodes.posts = { x: 300, y: 0, collapsed: false }
-    doc.diagram.model.relationships.posts_users = {
+    doc.diagram.er.view.nodes.posts = { x: 300, y: 0, collapsed: false }
+    doc.diagram.er.model.relationships.posts_users = {
       source: { entity: "posts", attributes: ["user_id"], cardinality: "many" },
       target: { entity: "users", attributes: ["id"], cardinality: "one" },
       identifying: false,

@@ -1,7 +1,10 @@
 import { useStore } from "zustand"
+import { documentStore } from "@/editor/document-store"
 import { splitKey } from "@/editor/families"
+import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { useDocumentFamilies, viewFor } from "@/ui/canvas/kinds/registry"
+import { viewFor } from "@/ui/canvas/kinds/registry"
+import { FlowLanesPanel } from "./FlowProperties"
 
 /**
  * Cornice, non contenuto: decide *se* c'è qualcosa da mostrare (esattamente un nodo o un arco
@@ -10,15 +13,15 @@ import { useDocumentFamilies, viewFor } from "@/ui/canvas/kinds/registry"
  * dipende dal tipo, quindi resta qui, con una frase unica: da quando gli strumenti sono per famiglia (Task 2) e
  * «Collega» è comune a tutte, non c'è più un'etichetta di nodo/arco singola da comporre per tipo.
  *
- * **Selezione vuota**: di norma è anche lei neutra rispetto al tipo (la stessa frase sopra, con
- * `selection.size === 0`). `view.EmptyProperties`, se dichiarato, la sostituisce — solo il
- * flowchart lo fa, per il pannello delle corsie (spec §11): senza nodo o arco da passare non c'è
- * niente che serva a `Properties`, quindi è un componente a sé. Una selezione **multipla** non
- * lo monta comunque: resta sulla frase generica, come oggi.
+ * **Selezione vuota**: se il flusso ha almeno un nodo, il pannello è quello delle corsie
+ * (`FlowLanesPanel`, spec §11), che compare insieme alle bande sul canvas (`LanesLayer`): le
+ * corsie esistono sempre nel modello, ma si vedono solo quando c'è un nodo di flusso. Altrimenti
+ * resta la frase generica. Una selezione **multipla** non lo monta comunque: resta sulla frase
+ * generica, come oggi.
  */
 export function PropertiesPanel() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const families = useDocumentFamilies()
+  const hasFlowNodes = useStore(documentStore, (s) => familyHasContent(s.doc, "flow"))
   const nodes = selectedKeys(selection, "node")
   const edges = selectedKeys(selection, "edge")
   const single = (nodes.length === 1 && edges.length === 0) || (edges.length === 1 && nodes.length === 0)
@@ -27,8 +30,7 @@ export function PropertiesPanel() {
     const { Properties } = viewFor(family)
     return <Properties />
   }
-  const Empty = families.map(viewFor).find((v) => v.EmptyProperties)?.EmptyProperties
-  if (selection.size === 0 && Empty) return <Empty />
+  if (selection.size === 0 && hasFlowNodes) return <FlowLanesPanel />
   return (
     <p className="p-3 text-sm text-muted-foreground">
       {selection.size === 0 ? "Seleziona un elemento sul canvas." : `${selection.size} elementi selezionati`}

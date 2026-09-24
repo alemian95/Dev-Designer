@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest"
+import { createDocument } from "@/model/document"
 import { addEntity } from "@/editor/commands/er"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
 import { selId, sessionStore } from "@/editor/session-store"
-import { createErDocument } from "@/model/er/schema"
 import { renameEntityWithNotice } from "./entity-rename"
 
-beforeEach(() => documentStore.getState().load(createErDocument("t", "t")))
+beforeEach(() => documentStore.getState().load(createDocument("t", "t")))
 
 describe("renameEntityWithNotice", () => {
   it("la selezione segue la nuova chiave, con il prefisso", () => {

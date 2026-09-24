@@ -1,8 +1,9 @@
 import { useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/geometry"
+import { FAMILIES } from "@/model/family"
 import { FlowNodeEditor } from "./FlowNodeEditor"
 import { InlineEditor } from "./InlineEditor"
-import { useDocumentFamilies, viewFor } from "./kinds/registry"
+import { viewFor } from "./kinds/registry"
 import { LanesLayer } from "./LanesLayer"
 import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
@@ -17,9 +18,6 @@ export function Canvas({ children }: { children?: ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null)
   // L'hook osserva l'svg: aggiorna la dimensione del canvas nella sessione e invalida il rect in cache.
   useCanvasInteraction(svgRef)
-  // Le famiglie vengono dal registro: con una sola famiglia nel documento è sempre la stessa,
-  // ma il canvas non lo sa più — scorre `documentFamilies` e monta i layer di ognuna.
-  const families = useDocumentFamilies()
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -35,11 +33,12 @@ export function Canvas({ children }: { children?: ReactNode }) {
               flowchart popola (spec §5). `LanesLayer` decide da sé se montarsi. */}
           <LanesLayer />
           {/* Tutti gli archi sotto tutti i nodi: un arco ER non deve coprire una classe (spec §5). */}
-          {families.map((f) => {
+          {/* Tutte le famiglie, nell'ordine canonico: ogni layer disegna la propria parte, vuota o no. */}
+          {FAMILIES.map((f) => {
             const { EdgesLayer } = viewFor(f)
             return <EdgesLayer key={`edges-${f}`} />
           })}
-          {families.map((f) => {
+          {FAMILIES.map((f) => {
             const { NodesLayer } = viewFor(f)
             return <NodesLayer key={`nodes-${f}`} />
           })}

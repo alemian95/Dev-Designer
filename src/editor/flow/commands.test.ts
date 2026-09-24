@@ -1,7 +1,7 @@
 import { enablePatches, produce, produceWithPatches } from "immer"
 import { describe, expect, it } from "vitest"
-import type { DevDocument } from "@/model/document"
-import { createFlowDocument, type FlowDiagram, type FlowModel } from "@/model/flow/schema"
+import { createDocument, type DevDocument } from "@/model/document"
+import type { FlowDiagram } from "@/model/flow/schema"
 import {
   addFlowEdge,
   addFlowNode,
@@ -30,16 +30,15 @@ import { snap } from "@/editor/geometry"
 enablePatches()
 
 function docWith(): { doc: DevDocument; lane: string } {
-  const doc = createFlowDocument("test", "id-1")
-  return { doc, lane: doc.diagram.model.lanes[0]!.id }
+  const doc = createDocument("test", "id-1")
+  return { doc, lane: doc.diagram.flow.model.lanes[0]!.id }
 }
 
 const apply = (doc: DevDocument, recipe: (d: DevDocument) => void): DevDocument => produce(doc, recipe)
 
 /** Il diagramma di flowchart del documento. Solleva se il documento è di un altro tipo. */
 function fd(doc: DevDocument) {
-  const d = doc.diagram
-  if (d.type !== "flow") throw new Error("tipo sbagliato")
+  const d = doc.diagram.flow
   return d
 }
 
@@ -48,8 +47,7 @@ describe("addFlowNode", () => {
     const { doc, lane } = docWith()
     const { key, recipe } = addFlowNode({ x: 33, y: 47 }, "decision", lane)
     const next = apply(doc, recipe)
-    const d = next.diagram
-    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    const d = next.diagram.flow
     expect(d.model.nodes[key]).toEqual({ label: "", shape: "decision", lane })
     expect(d.view.nodes[key]).toEqual({ x: 30, y: 50, collapsed: false })
   })
@@ -60,8 +58,7 @@ describe("addFlowEdge", () => {
     const { doc, lane } = docWith()
     const a = addFlowNode({ x: 0, y: 0 }, "process", lane)
     const next = apply(doc, a.recipe)
-    const d = next.diagram
-    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    const d = next.diagram.flow
     expect(addFlowEdge(d.model, a.key, "fantasma")).toBeNull()
   })
 
@@ -70,12 +67,11 @@ describe("addFlowEdge", () => {
     const a = addFlowNode({ x: 0, y: 0 }, "decision", lane)
     const b = addFlowNode({ x: 200, y: 0 }, "process", lane)
     let next = apply(apply(doc, a.recipe), b.recipe)
-    const first = addFlowEdge((next.diagram as { model: FlowModel }).model, a.key, b.key)!
+    const first = addFlowEdge(next.diagram.flow.model, a.key, b.key)!
     next = apply(next, first.recipe)
-    const second = addFlowEdge((next.diagram as { model: FlowModel }).model, a.key, b.key)!
+    const second = addFlowEdge(next.diagram.flow.model, a.key, b.key)!
     next = apply(next, second.recipe)
-    const d = next.diagram
-    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    const d = next.diagram.flow
     expect(Object.keys(d.model.edges)).toHaveLength(2)
   })
 })
@@ -86,11 +82,10 @@ describe("deleteFlowItems", () => {
     const a = addFlowNode({ x: 0, y: 0 }, "process", lane)
     const b = addFlowNode({ x: 200, y: 0 }, "process", lane)
     let next = apply(apply(doc, a.recipe), b.recipe)
-    const e = addFlowEdge((next.diagram as { model: FlowModel }).model, a.key, b.key)!
+    const e = addFlowEdge(next.diagram.flow.model, a.key, b.key)!
     next = apply(next, e.recipe)
     next = apply(next, deleteFlowItems([a.key], [])!)
-    const d = next.diagram
-    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    const d = next.diagram.flow
     expect(d.model.nodes[a.key]).toBeUndefined()
     expect(d.model.edges[e.key]).toBeUndefined()
     expect(d.view.nodes[a.key]).toBeUndefined()
@@ -139,8 +134,7 @@ describe("setNodeShape", () => {
     const { doc, lane } = docWith()
     const n = addFlowNode({ x: 0, y: 0 }, "process", lane)
     const next = apply(apply(doc, n.recipe), setNodeShape(n.key, "decision"))
-    const d = next.diagram
-    if (d.type !== "flow") throw new Error("tipo sbagliato")
+    const d = next.diagram.flow
     expect(d.model.nodes[n.key]).toEqual({ label: "", shape: "decision", lane })
     expectLaneInvariant(d)
   })
@@ -294,9 +288,9 @@ describe("restackLanes: la y di una banda è una conseguenza dell'ordine e delle
   })
 
   it("preserva l'altezza di una corsia invece di riazzerarla al minimo", () => {
-    const doc = createFlowDocument("test", "id-1")
-    const laneId = doc.diagram.model.lanes[0]!.id
-    doc.diagram.view.lanes[laneId] = { y: 0, h: 400 }
+    const doc = createDocument("test", "id-1")
+    const laneId = doc.diagram.flow.model.lanes[0]!.id
+    doc.diagram.flow.view.lanes[laneId] = { y: 0, h: 400 }
     const next = apply(doc, addLane("Corsia 2"))
     const d = fd(next)
     expect(d.view.lanes[laneId]).toEqual({ y: 0, h: 400 })
@@ -487,10 +481,10 @@ describe("applyFlowLayout", () => {
 
 /** Due corsie: `l1` da 0 a 100, `l2` da 100 a 200. Bande scritte a mano, non calcolate. */
 function dueCorsie(): { doc: DevDocument; l1: string; l2: string } {
-  const base = createFlowDocument("test", "id-1")
-  const l1 = base.diagram.model.lanes[0]!.id
+  const base = createDocument("test", "id-1")
+  const l1 = base.diagram.flow.model.lanes[0]!.id
   const doc = produce(base, (d) => {
-    const f = d.diagram as FlowDiagram
+    const f = d.diagram.flow
     f.model.lanes.push({ id: "l2", name: "Seconda" })
     f.view.lanes = { [l1]: { y: 0, h: 100 }, l2: { y: 100, h: 100 } }
   })
@@ -498,8 +492,7 @@ function dueCorsie(): { doc: DevDocument; l1: string; l2: string } {
 }
 
 const flow = (doc: DevDocument): FlowDiagram => {
-  if (doc.diagram.type !== "flow") throw new Error("tipo sbagliato")
-  return doc.diagram
+  return doc.diagram.flow
 }
 
 describe("moveFlowNodes", () => {

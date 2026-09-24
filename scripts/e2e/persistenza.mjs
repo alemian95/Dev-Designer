@@ -83,18 +83,17 @@ export async function run(browser, base) {
       if (!d.suggestedFilename().endsWith(".dd.json")) throw new Error(`nome inatteso: ${d.suggestedFilename()}`)
       saved = await readFile(await d.path(), "utf8")
       const parsed = JSON.parse(saved)
-      if (!parsed.diagram?.model?.entities?.[ENTITY]) throw new Error("il file non contiene l'entità")
+      if (!parsed.diagram?.er?.model?.entities?.[ENTITY]) throw new Error("il file non contiene l'entità")
       await expectDirty(page, false)
     })
 
-    await step("nuovo documento: canvas vuoto", async () => {
-      // "Nuovo" (Task 13) è un sottomenu, non più una voce diretta: `pickFromMenu` chiude tutto
-      // dopo un solo click, quindi qui si apre a mano e si sceglie il tipo nel sottomenu.
+    await step("Nuovo documento: il canvas è vuoto", async () => {
+      // «Nuovo documento» è di nuovo una voce diretta, non un sottomenu: il menu si apre e si
+      // chiude a mano come negli altri scenari, e il click sulla voce basta.
       await expectMenu(page, "closed")
       await page.locator("[data-document-menu]").click()
       await expectMenu(page, "open")
-      await page.getByRole("menuitem", { name: "Nuovo" }).click()
-      await page.getByRole("menuitem", { name: "Diagramma ER" }).click()
+      await page.getByRole("menuitem", { name: "Nuovo documento" }).click()
       await expectMenu(page, "closed")
       await expectNodes(page, 0)
     })

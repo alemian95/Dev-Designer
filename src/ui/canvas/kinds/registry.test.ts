@@ -9,17 +9,10 @@ import { canvasTools, LINK_TOOL, toolId, viewFor } from "./registry"
  * test unitario copriva `viewFor`, e la lacuna diventa portante esattamente quando arriva un
  * secondo tipo di diagramma (questo task). Senza questo test, un futuro terzo tipo potrebbe
  * rompere silenziosamente il dispatch dei due esistenti — es. `viewFor` che torna la stessa vista
- * per due tipi diversi, o `tools`/`textFormats` scambiati fra loro.
- *
- * Solo `viewFor`, non `useDocumentFamilies`: l'hook è un `useStore` sottile sopra `documentFamilies`,
- * e verificato che `react-dom/server` non è la sede giusta per provarlo — durante `renderToStaticMarkup`
- * (nessuna finestra, quindi un render SSR) `useSyncExternalStore` legge `getInitialState()`, non lo
- * stato corrente dopo un `.load()`: il test tornerebbe sempre lo stesso documento, qualunque se ne
- * carichi prima, e passerebbe anche se il dispatch dell'hook fosse rotto. È la stessa ragione per
- * cui `render.test.tsx` testa solo viste pure guidate dalle prop, mai componenti agganciati allo store.
+ * per due tipi diversi, o `tools` scambiati fra loro.
  */
 describe("viewFor", () => {
-  it("torna viste distinte per ER e per classi, coi tools e i textFormats giusti", () => {
+  it("torna viste distinte per ER e per classi, coi tools giusti", () => {
     const er = viewFor("er")
     const cls = viewFor("class")
     // Due object literal distinti lo sono per costruzione: l'asserzione che conta è che il dispatch
@@ -38,8 +31,6 @@ describe("viewFor", () => {
       { label: "Enum", key: "u", Icon: ListOrdered, tool: "node", family: "class", variant: "enum" },
       { label: "Nota di classe", key: "n", Icon: StickyNote, tool: "node", family: "class", variant: "note" },
     ])
-    expect(er.textFormats).toEqual(["postgres", "mysql", "mermaid"])
-    expect(cls.textFormats).toEqual(["class-mermaid"])
   })
 })
 

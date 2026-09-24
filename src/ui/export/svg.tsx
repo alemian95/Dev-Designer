@@ -2,13 +2,14 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { classDiagram } from "@/editor/class-access"
 import { edgeOffsets } from "@/editor/edge-routing"
 import { erDiagram } from "@/editor/er-access"
-import { documentFamilies, qualify } from "@/editor/families"
+import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { laneBandExtent } from "@/editor/flow/geometry"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
+import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
 import type { DevDocument } from "@/model/document"
-import type { Family } from "@/model/family"
+import { FAMILIES, type Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { LanesLayerView } from "@/ui/canvas/LanesLayer"
 import { viewFor } from "@/ui/canvas/kinds/registry"
@@ -89,10 +90,9 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
  * `null` se non c'è nessun nodo con una view: non c'è niente da esportare.
  */
 export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions): string | null {
-  const families = documentFamilies(doc)
   // Una sezione per famiglia: chiavi, rettangoli e archi restano senza prefisso, perché le viste
   // pure di ogni famiglia li vogliono così (e il prefisso nei `data-*-id` lo mettono loro).
-  const sections = families.map((family) => {
+  const sections = FAMILIES.map((family) => {
     const ops = familyOps(doc, family)
     const keys = ops.nodeKeys()
     const rects = new Map<string, Rect>()
@@ -115,7 +115,7 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
     }
   })
 
-  const flow = families.includes("flow") ? flowDiagram(doc) : null
+  const flow = familyHasContent(doc, "flow") ? flowDiagram(doc) : null
   const laneExtent = flow ? laneBandExtent(flow) : null
   const laneRects: Rect[] = []
   if (flow && laneExtent) {

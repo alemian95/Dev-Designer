@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument, type Entity, type ErDocument, type Relationship } from "@/model/er/schema"
+import { createDocument, type DevDocument } from "@/model/document"
+import type { Entity, Relationship } from "@/model/er/schema"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import { entitySize } from "../er/geometry"
@@ -23,7 +24,7 @@ const byHand = (source: string, target: string): Relationship => ({
   identifying: false,
 })
 
-const doc = (): ErDocument => createErDocument("prova", "doc-1")
+const doc = (): DevDocument => createDocument("prova", "doc-1")
 const diagram = () => erDiagram(documentStore.getState().doc)
 
 beforeEach(() => {

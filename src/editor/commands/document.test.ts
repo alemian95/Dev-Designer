@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/er/schema"
+import { createDocument } from "@/model/document"
 import { documentStore } from "../document-store"
 import { renameDocument } from "./document"
 
 const state = () => documentStore.getState()
 
-beforeEach(() => state().load(createErDocument("Senza titolo")))
+beforeEach(() => state().load(createDocument("Senza titolo")))
 
 describe("renameDocument", () => {
   it("rinomina togliendo gli spazi agli estremi, e l'undo lo riporta indietro", () => {

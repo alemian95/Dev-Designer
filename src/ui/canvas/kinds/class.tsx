@@ -79,5 +79,4 @@ export const classView: DiagramView = {
     { label: "Enum", key: "u", Icon: ListOrdered, tool: "node", family: "class", variant: "enum" },
     { label: "Nota di classe", key: "n", Icon: StickyNote, tool: "node", family: "class", variant: "note" },
   ],
-  textFormats: ["class-mermaid"],
 }

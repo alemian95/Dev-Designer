@@ -1,7 +1,7 @@
 import * as z from "zod"
 
 /** Versione del formato su disco. Incrementare insieme a una migrazione in migrations.ts. */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 export const Identifier = z.string().min(1)
 

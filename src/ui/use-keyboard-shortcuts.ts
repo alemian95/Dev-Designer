@@ -1,10 +1,10 @@
 import { useEffect } from "react"
 import { deleteSelection, duplicateSelection, fitToContent, resetView, selectAllNodes, zoomBy } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
-import { documentFamilies } from "@/editor/families"
 import { sessionStore } from "@/editor/session-store"
 import { documentIo } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
+import { FAMILIES } from "@/model/family"
 import { canvasTools } from "./canvas/kinds/registry"
 import { requestOpen } from "./document-actions"
 import { autoLayout } from "./layout-actions"
@@ -20,9 +20,9 @@ function onKeyDown(e: KeyboardEvent): void {
   const session = sessionStore.getState()
   const doc = documentStore.getState()
   const key = e.key.toLowerCase()
-  // Le lettere di nodo/arco vengono da `canvasTools`, non da un valore cablato: per l'ER sono
-  // "e" e "r", come prima di questo cambiamento.
-  const tools = canvasTools(documentFamilies(doc.doc))
+  // Le lettere di nodo/arco vengono da `canvasTools`, non da un valore cablato: gli strumenti di
+  // tutte le famiglie, perché il documento le contiene tutte.
+  const tools = canvasTools(FAMILIES)
   // Le scorciatoie che toccano il documento: in sola lettura non agiscono, ma restano consumate,
   // perché senza preventDefault ⌘S farebbe comparire il dialogo di salvataggio del browser.
   // ⌘O non è fra queste: apre un altro documento, come la voce di menu che resta abilitata.

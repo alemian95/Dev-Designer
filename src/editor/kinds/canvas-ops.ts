@@ -1,10 +1,10 @@
 import type { DevDocument } from "@/model/document"
-import type { Family } from "@/model/family"
+import { FAMILIES, type Family } from "@/model/family"
 import type { Issue } from "@/model/issue"
 import { moveNodes } from "../commands/view"
 import type { Recipe } from "../document-store"
 import type { EdgeGeometry } from "../edge-routing"
-import { documentFamilies, qualify, splitKey } from "../families"
+import { qualify, splitKey } from "../families"
 import type { Point, Rect } from "../geometry"
 import { familyOps, type EdgeEnds, type EditTarget } from "./ops"
 
@@ -53,11 +53,10 @@ function combine(recipes: readonly (Recipe | null)[]): Recipe | null {
 const NOOP: Recipe = () => {}
 
 export function canvasOps(doc: DevDocument): CanvasOps {
-  const families = documentFamilies(doc)
   const ops = (family: Family) => familyOps(doc, family)
 
   return {
-    nodeKeys: () => families.flatMap((f) => ops(f).nodeKeys().map((k) => qualify(f, k))),
+    nodeKeys: () => FAMILIES.flatMap((f) => ops(f).nodeKeys().map((k) => qualify(f, k))),
 
     rectOf: (qualified, at) => {
       const { family, key } = splitKey(qualified)
@@ -93,7 +92,7 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       combine(
         [...byFamily(keys)].map(([f, ks]) => {
           const o = ops(f)
-          return o.commitDrag ? o.commitDrag(ks, dx, dy) : moveNodes(ks, dx, dy)
+          return o.commitDrag ? o.commitDrag(ks, dx, dy) : moveNodes(f, ks, dx, dy)
         }),
       ),
 
@@ -113,7 +112,7 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     },
 
     validate: () =>
-      families.flatMap((f) =>
+      FAMILIES.flatMap((f) =>
         ops(f)
           .validate()
           .map((issue) => ({

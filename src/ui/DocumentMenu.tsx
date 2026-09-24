@@ -1,10 +1,9 @@
-import { Box, ChevronDown, ClipboardCopy, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, PencilLine, Save, SaveAll, Square, Trash2, Workflow } from "lucide-react"
+import { ChevronDown, ClipboardCopy, FileCode2, FileImage, FilePlus2, FileText, FolderOpen, Image, PencilLine, Save, SaveAll, Trash2 } from "lucide-react"
 import { useRef, useState, type ChangeEvent } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut,
-  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { renameDocument } from "@/editor/commands/document"
 import { documentStore } from "@/editor/document-store"
@@ -12,7 +11,6 @@ import { documentDb, documentIo } from "@/io/app-io"
 import type { RecentEntry } from "@/io/db"
 import { documentSession } from "@/io/document-session"
 import { readFile } from "@/io/file"
-import { useDocumentFamilies } from "./canvas/kinds/registry"
 import { CommitInput } from "./panels/CommitInput"
 import { requestOpen, UPLOAD_INPUT_ID } from "./document-actions"
 import { copyPng, exportPng, exportSvg } from "./export/lazy"
@@ -30,9 +28,6 @@ const commitName = (value: string): boolean => {
 /** Nome del documento, pallino delle modifiche non salvate, e il menu: nuovo, apri, salva, salva con nome, rinomina, recenti. */
 export function DocumentMenu() {
   const name = useStore(documentStore, (s) => s.doc.name)
-  // L'import DDL è un'entrata solo ER (§2 della spec del class diagram): sulle classi la voce
-  // resta ma non fa niente di sensato, quindi si disabilita come già succede in sola lettura.
-  const isEr = useDocumentFamilies().includes("er")
   const docId = useStore(documentSession, (s) => s.docId)
   const dirty = useStore(documentSession, (s) => s.dirty)
   const readOnly = useStore(documentSession, (s) => s.readOnly)
@@ -94,16 +89,9 @@ export function DocumentMenu() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-72" onCloseAutoFocus={(e) => renamingRef.current && e.preventDefault()}>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger><FilePlus2 /> Nuovo</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem onSelect={() => void documentIo.newDocument("er")}><Square /> Diagramma ER</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void documentIo.newDocument("class")}><Box /> Class diagram</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void documentIo.newDocument("flow")}><Workflow /> Flowchart</DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <DropdownMenuItem onSelect={() => void documentIo.newDocument()}><FilePlus2 /> Nuovo documento</DropdownMenuItem>
             <DropdownMenuItem onSelect={requestOpen}><FolderOpen /> Apri… <DropdownMenuShortcut>⌘O</DropdownMenuShortcut></DropdownMenuItem>
-            <DropdownMenuItem disabled={readOnly || !isEr} onSelect={() => setImportOpen(true)}><FileCode2 /> Importa DDL…</DropdownMenuItem>
+            <DropdownMenuItem disabled={readOnly} onSelect={() => setImportOpen(true)}><FileCode2 /> Importa DDL…</DropdownMenuItem>
             <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.save()}><Save /> Salva <DropdownMenuShortcut>⌘S</DropdownMenuShortcut></DropdownMenuItem>
             <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.saveAs()}><SaveAll /> Salva con nome… <DropdownMenuShortcut>⇧⌘S</DropdownMenuShortcut></DropdownMenuItem>
             <DropdownMenuItem disabled={readOnly} onSelect={startRename}><PencilLine /> Rinomina…</DropdownMenuItem>

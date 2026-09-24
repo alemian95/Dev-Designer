@@ -38,7 +38,7 @@ export interface DiagramOps {
    *  tornare sempre un valore. */
   addEdge(source: string, target: string): { key: string; recipe: Recipe } | null
   /**
-   * Sostituisce la dispatch predefinita `moveNodes(keys, dx, dy)` al rilascio del drag, quando c'è.
+   * Sostituisce la dispatch predefinita `moveNodes(family, keys, dx, dy)` al rilascio del drag, quando c'è.
    * Serve al flowchart, che al commit scrive anche la corsia (spec §6): posizione e corsia in una
    * sola recipe, un solo passo di undo. Durante il gesto non cambia niente — questo non è nel
    * percorso di `pointermove`, solo in quello di rilascio (`interaction-runner.ts`, `commit-drag`).
@@ -48,7 +48,7 @@ export interface DiagramOps {
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
   layoutGraph(): LayoutGraph
   /**
-   * Sostituisce la dispatch predefinita `applyLayout(positions)` quando c'è. Serve al flowchart,
+   * Sostituisce la dispatch predefinita `applyLayout(family, positions)` quando c'è. Serve al flowchart,
    * che col layout riscrive anche le bande: due dispatch darebbero due passi di undo.
    */
   layoutRecipe?(positions: LayoutPositions): Recipe
@@ -65,9 +65,4 @@ export function familyOps(doc: DevDocument, family: Family): DiagramOps {
     case "flow":
       return flowOps(doc)
   }
-}
-
-/** Solo fase A: le ops dell'unica famiglia del documento. Il Task 5 la rimuove. */
-export function opsFor(doc: DevDocument): DiagramOps {
-  return familyOps(doc, doc.diagram.type)
 }

@@ -76,14 +76,11 @@ export async function run(browser, base) {
     await page.goto(base)
     await page.waitForSelector("[data-canvas]")
 
-    await step("«Nuovo ▸ Class diagram»: il canvas è vuoto", async () => {
+    await step("Nuovo documento: il canvas è vuoto", async () => {
       await expectMenu(page, "closed")
       await page.locator("[data-document-menu]").click()
       await expectMenu(page, "open")
-      // Sottomenu (Task 13): `pickFromMenu` chiude tutto dopo un solo click, quindi qui — come in
-      // `persistenza.mjs` — si apre a mano e si sceglie il tipo nel sottomenu.
-      await page.getByRole("menuitem", { name: "Nuovo" }).click()
-      await page.getByRole("menuitem", { name: "Class diagram" }).click()
+      await page.getByRole("menuitem", { name: "Nuovo documento" }).click()
       await expectMenu(page, "closed")
       await expectNodes(page, 0)
     })

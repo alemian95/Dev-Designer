@@ -1,8 +1,7 @@
 import type { DevDocument } from "@/model/document"
 import type { ErDiagram } from "@/model/er/schema"
 
-/** Il guard resta perché la union include anche il class diagram (Task 7): senza, TypeScript non la restringe. */
+/** La parte ER del documento: c'è sempre, vuota se il documento non ha entità. */
 export function erDiagram(doc: DevDocument): ErDiagram {
-  if (doc.diagram.type !== "er") throw new Error(`atteso un diagramma ER, trovato ${doc.diagram.type}`)
-  return doc.diagram
+  return doc.diagram.er
 }

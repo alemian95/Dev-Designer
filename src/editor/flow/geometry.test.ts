@@ -71,7 +71,6 @@ describe("shapePath", () => {
 
 describe("laneAt", () => {
   const d = {
-    type: "flow",
     model: { lanes: [{ id: "l1", name: "a" }, { id: "l2", name: "b" }], nodes: {}, edges: {} },
     view: { nodes: {}, lanes: { l1: { y: 0, h: 100 }, l2: { y: 100, h: 100 } } },
   } as FlowDiagram
@@ -98,7 +97,6 @@ describe("laneBandExtent", () => {
    * del Task 11, spec §5 ("la stessa banda nell'app e nell'export").
    */
   const flowDiagram = (): FlowDiagram => ({
-    type: "flow",
     model: {
       lanes: [{ id: "l1", name: "a" }],
       nodes: { n1: { label: "x", shape: "process", lane: "l1" } },

@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createErDocument } from "@/model/er/schema"
-import { createFlowDocument } from "@/model/flow/schema"
-import { documentFamilies, editingIn, familySelectedKeys, qualify, splitKey } from "./families"
+import { editingIn, familySelectedKeys, qualify, splitKey } from "./families"
 import { selId } from "./session-store"
 
 describe("qualify / splitKey", () => {
@@ -36,12 +34,5 @@ describe("editingIn", () => {
     expect(editingIn(editing, "flow")).toEqual({ key: "n1", target: "body" })
     expect(editingIn(editing, "class")).toBeNull()
     expect(editingIn(null, "flow")).toBeNull()
-  })
-})
-
-describe("documentFamilies (fase A)", () => {
-  it("è il tipo del documento", () => {
-    expect(documentFamilies(createErDocument("x"))).toEqual(["er"])
-    expect(documentFamilies(createFlowDocument("x"))).toEqual(["flow"])
   })
 })

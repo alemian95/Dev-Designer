@@ -7,7 +7,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
-import { documentFamilies } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { emitDdl } from "@/io/emit/ddl"
@@ -100,8 +99,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
   const models = useStore(
     documentStore,
     useShallow((s): Models => {
-      const families = documentFamilies(s.doc)
-      const has = (f: Family) => families.includes(f) && familyHasContent(s.doc, f)
+      const has = (f: Family) => familyHasContent(s.doc, f)
       return {
         er: has("er") ? erDiagram(s.doc).model : null,
         class: has("class") ? classDiagram(s.doc).model : null,

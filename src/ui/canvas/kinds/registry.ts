@@ -1,10 +1,12 @@
 import type { ComponentType } from "react"
-import type { LucideIcon } from "lucide-react"
+import { Spline, type LucideIcon } from "lucide-react"
 import { useStore } from "zustand"
+import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
+import { documentFamilies } from "@/editor/families"
 import type { Rect } from "@/editor/geometry"
 import type { Tool } from "@/editor/session-store"
-import type { Diagram } from "@/model/document"
+import type { Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { classView } from "./class"
 import { erView } from "./er"
@@ -57,13 +59,32 @@ export interface ToolDef {
   key: string
   Icon: LucideIcon
   tool: Tool
-  /** Passata ad `addNode`: la forma, per i tipi che ne hanno più d'una. */
+  /** Famiglia in cui lo strumento crea: `null` per Collega, che non crea nodi. */
+  family: Family | null
+  /** Passata ad `addNode`: la forma, per le famiglie che ne hanno più d'una. */
   variant?: string
 }
 
-/** Identità di uno strumento nel ToggleGroup: `tool` da solo non basta quando ci sono più varianti. */
-export function toolId(def: Pick<ToolDef, "tool" | "variant">): string {
-  return def.variant ? `${def.tool}:${def.variant}` : def.tool
+/**
+ * Identità di uno strumento nel ToggleGroup. La famiglia serve: «Nota di classe» e «Nota di flusso»
+ * sono entrambe `node` con variante `note`, e senza la famiglia avrebbero lo stesso id.
+ */
+export function toolId(def: Pick<ToolDef, "tool" | "family" | "variant">): string {
+  return [def.tool, def.family, def.variant].filter(Boolean).join(":")
+}
+
+/**
+ * Lo strumento per collegare, uno solo per tutte le famiglie: il tipo di arco lo decidono gli
+ * estremi (`CanvasOps.addEdge`), non lo strumento.
+ */
+export const LINK_TOOL: ToolDef = { label: "Collega", key: "r", Icon: Spline, tool: "edge", family: null }
+
+/** Nome del gruppo della sidebar: è anche il nome accessibile del `role="group"`. */
+export const FAMILY_LABEL: Record<Family, string> = { er: "ER", class: "Classi", flow: "Flusso" }
+
+/** Gli strumenti del canvas nell'ordine della sidebar: famiglia per famiglia, poi Collega. «Seleziona» non è qui: non crea niente. */
+export function canvasTools(families: readonly Family[]): ToolDef[] {
+  return [...families.flatMap((family) => viewFor(family).tools), LINK_TOOL]
 }
 
 export interface DiagramView {
@@ -85,9 +106,9 @@ export interface DiagramView {
   textFormats: TextFormat[]
 }
 
-/** Chiuso sul tipo: neutro rispetto a cosa contiene ogni vista, non guarda dentro nessuna di esse. */
-export function viewFor(type: Diagram["type"]): DiagramView {
-  switch (type) {
+/** Chiuso sulla famiglia: neutro rispetto a cosa contiene ogni vista, non guarda dentro nessuna di esse. */
+export function viewFor(family: Family): DiagramView {
+  switch (family) {
     case "er":
       return erView
     case "class":
@@ -101,4 +122,9 @@ export function viewFor(type: Diagram["type"]): DiagramView {
 export function useDiagramView(): DiagramView {
   const type = useStore(documentStore, (s) => s.doc.diagram.type)
   return viewFor(type)
+}
+
+/** Le famiglie del documento aperto (fase A: il suo tipo). Il Task 5 la sostituisce con `FAMILIES`. */
+export function useDocumentFamilies(): readonly Family[] {
+  return useStore(documentStore, useShallow((s) => documentFamilies(s.doc)))
 }

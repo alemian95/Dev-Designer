@@ -1,4 +1,5 @@
 import { createStore } from "zustand/vanilla"
+import type { Family } from "@/model/family"
 import type { Size } from "./geometry"
 import type { EditTarget } from "./kinds/ops"
 import { IDENTITY, type Viewport } from "./viewport"
@@ -23,7 +24,9 @@ export interface SessionState {
   viewport: Viewport
   selection: ReadonlySet<string>
   tool: Tool
-  /** Variante dello strumento corrente: la forma, per i tipi che ne hanno più d'una. Opaca qui. */
+  /** Famiglia dello strumento nodo attivo: sceglie dove `addNode` crea il nodo. `null` per Seleziona e Collega. */
+  family: Family | null
+  /** Variante dello strumento corrente: la forma, per le famiglie che ne hanno più d'una. Opaca qui. */
   variant: string | null
   /**
    * `name`/`body` sono `EditTarget`, ciò che `addNode` può aprire (`kinds/ops.ts`) — una creazione
@@ -36,7 +39,7 @@ export interface SessionState {
   canvasSize: Size
   setViewport: (viewport: Viewport) => void
   setSelection: (ids: Iterable<string>) => void
-  setTool: (tool: Tool, variant?: string | null) => void
+  setTool: (tool: Tool, family?: Family | null, variant?: string | null) => void
   setEditing: (editing: { key: string; target: EditTarget | "label" } | null) => void
   setCanvasSize: (size: Size) => void
 }
@@ -45,12 +48,13 @@ export const sessionStore = createStore<SessionState>()((set) => ({
   viewport: IDENTITY,
   selection: new Set<string>(),
   tool: "select",
+  family: null,
   variant: null,
   editing: null,
   canvasSize: { w: 0, h: 0 },
   setViewport: (viewport) => set({ viewport }),
   setSelection: (ids) => set({ selection: new Set(ids) }),
-  setTool: (tool, variant = null) => set({ tool, variant }),
+  setTool: (tool, family = null, variant = null) => set({ tool, family, variant }),
   setEditing: (editing) => set({ editing }),
   setCanvasSize: (canvasSize) => set({ canvasSize }),
 }))

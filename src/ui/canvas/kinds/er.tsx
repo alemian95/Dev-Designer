@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Plus, Spline, Square, X } from "lucide-react"
+import { ArrowDown, ArrowUp, Plus, Square, X } from "lucide-react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -154,9 +154,6 @@ export const erView: DiagramView = {
   NodeView,
   EdgeView,
   Properties,
-  tools: [
-    { label: "Entità", key: "e", Icon: Square, tool: "node" },
-    { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
-  ],
+  tools: [{ label: "Entità", key: "e", Icon: Square, tool: "node", family: "er" }],
   textFormats: ["postgres", "mysql", "mermaid"],
 }

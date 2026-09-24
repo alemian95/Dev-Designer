@@ -111,12 +111,13 @@ describe("restoreLast", () => {
     d.db.last = "s1"
     // La variante "note" esiste solo nel class diagram: se sopravvivesse al mount di un ER, il
     // canvas non risponderebbe più al click.
-    sessionStore.getState().setTool("node", "note")
+    sessionStore.getState().setTool("node", "class", "note")
     await createDocumentIo(d).restoreLast()
     expect(documentStore.getState().doc).toEqual(saved)
     expect(documentStore.getState().past).toHaveLength(0)
     expect(sessionStore.getState().selection.size).toBe(0)
     expect(sessionStore.getState().tool).toBe("select")
+    expect(sessionStore.getState().family).toBeNull()
     expect(sessionStore.getState().variant).toBeNull()
     expect(documentSession.getState()).toMatchObject({ docId: "s1", fileName: "s1.dd.json", lastSavedAt: 800, dirty: true })
   })

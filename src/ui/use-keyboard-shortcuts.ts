@@ -1,10 +1,11 @@
 import { useEffect } from "react"
 import { deleteSelection, duplicateSelection, fitToContent, resetView, selectAllNodes, zoomBy } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
+import { documentFamilies } from "@/editor/families"
 import { sessionStore } from "@/editor/session-store"
 import { documentIo } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
-import { viewFor } from "./canvas/kinds/registry"
+import { canvasTools } from "./canvas/kinds/registry"
 import { requestOpen } from "./document-actions"
 import { autoLayout } from "./layout-actions"
 
@@ -19,9 +20,9 @@ function onKeyDown(e: KeyboardEvent): void {
   const session = sessionStore.getState()
   const doc = documentStore.getState()
   const key = e.key.toLowerCase()
-  // Le lettere di nodo/arco vengono dal tipo di diagramma corrente, non da un valore cablato:
-  // per l'ER sono "e" e "r", come prima di questo cambiamento.
-  const tools = viewFor(doc.doc.diagram.type).tools
+  // Le lettere di nodo/arco vengono da `canvasTools`, non da un valore cablato: per l'ER sono
+  // "e" e "r", come prima di questo cambiamento.
+  const tools = canvasTools(documentFamilies(doc.doc))
   // Le scorciatoie che toccano il documento: in sola lettura non agiscono, ma restano consumate,
   // perché senza preventDefault ⌘S farebbe comparire il dialogo di salvataggio del browser.
   // ⌘O non è fra queste: apre un altro documento, come la voce di menu che resta abilitata.
@@ -49,7 +50,7 @@ function onKeyDown(e: KeyboardEvent): void {
   else if (!mod && key === "v") session.setTool("select")
   else if (!mod && tools.some((t) => t.key === key)) {
     const def = tools.find((t) => t.key === key)
-    if (def) session.setTool(def.tool, def.variant ?? null)
+    if (def) session.setTool(def.tool, def.family, def.variant ?? null)
   }
   else if (!mod && key === "f") fitToContent()
   else if (!mod && key === "l") void autoLayout()
@@ -64,7 +65,7 @@ function onKeyDown(e: KeyboardEvent): void {
  * Scorciatoie globali. mod = cmd su macOS, ctrl altrove.
  * mod+s salva · mod+shift+s salva con nome · mod+o apri
  * mod+z undo · mod+shift+z / mod+y redo · mod+d duplica · mod+a seleziona tutto · canc/backspace elimina
- * v tool selezione · le lettere di nodo/arco/nota vengono da `viewFor(tipo).tools` (per l'ER, e/r; le classi aggiungono n)
+ * v tool selezione · le lettere degli strumenti vengono da `canvasTools` (E entità · C I U N classi · 1–6 forme del flusso · R collega)
  * f fit · l disponi · mod+= / mod+- zoom · mod+0 reset · esc deseleziona e torna al tool select
  */
 export function useKeyboardShortcuts(): void {

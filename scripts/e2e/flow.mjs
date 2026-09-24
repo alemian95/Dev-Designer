@@ -156,7 +156,7 @@ export async function run(browser, base) {
     })
 
     await step("collega Inizio a Processo A e scrivi l'etichetta sull'arco col doppio click", async () => {
-      await page.getByRole("radio", { name: "Arco" }).click()
+      await page.getByRole("radio", { name: "Collega" }).click()
       const inizio = await rectByLabel(page, "Inizio")
       const processo = await rectByLabel(page, "Processo A")
       await page.mouse.move(inizio.x + inizio.w / 2, inizio.y + inizio.h / 2)

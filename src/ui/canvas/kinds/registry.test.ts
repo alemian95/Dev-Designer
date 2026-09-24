@@ -1,7 +1,8 @@
-import { Box, ListOrdered, Spline, Square, SquareDashed, StickyNote } from "lucide-react"
+import { Box, ListOrdered, Square, SquareDashed, StickyNote } from "lucide-react"
 import { describe, expect, it } from "vitest"
+import { FAMILIES } from "@/model/family"
 import { FlowShapeSchema } from "@/model/flow/schema"
-import { toolId, viewFor } from "./registry"
+import { canvasTools, LINK_TOOL, toolId, viewFor } from "./registry"
 
 /**
  * Fissa il dispatch del registro: la revisione del Task 6 ha lasciato una voce ⚠️ perché nessun
@@ -30,16 +31,12 @@ describe("viewFor", () => {
     // `viewFor` la vista sbagliata qui, silenziosamente.
     expect(er.NodeView).not.toBe(cls.NodeView)
     expect(er.EdgeView).not.toBe(cls.EdgeView)
-    expect(er.tools).toEqual([
-      { label: "Entità", key: "e", Icon: Square, tool: "node" },
-      { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
-    ])
+    expect(er.tools).toEqual([{ label: "Entità", key: "e", Icon: Square, tool: "node", family: "er" }])
     expect(cls.tools).toEqual([
-      { label: "Classe", key: "c", Icon: Box, tool: "node" },
-      { label: "Interfaccia", key: "i", Icon: SquareDashed, tool: "node", variant: "interface" },
-      { label: "Enum", key: "e", Icon: ListOrdered, tool: "node", variant: "enum" },
-      { label: "Relazione", key: "r", Icon: Spline, tool: "edge" },
-      { label: "Nota", key: "n", Icon: StickyNote, tool: "node", variant: "note" },
+      { label: "Classe", key: "c", Icon: Box, tool: "node", family: "class" },
+      { label: "Interfaccia", key: "i", Icon: SquareDashed, tool: "node", family: "class", variant: "interface" },
+      { label: "Enum", key: "u", Icon: ListOrdered, tool: "node", family: "class", variant: "enum" },
+      { label: "Nota di classe", key: "n", Icon: StickyNote, tool: "node", family: "class", variant: "note" },
     ])
     expect(er.textFormats).toEqual(["postgres", "mysql", "mermaid"])
     expect(cls.textFormats).toEqual(["class-mermaid"])
@@ -61,11 +58,12 @@ describe("terzo strumento", () => {
 })
 
 describe("flowchart", () => {
-  it("il flowchart dichiara sette strumenti, tutti con chiave distinta", () => {
+  it("il flowchart dichiara sei strumenti, tutti con chiave distinta, tutti nella famiglia flow", () => {
     const view = viewFor("flow")
-    expect(view.tools).toHaveLength(7)
+    expect(view.tools).toHaveLength(6)
     const keys = view.tools.map((t) => t.key)
     expect(new Set(keys).size).toBe(keys.length)
+    expect(view.tools.every((t) => t.family === "flow")).toBe(true)
   })
 
   /**
@@ -76,11 +74,15 @@ describe("flowchart", () => {
    * `undefined`: invisibile, e respinto da `FlowShapeSchema` al primo salvataggio. L'insieme delle
    * varianti deve coincidere esattamente con le forme dello schema, non solo essere non vuoto.
    */
-  it("le sei varianti del nodo sono esattamente le forme di FlowShapeSchema, l'arco non ne ha una", () => {
+  it("le sei varianti del nodo sono esattamente le forme di FlowShapeSchema", () => {
     const view = viewFor("flow")
     const nodeVariants = view.tools.filter((t) => t.tool === "node").map((t) => t.variant)
     expect(new Set(nodeVariants)).toEqual(new Set(FlowShapeSchema.options))
-    expect(view.tools.filter((t) => t.tool === "edge")).toHaveLength(1)
+  })
+
+  it("la nota del flusso ha un'etichetta sua, distinta da quella delle classi", () => {
+    const note = viewFor("flow").tools.find((t) => t.variant === "note")
+    expect(note?.label).toBe("Nota di flusso")
   })
 
   /**
@@ -100,17 +102,33 @@ describe("flowchart", () => {
     expect(byKey.get("4")).toBe("io")
     expect(byKey.get("5")).toBe("subprocess")
     expect(byKey.get("6")).toBe("note")
-    expect(view.tools.find((t) => t.key === "r")).toMatchObject({ tool: "edge" })
+  })
+})
+
+describe("canvasTools", () => {
+  it("mette gli strumenti delle famiglie nell'ordine dato, poi Collega", () => {
+    const tools = canvasTools(["er", "flow"])
+    expect(tools[0]!.label).toBe("Entità")
+    expect(tools.at(-1)).toBe(LINK_TOOL)
+    expect(tools.filter((t) => t.tool === "edge")).toEqual([LINK_TOOL])
+  })
+
+  it("su tutte le famiglie tasti, etichette e id sono unici", () => {
+    const tools = canvasTools(FAMILIES)
+    const unique = (xs: string[]) => new Set(xs).size === xs.length
+    expect(unique(tools.map((t) => t.key))).toBe(true)
+    expect(unique(tools.map((t) => t.label))).toBe(true)
+    expect(unique(tools.map(toolId))).toBe(true)
+    // «v» è Seleziona, che non sta in `canvasTools`: nessuno strumento può rubarla.
+    expect(tools.some((t) => t.key === "v")).toBe(false)
   })
 })
 
 describe("toolId", () => {
-  it("compone tool e variant quando c'è una variante", () => {
-    expect(toolId({ tool: "node", variant: "note" })).toBe("node:note")
-  })
-
-  it("torna solo il tool quando non c'è variante", () => {
-    expect(toolId({ tool: "node" })).toBe("node")
-    expect(toolId({ tool: "edge" })).toBe("edge")
+  it("distingue due note di famiglie diverse", () => {
+    expect(toolId({ tool: "node", family: "class", variant: "note" })).toBe("node:class:note")
+    expect(toolId({ tool: "node", family: "flow", variant: "note" })).toBe("node:flow:note")
+    expect(toolId({ tool: "select", family: null })).toBe("select")
+    expect(toolId(LINK_TOOL)).toBe("edge")
   })
 })

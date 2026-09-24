@@ -1,4 +1,3 @@
-import { Spline } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
@@ -50,10 +49,10 @@ function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeV
 
 /**
  * `DiagramView` per il flowchart: cablaggio verso i componenti di questo task, più gli strumenti
- * — sei varianti dello strumento nodo, una per forma, e l'arco. `textFormats` elenca
- * `flow-mermaid` da questo task in poi: `emitFlowMermaid` esiste (`@/io/emit/flow-mermaid.ts`),
- * quindi il formato può comparire nel dialogo di export testo (docblock di `TextFormat`,
- * `registry.ts`).
+ * — sei varianti dello strumento nodo, una per forma. Collega è comune a tutte le famiglie
+ * (`LINK_TOOL`, `registry.ts`) e non compare qui. `textFormats` elenca `flow-mermaid` da questo
+ * task in poi: `emitFlowMermaid` esiste (`@/io/emit/flow-mermaid.ts`), quindi il formato può
+ * comparire nel dialogo di export testo (docblock di `TextFormat`, `registry.ts`).
  */
 export const flowView: DiagramView = {
   NodesLayer,
@@ -65,15 +64,14 @@ export const flowView: DiagramView = {
   // Sei varianti, una per forma: l'ordine e il tasto (`1`..`6`, spec §11) seguono `FLOW_SHAPES`,
   // cioè l'ordine di `FlowShapeSchema`. Etichetta e icona vengono da `flow-shapes.ts`, non
   // ridichiarate qui — è la stessa fonte che usa il select del pannello proprietà.
-  tools: [
-    ...FLOW_SHAPES.map((shape, i) => ({
-      label: FLOW_SHAPE_LABEL[shape],
-      key: String(i + 1),
-      Icon: FLOW_SHAPE_ICON[shape],
-      tool: "node" as const,
-      variant: shape,
-    })),
-    { label: "Arco", key: "r", Icon: Spline, tool: "edge" },
-  ],
+  tools: FLOW_SHAPES.map((shape, i) => ({
+    // La nota ha un'etichetta sua solo qui: il select delle forme nel pannello resta «Nota».
+    label: shape === "note" ? "Nota di flusso" : FLOW_SHAPE_LABEL[shape],
+    key: String(i + 1),
+    Icon: FLOW_SHAPE_ICON[shape],
+    tool: "node" as const,
+    family: "flow" as const,
+    variant: shape,
+  })),
   textFormats: ["flow-mermaid"],
 }

@@ -218,7 +218,12 @@ export function createInteractionRunner(): InteractionRunner {
   }
 
   const step = (event: InteractionEvent): void => {
-    const result = reduce(mode, event, { tool: session().tool, variant: session().variant ?? undefined, selection: session().selection })
+    const result = reduce(mode, event, {
+      tool: session().tool,
+      family: session().family,
+      variant: session().variant ?? undefined,
+      selection: session().selection,
+    })
     mode = result.mode
     for (const fx of result.effects) run(fx)
     // Lo snapshot del drag vale per un solo drag: si scarta appena si esce dal modo, commit o annullamento che sia.

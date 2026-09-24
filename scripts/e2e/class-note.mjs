@@ -104,7 +104,7 @@ export async function run(browser, base) {
     let key
     let beforeTextRect
     await step("strumento «Nota», un click: nasce un nodo e la textarea si apre da sé", async () => {
-      await page.getByRole("radio", { name: "Nota" }).click()
+      await page.getByRole("radio", { name: "Nota di classe" }).click()
       await page.mouse.click(canvas.x + 300, canvas.y + 200)
       await expectNodes(page, 1)
       key = await page.locator("[data-node-id]").first().getAttribute("data-node-id")
@@ -158,11 +158,11 @@ export async function run(browser, base) {
     })
 
     await step("una classe, e lo strumento relazione ancora la nota alla classe", async () => {
-      await page.getByRole("radio", { name: "Classe" }).click()
+      await page.getByRole("radio", { name: "Classe", exact: true }).click()
       await page.mouse.click(600, 400)
       await page.keyboard.press("Escape") // chiude l'editor del nome che la creazione apre da sé
 
-      await page.getByRole("radio", { name: "Relazione" }).click()
+      await page.getByRole("radio", { name: "Collega" }).click()
       const nota = await rectByKey(page, key)
       const classe = await rectByName(page, "class")
       await page.mouse.move(nota.x + nota.w / 2, nota.y + nota.h / 2)

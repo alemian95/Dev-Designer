@@ -204,6 +204,20 @@ describe("openFile", () => {
     await createDocumentIo(d).openFile({ name: "doc.dd.json", text: toJson(doc), handle: null })
     expect(d.confirm).not.toHaveBeenCalled()
   })
+
+  it("riaprire lo stesso file v2 non chiede di ripristinare modifiche che non ci sono", async () => {
+    // L'orologio avanza a ogni lettura, come quello vero: il record scritto alla prima apertura
+    // ha `updatedAt` successivo a `savedToFileAt`.
+    let t = 1000
+    const d = deps({ now: () => t++ })
+    const { er } = withEntity("vecchio", "v2doc").diagram
+    const text = JSON.stringify({ schemaVersion: 2, id: "v2doc", name: "vecchio", diagram: { type: "er", ...er } })
+    const io = createDocumentIo(d)
+    await io.openFile({ name: "vecchio.dd.json", text, handle: null })
+    await io.openFile({ name: "vecchio.dd.json", text, handle: null })
+    expect(d.confirm).not.toHaveBeenCalled()
+    expect(documentSession.getState().dirty).toBe(false)
+  })
 })
 
 describe("save", () => {

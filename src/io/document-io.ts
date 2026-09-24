@@ -113,9 +113,8 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
   }
 
   /**
-   * Mette il documento negli store. La selezione e l'editing si azzerano: le chiavi erano di un altro
-   * documento. Anche lo strumento, che non ha chiavi ma un tipo di diagramma: `note` esiste solo nel
-   * class diagram e resterebbe attivo su un ER, dove il click sul canvas non farebbe nulla.
+   * Mette il documento negli store. Selezione, editing e strumento si azzerano: le chiavi selezionate
+   * o in modifica, e la famiglia dello strumento attivo, erano del documento uscente.
    */
   function mount(doc: DevDocument, s: Mounted): void {
     documentStore.getState().load(doc)
@@ -179,8 +178,10 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     let lastSavedAt: number | null = now()
     let dirty = false
     // Stesso id già in biblioteca con lavoro non salvato: è il recupero dopo un crash, e decide l'utente.
+    // Il buffer si confronta con la forma canonica del documento letto, non col testo del file: un
+    // file di una versione precedente, migrato, non è mai uguale al buffer carattere per carattere.
     const existing = await safe(() => db.get(doc.id), undefined)
-    if (existing && existing.json !== opened.text) {
+    if (existing && existing.json !== toJson(parsed.document)) {
       const buffered = parseDocument(existing.json)
       if (buffered.ok && hasUnsaved(existing, buffered.document)) {
         const restore = confirm(`"${doc.name}" ha modifiche non salvate nel browser, più recenti del file. Ripristinarle?\n\nAnnulla per aprire il file com'è.`)

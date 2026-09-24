@@ -129,3 +129,9 @@ export function canvasOps(doc: DevDocument): CanvasOps {
 export function familyHasContent(doc: DevDocument, family: Family): boolean {
   return familyOps(doc, family).nodeKeys().length > 0
 }
+
+/** I rettangoli di tutti i nodi del canvas, di ogni famiglia: lo spazio già occupato. */
+export function nodeRects(doc: DevDocument): Rect[] {
+  const ops = canvasOps(doc)
+  return ops.nodeKeys().flatMap((key) => ops.rectOf(key) ?? [])
+}

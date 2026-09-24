@@ -5,9 +5,6 @@ import type { NodeView } from "@/model/shared"
 import type { Recipe } from "../document-store"
 import { snap } from "../geometry"
 
-/** Distanza dall'origine del risultato: un diagramma appiccicato al bordo (0, 0) si legge male. */
-const MARGIN = 40
-
 /** La view di una famiglia: `view.nodes` ha la stessa forma in tutte. */
 export function diagramView(doc: DevDocument, family: Family): { nodes: Record<string, NodeView> } {
   return doc.diagram[family].view
@@ -34,11 +31,12 @@ export function setCollapsed(family: Family, key: string, collapsed: boolean): R
 }
 
 /**
- * Scrive le posizioni calcolate nella view della famiglia, in una sola recipe: un ⌘Z rimette tutte quelle di prima.
+ * Scrive le posizioni ricevute nella view della famiglia, in una sola recipe: un ⌘Z rimette tutte quelle di prima.
  *
- * Le coordinate di ELK partono dalla sua origine e sono float. Qui si traslano perché il risultato
- * parta da `MARGIN` e si allineano alla griglia, come ogni altra posizione dell'app — una posizione
- * fuori griglia si nota al primo trascinamento, che riallinea il nodo di qualche pixel.
+ * Le coordinate arrivano già nel punto in cui devono cadere — l'origine la decide `packBlocks`
+ * (`layout-pack.ts`), che impacchetta i blocchi delle famiglie in fila — qui si scrivono e si
+ * allineano alla griglia, come ogni altra posizione dell'app: una posizione fuori griglia si nota al
+ * primo trascinamento, che riallinea il nodo di qualche pixel.
  *
  * Le chiavi che nella view non esistono più (l'entità è stata cancellata mentre il worker
  * calcolava) si ignorano: il nodo non si ricrea. Riscrivere lo stesso valore non genera patch —
@@ -55,11 +53,9 @@ export function applyLayout(family: Family, positions: LayoutPositions): Recipe 
     })
     if (entries.length === 0) return
 
-    const minX = Math.min(...entries.map(({ p }) => p.x))
-    const minY = Math.min(...entries.map(({ p }) => p.y))
     for (const { node, p } of entries) {
-      node.x = snap(p.x - minX + MARGIN)
-      node.y = snap(p.y - minY + MARGIN)
+      node.x = snap(p.x)
+      node.y = snap(p.y)
     }
   }
 }

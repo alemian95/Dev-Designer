@@ -61,11 +61,11 @@ describe("setCollapsed condiviso", () => {
 })
 
 describe("applyLayout condiviso", () => {
-  it("trasla dal minimo e ignora le posizioni di nodi che non esistono", () => {
+  it("scrive le posizioni ricevute, allineate alla griglia, e ignora le posizioni di nodi che non esistono", () => {
     const doc = docConDueNodi()
-    applyLayout("er", { cliente: { x: 500, y: 500 }, ordine: { x: 600, y: 500 }, fantasma: { x: 0, y: 0 } })(doc)
-    expect(doc.diagram.er.view.nodes["cliente"]).toEqual({ x: 40, y: 40, collapsed: false })
-    expect(doc.diagram.er.view.nodes["ordine"]).toEqual({ x: 140, y: 40, collapsed: false })
+    applyLayout("er", { cliente: { x: 13, y: 27 }, ordine: { x: 600, y: 500 }, fantasma: { x: 0, y: 0 } })(doc)
+    expect(doc.diagram.er.view.nodes["cliente"]).toEqual({ x: 10, y: 30, collapsed: false })
+    expect(doc.diagram.er.view.nodes["ordine"]).toEqual({ x: 600, y: 500, collapsed: false })
     expect(doc.diagram.er.view.nodes["fantasma"]).toBeUndefined()
   })
 
@@ -79,10 +79,10 @@ describe("applyLayout condiviso", () => {
       state().load(docConDueNodi())
     })
 
-    it("trasla a (40, 40) e allinea alla griglia da 10", () => {
+    it("scrive le posizioni ricevute, allineate alla griglia da 10", () => {
       expect(state().dispatch(applyLayout("er", positions))).toBe(true)
-      expect(view().nodes["cliente"]).toEqual({ x: 40, y: 40, collapsed: false })
-      expect(view().nodes["ordine"]).toEqual({ x: 240, y: 240, collapsed: false })
+      expect(view().nodes["cliente"]).toEqual({ x: 10, y: 10, collapsed: false })
+      expect(view().nodes["ordine"]).toEqual({ x: 210, y: 210, collapsed: false })
     })
 
     it("una sola voce di undo per tutto il layout", () => {
@@ -103,7 +103,7 @@ describe("applyLayout condiviso", () => {
       const withGhost: LayoutPositions = { ...positions, sparita: { x: 999, y: 999 } }
       expect(state().dispatch(applyLayout("er", withGhost))).toBe(true)
       expect(view().nodes["sparita"]).toBeUndefined()
-      expect(view().nodes["cliente"]).toEqual({ x: 40, y: 40, collapsed: false })
+      expect(view().nodes["cliente"]).toEqual({ x: 10, y: 10, collapsed: false })
     })
 
     it("nessuna posizione applicabile: nessuna modifica", () => {

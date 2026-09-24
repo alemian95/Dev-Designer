@@ -1,40 +1,28 @@
 import { useStore } from "zustand"
 import { fitToContent } from "@/editor/actions"
-import { applyLayout } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
-import { canvasOps, familyHasContent } from "@/editor/kinds/canvas-ops"
-import { familyOps } from "@/editor/kinds/ops"
-import { FAMILIES } from "@/model/family"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
+import { layoutAll } from "@/editor/layout-pack"
 import { layoutEngine } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
 
 /**
- * Dispone il diagramma: grafo → worker → una sola dispatch → vista adattata.
+ * Dispone il canvas: un layout per famiglia → blocchi in fila → una sola dispatch → vista adattata.
  *
- * Un fallimento del worker non tocca il documento: o arrivano le posizioni o non se ne applica
- * nessuna, perché un layout a metà è peggio di quello di prima. L'avviso passa dalla barra che
- * esiste già.
- *
- * Dispone una famiglia sola, la prima che ha contenuto: soluzione di transizione, il Task 6 la
- * sostituisce con il layout per blocchi di tutte le famiglie.
+ * Un fallimento del worker non tocca il documento: o arrivano le posizioni di tutte le famiglie o
+ * non se ne applica nessuna, perché un layout a metà è peggio di quello di prima. L'avviso passa
+ * dalla barra che esiste già.
  */
 export async function autoLayout(): Promise<void> {
   const session = documentSession.getState()
   if (session.layingOut || session.readOnly) return
-  const family = FAMILIES.find((f) => familyHasContent(documentStore.getState().doc, f))
-  if (!family) return
-  const graph = familyOps(documentStore.getState().doc, family).layoutGraph()
-  // Con meno di due nodi non c'è niente da disporre, e il pulsante è già disabilitato: questa è la
-  // guardia per la scorciatoia da tastiera, che non ha uno stato disabilitato.
-  if (graph.nodes.length < 2) return
+  // Guardia per la scorciatoia da tastiera, che non ha uno stato disabilitato.
+  if (canvasOps(documentStore.getState().doc).nodeKeys().length < 2) return
 
   documentSession.getState().patch({ layingOut: true })
   try {
-    const positions = await layoutEngine.layout(graph)
-    const ops = familyOps(documentStore.getState().doc, family)
-    documentStore.getState().dispatch(ops.layoutRecipe ? ops.layoutRecipe(positions) : applyLayout(family, positions))
-    // Anche se il layout non ha cambiato niente: la vista si adatta comunque, ed è ciò che
-    // l'utente ha chiesto premendo il pulsante.
+    const recipe = await layoutAll(documentStore.getState().doc, (g) => layoutEngine.layout(g))
+    if (recipe) documentStore.getState().dispatch(recipe)
     fitToContent()
   } catch {
     documentSession.getState().patch({ notice: "Non è stato possibile disporre il diagramma." })

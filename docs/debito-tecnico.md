@@ -1207,7 +1207,7 @@ famiglie (`doc.diagram = { er, class, flow }`), chiavi con prefisso `famiglia/` 
 Nessuno dei quattro tocca la correttezza del modello: sono margini di questo giro, non difetti
 scoperti dopo.
 
-- **Le bande delle corsie attraversano tutto il canvas, anche sotto entità e classi.**
+- **Le bande delle corsie possono passare sotto entità e classi.**
   `laneBandExtent` (`src/editor/flow/geometry.ts`) calcola x e larghezza dai soli nodi di flusso, con
   un margine e un minimo (`LANE_MIN_W`): finché «Disponi» non ha ancora messo le tre famiglie in fila
   — subito dopo aver creato un nodo di flusso vicino a un'entità o a una classe, per esempio — la
@@ -1233,8 +1233,9 @@ scoperti dopo.
   (`er`, `class`, `flow`), allineati in alto: non guarda se un arco collega un nodo di una famiglia a
   un nodo di un'altra — cosa che oggi non può succedere, «Collega» rifiuta un arco fra famiglie
   diverse — né se un utente vorrebbe due blocchi vicini per motivi che il documento non registra. Da
-  rivalutare quando esisteranno collegamenti fra famiglie diverse, se mai nasceranno: un layout che
-  ragionasse sulla vicinanza avrebbe bisogno di sapere cosa, fra due blocchi, li rende vicini.
+  rivalutare con lo step 4 della roadmap, i collegamenti tipizzati fra famiglie (spec del canvas
+  unificato, §1): un layout che ragionasse sulla vicinanza avrebbe bisogno di sapere cosa, fra due
+  blocchi, li rende vicini.
 
 ---
 

@@ -4,7 +4,7 @@ import { SCHEMA_VERSION } from "./shared"
 import { entityKey, ErModelSchema } from "./er/schema"
 
 describe("document schema", () => {
-  it("un documento ER nuovo è valido", () => {
+  it("un documento nuovo, con le tre famiglie vuote, è valido", () => {
     const doc = createDocument("Prova", "doc-1")
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
@@ -23,7 +23,7 @@ describe("document schema", () => {
     expect(ErModelSchema.safeParse(model).success).toBe(false)
   })
 
-  it("rifiuta un tipo di diagramma sconosciuto", () => {
+  it("rifiuta un documento il cui diagramma non ha le tre parti er, class e flow", () => {
     const doc = { ...createDocument("x", "id"), diagram: { type: "mindmap" } }
     expect(DocumentSchema.safeParse(doc).success).toBe(false)
   })

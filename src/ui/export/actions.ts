@@ -110,20 +110,20 @@ async function currentSvg(): Promise<string | null> {
   return buildSvg(documentStore.getState().doc, { vars: readLightVars(), fontFace: await loadFontFace() })
 }
 
-/** Esporta il diagramma come SVG. Non fa nulla se non c'è nessuna entità. */
+/** Esporta il diagramma come SVG. Non fa nulla se non c'è nessun nodo. */
 export async function exportSvg(): Promise<void> {
   const svg = await currentSvg()
   if (svg) download(documentFileName("svg"), svg, "image/svg+xml")
 }
 
-/** Esporta il diagramma come PNG a 2×. Non fa nulla se non c'è nessuna entità. */
+/** Esporta il diagramma come PNG a 2×. Non fa nulla se non c'è nessun nodo. */
 export async function exportPng(): Promise<void> {
   const svg = await currentSvg()
   if (svg) download(documentFileName("png"), await svgToPng(svg), "image/png")
 }
 
 /**
- * Copia il diagramma come PNG negli appunti. Non fa nulla se non c'è nessuna entità.
+ * Copia il diagramma come PNG negli appunti. Non fa nulla se non c'è nessun nodo.
  *
  * Dove `ClipboardItem` non esiste (contesto non sicuro, browser vecchi) si ricade sul download:
  * l'immagine si ottiene comunque, in un passo in più.
@@ -139,7 +139,7 @@ export function copyPng(): Promise<void> {
   // dell'utente è già finito quando `write` parte, e così font e rasterizzazione restano dentro il
   // gesto. Chrome accetta entrambe le forme.
   const png = currentSvg().then((svg) => {
-    if (!svg) throw new Error("PNG non generato: nessuna entità con una posizione")
+    if (!svg) throw new Error("PNG non generato: nessun nodo con una posizione")
     return svgToPng(svg)
   })
   return navigator.clipboard.write([new ClipboardItem({ "image/png": png })])

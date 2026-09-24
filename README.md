@@ -87,8 +87,8 @@ si perde niente.
 tre — ER, class diagram e flowchart, e tutti e tre convivono in un solo documento (`doc.diagram = {
 er, class, flow }`), non in tre file separati: `CanvasOps` smista ogni comando alla famiglia giusta
 leggendo il prefisso `famiglia/` con cui ogni chiave del canvas nasce (`er/…`, `class/…`, `flow/…`).
-La giuntura per aggiungerne un quarto esiste già (union sul tipo di diagramma, registro `kinds/`), ma
-il lavoro non è fatto.
+La giuntura per aggiungerne un quarto esiste già (una parte in più accanto a `er`, `class` e `flow` in
+`doc.diagram`, una voce in `FAMILIES` e nel registro `kinds/`), ma il lavoro non è fatto.
 
 **È uno strumento da desktop.** Il canvas disabilita i gesti touch del browser: su tablet e telefono
 non si usa. Sviluppato e collaudato su Chrome; su Firefox e Safari manca la File System Access API e

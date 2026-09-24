@@ -1,28 +1,11 @@
 import type { Dialect } from "@/io/ddl/schema"
+import { baseType } from "@/model/sql-type"
+
+// Ri-esportata: i test degli avvisi dell'export la importano da qui, e restano com'erano.
+export { baseType }
 
 /** Etichetta del dialetto nei messaggi all'utente. */
 export const DIALECT_LABEL: Record<Dialect, string> = { postgres: "PostgreSQL", mysql: "MySQL" }
-
-/**
- * Nome base del tipo, **solo** per il confronto con gli insiemi qui sotto: il tipo emesso resta
- * sempre la stringa del modello, intatta.
- *
- * Non si tronca al primo spazio perché i tipi a più parole esistono e sono quelli che contano:
- * `double precision` arriva così dall'adapter Postgres, `bigint(20) unsigned` da quello MySQL.
- *
- * Un letterale con una parentesi chiusa dentro — `enum('a)b')` — confonde il taglio delle
- * parentesi. Il risultato non corrisponde a nessun insieme e quindi non produce alcun avviso:
- * fallire in silenzio è il modo giusto di sbagliare, qui.
- */
-export function baseType(type: string): string {
-  return type
-    .toLowerCase()
-    .replaceAll(/\([^)]*\)/g, " ")
-    .replaceAll("[]", " ")
-    .replaceAll(/\b(?:unsigned|zerofill)\b/g, " ")
-    .replaceAll(/\s+/g, " ")
-    .trim()
-}
 
 /** Table 8.1 di `postgresql.org/docs/current/datatype.html`, nomi e alias. */
 const POSTGRES: ReadonlySet<string> = new Set([

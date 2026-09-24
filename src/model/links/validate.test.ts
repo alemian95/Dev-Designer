@@ -1,0 +1,94 @@
+import { describe, expect, it } from "vitest"
+import type { ClassAttribute } from "../class/schema"
+import { createDocument, type DevDocument } from "../document"
+import type { Attribute } from "../er/schema"
+import { validateLinks } from "./validate"
+
+const col = (name: string, type: string): Attribute => ({ name, type, primaryKey: false, foreignKey: false, nullable: false, unique: false })
+const attr = (name: string, type: string, isStatic = false): ClassAttribute => ({ name, type, visibility: "public", isStatic })
+
+/** Un'entità `ordini` e una classe `Ordine`, collegate da «mappa su» con id `l1`. */
+function documento(columns: Attribute[], attributes: ClassAttribute[]): DevDocument {
+  const doc = createDocument("t", "t")
+  doc.diagram.er.model.entities["ordini"] = { name: "ordini", attributes: columns }
+  doc.diagram.class.model.classes["Ordine"] = { name: "Ordine", stereotype: "class", attributes, methods: [] }
+  doc.diagram.links["l1"] = { kind: "maps-to", source: "class/Ordine", target: "er/ordini" }
+  return doc
+}
+
+describe("validateLinks", () => {
+  it("un documento senza collegamenti non ha problemi", () => {
+    expect(validateLinks(createDocument("x"))).toEqual([])
+  })
+
+  it("un attributo senza colonna è un avviso sul collegamento", () => {
+    expect(validateLinks(documento([col("id", "bigint")], [attr("note", "string")]))).toEqual([
+      { code: "link-attribute-missing", severity: "warning", message: "«Ordine.note» non ha una colonna in «ordini»", edge: "l1" },
+    ])
+  })
+
+  it("created_at e createdAt sono lo stesso campo", () => {
+    expect(validateLinks(documento([col("created_at", "timestamp")], [attr("createdAt", "Carbon")]))).toEqual([])
+  })
+
+  it("un attributo static non è una colonna", () => {
+    expect(validateLinks(documento([], [attr("tabella", "string", true)]))).toEqual([])
+  })
+
+  it("tipi incompatibili sono un avviso con i due tipi", () => {
+    expect(validateLinks(documento([col("totale", "numeric(10,2)")], [attr("totale", "string")]))).toEqual([
+      {
+        code: "link-type-mismatch",
+        severity: "warning",
+        message: "«Ordine.totale: string» non è compatibile con «ordini.totale numeric(10,2)»",
+        edge: "l1",
+      },
+    ])
+  })
+
+  it("tinyint accetta un bool", () => {
+    expect(validateLinks(documento([col("attivo", "tinyint(1)")], [attr("attivo", "bool")]))).toEqual([])
+  })
+
+  it("?int e int|null sono interi", () => {
+    expect(validateLinks(documento([col("n", "int")], [attr("n", "?int")]))).toEqual([])
+    expect(validateLinks(documento([col("n", "int")], [attr("n", "int|null")]))).toEqual([])
+  })
+
+  it("un tipo sconosciuto non avvisa", () => {
+    expect(validateLinks(documento([col("stato", "enum('a','b')")], [attr("stato", "StatoOrdine")]))).toEqual([])
+  })
+
+  it("un tipo che si chiama constructor non avvisa", () => {
+    // Review Focus 2: una tabella dei tipi su un oggetto letterale troverebbe `Object.prototype.constructor`.
+    expect(validateLinks(documento([col("x", "varchar")], [attr("x", "constructor")]))).toEqual([])
+    expect(validateLinks(documento([col("x", "toString")], [attr("x", "string")]))).toEqual([])
+  })
+
+  it("un collegamento pendente è un errore, senza avvisi sugli attributi", () => {
+    const doc = documento([], [attr("note", "string")])
+    delete doc.diagram.er.model.entities["ordini"]
+    expect(validateLinks(doc)).toEqual([
+      {
+        code: "link-dangling",
+        severity: "error",
+        message: "Il collegamento «mappa su» fra «Ordine» e «ordini» punta a un elemento che non esiste più",
+        edge: "l1",
+      },
+    ])
+  })
+
+  it("una classe con due «mappa su» è un errore sulla classe", () => {
+    const doc = documento([], [])
+    doc.diagram.er.model.entities["righe"] = { name: "righe", attributes: [] }
+    doc.diagram.links["l2"] = { kind: "maps-to", source: "class/Ordine", target: "er/righe" }
+    expect(validateLinks(doc)).toEqual([
+      {
+        code: "class-maps-multiple",
+        severity: "error",
+        message: "«Ordine» mappa su 2 tabelle: una classe si mappa su una tabella sola",
+        node: "class/Ordine",
+      },
+    ])
+  })
+})

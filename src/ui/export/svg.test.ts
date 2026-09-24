@@ -459,3 +459,36 @@ describe("buildSvg (flowchart)", () => {
     expect(buildSvg(docOf("flow", empty), { vars })).toBeNull()
   })
 })
+
+describe("collegamenti nell'export", () => {
+  /** Il diagramma ER di prova, una classe `Ordine` e un collegamento verso `ordini`. */
+  function conCollegamento(target = "er/ordini"): DevDocument {
+    const doc = docOf("er", diagram())
+    return {
+      ...doc,
+      diagram: {
+        ...doc.diagram,
+        class: {
+          model: { classes: { Ordine: { name: "Ordine", stereotype: "class", attributes: [], methods: [] } }, relations: {}, notes: {} },
+          view: { nodes: { Ordine: { x: 900, y: 200, collapsed: false } } },
+        },
+        links: { l1: { kind: "maps-to", source: "class/Ordine", target } },
+      },
+    }
+  }
+
+  it("i collegamenti stanno fra gli archi di famiglia e i nodi", () => {
+    const svg = buildSvg(conCollegamento(), { vars })!
+    const edges = svg.indexOf('data-layer="edges"')
+    const links = svg.indexOf('data-layer="links"')
+    const nodes = svg.indexOf('data-layer="nodes"')
+    expect(edges).toBeGreaterThan(-1)
+    expect(links).toBeGreaterThan(edges)
+    expect(nodes).toBeGreaterThan(links)
+    expect(svg).toContain('data-edge-id="link/l1"')
+  })
+
+  it("un collegamento pendente non si disegna", () => {
+    expect(buildSvg(conCollegamento("er/fantasma"), { vars })!).not.toContain('data-edge-id="link/l1"')
+  })
+})

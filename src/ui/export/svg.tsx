@@ -6,12 +6,13 @@ import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { laneBandExtent } from "@/editor/flow/geometry"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
-import { familyHasContent } from "@/editor/kinds/canvas-ops"
+import { canvasOps, familyHasContent } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
 import type { DevDocument } from "@/model/document"
 import { FAMILIES, type Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { LanesLayerView } from "@/ui/canvas/LanesLayer"
+import { LinkEdgeView } from "@/ui/canvas/LinkEdge"
 import { viewFor } from "@/ui/canvas/kinds/registry"
 
 /**
@@ -66,7 +67,8 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
 
 /**
  * Serializza il documento come SVG autoconsistente. Scorre le famiglie del documento nello stesso
- * ordine del canvas: le corsie sotto tutto, poi tutti gli archi, poi tutti i nodi.
+ * ordine del canvas: le corsie sotto tutto, poi tutti gli archi, poi i collegamenti fra famiglie,
+ * poi tutti i nodi.
  *
  * Una sezione per famiglia: `nodeKeys`/`rectOf`/`edgesTouching`/`edgeGeometry` di `DiagramOps`
  * (`@/editor/kinds/ops.ts`) danno chiavi, geometria e bounds senza sapere se il modello si chiama
@@ -133,6 +135,9 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
   const w = bounds.w + 2 * EXPORT_PADDING
   const h = bounds.h + 2 * EXPORT_PADDING
 
+  // Gli estremi dei collegamenti sono chiavi con prefisso, di famiglie diverse: li risolve `CanvasOps`.
+  const allOps = canvasOps(doc)
+
   // Le corsie sotto tutto, come nel canvas (`Canvas.tsx`: `LanesLayer` monta prima dei layer di
   // famiglia). Poi tutti gli archi sotto tutti i nodi. Il fondo sotto tutto: nell'app lo dipinge il
   // div attorno all'svg, quindi qui va aggiunto, altrimenti il PNG esce trasparente e il testo del
@@ -164,6 +169,15 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
             )
           }),
         )}
+      </g>
+      <g data-layer="links">
+        {Object.entries(doc.diagram.links).map(([id, link]) => {
+          const source = allOps.rectOf(link.source)
+          const target = allOps.rectOf(link.target)
+          // Un collegamento pendente non si disegna, come sul canvas.
+          if (!source || !target) return null
+          return <LinkEdgeView key={id} id={id} link={link} source={source} target={target} selected={false} />
+        })}
       </g>
       <g data-layer="nodes">
         {sections.flatMap((s) =>

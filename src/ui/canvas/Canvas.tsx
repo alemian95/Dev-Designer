@@ -5,6 +5,7 @@ import { FlowNodeEditor } from "./FlowNodeEditor"
 import { InlineEditor } from "./InlineEditor"
 import { viewFor } from "./kinds/registry"
 import { LanesLayer } from "./LanesLayer"
+import { LinksLayer } from "./LinkEdge"
 import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
 import { Overlay } from "./Overlay"
@@ -38,6 +39,8 @@ export function Canvas({ children }: { children?: ReactNode }) {
             const { EdgesLayer } = viewFor(f)
             return <EdgesLayer key={`edges-${f}`} />
           })}
+          {/* I collegamenti fra famiglie: sopra gli archi interni, sotto ogni nodo (spec 4a §6). */}
+          <LinksLayer />
           {FAMILIES.map((f) => {
             const { NodesLayer } = viewFor(f)
             return <NodesLayer key={`nodes-${f}`} />

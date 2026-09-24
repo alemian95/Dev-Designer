@@ -4,6 +4,7 @@ import { entitySize } from "@/editor/er/geometry"
 import { HEADER_H, MIN_W } from "@/editor/geometry"
 import type { Entity, Relationship } from "@/model/er/schema"
 import { EntityNodeView } from "./EntityNode"
+import { LinkEdgeView } from "./LinkEdge"
 import { RelationshipEdgeView } from "./RelationshipEdge"
 
 const entity: Entity = {
@@ -50,5 +51,26 @@ describe("RelationshipEdgeView", () => {
   it("identificante: linea continua", () => {
     const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={{ ...rel, identifying: true }} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} offset={0} />)
     expect(html).not.toContain("stroke-dasharray")
+  })
+})
+
+describe("LinkEdgeView", () => {
+  it("tratteggiato, con la chiave link/, l'etichetta e gli attributi dell'anteprima del drag", () => {
+    const html = renderToStaticMarkup(
+      <LinkEdgeView
+        id="l1"
+        link={{ kind: "maps-to", source: "class/Ordine", target: "er/ordini" }}
+        source={{ x: 0, y: 0, w: 100, h: 40 }}
+        target={{ x: 300, y: 0, w: 100, h: 40 }}
+        selected={false}
+      />,
+    )
+    expect(html).toContain('data-edge-id="link/l1"')
+    expect(html).toContain("data-edge-hit")
+    expect(html).toContain("data-edge-line")
+    expect(html).toContain("data-edge-target")
+    expect(html).toContain("data-edge-label")
+    expect(html).toContain('stroke-dasharray="6 4"')
+    expect(html).toContain(">mappa su<")
   })
 })

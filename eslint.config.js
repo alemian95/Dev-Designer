@@ -36,6 +36,14 @@ export default defineConfig([
     },
   },
   {
+    // `LinkEdge.tsx` esporta anche `LINK_LABEL`, la costante condivisa col pannello (Task 8): stessa
+    // ragione dell'override sopra, una sola definizione dell'etichetta invece di due file paralleli.
+    files: ['src/ui/canvas/LinkEdge.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     // Strato model: TypeScript puro. Solo zod.
     files: ['src/model/**/*.{ts,tsx}'],
     rules: {

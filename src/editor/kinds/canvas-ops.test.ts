@@ -3,6 +3,8 @@ import { createDocument } from "@/model/document"
 import { addEntity, addRelationship, removeAttribute } from "../commands/er"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
+import { splitKey } from "../families"
+import { flowDiagram } from "../flow-access"
 import { canvasOps, familyHasContent } from "./canvas-ops"
 
 const state = () => documentStore.getState()
@@ -85,6 +87,16 @@ describe("canvasOps (una famiglia)", () => {
       if (i.edge) expect(i.edge.startsWith("er/")).toBe(true)
     }
   })
+
+  it("un documento vuoto non ha problemi", () => {
+    expect(canvasOps(createDocument("x")).validate()).toEqual([])
+  })
+
+  it("un documento con sole entità non ha problemi di flusso", () => {
+    erConDueEntita()
+    const issues = canvasOps(state().doc).validate()
+    expect(issues.filter((i) => i.code.startsWith("flow-"))).toEqual([])
+  })
 })
 
 describe("familyHasContent", () => {
@@ -125,9 +137,14 @@ describe("canvasOps (famiglie mescolate)", () => {
     state().dispatch(entity.recipe)
     const node = canvasOps(state().doc).addNode({ x: 400, y: 40 }, "flow", "process")
     state().dispatch(node.recipe)
+    const flowKey = splitKey(node.key).key
+    const laneBefore = flowDiagram(state().doc).model.nodes[flowKey]!.lane
+    const xBefore = canvasOps(state().doc).rectOf(node.key)!.x
     const past = state().past.length
     state().dispatch(canvasOps(state().doc).commitDrag([entity.key, node.key], 20, 0)!)
     expect(state().past.length).toBe(past + 1)
     expect(canvasOps(state().doc).rectOf(entity.key)!.x).toBe(20)
+    expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(xBefore + 20)
+    expect(flowDiagram(state().doc).model.nodes[flowKey]!.lane).toBe(laneBefore)
   })
 })

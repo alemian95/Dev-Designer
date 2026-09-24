@@ -26,6 +26,7 @@ export interface CanvasOps {
   commitDrag(keys: readonly string[], dx: number, dy: number): Recipe | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
+  /** Solo le famiglie con contenuto: una famiglia vuota non ha problemi da segnalare. */
   validate(): Issue[]
 }
 
@@ -112,7 +113,7 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     },
 
     validate: () =>
-      FAMILIES.flatMap((f) =>
+      FAMILIES.filter((f) => familyHasContent(doc, f)).flatMap((f) =>
         ops(f)
           .validate()
           .map((issue) => ({

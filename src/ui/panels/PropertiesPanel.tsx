@@ -1,7 +1,7 @@
 import { useStore } from "zustand"
 import { splitKey } from "@/editor/families"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { useDiagramView, viewFor } from "@/ui/canvas/kinds/registry"
+import { useDocumentFamilies, viewFor } from "@/ui/canvas/kinds/registry"
 
 /**
  * Cornice, non contenuto: decide *se* c'è qualcosa da mostrare (esattamente un nodo o un arco
@@ -18,7 +18,7 @@ import { useDiagramView, viewFor } from "@/ui/canvas/kinds/registry"
  */
 export function PropertiesPanel() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const view = useDiagramView()
+  const families = useDocumentFamilies()
   const nodes = selectedKeys(selection, "node")
   const edges = selectedKeys(selection, "edge")
   const single = (nodes.length === 1 && edges.length === 0) || (edges.length === 1 && nodes.length === 0)
@@ -27,7 +27,8 @@ export function PropertiesPanel() {
     const { Properties } = viewFor(family)
     return <Properties />
   }
-  if (selection.size === 0 && view.EmptyProperties) return <view.EmptyProperties />
+  const Empty = families.map(viewFor).find((v) => v.EmptyProperties)?.EmptyProperties
+  if (selection.size === 0 && Empty) return <Empty />
   return (
     <p className="p-3 text-sm text-muted-foreground">
       {selection.size === 0 ? "Seleziona un elemento sul canvas." : `${selection.size} elementi selezionati`}

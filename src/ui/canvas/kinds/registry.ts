@@ -118,12 +118,6 @@ export function viewFor(family: Family): DiagramView {
   }
 }
 
-/** Hook: legge il tipo di diagramma corrente dallo store e ne ricava la vista. */
-export function useDiagramView(): DiagramView {
-  const type = useStore(documentStore, (s) => s.doc.diagram.type)
-  return viewFor(type)
-}
-
 /** Le famiglie del documento aperto (fase A: il suo tipo). Il Task 5 la sostituisce con `FAMILIES`. */
 export function useDocumentFamilies(): readonly Family[] {
   return useStore(documentStore, useShallow((s) => documentFamilies(s.doc)))

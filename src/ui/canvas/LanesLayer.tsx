@@ -1,6 +1,7 @@
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
+import { documentFamilies } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { laneBandExtent } from "@/editor/flow/geometry"
 import { PAD_X } from "@/editor/geometry"
@@ -60,17 +61,17 @@ const EMPTY_BANDS: Record<string, LaneView> = {}
  * non-flow non paga il giro su `laneBandExtent` a ogni cambiamento dello store.
  */
 export function LanesLayer() {
-  const type = useStore(documentStore, (s) => s.doc.diagram.type)
-  const lanes = useStore(documentStore, (s) => (s.doc.diagram.type === "flow" ? flowDiagram(s.doc).model.lanes : EMPTY_LANES))
-  const bands = useStore(documentStore, (s) => (s.doc.diagram.type === "flow" ? flowDiagram(s.doc).view.lanes : EMPTY_BANDS))
+  const hasFlow = useStore(documentStore, (s) => documentFamilies(s.doc).includes("flow"))
+  const lanes = useStore(documentStore, (s) => (documentFamilies(s.doc).includes("flow") ? flowDiagram(s.doc).model.lanes : EMPTY_LANES))
+  const bands = useStore(documentStore, (s) => (documentFamilies(s.doc).includes("flow") ? flowDiagram(s.doc).view.lanes : EMPTY_BANDS))
   // `useShallow`: `laneBandExtent` costruisce un oggetto nuovo a ogni chiamata, come `rectOf`
   // (`ClassEdge.tsx`) — senza, ogni cambiamento nel documento, anche fuori dalle corsie,
   // ridisegnerebbe le bande.
   const extent = useStore(
     documentStore,
-    useShallow((s) => (s.doc.diagram.type === "flow" ? laneBandExtent(flowDiagram(s.doc)) : { x: 0, w: 0 })),
+    useShallow((s) => (documentFamilies(s.doc).includes("flow") ? laneBandExtent(flowDiagram(s.doc)) : { x: 0, w: 0 })),
   )
 
-  if (type !== "flow") return null
+  if (!hasFlow) return null
   return <LanesLayerView lanes={lanes} bands={bands} x={extent.x} w={extent.w} />
 }

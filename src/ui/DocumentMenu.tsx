@@ -12,6 +12,7 @@ import { documentDb, documentIo } from "@/io/app-io"
 import type { RecentEntry } from "@/io/db"
 import { documentSession } from "@/io/document-session"
 import { readFile } from "@/io/file"
+import { useDocumentFamilies } from "./canvas/kinds/registry"
 import { CommitInput } from "./panels/CommitInput"
 import { requestOpen, UPLOAD_INPUT_ID } from "./document-actions"
 import { copyPng, exportPng, exportSvg } from "./export/lazy"
@@ -31,7 +32,7 @@ export function DocumentMenu() {
   const name = useStore(documentStore, (s) => s.doc.name)
   // L'import DDL è un'entrata solo ER (§2 della spec del class diagram): sulle classi la voce
   // resta ma non fa niente di sensato, quindi si disabilita come già succede in sola lettura.
-  const isEr = useStore(documentStore, (s) => s.doc.diagram.type === "er")
+  const isEr = useDocumentFamilies().includes("er")
   const docId = useStore(documentSession, (s) => s.docId)
   const dirty = useStore(documentSession, (s) => s.dirty)
   const readOnly = useStore(documentSession, (s) => s.readOnly)

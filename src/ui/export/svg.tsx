@@ -1,10 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server"
-import { opsFor } from "@/editor/kinds/ops"
+import { classDiagram } from "@/editor/class-access"
 import { edgeOffsets } from "@/editor/edge-routing"
-import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
+import { erDiagram } from "@/editor/er-access"
+import { documentFamilies, qualify } from "@/editor/families"
+import { flowDiagram } from "@/editor/flow-access"
 import { laneBandExtent } from "@/editor/flow/geometry"
-import type { Diagram } from "@/model/document"
-import { SCHEMA_VERSION } from "@/model/shared"
+import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
+import { familyOps } from "@/editor/kinds/ops"
+import type { DevDocument } from "@/model/document"
+import type { Family } from "@/model/family"
+import type { NodeView as NodeViewModel } from "@/model/shared"
 import { LanesLayerView } from "@/ui/canvas/LanesLayer"
 import { viewFor } from "@/ui/canvas/kinds/registry"
 
@@ -22,92 +27,105 @@ export interface BuildSvgOptions {
   fontFace?: string
 }
 
-/**
- * `opsFor` vuole un `DevDocument` intero, ma `erOps`/`classOps` (`@/editor/kinds/*.ts`) leggono
- * solo `.diagram`: nessuno dei due tocca `id`, `name` o `schemaVersion`. L'export non ha né gli
- * serve un documento intero: bastano segnaposto per i tre campi che `opsFor` non guarda.
- */
-function opsForDiagram(diagram: Diagram) {
-  return opsFor({ schemaVersion: SCHEMA_VERSION, id: "export", name: "export", diagram })
-}
-
-/** I nodi grezzi del modello, con nomi di campo diversi per tipo: vedi la nota sopra `buildSvg`. */
-function nodeModelsOf(diagram: Diagram): Record<string, unknown> {
-  switch (diagram.type) {
+/** I nodi grezzi di una famiglia: vedi la nota sopra `buildSvg`. */
+function nodeModelsOf(doc: DevDocument, family: Family): Record<string, unknown> {
+  switch (family) {
     case "er":
-      return diagram.model.entities
+      return erDiagram(doc).model.entities
     case "class":
-      return { ...diagram.model.classes, ...diagram.model.notes }
+      return { ...classDiagram(doc).model.classes, ...classDiagram(doc).model.notes }
     case "flow":
-      return diagram.model.nodes
+      return flowDiagram(doc).model.nodes
   }
 }
 
-/** Gli archi grezzi del modello, stessa ragione di `nodeModelsOf`. */
-function edgeModelsOf(diagram: Diagram): Record<string, unknown> {
-  switch (diagram.type) {
+/** Gli archi grezzi di una famiglia, stessa ragione di `nodeModelsOf`. */
+function edgeModelsOf(doc: DevDocument, family: Family): Record<string, unknown> {
+  switch (family) {
     case "er":
-      return diagram.model.relationships
+      return erDiagram(doc).model.relationships
     case "class":
-      return diagram.model.relations
+      return classDiagram(doc).model.relations
     case "flow":
-      return diagram.model.edges
+      return flowDiagram(doc).model.edges
+  }
+}
+
+/** Le view dei nodi di una famiglia: la forma è la stessa per tutte (`NodeViewSchema`). */
+function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewModel> {
+  switch (family) {
+    case "er":
+      return erDiagram(doc).view.nodes
+    case "class":
+      return classDiagram(doc).view.nodes
+    case "flow":
+      return flowDiagram(doc).view.nodes
   }
 }
 
 /**
- * Serializza il diagramma come SVG autoconsistente. Un renderer solo per entrambi i tipi di
- * diagramma, sopra la giuntura: `nodeKeys`/`rectOf`/`edgesTouching`/`edgeGeometry` di
- * `DiagramOps` (`@/editor/kinds/ops.ts`) danno chiavi, geometria e bounds senza sapere se il
- * modello si chiama `entities`/`classes` o `relationships`/`relations`; `NodeView`/`EdgeView` di
+ * Serializza il documento come SVG autoconsistente. Scorre le famiglie del documento nello stesso
+ * ordine del canvas: le corsie sotto tutto, poi tutti gli archi, poi tutti i nodi.
+ *
+ * Una sezione per famiglia: `nodeKeys`/`rectOf`/`edgesTouching`/`edgeGeometry` di `DiagramOps`
+ * (`@/editor/kinds/ops.ts`) danno chiavi, geometria e bounds senza sapere se il modello si chiama
+ * `entities`/`classes`/`nodes` o `relationships`/`relations`/`edges`; `NodeView`/`EdgeView` di
  * `DiagramView` (`@/ui/canvas/kinds`) sono le stesse viste pure che il canvas monta, guidate
  * dalle prop e non dallo store — `renderToStaticMarkup` costruisce l'albero fuori dal DOM di
  * React, in un contesto senza store da cui i layer sottoscritti potrebbero leggere.
  *
  * Resta un solo punto dove i nomi dei campi del modello contano — `nodeModelsOf`/`edgeModelsOf`
  * qui sopra — perché `DiagramOps` non espone i record grezzi (non è il suo lavoro: geometria e
- * comandi, non lettura del modello). `diagram.view.nodes` invece è già uniforme fra i due tipi
+ * comandi, non lettura del modello). `view.nodes` invece è già uniforme fra le famiglie
  * (`NodeViewSchema` condiviso, `model/shared.ts`), quindi non serve distinguerlo.
  *
  * Le corsie sono l'unica parte del flowchart che non passa da `DiagramOps`/`DiagramView`: sono un
  * terzo layer che solo il flowchart ha (spec §5), disegnato con `LanesLayerView` pura
  * (`@/ui/canvas/LanesLayer.tsx`) — la stessa che il canvas monta, così è garantito che la banda
- * sia identica nell'app e nell'export (Task 11). La sua estensione orizzontale viene da
- * `laneBandExtent` (`@/editor/flow/geometry.ts`), lo stesso calcolo che fa `LanesLayer`: un solo
- * punto, non due copie della formula che potrebbero divergere.
+ * sia identica nell'app e nell'export. La sua estensione orizzontale viene da `laneBandExtent`
+ * (`@/editor/flow/geometry.ts`), lo stesso calcolo che fa `LanesLayer`: un solo punto, non due
+ * copie della formula che potrebbero divergere.
  *
  * `null` se non c'è nessun nodo con una view: non c'è niente da esportare.
  */
-export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions): string | null {
-  const ops = opsForDiagram(diagram)
-  const { NodeView, EdgeView } = viewFor(diagram.type)
-  const nodeModels = nodeModelsOf(diagram)
-  const edgeModels = edgeModelsOf(diagram)
+export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions): string | null {
+  const families = documentFamilies(doc)
+  // Una sezione per famiglia: chiavi, rettangoli e archi restano senza prefisso, perché le viste
+  // pure di ogni famiglia li vogliono così (e il prefisso nei `data-*-id` lo mettono loro).
+  const sections = families.map((family) => {
+    const ops = familyOps(doc, family)
+    const keys = ops.nodeKeys()
+    const rects = new Map<string, Rect>()
+    for (const key of keys) {
+      const rect = ops.rectOf(key)
+      if (rect) rects.set(key, rect)
+    }
+    const edges = ops.edgesTouching(new Set(keys))
+    return {
+      family,
+      ops,
+      keys,
+      rects,
+      edges,
+      offsets: edgeOffsets(edges),
+      view: viewFor(family),
+      nodeModels: nodeModelsOf(doc, family),
+      edgeModels: edgeModelsOf(doc, family),
+      viewNodes: viewNodesOf(doc, family),
+    }
+  })
 
-  const keys = ops.nodeKeys()
-  const rects = new Map<string, Rect>()
-  for (const key of keys) {
-    const rect = ops.rectOf(key)
-    if (rect) rects.set(key, rect)
-  }
-
-  // Gli stessi estremi che il canvas dà a `edgeOffsets` dal proprio layer: l'export deve disegnare
-  // il fascio dov'è sullo schermo, non ricentrarlo perché lo calcola per conto proprio.
-  const edges = ops.edgesTouching(new Set(keys))
-  const offsets = edgeOffsets(edges)
-
-  // Le bande delle corsie entrano nei bounds insieme ai nodi: una corsia più alta dei suoi nodi, o
-  // vuota, non deve uscire tagliata dal viewBox (spec §10).
+  const flow = families.includes("flow") ? flowDiagram(doc) : null
+  const laneExtent = flow ? laneBandExtent(flow) : null
   const laneRects: Rect[] = []
-  const laneExtent = diagram.type === "flow" ? laneBandExtent(diagram) : null
-  if (diagram.type === "flow" && laneExtent) {
-    for (const lane of diagram.model.lanes) {
-      const band = diagram.view.lanes[lane.id]
+  if (flow && laneExtent) {
+    for (const lane of flow.model.lanes) {
+      const band = flow.view.lanes[lane.id]
       if (band) laneRects.push({ x: laneExtent.x, y: band.y, w: laneExtent.w, h: band.h })
     }
   }
 
-  const bounds = rectsBounds([...rects.values(), ...laneRects])
+  const bounds = rectsBounds([...sections.flatMap((s) => [...s.rects.values()]), ...laneRects])
   if (!bounds) return null
 
   const x = bounds.x - EXPORT_PADDING
@@ -115,36 +133,48 @@ export function buildSvg(diagram: Diagram, { vars, fontFace }: BuildSvgOptions):
   const w = bounds.w + 2 * EXPORT_PADDING
   const h = bounds.h + 2 * EXPORT_PADDING
 
-  // Le corsie sotto tutto, come nel canvas (`Canvas.tsx`: `LanesLayer` monta prima di
-  // `EdgesLayer`/`NodesLayer`). Poi gli archi sotto i nodi. Il fondo sotto tutto: nell'app lo
-  // dipinge il div attorno all'svg, quindi qui va aggiunto, altrimenti il PNG esce trasparente e
-  // il testo del tema chiaro diventa illeggibile su una pagina scura.
+  // Le corsie sotto tutto, come nel canvas (`Canvas.tsx`: `LanesLayer` monta prima dei layer di
+  // famiglia). Poi tutti gli archi sotto tutti i nodi. Il fondo sotto tutto: nell'app lo dipinge il
+  // div attorno all'svg, quindi qui va aggiunto, altrimenti il PNG esce trasparente e il testo del
+  // tema chiaro diventa illeggibile su una pagina scura.
   const body = renderToStaticMarkup(
     <>
       <rect data-background x={x} y={y} width={w} height={h} fill="var(--background)" />
-      {diagram.type === "flow" && laneExtent && (
-        <LanesLayerView lanes={diagram.model.lanes} bands={diagram.view.lanes} x={laneExtent.x} w={laneExtent.w} />
-      )}
+      {flow && laneExtent && <LanesLayerView lanes={flow.model.lanes} bands={flow.view.lanes} x={laneExtent.x} w={laneExtent.w} />}
       <g data-layer="edges">
-        {edges.map((edge) => {
-          const source = rects.get(edge.source)
-          const target = rects.get(edge.target)
-          const relation = edgeModels[edge.key]
-          // `edgeGeometry` verifica che l'arco esista davvero nel modello (torna null altrimenti,
-          // stessa guardia di `relation` qui sotto): la vista ricalcola comunque la propria
-          // geometria dalle prop, come già fa nel canvas.
-          if (!source || !target || !relation || !ops.edgeGeometry(edge.key, source, target)) return null
-          return <EdgeView key={edge.key} edgeKey={edge.key} relation={relation} source={source} target={target} selected={false} offset={offsets.get(edge.key) ?? 0} />
-        })}
+        {sections.flatMap((s) =>
+          s.edges.map((edge) => {
+            const source = s.rects.get(edge.source)
+            const target = s.rects.get(edge.target)
+            const relation = s.edgeModels[edge.key]
+            // `edgeGeometry` verifica che l'arco esista davvero nel modello (torna null altrimenti,
+            // stessa guardia di `relation` qui sotto): la vista ricalcola comunque la propria
+            // geometria dalle prop, come già fa nel canvas.
+            if (!source || !target || !relation || !s.ops.edgeGeometry(edge.key, source, target)) return null
+            return (
+              <s.view.EdgeView
+                key={qualify(s.family, edge.key)}
+                edgeKey={edge.key}
+                relation={relation}
+                source={source}
+                target={target}
+                selected={false}
+                offset={s.offsets.get(edge.key) ?? 0}
+              />
+            )
+          }),
+        )}
       </g>
       <g data-layer="nodes">
-        {keys.map((key) => {
-          const rect = rects.get(key)
-          const view = diagram.view.nodes[key]
-          const node = nodeModels[key]
-          if (!rect || !view || !node) return null
-          return <NodeView key={key} nodeKey={key} node={node} view={view} selected={false} />
-        })}
+        {sections.flatMap((s) =>
+          s.keys.map((key) => {
+            const rect = s.rects.get(key)
+            const view = s.viewNodes[key]
+            const node = s.nodeModels[key]
+            if (!rect || !view || !node) return null
+            return <s.view.NodeView key={qualify(s.family, key)} nodeKey={key} node={node} view={view} selected={false} />
+          }),
+        )}
       </g>
     </>,
   )

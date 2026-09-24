@@ -2,7 +2,7 @@ import { useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/geometry"
 import { FlowNodeEditor } from "./FlowNodeEditor"
 import { InlineEditor } from "./InlineEditor"
-import { useDiagramView } from "./kinds/registry"
+import { useDocumentFamilies, viewFor } from "./kinds/registry"
 import { LanesLayer } from "./LanesLayer"
 import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
@@ -17,9 +17,9 @@ export function Canvas({ children }: { children?: ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null)
   // L'hook osserva l'svg: aggiorna la dimensione del canvas nella sessione e invalida il rect in cache.
   useCanvasInteraction(svgRef)
-  // I layer vengono dal registro: con un solo tipo di diagramma sono sempre NodesLayer/EdgesLayer
-  // di `layers.tsx`, ma il canvas non lo sa più — legge `DiagramView`, non un modulo fisso.
-  const { NodesLayer, EdgesLayer } = useDiagramView()
+  // Le famiglie vengono dal registro: con una sola famiglia nel documento è sempre la stessa,
+  // ma il canvas non lo sa più — scorre `documentFamilies` e monta i layer di ognuna.
+  const families = useDocumentFamilies()
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
@@ -32,11 +32,17 @@ export function Canvas({ children }: { children?: ReactNode }) {
         <ViewportGroup>
           <rect data-canvas x={-GRID_EXTENT} y={-GRID_EXTENT} width={2 * GRID_EXTENT} height={2 * GRID_EXTENT} fill="url(#dd-grid)" />
           {/* Le corsie non sono un `DiagramView.NodesLayer`: sono un terzo layer che solo il
-              flowchart popola (spec §5). `LanesLayer` verifica da sé il tipo di diagramma e torna
-              `null` sugli altri (Task 11) — il canvas non lo sa più, legge solo `DiagramView`. */}
+              flowchart popola (spec §5). `LanesLayer` decide da sé se montarsi. */}
           <LanesLayer />
-          <EdgesLayer />
-          <NodesLayer />
+          {/* Tutti gli archi sotto tutti i nodi: un arco ER non deve coprire una classe (spec §5). */}
+          {families.map((f) => {
+            const { EdgesLayer } = viewFor(f)
+            return <EdgesLayer key={`edges-${f}`} />
+          })}
+          {families.map((f) => {
+            const { NodesLayer } = viewFor(f)
+            return <NodesLayer key={`nodes-${f}`} />
+          })}
           {children}
           <Overlay />
         </ViewportGroup>

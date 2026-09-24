@@ -7,6 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { importEr } from "@/editor/commands/import"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
+import { documentFamilies } from "@/editor/families"
 import { detectDialect } from "@/io/ddl/detect"
 import { mapToEr } from "@/io/ddl/map"
 import { createParser, type DdlParser } from "@/io/ddl/parse-client"
@@ -95,7 +96,7 @@ export function ImportDdlDialog({ open, onOpenChange }: { open: boolean; onOpenC
   const doc = useStore(documentStore, (s) => s.doc)
   // `erDiagram` solleva su un documento di classi: l'import DDL è un'entrata solo ER (§2 della
   // spec del class diagram), quindi qui non c'è nulla di "già presente" da segnalare.
-  const present = new Set(doc.diagram.type === "er" ? Object.keys(erDiagram(doc).model.entities) : [])
+  const present = new Set(documentFamilies(doc).includes("er") ? Object.keys(erDiagram(doc).model.entities) : [])
   // Iscrizione, non lettura una tantum: la sola lettura può sopravvenire mentre il dialog è aperto
   // (un'altra scheda prende il controllo), e lo stato deve reagire, non essere letto una sola volta.
   const readOnly = useStore(documentSession, (s) => s.readOnly)

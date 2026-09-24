@@ -124,3 +124,8 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       ),
   }
 }
+
+/** La famiglia ha almeno un nodo. È la sola definizione di «ha contenuto»: export, menu e documento la usano. */
+export function familyHasContent(doc: DevDocument, family: Family): boolean {
+  return familyOps(doc, family).nodeKeys().length > 0
+}

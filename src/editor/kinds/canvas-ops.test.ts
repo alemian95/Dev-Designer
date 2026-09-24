@@ -3,7 +3,7 @@ import { createErDocument } from "@/model/er/schema"
 import { addEntity, addRelationship, removeAttribute } from "../commands/er"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
-import { canvasOps } from "./canvas-ops"
+import { canvasOps, familyHasContent } from "./canvas-ops"
 
 const state = () => documentStore.getState()
 
@@ -85,5 +85,13 @@ describe("canvasOps (una famiglia)", () => {
       if (i.node) expect(i.node.startsWith("er/")).toBe(true)
       if (i.edge) expect(i.edge.startsWith("er/")).toBe(true)
     }
+  })
+})
+
+describe("familyHasContent", () => {
+  it("è vero quando la famiglia ha almeno un nodo", () => {
+    expect(familyHasContent(state().doc, "er")).toBe(false)
+    erConDueEntita()
+    expect(familyHasContent(state().doc, "er")).toBe(true)
   })
 })

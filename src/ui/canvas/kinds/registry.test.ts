@@ -6,15 +6,15 @@ import { canvasTools, LINK_TOOL, toolId, viewFor } from "./registry"
 
 /**
  * Fissa il dispatch del registro: la revisione del Task 6 ha lasciato una voce ⚠️ perché nessun
- * test unitario copriva `viewFor`/`useDiagramView`, e la lacuna diventa portante esattamente
- * quando arriva un secondo tipo di diagramma (questo task). Senza questo test, un futuro terzo
- * tipo potrebbe rompere silenziosamente il dispatch dei due esistenti — es. `viewFor` che torna
- * la stessa vista per due tipi diversi, o `tools`/`textFormats` scambiati fra loro.
+ * test unitario copriva `viewFor`, e la lacuna diventa portante esattamente quando arriva un
+ * secondo tipo di diagramma (questo task). Senza questo test, un futuro terzo tipo potrebbe
+ * rompere silenziosamente il dispatch dei due esistenti — es. `viewFor` che torna la stessa vista
+ * per due tipi diversi, o `tools`/`textFormats` scambiati fra loro.
  *
- * Solo `viewFor`, non `useDiagramView`: l'hook è un `useStore` sottile sopra `viewFor`, e
- * verificato che `react-dom/server` non è la sede giusta per provarlo — durante `renderToStaticMarkup`
+ * Solo `viewFor`, non `useDocumentFamilies`: l'hook è un `useStore` sottile sopra `documentFamilies`,
+ * e verificato che `react-dom/server` non è la sede giusta per provarlo — durante `renderToStaticMarkup`
  * (nessuna finestra, quindi un render SSR) `useSyncExternalStore` legge `getInitialState()`, non lo
- * stato corrente dopo un `.load()`: il test tornerebbe sempre lo stesso tipo, qualunque documento si
+ * stato corrente dopo un `.load()`: il test tornerebbe sempre lo stesso documento, qualunque se ne
  * carichi prima, e passerebbe anche se il dispatch dell'hook fosse rotto. È la stessa ragione per
  * cui `render.test.tsx` testa solo viste pure guidate dalle prop, mai componenti agganciati allo store.
  */

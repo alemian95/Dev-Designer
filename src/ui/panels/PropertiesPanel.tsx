@@ -13,11 +13,11 @@ import { FlowLanesPanel } from "./FlowProperties"
  * dipende dal tipo, quindi resta qui, con una frase unica: da quando gli strumenti sono per famiglia (Task 2) e
  * «Collega» è comune a tutte, non c'è più un'etichetta di nodo/arco singola da comporre per tipo.
  *
- * **Selezione vuota**: se il flusso ha almeno un nodo, il pannello è quello delle corsie
- * (`FlowLanesPanel`, spec §11), che compare insieme alle bande sul canvas (`LanesLayer`): le
- * corsie esistono sempre nel modello, ma si vedono solo quando c'è un nodo di flusso. Altrimenti
- * resta la frase generica. Una selezione **multipla** non lo monta comunque: resta sulla frase
- * generica, come oggi.
+ * **Selezione vuota**: la frase generica c'è sempre (spec §10), e se il flusso ha almeno un nodo
+ * sotto di lei compare anche il pannello delle corsie (`FlowLanesPanel`, spec §11), nello stesso
+ * ordine in cui compaiono le bande sul canvas (`LanesLayer`): le corsie esistono sempre nel
+ * modello, ma si vedono solo quando c'è un nodo di flusso. Una selezione **multipla** non monta
+ * mai le corsie: resta sulla sola frase generica, come oggi.
  */
 export function PropertiesPanel() {
   const selection = useStore(sessionStore, (s) => s.selection)
@@ -30,10 +30,12 @@ export function PropertiesPanel() {
     const { Properties } = viewFor(family)
     return <Properties />
   }
-  if (selection.size === 0 && hasFlowNodes) return <FlowLanesPanel />
   return (
-    <p className="p-3 text-sm text-muted-foreground">
-      {selection.size === 0 ? "Seleziona un elemento sul canvas." : `${selection.size} elementi selezionati`}
-    </p>
+    <>
+      <p className="p-3 text-sm text-muted-foreground">
+        {selection.size === 0 ? "Seleziona un elemento sul canvas." : `${selection.size} elementi selezionati`}
+      </p>
+      {selection.size === 0 && hasFlowNodes && <FlowLanesPanel />}
+    </>
   )
 }

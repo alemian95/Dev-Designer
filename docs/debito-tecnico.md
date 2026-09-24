@@ -1200,6 +1200,42 @@ dimenticanza.
   «Disponi», e una vista che non inquadra una corsia larga o vuota fino al
   primo zoom manuale — nessuno dei due perde un dato.
 
+### Canvas unificato (2026-09-24)
+
+Limiti accettati scrivendo il primo giro del canvas unificato — un solo documento con le tre
+famiglie (`doc.diagram = { er, class, flow }`), chiavi con prefisso `famiglia/` in tutto lo stack.
+Nessuno dei quattro tocca la correttezza del modello: sono margini di questo giro, non difetti
+scoperti dopo.
+
+- **Le bande delle corsie attraversano tutto il canvas, anche sotto entità e classi.**
+  `laneBandExtent` (`src/editor/flow/geometry.ts`) calcola x e larghezza dai soli nodi di flusso, con
+  un margine e un minimo (`LANE_MIN_W`): finché «Disponi» non ha ancora messo le tre famiglie in fila
+  — subito dopo aver creato un nodo di flusso vicino a un'entità o a una classe, per esempio — la
+  banda può disegnarsi sopra un nodo di un'altra famiglia, che non le appartiene e non dovrebbe
+  starci sotto. Un passo dedicato a restringere l'estensione della banda a ciò che effettivamente
+  condivide lo spazio col resto del documento risolverebbe il caso, ma non è stato scritto in questo
+  giro.
+- **Il pannello delle corsie compare solo dal primo nodo di flusso, quindi non si possono preparare
+  le corsie prima.** `FlowLanesPanel` (`src/ui/panels/FlowProperties.tsx`) e le sue bande
+  (`LanesLayer`) seguono entrambi `familyHasContent(doc, "flow")` (spec §5, §10): chi vuole disegnare
+  un flowchart deve prima piazzare una forma qualsiasi con lo strumento, e solo allora può nominare o
+  aggiungere corsie. Le corsie esistono comunque nel modello fin dalla creazione del documento
+  (`lanes` è `.min(1)`), quindi non è un dato mancante — è un ordine di lavoro imposto dall'interfaccia
+  che un utente abituato a preparare prima la struttura di un diagramma potrebbe non aspettarsi.
+- **Due note, quella di classe e quella di flusso, restano due implementazioni separate.** Lo stesso
+  editor di testo aperto dalla creazione (spec §7) e la stessa forma concettuale — un rettangolo di
+  testo libero, senza campi — vivono in due schemi e due componenti che non condividono codice al di
+  là delle primitive comuni del canvas. Unificarle chiederebbe di far emergere una nozione di «nota»
+  comune alle famiglie, che oggi non esiste e che nessuna delle due sole occorrenze giustifica da
+  sola (DRY: due copie non sono ancora una duplicazione da correggere).
+- **«Disponi» mette le famiglie in fila senza ragionare sulla vicinanza.** `packBlocks`
+  (`src/editor/layout-pack.ts`) impacchetta i blocchi da sinistra a destra nell'ordine canonico
+  (`er`, `class`, `flow`), allineati in alto: non guarda se un arco collega un nodo di una famiglia a
+  un nodo di un'altra — cosa che oggi non può succedere, «Collega» rifiuta un arco fra famiglie
+  diverse — né se un utente vorrebbe due blocchi vicini per motivi che il documento non registra. Da
+  rivalutare quando esisteranno collegamenti fra famiglie diverse, se mai nasceranno: un layout che
+  ragionasse sulla vicinanza avrebbe bisogno di sapere cosa, fra due blocchi, li rende vicini.
+
 ---
 
 ## Perduto

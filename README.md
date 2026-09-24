@@ -1,6 +1,6 @@
 # Dev Designer
 
-Editor web di diagrammi per sviluppatori: **ER**, **UML class diagram** e **flowchart**.
+Editor web di diagrammi per sviluppatori: entità **ER**, **classi UML** e **flowchart** sullo stesso canvas, ognuno con le sue regole.
 
 Nessun backend, nessun account, niente da configurare: il documento vive nel browser e si apre e si
 salva come file, come in un editor di testo. Il deploy è automatico su Vercel a ogni push su
@@ -68,11 +68,13 @@ si perde niente.
 
 ## Scorciatoie
 
-| | |
+| Tasti | Strumento |
 |---|---|
-| `V` · `E` · `R` | selezione (ogni tipo) · entità · relazione (ER) |
-| `C` · `I` · `E` · `R` · `N` | classe · interfaccia · enum · relazione · nota (class diagram) |
-| `1`..`6` · `R` | forma del nodo di flowchart (terminale, processo, decisione, input/output, sottoprocesso, nota) · arco |
+| `V` | selezione |
+| `E` | entità (ER) |
+| `C` · `I` · `U` · `N` | classe · interfaccia · enum · nota di classe |
+| `1`..`6` | forme del flusso (terminale, processo, decisione, input/output, sottoprocesso, nota) |
+| `R` | Collega: il tipo di arco dipende dagli estremi |
 | `F` · `L` | inquadra tutto · disponi |
 | `⌘Z` · `⇧⌘Z` / `⌘Y` · `⌘D` · `⌫` | annulla · ripeti · duplica · elimina |
 | `⌘S` · `⇧⌘S` · `⌘O` | salva · salva con nome · apri |
@@ -82,8 +84,11 @@ si perde niente.
 ## Limiti noti
 
 **Non c'è il sequence diagram.** La spec originale prevedeva quattro tipi: ne sono stati consegnati
-tre — ER, class diagram e flowchart. La giuntura per aggiungerne un quarto esiste già (union sul tipo
-di diagramma, registro `kinds/`), ma il lavoro non è fatto.
+tre — ER, class diagram e flowchart, e tutti e tre convivono in un solo documento (`doc.diagram = {
+er, class, flow }`), non in tre file separati: `CanvasOps` smista ogni comando alla famiglia giusta
+leggendo il prefisso `famiglia/` con cui ogni chiave del canvas nasce (`er/…`, `class/…`, `flow/…`).
+La giuntura per aggiungerne un quarto esiste già (union sul tipo di diagramma, registro `kinds/`), ma
+il lavoro non è fatto.
 
 **È uno strumento da desktop.** Il canvas disabilita i gesti touch del browser: su tablet e telefono
 non si usa. Sviluppato e collaudato su Chrome; su Firefox e Safari manca la File System Access API e
@@ -167,11 +172,11 @@ significano niente. Il deploy su Vercel parte dal push: perché aspetti la CI va
 ### Test end-to-end
 
 ```bash
-pnpm e2e       # otto scenari provati in un browser vero
+pnpm e2e       # nove scenari provati in un browser vero
 ```
 
 Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
-condivisi dagli otto scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock fra
+condivisi dai nove scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock fra
 schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a vicenda) —
 ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
 
@@ -211,10 +216,16 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   posizione e corsia sono un passo unico di undo (spec §6), ed è la sola asserzione di tutta la
   suite che li controlla insieme — e infine esporta in Mermaid e verifica che compaiano una
   `subgraph`, un rombo `{"…"}` e l'etichetta sull'arco.
+- **Canvas misto**: crea un'entità, una classe e un nodo di flusso nello stesso documento e verifica
+  che le chiavi del DOM portino il prefisso di famiglia, che «Collega» fra un'entità e una classe non
+  crei niente mentre dentro la stessa famiglia colleghi (una seconda entità), che il documento misto
+  sopravviva a un ricaricamento, che «Disponi» metta le tre famiglie in fila da sinistra a destra
+  senza sovrapposizioni, e che «Esporta testo…» offra i formati di tutte e tre — PostgreSQL, MySQL,
+  Mermaid ER, Mermaid classi, Mermaid flowchart.
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno degli otto scenari non regge.
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei nove scenari non regge.
 
 ### Misura prestazioni
 

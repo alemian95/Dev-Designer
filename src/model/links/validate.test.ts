@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { ClassAttribute } from "../class/schema"
+import type { ClassAttribute, Stereotype } from "../class/schema"
 import { createDocument, type DevDocument } from "../document"
 import type { Attribute } from "../er/schema"
 import { validateLinks } from "./validate"
@@ -7,11 +7,11 @@ import { validateLinks } from "./validate"
 const col = (name: string, type: string): Attribute => ({ name, type, primaryKey: false, foreignKey: false, nullable: false, unique: false })
 const attr = (name: string, type: string, isStatic = false): ClassAttribute => ({ name, type, visibility: "public", isStatic })
 
-/** Un'entità `ordini` e una classe `Ordine`, collegate da «mappa su» con id `l1`. */
-function documento(columns: Attribute[], attributes: ClassAttribute[]): DevDocument {
+/** Un'entità `ordini` e una classe `Ordine` (di serie `class`, salvo indicazione), collegate da «mappa su» con id `l1`. */
+function documento(columns: Attribute[], attributes: ClassAttribute[], stereotype: Stereotype = "class"): DevDocument {
   const doc = createDocument("t", "t")
   doc.diagram.er.model.entities["ordini"] = { name: "ordini", attributes: columns }
-  doc.diagram.class.model.classes["Ordine"] = { name: "Ordine", stereotype: "class", attributes, methods: [] }
+  doc.diagram.class.model.classes["Ordine"] = { name: "Ordine", stereotype, attributes, methods: [] }
   doc.diagram.links["l1"] = { kind: "maps-to", source: "class/Ordine", target: "er/ordini" }
   return doc
 }
@@ -76,6 +76,33 @@ describe("validateLinks", () => {
         edge: "l1",
       },
     ])
+  })
+
+  it("una classe interface collegata è un errore, senza avvisi sugli attributi", () => {
+    // F1 (review finale): la regola «solo class e abstract» torna a valere anche dopo il collegamento.
+    expect(validateLinks(documento([], [attr("note", "string")], "interface"))).toEqual([
+      {
+        code: "link-unmappable",
+        severity: "error",
+        message: "«Ordine»: Un'interfaccia non si mappa su una tabella.",
+        edge: "l1",
+      },
+    ])
+  })
+
+  it("una classe enum collegata dà il messaggio dell'enum", () => {
+    expect(validateLinks(documento([], [], "enum"))).toEqual([
+      {
+        code: "link-unmappable",
+        severity: "error",
+        message: "«Ordine»: Un enum non si mappa su una tabella.",
+        edge: "l1",
+      },
+    ])
+  })
+
+  it("una classe abstract collegata non ha problemi", () => {
+    expect(validateLinks(documento([], [], "abstract"))).toEqual([])
   })
 
   it("una classe con due «mappa su» è un errore sulla classe", () => {

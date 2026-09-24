@@ -7,11 +7,9 @@ import type { Rect } from "@/editor/geometry"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { linkGeometry } from "@/editor/links/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
-import type { Link, LinkKind } from "@/model/links/schema"
+import type { Link } from "@/model/links/schema"
 import { registerEdge } from "./dom-registry"
-
-/** L'etichetta di ogni tipo, sul canvas e (con l'iniziale maiuscola) nel pannello. */
-export const LINK_LABEL: Record<LinkKind, string> = { "maps-to": "mappa su" }
+import { LINK_LABEL } from "./link-label"
 
 interface Props {
   id: string

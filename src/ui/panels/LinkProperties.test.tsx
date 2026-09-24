@@ -45,6 +45,18 @@ describe("pannello del collegamento", () => {
     expect(container.textContent).toContain("«Ordine.note» non ha una colonna in «ordini»")
   })
 
+  it("mostra anche l'errore della classe («class-maps-multiple») aprendo uno dei due collegamenti", () => {
+    // F2 (review finale): il filtro dei problemi include anche quelli sulla classe sorgente.
+    act(() => {
+      documentStore.getState().dispatch((draft) => {
+        draft.diagram.er.model.entities["righe"] = { name: "righe", attributes: [] }
+        draft.diagram.er.view.nodes["righe"] = { x: 800, y: 0, collapsed: false }
+        draft.diagram.links["l2"] = { kind: "maps-to", source: "class/Ordine", target: "er/righe" }
+      })
+    })
+    expect(container.textContent).toContain("«Ordine» mappa su 2 tabelle: una classe si mappa su una tabella sola")
+  })
+
   it("«Elimina collegamento» lo toglie dal documento e svuota la selezione", () => {
     const button = [...container.querySelectorAll("button")].find((b) => b.textContent === "Elimina collegamento")!
     act(() => button.click())

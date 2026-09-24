@@ -5,7 +5,7 @@ import { deleteSelection } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
 import { splitKey } from "@/editor/families"
 import { validateLinks } from "@/model/links/validate"
-import { LINK_LABEL } from "@/ui/canvas/LinkEdge"
+import { LINK_LABEL } from "@/ui/canvas/link-label"
 
 /**
  * Il pannello di un collegamento fra famiglie (spec 4a §7): il tipo, i due estremi, i problemi di quel
@@ -16,7 +16,9 @@ import { LINK_LABEL } from "@/ui/canvas/LinkEdge"
 export function LinkProperties({ linkId: id }: { linkId: string }) {
   const link = useStore(documentStore, (s) => s.doc.diagram.links[id])
   const doc = useStore(documentStore, (s) => s.doc)
-  const issues = useMemo(() => validateLinks(doc).filter((i) => i.edge === id), [doc, id])
+  // Anche il problema sulla classe sorgente (`class-maps-multiple`, `node`) compare qui: aprendo uno
+  // dei due collegamenti di una classe che ne ha troppi, si vede subito perché (F2, review finale).
+  const issues = useMemo(() => validateLinks(doc).filter((i) => i.edge === id || i.node === link?.source), [doc, id, link?.source])
   if (!link) return null
   return (
     <div className="flex flex-col gap-3 p-3">

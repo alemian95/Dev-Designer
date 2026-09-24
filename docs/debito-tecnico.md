@@ -53,6 +53,29 @@ DT-29 è del 2026-09-21 come le precedenti tre, ma viene dal giro delle note
 ancorate e chiude le due voci d'Archivio sull'ancoraggio e sul layout delle
 note, il cui rimedio comune si è rivelato essere un arco, non un campo nuovo.
 
+DT-30 è del 2026-09-24, dalla review finale del piano dei collegamenti
+tipizzati fra famiglie (`.superpowers/sdd/2026-09-24-collegamenti-tipizzati/`):
+un limite noto della tabella dei tipi, lasciato aperto perché il caso che lo
+tocca non si è ancora presentato.
+
+### DT-30 · `char`/`character` danno solo la categoria string: un uuid MySQL può produrre un falso `link-type-mismatch`
+
+La tabella dei tipi SQL di
+[types.ts](../src/model/links/types.ts:32) mette `char`/`character` (con
+`varchar` e gli altri tipi testuali) nella sola categoria `string`. In
+PostgreSQL non è un problema: chi vuole un uuid usa il tipo nativo `uuid`, già
+mappato su `["uuid", "string"]`. In MySQL, che non ha un tipo uuid nativo, la
+convenzione comune è una colonna `char(36)`: una classe con un attributo
+`uuid` collegata a quella colonna riceve un `link-type-mismatch` («non è
+compatibile»), anche se il valore che ci finisce dentro è esattamente un uuid.
+
+Non si corregge ora perché nessuna fixture né il dump reale importato finora
+(Chamilo, DT-26/DT-27) usa questa convenzione: aggiungerla sulla fiducia
+rischierebbe l'errore opposto, un vero mismatch fra un `char` generico e un
+`uuid` che passa silenzioso. Si corregge dando a `char`/`character`
+`["string", "uuid"]` — la stessa forma di `json`/`jsonb`, poco sopra nella
+stessa mappa — quando un caso reale lo chiede.
+
 ---
 
 ## Corretti

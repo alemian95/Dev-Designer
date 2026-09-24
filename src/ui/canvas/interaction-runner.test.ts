@@ -335,6 +335,15 @@ describe("Collega fra famiglie", () => {
     expect(sessionStore.getState().tool).toBe("select")
   })
 
+  it("un collegamento riuscito toglie l'avviso di un rifiuto precedente", () => {
+    // T6 (review finale): un Collega riuscito fra famiglie non deve lasciare a schermo l'avviso di un
+    // rifiuto precedente dello stesso strumento.
+    collega(qualify("class", "Pagabile"), qualify("er", "ordini"))
+    expect(documentSession.getState().notice).toBe("Un'interfaccia non si mappa su una tabella.")
+    collega(qualify("class", "Ordine"), qualify("er", "ordini"))
+    expect(documentSession.getState().notice).toBeNull()
+  })
+
   it("un collegamento già presente si seleziona, senza un passo di annulla in più", () => {
     collega(qualify("class", "Ordine"), qualify("er", "ordini"))
     const past = documentStore.getState().past.length

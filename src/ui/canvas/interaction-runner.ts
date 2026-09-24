@@ -1,4 +1,5 @@
 import { documentStore } from "@/editor/document-store"
+import { linkId } from "@/editor/families"
 import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
 import { IDLE, reduce, type Effect, type InteractionEvent, type Mode } from "@/editor/interaction"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
@@ -210,6 +211,10 @@ export function createInteractionRunner(): InteractionRunner {
           break
         }
         if (result.type === "created") documentStore.getState().dispatch(result.recipe)
+        // Un collegamento riuscito fra famiglie toglie un eventuale rifiuto precedente dello stesso
+        // strumento: la chiave del risultato è `link/…` solo per un collegamento fra famiglie, mai per
+        // un arco dentro una famiglia (spec 4a §4, T6 della review finale).
+        if (linkId(result.key) !== null) documentSession.getState().patch({ notice: null })
         session().setSelection([selId("edge", result.key)])
         session().setTool("select")
         break

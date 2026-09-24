@@ -1,6 +1,6 @@
-import type { Stereotype } from "@/model/class/schema"
 import type { DevDocument } from "@/model/document"
 import type { Family } from "@/model/family"
+import { unmappableNotice } from "@/model/links/mappable"
 import { linkRule, type Link, type LinkKind } from "@/model/links/schema"
 import { classDiagram } from "../class-access"
 import type { Recipe } from "../document-store"
@@ -16,13 +16,11 @@ export type ConnectResult =
 /** Come si nomina un nodo di ogni famiglia nell'avviso di rifiuto. */
 const FAMILY_NOUN: Record<Family, string> = { er: "un'entità", class: "una classe", flow: "un nodo di flusso" }
 
-/** Gli stereotipi che non si persistono in una tabella. `class` e `abstract` possono avere «mappa su». */
-const UNMAPPABLE: Partial<Record<Stereotype, string>> = {
-  interface: "Un'interfaccia non si mappa su una tabella.",
-  enum: "Un enum non si mappa su una tabella.",
-}
-
-/** Il motivo per cui un estremo non ammette il tipo, o `null` se lo ammette. `source` è già nel verso del tipo. */
+/**
+ * Il motivo per cui un estremo non ammette il tipo, o `null` se lo ammette. `source` è già nel verso
+ * del tipo. La regola «solo class e abstract» vive nel modello (`unmappableNotice`, review finale F1):
+ * qui la si usa per l'avviso, e `validateLinks` la stessa fonte per l'errore `link-unmappable`.
+ */
 function refusal(doc: DevDocument, kind: LinkKind, source: string): string | null {
   switch (kind) {
     case "maps-to": {
@@ -30,7 +28,7 @@ function refusal(doc: DevDocument, kind: LinkKind, source: string): string | nul
       const cls = classDiagram(doc).model.classes[key]
       // Nella famiglia `class` un nodo che non è una classe è una nota.
       if (!cls) return "Una nota non si mappa su una tabella."
-      return UNMAPPABLE[cls.stereotype] ?? null
+      return unmappableNotice(cls.stereotype)
     }
   }
 }

@@ -1,6 +1,7 @@
 import type { DevDocument } from "../document"
 import { splitKey } from "../family"
 import type { Issue } from "../issue"
+import { unmappableNotice } from "./mappable"
 import { typesCompatible } from "./types"
 
 /** Nome di attributo o di colonna nella forma di confronto: `createdAt`, `created_at` e `CreatedAt` coincidono. */
@@ -34,6 +35,14 @@ export function validateLinks(doc: DevDocument): Issue[] {
       continue
     }
     bySource.set(link.source, (bySource.get(link.source) ?? 0) + 1)
+    // La regola «solo class e abstract» (F1, review finale): una classe collegata che non si mappa su
+    // una tabella è un errore sul collegamento, e per quel collegamento non ha senso confrontare gli
+    // attributi — come per il pendente, poco sopra.
+    const notice = unmappableNotice(cls.stereotype)
+    if (notice) {
+      issues.push({ code: "link-unmappable", severity: "error", message: `«${s.key}»: ${notice}`, edge: id })
+      continue
+    }
     for (const attribute of cls.attributes) {
       if (attribute.isStatic) continue
       const column = entity.attributes.find((c) => normalize(c.name) === normalize(attribute.name))

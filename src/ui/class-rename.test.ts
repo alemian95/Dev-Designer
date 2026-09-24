@@ -19,4 +19,17 @@ describe("renameClassWithNotice", () => {
     documentStore.getState().undo()
     expect(documentStore.getState().doc.diagram.links["l1"]!.source).toBe(qualify("class", key))
   })
+
+  it("una rinomina che collide non sposta il collegamento", () => {
+    // F4 (review finale): come «una rinomina che collide non sposta il collegamento» in entity-rename.test.ts.
+    const a = addClass({}, { x: 0, y: 0 })
+    documentStore.getState().dispatch(a.recipe)
+    documentStore.getState().dispatch((draft) => {
+      draft.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
+      draft.diagram.class.view.nodes["Cliente"] = { x: 300, y: 0, collapsed: false }
+      draft.diagram.links["l1"] = { kind: "maps-to", source: qualify("class", a.key), target: "er/ordini" }
+    })
+    expect(renameClassWithNotice(a.key, "Cliente")).toBe(false)
+    expect(documentStore.getState().doc.diagram.links["l1"]!.source).toBe(qualify("class", a.key))
+  })
 })

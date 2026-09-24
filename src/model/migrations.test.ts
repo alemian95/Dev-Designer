@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createDocument } from "./document"
 import { migrateDocument } from "./migrations"
-import { parseDocument } from "./serialize"
+import { parseDocument, toJson } from "./serialize"
 
 describe("migrazione 1 → 2", () => {
   const v1Class = {
@@ -23,7 +23,7 @@ describe("migrazione 1 → 2", () => {
     const out = migrateDocument(v1Class)
     expect(out.ok).toBe(true)
     const doc = (out as { ok: true; value: Record<string, unknown> }).value
-    expect(doc.schemaVersion).toBe(3)
+    expect(doc.schemaVersion).toBe(4)
     expect((doc.diagram as { class: { model: { notes: unknown } } }).class.model.notes).toEqual({})
   })
 
@@ -31,7 +31,7 @@ describe("migrazione 1 → 2", () => {
     const out = migrateDocument(v1Er)
     expect(out.ok).toBe(true)
     const doc = (out as { ok: true; value: Record<string, unknown> }).value
-    expect(doc.schemaVersion).toBe(3)
+    expect(doc.schemaVersion).toBe(4)
     expect((doc.diagram as { er: { model: Record<string, unknown> } }).er.model).toEqual({ entities: {}, relationships: {} })
   })
 
@@ -41,7 +41,7 @@ describe("migrazione 1 → 2", () => {
     expect(v1Class).toEqual(before)
   })
 
-  it("un documento già alla versione corrente (3) passa senza toccare niente", () => {
+  it("un documento già alla versione corrente (4) passa senza toccare niente", () => {
     const v3 = createDocument("Prova", "a")
     expect(migrateDocument(v3)).toEqual({ ok: true, value: v3 })
   })
@@ -55,7 +55,7 @@ describe("migrazione 2 → 3", () => {
     const r = parseDocument(v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(3)
+    expect(r.document.schemaVersion).toBe(4)
     expect(r.document.diagram.class.model.classes).toEqual({})
     expect(r.document.diagram.flow.model.lanes).toHaveLength(1)
   })
@@ -80,5 +80,27 @@ describe("migrazione 2 → 3", () => {
   it("la migrazione è pura: due esecuzioni danno lo stesso documento", () => {
     const text = v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } })
     expect(parseDocument(text)).toEqual(parseDocument(text))
+  })
+})
+
+/** Un documento v3 com'era su disco: le tre famiglie, senza la parte dei collegamenti. */
+function v3Text(): string {
+  const doc = JSON.parse(toJson(createDocument("Prova", "v3doc"))) as { schemaVersion: number; diagram: Record<string, unknown> }
+  delete doc.diagram.links
+  return JSON.stringify({ ...doc, schemaVersion: 3 })
+}
+
+describe("migrazione 3 → 4", () => {
+  it("un documento v3 prende la parte dei collegamenti, vuota", () => {
+    const r = parseDocument(v3Text())
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.document.schemaVersion).toBe(4)
+    expect(r.document.diagram.links).toEqual({})
+  })
+
+  it("un documento v2 arriva alla 4 passando dalla 3", () => {
+    const r = parseDocument(v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } }))
+    expect(r.ok && r.document.diagram.links).toEqual({})
   })
 })

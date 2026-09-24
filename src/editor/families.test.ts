@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { editingIn, familySelectedKeys, qualify, splitKey } from "./families"
+import { editingIn, familySelectedKeys, linkId, linkKey, qualify, splitKey } from "./families"
 import { selId } from "./session-store"
 
 describe("qualify / splitKey", () => {
@@ -25,6 +25,28 @@ describe("familySelectedKeys", () => {
     expect(familySelectedKeys(selection, "node", "er")).toEqual(["a", "b"])
     expect(familySelectedKeys(selection, "edge", "er")).toEqual(["r1"])
     expect(familySelectedKeys(selection, "node", "class")).toEqual([])
+  })
+
+  it("salta i collegamenti: non appartengono a nessuna famiglia", () => {
+    // Review Focus 4: senza il salto, `splitKey` lancerebbe su `link/l1`.
+    const selection = new Set([selId("edge", linkKey("l1")), selId("edge", "er/r1")])
+    expect(familySelectedKeys(selection, "edge", "er")).toEqual(["r1"])
+  })
+})
+
+describe("linkKey / linkId", () => {
+  it("si invertono l'una con l'altra", () => {
+    expect(linkKey("l1")).toBe("link/l1")
+    expect(linkId(linkKey("l1"))).toBe("l1")
+  })
+
+  it("linkId su una chiave di famiglia dà null", () => {
+    expect(linkId("er/utenti")).toBeNull()
+    expect(linkId("class/link")).toBeNull()
+  })
+
+  it("una chiave di collegamento non è una chiave di famiglia", () => {
+    expect(() => splitKey(linkKey("l1"))).toThrow()
   })
 })
 

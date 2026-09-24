@@ -336,12 +336,12 @@ describe("openRecent e newDocument", () => {
     expect(documentSession.getState()).toMatchObject({ docId: "r1", fileName: "r.dd.json", dirty: false })
   })
 
-  it("newDocument crea un documento con le tre parti vuote", async () => {
+  it("newDocument crea un documento con le tre famiglie e i collegamenti vuoti", async () => {
     const d = deps()
     const io = createDocumentIo(d)
     await io.newDocument()
     const doc = documentStore.getState().doc
-    expect(Object.keys(doc.diagram).sort()).toEqual(["class", "er", "flow"])
+    expect(Object.keys(doc.diagram).sort()).toEqual(["class", "er", "flow", "links"])
   })
 
   it("newDocument lascia il precedente in biblioteca", async () => {

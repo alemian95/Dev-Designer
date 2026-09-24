@@ -70,8 +70,8 @@ describe("schema del class diagram", () => {
     doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
     doc.diagram.er.model.entities["clienti"] = { name: "clienti", attributes: [] }
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
-    // La versione è quella corrente: la migrazione 2 → 3 unisce le famiglie in un documento solo.
-    expect(SCHEMA_VERSION).toBe(3)
+    // La versione è quella corrente: la migrazione 3 → 4 aggiunge i collegamenti fra famiglie.
+    expect(SCHEMA_VERSION).toBe(4)
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })

@@ -27,4 +27,8 @@ describe("document schema", () => {
     const doc = { ...createDocument("x", "id"), diagram: { type: "mindmap" } }
     expect(DocumentSchema.safeParse(doc).success).toBe(false)
   })
+
+  it("createDocument nasce senza collegamenti", () => {
+    expect(createDocument("x", "id").diagram.links).toEqual({})
+  })
 })

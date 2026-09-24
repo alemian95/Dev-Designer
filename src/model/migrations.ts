@@ -43,11 +43,18 @@ const unifyDiagram: Migration = (raw) => {
   return { ...raw, diagram: parts }
 }
 
+/** 3 → 4: il documento guadagna la parte dei collegamenti fra famiglie, vuota (spec 4a §3). */
+const addLinks: Migration = (raw) => {
+  const diagram = raw.diagram
+  if (diagram === null || typeof diagram !== "object") return raw
+  return { ...raw, diagram: { ...(diagram as Record<string, unknown>), links: {} } }
+}
+
 /**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
  */
-const migrations: ReadonlyMap<number, Migration> = new Map([[1, addClassNotes], [2, unifyDiagram]])
+const migrations: ReadonlyMap<number, Migration> = new Map([[1, addClassNotes], [2, unifyDiagram], [3, addLinks]])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }
 

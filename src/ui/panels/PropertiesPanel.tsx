@@ -1,10 +1,11 @@
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
-import { splitKey } from "@/editor/families"
+import { linkId, splitKey } from "@/editor/families"
 import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
 import { viewFor } from "@/ui/canvas/kinds/registry"
 import { FlowLanesPanel } from "./FlowProperties"
+import { LinkProperties } from "./LinkProperties"
 
 /**
  * Cornice, non contenuto: decide *se* c'è qualcosa da mostrare (esattamente un nodo o un arco
@@ -26,8 +27,11 @@ export function PropertiesPanel() {
   const edges = selectedKeys(selection, "edge")
   const single = (nodes.length === 1 && edges.length === 0) || (edges.length === 1 && nodes.length === 0)
   if (single) {
-    const { family } = splitKey((nodes[0] ?? edges[0])!)
-    const { Properties } = viewFor(family)
+    const key = (nodes[0] ?? edges[0])!
+    // Un collegamento non ha famiglia: si riconosce prima di `splitKey`, che lo rifiuterebbe.
+    const link = linkId(key)
+    if (link !== null) return <LinkProperties key={link} linkId={link} />
+    const { Properties } = viewFor(splitKey(key).family)
     return <Properties />
   }
   return (

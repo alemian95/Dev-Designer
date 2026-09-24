@@ -107,6 +107,8 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
       }
     }),
   )
+  // DDL e Mermaid non hanno una notazione fra tipi di diagramma diversi (spec 4a §8): lo si dice.
+  const hasLinks = useStore(documentStore, (s) => Object.keys(s.doc.diagram.links).length > 0)
   // Gli hook stanno sopra, l'uscita anticipata sotto: `DocumentMenu` si ri-renderizza a ogni
   // battuta sul nome del documento e a ogni cambio del pallino delle modifiche, e senza questa
   // riga gli emettitori girerebbero ogni volta a dialog chiuso.
@@ -152,6 +154,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
           <>
             <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
               <li>{MODEL_LIMITS[FORMAT_FAMILY[effectiveFormat]]}</li>
+              {hasLinks && <li data-export-links-note>I collegamenti fra famiglie non hanno una notazione in questo formato.</li>}
               {/* La chiave è l'indice: gli avvisi sono una lista derivata e stabile, e due avvisi
                   con lo stesso testo darebbero chiavi duplicate. */}
               {warnings.map((w, i) => (

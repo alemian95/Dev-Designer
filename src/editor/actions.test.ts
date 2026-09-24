@@ -3,6 +3,7 @@ import { createErDocument } from "@/model/er/schema"
 import { deleteSelection, duplicateSelection, fitToContent, selectAllNodes, zoomBy } from "./actions"
 import { documentStore } from "./document-store"
 import { erDiagram } from "./er-access"
+import { qualify } from "./families"
 import { selId, sessionStore } from "./session-store"
 import { IDENTITY } from "./viewport"
 
@@ -24,11 +25,11 @@ describe("actions", () => {
 
   it("selectAllNodes seleziona solo i nodi", () => {
     selectAllNodes()
-    expect([...sessionStore.getState().selection].sort()).toEqual([selId("node", "a"), selId("node", "b")])
+    expect([...sessionStore.getState().selection].sort()).toEqual([selId("node", qualify("er", "a")), selId("node", qualify("er", "b"))])
   })
 
   it("deleteSelection elimina e svuota la selezione", () => {
-    sessionStore.getState().setSelection([selId("node", "a")])
+    sessionStore.getState().setSelection([selId("node", qualify("er", "a"))])
     deleteSelection()
     expect(erDiagram(documentStore.getState().doc).model.entities.a).toBeUndefined()
     expect(erDiagram(documentStore.getState().doc).model.relationships.r).toBeUndefined()
@@ -36,9 +37,9 @@ describe("actions", () => {
   })
 
   it("duplicateSelection seleziona le copie", () => {
-    sessionStore.getState().setSelection([selId("node", "a"), selId("edge", "r")])
+    sessionStore.getState().setSelection([selId("node", qualify("er", "a")), selId("edge", qualify("er", "r"))])
     duplicateSelection()
-    expect([...sessionStore.getState().selection]).toEqual([selId("node", "a_copy")])
+    expect([...sessionStore.getState().selection]).toEqual([selId("node", qualify("er", "a_copy"))])
   })
 
   it("fitToContent inquadra le entità; zoomBy scala attorno al centro", () => {

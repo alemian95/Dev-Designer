@@ -1,6 +1,7 @@
 import { memo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { flowNodeSize, shapePath } from "@/editor/flow/geometry"
 import { ROW_H } from "@/editor/geometry"
@@ -29,6 +30,7 @@ interface Props {
  * dentro qualunque delle cinque forme.
  */
 export const FlowNodeView = memo(function FlowNodeView({ nodeKey, node, view, selected }: Props) {
+  const id = qualify("flow", nodeKey)
   const { w, h } = flowNodeSize(node)
   const d = shapePath(node.shape, w, h)
   const lines = node.label === "" ? [] : node.label.split("\n")
@@ -38,11 +40,11 @@ export const FlowNodeView = memo(function FlowNodeView({ nodeKey, node, view, se
   const startY = h / 2 - ((lines.length - 1) * ROW_H) / 2
   return (
     <g
-      data-node-id={nodeKey}
+      data-node-id={id}
       transform={`translate(${view.x} ${view.y})`}
       ref={(el) => {
-        registerNode(nodeKey, el)
-        return () => registerNode(nodeKey, null)
+        registerNode(id, el)
+        return () => registerNode(id, null)
       }}
     >
       <path d={d} fill="var(--card)" stroke={stroke} strokeWidth={selected ? 2 : 1} />
@@ -66,7 +68,7 @@ export const FlowNodeView = memo(function FlowNodeView({ nodeKey, node, view, se
 export function FlowNode({ nodeKey }: { nodeKey: string }) {
   const node = useStore(documentStore, (s) => flowDiagram(s.doc).model.nodes[nodeKey])
   const view = useStore(documentStore, (s) => flowDiagram(s.doc).view.nodes[nodeKey])
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", nodeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", qualify("flow", nodeKey))))
   if (!node || !view) return null
   return <FlowNodeView nodeKey={nodeKey} node={node} view={view} selected={selected} />
 }

@@ -117,9 +117,9 @@ describe("buildSvg", () => {
 
   it("disegna entità e relazioni", () => {
     const svg = buildSvg(diagram(), { vars })!
-    expect(svg).toContain('data-node-id="utenti"')
-    expect(svg).toContain('data-node-id="ordini"')
-    expect(svg).toContain('data-edge-id="ordini_utenti"')
+    expect(svg).toContain('data-node-id="er/utenti"')
+    expect(svg).toContain('data-node-id="er/ordini"')
+    expect(svg).toContain('data-edge-id="er/ordini_utenti"')
   })
 
   it("incorpora il font quando gli viene dato", () => {
@@ -167,8 +167,8 @@ describe("buildSvg", () => {
       identifying: false,
     }
     const svg = buildSvg(d, { vars })!
-    expect(svg).toContain('data-edge-id="ordini_utenti"')
-    expect(svg).not.toContain('data-edge-id="rotta"')
+    expect(svg).toContain('data-edge-id="er/ordini_utenti"')
+    expect(svg).not.toContain('data-edge-id="er/rotta"')
   })
 
   it("include un'entità collassata nei bounds con la sua altezza ridotta", () => {
@@ -297,9 +297,9 @@ describe("buildSvg (class diagram)", () => {
 
   it("disegna classi e relazioni", () => {
     const svg = buildSvg(classDiagram(), { vars })!
-    expect(svg).toContain('data-node-id="Cliente"')
-    expect(svg).toContain('data-node-id="Persona"')
-    expect(svg).toContain('data-edge-id="cliente_persona"')
+    expect(svg).toContain('data-node-id="class/Cliente"')
+    expect(svg).toContain('data-node-id="class/Persona"')
+    expect(svg).toContain('data-edge-id="class/cliente_persona"')
   })
 
   it("incorpora il font quando gli viene dato", () => {
@@ -345,8 +345,8 @@ describe("buildSvg (class diagram)", () => {
       target: { class: "inesistente", multiplicity: "", role: "" },
     }
     const svg = buildSvg(d, { vars })!
-    expect(svg).toContain('data-edge-id="cliente_persona"')
-    expect(svg).not.toContain('data-edge-id="rotta"')
+    expect(svg).toContain('data-edge-id="class/cliente_persona"')
+    expect(svg).not.toContain('data-edge-id="class/rotta"')
   })
 
   it("include una classe collassata nei bounds con la sua altezza ridotta", () => {
@@ -363,7 +363,7 @@ describe("buildSvg (class diagram)", () => {
     d.model.notes = { "n-1": { text: "da rivedere" } }
     d.view.nodes["n-1"] = { x: 700, y: 700, collapsed: false }
     const svg = buildSvg(d, { vars })!
-    expect(svg).toContain('data-node-id="n-1"')
+    expect(svg).toContain('data-node-id="class/n-1"')
     expect(svg).toContain(">da rivedere<")
   })
 })

@@ -1,8 +1,8 @@
-import { moveNodes } from "@/editor/commands/view"
 import { documentStore } from "@/editor/document-store"
 import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
 import { IDLE, reduce, type Effect, type InteractionEvent, type Mode } from "@/editor/interaction"
-import { opsFor, type EdgeEnds } from "@/editor/kinds/ops"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
+import type { EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import { panBy, visibleWorldRect } from "@/editor/viewport"
 import { setEdgeGeometry, setNodePosition, showConnect, showMarquee } from "./dom-registry"
@@ -29,7 +29,7 @@ interface DragTargets {
 }
 
 function collectDragTargets(keys: readonly string[]): DragTargets {
-  const ops = opsFor(documentStore.getState().doc)
+  const ops = canvasOps(documentStore.getState().doc)
   const edges = ops.edgesTouching(new Set(keys))
   const rects = new Map<string, Rect>()
   const measure = (key: string) => {
@@ -72,7 +72,7 @@ function union(a: Rect, b: Rect): Rect {
  * indietro: è un'anteprima, non lo stato.
  */
 function previewDrag(targets: DragTargets, dx: number, dy: number): void {
-  const ops = opsFor(documentStore.getState().doc)
+  const ops = canvasOps(documentStore.getState().doc)
   const { viewport, canvasSize } = sessionStore.getState()
   const v = visibleWorldRect(viewport, canvasSize)
   const seen = { x: v.x - PREVIEW_MARGIN, y: v.y - PREVIEW_MARGIN, w: v.w + 2 * PREVIEW_MARGIN, h: v.h + 2 * PREVIEW_MARGIN }
@@ -104,19 +104,23 @@ function previewDrag(targets: DragTargets, dx: number, dy: number): void {
  * rilascio, non a ogni frame, e su ciò che il gesto ha davvero toccato, quindi il costo è quello
  * della selezione trascinata, non del documento intero.
  *
- * Serve solo al ramo `commitDrag` (flowchart, spec §6), dove la posizione scritta al rilascio può
- * differire da quella dell'anteprima: se il centro del nodo cade fuori da ogni banda, il comando
- * lo riallinea alla sua banda di partenza, e quel riallineamento può riportarlo **esattamente**
- * dov'era prima del drag. In quel caso `documentStore.dispatch` non produce patch per quel nodo
- * (e per gli archi che lo toccano), React non ridisegna niente perché per lei nulla è cambiato, e
- * il `transform` scritto a mano dall'anteprima — fermo all'ultima posizione del puntatore, non a
- * quella di partenza — resterebbe sul DOM. Scrivendo qui le posizioni di partenza *prima* della
- * dispatch, il DOM è già corretto se la dispatch non fa nulla, e viene comunque sovrascritto da
- * React se la fa. `moveNodes` (ER, classi) non ne ha bisogno: lì la posizione confermata è sempre
- * uguale a quella dell'anteprima, quindi la divergenza che questa funzione ripara non si presenta.
+ * Gira a ogni rilascio, prima della dispatch. Serve per primo al flowchart (spec §6), dove la
+ * posizione scritta al rilascio può differire da quella dell'anteprima: se il centro del nodo cade
+ * fuori da ogni banda, il comando lo riallinea alla sua banda di partenza, e quel riallineamento
+ * può riportarlo **esattamente** dov'era prima del drag. In quel caso `documentStore.dispatch` non
+ * produce patch per quel nodo (e per gli archi che lo toccano), React non ridisegna niente perché
+ * per lei nulla è cambiato, e il `transform` scritto a mano dall'anteprima — fermo all'ultima
+ * posizione del puntatore, non a quella di partenza — resterebbe sul DOM. Scrivendo qui le
+ * posizioni di partenza *prima* della dispatch, il DOM è già corretto se la dispatch non fa nulla,
+ * e viene comunque sovrascritto da React se la fa.
+ *
+ * Il reset è **incondizionato**: una selezione mista può contenere nodi di una famiglia con
+ * `commitDrag` e nodi di un'altra senza, e decidere famiglia per famiglia non varrebbe la pena. Per
+ * ER e classi è innocuo: React riscrive i nodi la cui view è cambiata, e quelli rimasti fermi sono
+ * già tornati alla posizione di partenza.
  */
 function resetDragTargets(targets: DragTargets): void {
-  const ops = opsFor(documentStore.getState().doc)
+  const ops = canvasOps(documentStore.getState().doc)
   for (const node of targets.nodes) setNodePosition(node.key, node.x, node.y)
   for (const edge of targets.edges) {
     const a = targets.rects.get(edge.source)
@@ -128,12 +132,12 @@ function resetDragTargets(targets: DragTargets): void {
 }
 
 function nodeCenter(key: string): Point | null {
-  const r = opsFor(documentStore.getState().doc).rectOf(key)
+  const r = canvasOps(documentStore.getState().doc).rectOf(key)
   return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : null
 }
 
 function nodesIn(rect: Rect): string[] {
-  const ops = opsFor(documentStore.getState().doc)
+  const ops = canvasOps(documentStore.getState().doc)
   return ops.nodeKeys().filter((key) => {
     const r = ops.rectOf(key)
     return r !== null && rectsIntersect(r, rect)
@@ -178,9 +182,8 @@ export function createInteractionRunner(): InteractionRunner {
         previewDrag(dragTargets, fx.dx, fx.dy)
         break
       case "commit-drag": {
-        const ops = opsFor(documentStore.getState().doc)
-        if (ops.commitDrag && dragTargets) resetDragTargets(dragTargets)
-        const recipe = ops.commitDrag ? ops.commitDrag(fx.keys, fx.dx, fx.dy) : moveNodes(fx.keys, fx.dx, fx.dy)
+        if (dragTargets) resetDragTargets(dragTargets)
+        const recipe = canvasOps(documentStore.getState().doc).commitDrag(fx.keys, fx.dx, fx.dy)
         if (recipe) documentStore.getState().dispatch(recipe)
         break
       }
@@ -199,7 +202,7 @@ export function createInteractionRunner(): InteractionRunner {
         // `null` oggi significa solo nota → nota, o un estremo che non esiste (contratto in
         // `DiagramOps.addEdge`, §4): nessuna selezione, nessun dispatch. Trascinare una relazione
         // fra due note non fa nulla — comportamento voluto, non un caso da segnalare all'utente.
-        const result = opsFor(documentStore.getState().doc).addEdge(fx.source, fx.target)
+        const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target)
         if (!result) break
         documentStore.getState().dispatch(result.recipe)
         session().setSelection([selId("edge", result.key)])
@@ -207,7 +210,7 @@ export function createInteractionRunner(): InteractionRunner {
         break
       }
       case "create-node": {
-        const { key, recipe, edit } = opsFor(documentStore.getState().doc).addNode(fx.at, fx.variant)
+        const { key, recipe, edit } = canvasOps(documentStore.getState().doc).addNode(fx.at, fx.family, fx.variant)
         documentStore.getState().dispatch(recipe)
         session().setSelection([selId("node", key)])
         session().setTool("select")

@@ -4,6 +4,7 @@ import { setMembers } from "@/editor/class/commands"
 import { classDiagram } from "@/editor/class-access"
 import { classSize } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
+import { editingIn } from "@/editor/families"
 import { FONT_SIZE } from "@/editor/geometry"
 import { sessionStore } from "@/editor/session-store"
 import { worldToScreen } from "@/editor/viewport"
@@ -43,18 +44,15 @@ function caretOffsetForLine(text: string, line: number): number {
  */
 export function MembersEditor() {
   const editing = useStore(sessionStore, (s) => s.editing)
+  const own = editingIn(editing, "class")
   const viewport = useStore(sessionStore, (s) => s.viewport)
-  const cls = useStore(documentStore, (s) =>
-    editing?.target === "body" && s.doc.diagram.type === "class" ? classDiagram(s.doc).model.classes[editing.key] : undefined,
-  )
-  const view = useStore(documentStore, (s) =>
-    editing?.target === "body" && s.doc.diagram.type === "class" ? classDiagram(s.doc).view.nodes[editing.key] : undefined,
-  )
+  const cls = useStore(documentStore, (s) => (own?.target === "body" ? classDiagram(s.doc).model.classes[own.key] : undefined))
+  const view = useStore(documentStore, (s) => (own?.target === "body" ? classDiagram(s.doc).view.nodes[own.key] : undefined))
   // `null` significa «prossimo focus è l'autofocus iniziale, seleziona tutto»; un numero è l'offset
   // dove posare il caret dopo un rifiuto. Un `useRef`, non uno stato locale: cambiarlo non deve
   // causare un render, lo legge solo il prossimo `onFocus`.
   const caretOffsetRef = useRef<number | null>(null)
-  if (!editing || editing.target !== "body" || !cls || !view) return null
+  if (!own || own.target !== "body" || !cls || !view) return null
 
   const close = () => sessionStore.getState().setEditing(null)
   const initial = memberText({ attributes: cls.attributes, methods: cls.methods })
@@ -74,7 +72,7 @@ export function MembersEditor() {
       requestAnimationFrame(() => field.focus())
       return
     }
-    documentStore.getState().dispatch(setMembers(editing.key, result.value))
+    documentStore.getState().dispatch(setMembers(own.key, result.value))
     close()
   }
 

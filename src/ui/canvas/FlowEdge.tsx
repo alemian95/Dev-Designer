@@ -2,10 +2,11 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { flowEdgeGeometry } from "@/editor/flow/geometry"
 import type { Rect } from "@/editor/geometry"
-import { opsFor } from "@/editor/kinds/ops"
+import { familyOps } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { FlowEdge as FlowEdgeModel } from "@/model/flow/schema"
 import { registerEdge } from "./dom-registry"
@@ -27,14 +28,15 @@ interface Props {
  * separazione del fascio (spec §8, vedi il docblock di `flowEdgeGeometry`).
  */
 export const FlowEdgeView = memo(function FlowEdgeView({ edgeKey, edge, source, target, selected, offset }: Props) {
+  const id = qualify("flow", edgeKey)
   const geo = flowEdgeGeometry(source, target, edge, offset)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   return (
     <g
-      data-edge-id={edgeKey}
+      data-edge-id={id}
       ref={(el) => {
-        registerEdge(edgeKey, el)
-        return () => registerEdge(edgeKey, null)
+        registerEdge(id, el)
+        return () => registerEdge(id, null)
       }}
     >
       <path data-edge-hit d={geo.d} fill="none" stroke="transparent" strokeWidth={12} />
@@ -49,12 +51,12 @@ export const FlowEdgeView = memo(function FlowEdgeView({ edgeKey, edge, source, 
   )
 })
 
-/** Gemella di `useNodeRect` in `ClassEdge.tsx`: stesso seam (`opsFor(doc).rectOf`), stessa ragione
- *  per `useShallow` — `rectOf` costruisce un oggetto piatto nuovo a ogni chiamata. */
+/** Gemella di `useNodeRect` in `ClassEdge.tsx`: stesso seam (`familyOps(doc, "flow").rectOf`),
+ *  stessa ragione per `useShallow` — `rectOf` costruisce un oggetto piatto nuovo a ogni chiamata. */
 function useNodeRect(key: string | undefined): Rect | null {
   return useStore(
     documentStore,
-    useShallow((s) => (key ? opsFor(s.doc).rectOf(key) : null)),
+    useShallow((s) => (key ? familyOps(s.doc, "flow").rectOf(key) : null)),
   )
 }
 
@@ -62,7 +64,7 @@ export function FlowEdge({ edgeKey, offset }: { edgeKey: string; offset: number 
   const edge = useStore(documentStore, (s) => flowDiagram(s.doc).model.edges[edgeKey])
   const source = useNodeRect(edge?.source)
   const target = useNodeRect(edge?.target)
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", edgeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", qualify("flow", edgeKey))))
   if (!edge || !source || !target) return null
   return <FlowEdgeView edgeKey={edgeKey} edge={edge} source={source} target={target} selected={selected} offset={offset} />
 }

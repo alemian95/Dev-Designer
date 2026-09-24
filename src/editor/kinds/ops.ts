@@ -1,4 +1,5 @@
 import type { DevDocument } from "@/model/document"
+import type { Family } from "@/model/family"
 import type { Issue } from "@/model/issue"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
@@ -54,9 +55,9 @@ export interface DiagramOps {
   validate(): Issue[]
 }
 
-/** Chiuso sullo snapshot: il chiamante lo ricrea a ogni lettura dello store. */
-export function opsFor(doc: DevDocument): DiagramOps {
-  switch (doc.diagram.type) {
+/** Le `DiagramOps` di una famiglia del documento, chiuse sullo snapshot. Chiavi senza prefisso. */
+export function familyOps(doc: DevDocument, family: Family): DiagramOps {
+  switch (family) {
     case "er":
       return erOps(doc)
     case "class":
@@ -64,4 +65,9 @@ export function opsFor(doc: DevDocument): DiagramOps {
     case "flow":
       return flowOps(doc)
   }
+}
+
+/** Solo fase A: le ops dell'unica famiglia del documento. Il Task 5 la rimuove. */
+export function opsFor(doc: DevDocument): DiagramOps {
+  return familyOps(doc, doc.diagram.type)
 }

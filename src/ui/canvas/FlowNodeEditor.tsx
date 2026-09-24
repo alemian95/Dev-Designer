@@ -1,5 +1,6 @@
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
+import { editingIn } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { setNodeLabel } from "@/editor/flow/commands"
 import { flowNodeSize } from "@/editor/flow/geometry"
@@ -22,14 +23,11 @@ import { TextEditorOverlay } from "./TextEditorOverlay"
  */
 export function FlowNodeEditor() {
   const editing = useStore(sessionStore, (s) => s.editing)
+  const own = editingIn(editing, "flow")
   const viewport = useStore(sessionStore, (s) => s.viewport)
-  const node = useStore(documentStore, (s) =>
-    editing?.target === "body" && s.doc.diagram.type === "flow" ? flowDiagram(s.doc).model.nodes[editing.key] : undefined,
-  )
-  const view = useStore(documentStore, (s) =>
-    editing?.target === "body" && s.doc.diagram.type === "flow" ? flowDiagram(s.doc).view.nodes[editing.key] : undefined,
-  )
-  if (!editing || editing.target !== "body" || !node || !view) return null
+  const node = useStore(documentStore, (s) => (own?.target === "body" ? flowDiagram(s.doc).model.nodes[own.key] : undefined))
+  const view = useStore(documentStore, (s) => (own?.target === "body" ? flowDiagram(s.doc).view.nodes[own.key] : undefined))
+  if (!own || own.target !== "body" || !node || !view) return null
 
   const close = () => sessionStore.getState().setEditing(null)
   const { w, h } = flowNodeSize(node)
@@ -44,7 +42,7 @@ export function FlowNodeEditor() {
       viewport={viewport}
       defaultValue={node.label}
       onCommit={(value) => {
-        documentStore.getState().dispatch(setNodeLabel(editing.key, value))
+        documentStore.getState().dispatch(setNodeLabel(own.key, value))
         close()
       }}
       onCancel={close}

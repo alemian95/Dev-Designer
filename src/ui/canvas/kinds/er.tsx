@@ -6,7 +6,8 @@ import { addAttribute, moveAttribute, removeAttribute, updateAttribute, updateRe
 import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
-import { selectedKeys, sessionStore } from "@/editor/session-store"
+import { familySelectedKeys } from "@/editor/families"
+import { sessionStore } from "@/editor/session-store"
 import { CardinalitySchema, type Attribute, type Cardinality, type Entity, type Relationship } from "@/model/er/schema"
 import { renameEntityWithNotice } from "@/ui/entity-rename"
 import { EntityNodeView } from "@/ui/canvas/EntityNode"
@@ -127,9 +128,9 @@ function RelationshipProperties({ relationshipKey: key }: { relationshipKey: str
  */
 function Properties() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const entities = selectedKeys(selection, "node")
+  const entities = familySelectedKeys(selection, "node", "er")
   if (entities.length === 1) return <EntityProperties key={entities[0]} entityKey={entities[0]!} />
-  const relationships = selectedKeys(selection, "edge")
+  const relationships = familySelectedKeys(selection, "edge", "er")
   return <RelationshipProperties key={relationships[0]} relationshipKey={relationships[0]!} />
 }
 

@@ -40,7 +40,7 @@ function relazione(
 describe("ClassNodeView", () => {
   it("disegna header, nome e i due scomparti", () => {
     const html = renderToStaticMarkup(<ClassNodeView nodeKey="Cliente" node={cliente} view={{ x: 10, y: 20, collapsed: false }} selected={false} />)
-    expect(html).toContain('data-node-id="Cliente"')
+    expect(html).toContain('data-node-id="class/Cliente"')
     expect(html).toContain('transform="translate(10 20)"')
     expect(html).toContain(">Cliente<")
     expect(html).toContain("+ id: int")
@@ -198,7 +198,7 @@ describe("ClassNoteView", () => {
 
   it("disegna corpo e piega, e una riga di testo per riga di nota", () => {
     const html = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={nota} view={{ x: 10, y: 20, collapsed: false }} selected={false} />)
-    expect(html).toContain('data-node-id="n-1"')
+    expect(html).toContain('data-node-id="class/n-1"')
     expect(html).toContain('transform="translate(10 20)"')
     expect(html).toContain("data-note-fold")
     expect(html).toContain(">prima<")
@@ -207,7 +207,7 @@ describe("ClassNoteView", () => {
 
   it("una nota vuota non produce righe di testo ma esiste come nodo", () => {
     const html = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={{ text: "" }} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
-    expect(html).toContain('data-node-id="n-1"')
+    expect(html).toContain('data-node-id="class/n-1"')
     expect(html).not.toContain("<text")
   })
 
@@ -248,7 +248,7 @@ describe("ClassEdge — connesso allo store", () => {
       act(() => {
         root.render(<ClassEdge edgeKey="ancora" offset={0} />)
       })
-      expect(container.innerHTML).toContain('data-edge-id="ancora"')
+      expect(container.innerHTML).toContain('data-edge-id="class/ancora"')
     } finally {
       root.unmount()
     }

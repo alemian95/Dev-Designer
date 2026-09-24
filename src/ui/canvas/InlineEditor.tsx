@@ -6,16 +6,18 @@ import { classSize } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { entitySize } from "@/editor/er/geometry"
+import { splitKey } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { setEdgeLabel } from "@/editor/flow/commands"
 import { CHAR_W, FONT_SIZE, HEADER_H, PAD_X } from "@/editor/geometry"
-import { opsFor } from "@/editor/kinds/ops"
+import { familyOps } from "@/editor/kinds/ops"
 import { sessionStore, type SessionState } from "@/editor/session-store"
 import { worldToScreen, type Viewport } from "@/editor/viewport"
-import type { Diagram } from "@/model/document"
+import type { Family } from "@/model/family"
 import { renameClassWithNotice } from "../class-rename"
 import { renameEntityWithNotice } from "../entity-rename"
 
+/** Negli editor di famiglia la chiave è **senza** prefisso: la toglie `InlineEditor`. La forma resta quella della sessione. */
 type Editing = NonNullable<SessionState["editing"]>
 
 interface NameInputProps {
@@ -91,22 +93,20 @@ const MIN_LABEL_CHARS = 4
  * che questo file condivide fra entità e classi (docblock qui sopra).
  *
  * La posizione è il punto etichetta che il render calcola già (spec §8: «si colloca sul primo
- * segmento, con lo stesso offset di fascio»): si legge da `opsFor(doc).rectOf`/`ops.edgeGeometry`,
- * la stessa via di `FlowEdge.tsx` — non si ricalcolano i rettangoli a mano con `flowNodeRect` (una
+ * segmento, con lo stesso offset di fascio»): si legge da `familyOps(doc, "flow")`, la stessa via
+ * di `FlowEdge.tsx` — non si ricalcolano i rettangoli a mano con `flowNodeRect` (una
  * seconda strada verso lo stesso dato, la ragione della correzione qui).
  *
  * Il testo si scarta senza rifinirlo: `setEdgeLabel` (`flow/commands.ts`) scarta gli spazi ai
  * margini da sé, così ogni via che scrive l'etichetta rispetta la stessa regola.
  */
 function FlowEdgeLabelEditor({ editing, viewport, close }: { editing: Editing; viewport: Viewport; close: () => void }) {
-  const edge = useStore(documentStore, (s) =>
-    s.doc.diagram.type === "flow" ? flowDiagram(s.doc).model.edges[editing.key] : undefined,
-  )
+  const edge = useStore(documentStore, (s) => flowDiagram(s.doc).model.edges[editing.key])
   const point = useStore(
     documentStore,
     useShallow((s) => {
       if (!edge) return null
-      const ops = opsFor(s.doc)
+      const ops = familyOps(s.doc, "flow")
       const source = ops.rectOf(edge.source)
       const target = ops.rectOf(edge.target)
       if (!source || !target) return null
@@ -126,7 +126,7 @@ function FlowEdgeLabelEditor({ editing, viewport, close }: { editing: Editing; v
 }
 
 /**
- * L'editor del nome per il tipo di diagramma corrente — `null` per il flowchart, che un nome non
+ * L'editor del nome per la famiglia della chiave in editing — `null` per il flowchart, che un nome non
  * ce l'ha (un nodo ha solo l'etichetta del corpo, `target: "body"`). Uno `switch` esaustivo sul
  * tipo, non il ternario `er ? Entity : Class` di prima: quel ternario è nato quando i tipi erano
  * due, e un terzo (`"flow"`) ci sarebbe caduto dentro il ramo sbagliato in silenzio — lo stesso
@@ -134,8 +134,8 @@ function FlowEdgeLabelEditor({ editing, viewport, close }: { editing: Editing; v
  * L'annotazione di ritorno è ciò che rende lo switch esaustivo: senza, un quarto tipo futuro non
  * gestito qui tornerebbe `undefined` senza che il compilatore se ne accorga.
  */
-function nameEditorFor(type: Diagram["type"], editing: Editing, viewport: Viewport, close: () => void): ReactElement | null {
-  switch (type) {
+function nameEditorFor(family: Family, editing: Editing, viewport: Viewport, close: () => void): ReactElement | null {
+  switch (family) {
     case "er":
       return <EntityNameEditor editing={editing} viewport={viewport} close={close} />
     case "class":
@@ -150,9 +150,10 @@ function nameEditorFor(type: Diagram["type"], editing: Editing, viewport: Viewpo
  * ripristina — comportamento invariato dal Task 6. Guadagna la guardia su `target`: il corpo di una
  * classe è testo strutturato, non un nome, e ha il suo editor separato (`MembersEditor`); `label`
  * (l'etichetta di un arco di flowchart) smista a `FlowEdgeLabelEditor` prima di questa guardia,
- * perché non dipende dal tipo di diagramma corrente come fanno `name` ed `EntityNameEditor`/`ClassNameEditor`.
+ * e solo per una chiave `flow/`: gli archi delle altre famiglie un'etichetta modificabile non ce l'hanno.
  *
- * Il nome viene dal tipo di diagramma corrente: nell'ER da `erDiagram`/`renameEntityWithNotice`,
+ * La famiglia viene dal prefisso della chiave in editing, che qui si toglie: gli editor di famiglia
+ * ricevono la chiave nuda. Il nome: nell'ER da `erDiagram`/`renameEntityWithNotice`,
  * nelle classi da `classDiagram`/`renameClassWithNotice`, stesso schema di posizionamento e stessa
  * regola «il blur chiude sempre» — a differenza del corpo (§5 della spec), qui non c'è un parser
  * che possa rifiutare il testo.
@@ -160,10 +161,11 @@ function nameEditorFor(type: Diagram["type"], editing: Editing, viewport: Viewpo
 export function InlineEditor() {
   const editing = useStore(sessionStore, (s) => s.editing)
   const viewport = useStore(sessionStore, (s) => s.viewport)
-  const type = useStore(documentStore, (s) => s.doc.diagram.type)
   const close = () => sessionStore.getState().setEditing(null)
   if (!editing) return null
-  if (editing.target === "label") return <FlowEdgeLabelEditor editing={editing} viewport={viewport} close={close} />
-  if (editing.target !== "name") return null
-  return nameEditorFor(type, editing, viewport, close)
+  const { family, key } = splitKey(editing.key)
+  const own = { key, target: editing.target }
+  if (own.target === "label") return family === "flow" ? <FlowEdgeLabelEditor editing={own} viewport={viewport} close={close} /> : null
+  if (own.target !== "name") return null
+  return nameEditorFor(family, own, viewport, close)
 }

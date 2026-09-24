@@ -3,6 +3,7 @@ import { setNoteText } from "@/editor/class/commands"
 import { classDiagram } from "@/editor/class-access"
 import { noteSize } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
+import { editingIn } from "@/editor/families"
 import { sessionStore } from "@/editor/session-store"
 import { TextEditorOverlay } from "./TextEditorOverlay"
 
@@ -12,14 +13,11 @@ import { TextEditorOverlay } from "./TextEditorOverlay"
  */
 export function NoteEditor() {
   const editing = useStore(sessionStore, (s) => s.editing)
+  const own = editingIn(editing, "class")
   const viewport = useStore(sessionStore, (s) => s.viewport)
-  const note = useStore(documentStore, (s) =>
-    editing?.target === "body" && s.doc.diagram.type === "class" ? classDiagram(s.doc).model.notes[editing.key] : undefined,
-  )
-  const view = useStore(documentStore, (s) =>
-    editing?.target === "body" && s.doc.diagram.type === "class" ? classDiagram(s.doc).view.nodes[editing.key] : undefined,
-  )
-  if (!editing || editing.target !== "body" || !note || !view) return null
+  const note = useStore(documentStore, (s) => (own?.target === "body" ? classDiagram(s.doc).model.notes[own.key] : undefined))
+  const view = useStore(documentStore, (s) => (own?.target === "body" ? classDiagram(s.doc).view.nodes[own.key] : undefined))
+  if (!own || own.target !== "body" || !note || !view) return null
 
   const close = () => sessionStore.getState().setEditing(null)
   const { w, h } = noteSize(note)
@@ -34,7 +32,7 @@ export function NoteEditor() {
       viewport={viewport}
       defaultValue={note.text}
       onCommit={(value) => {
-        documentStore.getState().dispatch(setNoteText(editing.key, value))
+        documentStore.getState().dispatch(setNoteText(own.key, value))
         close()
       }}
       onCancel={close}

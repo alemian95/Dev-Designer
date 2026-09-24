@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createErDocument } from "@/model/er/schema"
 import { createFlowDocument } from "@/model/flow/schema"
 import { documentStore } from "@/editor/document-store"
-import { sessionStore } from "@/editor/session-store"
+import { qualify } from "@/editor/families"
+import { selId, sessionStore } from "@/editor/session-store"
 import { IDENTITY } from "@/editor/viewport"
 import { useCanvasInteraction } from "./use-canvas-interaction"
 
@@ -65,7 +66,7 @@ beforeEach(() => {
   document.body.innerHTML = ""
   svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
   nodo = document.createElementNS("http://www.w3.org/2000/svg", "g")
-  nodo.setAttribute("data-node-id", "a")
+  nodo.setAttribute("data-node-id", qualify("er", "a"))
   header = document.createElementNS("http://www.w3.org/2000/svg", "rect")
   header.setAttribute("data-node-header", "")
   nodo.append(header)
@@ -128,7 +129,7 @@ describe("pointer capture", () => {
   })
 
   it("mentre un editor inline è aperto il down non fa nulla: il blur lo gestisce l'input", () => {
-    sessionStore.getState().setEditing({ key: "a", target: "name" })
+    sessionStore.getState().setEditing({ key: qualify("er", "a"), target: "name" })
     giu()
     expect(catturati.size).toBe(0)
   })
@@ -215,7 +216,7 @@ describe("la tastiera", () => {
     giu()
     muovi()
     expect(viewport()).toEqual(prima)
-    expect(sessionStore.getState().selection.has("node:a")).toBe(true)
+    expect(sessionStore.getState().selection.has(selId("node", qualify("er", "a")))).toBe(true)
     su()
   })
 
@@ -248,7 +249,7 @@ describe("il resto del cablaggio", () => {
   it("il doppio click sull'header di un'entità apre la rinomina", () => {
     sotto = header
     svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
-    expect(sessionStore.getState().editing).toEqual({ key: "a", target: "name" })
+    expect(sessionStore.getState().editing).toEqual({ key: qualify("er", "a"), target: "name" })
   })
 
   it("il doppio click fuori dall'header di un'entità non apre niente", () => {
@@ -271,17 +272,17 @@ describe("il resto del cablaggio", () => {
       d.model.edges["e1"] = { source: "a", target: "b", label: "" }
     })
     const arco = document.createElementNS("http://www.w3.org/2000/svg", "g")
-    arco.setAttribute("data-edge-id", "e1")
+    arco.setAttribute("data-edge-id", qualify("flow", "e1"))
     svg.append(arco)
     sotto = arco
     svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
-    expect(sessionStore.getState().editing).toEqual({ key: "e1", target: "label" })
+    expect(sessionStore.getState().editing).toEqual({ key: qualify("flow", "e1"), target: "label" })
   })
 
   it("il doppio click su un arco in un ER non apre niente: niente etichette sugli archi", () => {
     // Guardia invariata per gli altri tipi: `hit.kind !== "node"` esce prima di aprire qualunque cosa.
     const arco = document.createElementNS("http://www.w3.org/2000/svg", "g")
-    arco.setAttribute("data-edge-id", "rel")
+    arco.setAttribute("data-edge-id", qualify("er", "rel"))
     svg.append(arco)
     sotto = arco
     svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))

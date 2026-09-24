@@ -4,6 +4,7 @@ import { createErDocument, type Entity, type ErDocument } from "@/model/er/schem
 import { createFlowDocument, type FlowDiagram } from "@/model/flow/schema"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
+import { qualify } from "@/editor/families"
 import { addFlowNode } from "@/editor/flow/commands"
 import { LANE_PAD } from "@/editor/flow/layout"
 import { flowDiagram } from "@/editor/flow-access"
@@ -93,21 +94,21 @@ beforeEach(() => {
   documentStore.getState().load(documento())
   sessionStore.getState().setViewport(IDENTITY)
   sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
-  sessionStore.getState().setSelection(CHIAVI.map((k) => selId("node", k)))
-  for (const k of CHIAVI) registerNode(k, fintoNodo(scritture, k))
-  for (const k of ARCHI) registerEdge(k, fintoArco(tocchi, k))
+  sessionStore.getState().setSelection(CHIAVI.map((k) => selId("node", qualify("er", k))))
+  for (const k of CHIAVI) registerNode(qualify("er", k), fintoNodo(scritture, qualify("er", k)))
+  for (const k of ARCHI) registerEdge(qualify("er", k), fintoArco(tocchi, qualify("er", k)))
 })
 
 afterEach(() => {
-  for (const k of CHIAVI) registerNode(k, null)
-  for (const k of ARCHI) registerEdge(k, null)
+  for (const k of CHIAVI) registerNode(qualify("er", k), null)
+  for (const k of ARCHI) registerEdge(qualify("er", k), null)
   sessionStore.getState().setSelection([])
 })
 
 /** Presa sull'header di `dentro`, un solo spostamento di 900 unità verso l'alto, rilascio. */
 function trascina(runner = createInteractionRunner()) {
   const partenza = { x: 100 + W / 2, y: 100 + H / 2 }
-  runner.step(giu({ world: partenza, hit: { kind: "node", key: "dentro" } }))
+  runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("er", "dentro") } }))
   runner.step(muovi({ world: { x: partenza.x, y: partenza.y - 900 } }))
   return runner
 }
@@ -118,21 +119,21 @@ describe("l'anteprima del drag scrive solo ciò che si vede", () => {
     const toccati = new Set(scritture.map((s) => s.split(":")[0]))
     // `entra` arriva a y=100: dentro l'inquadratura, e senza questa scrittura resterebbe invisibile
     // proprio nel momento in cui l'utente se lo aspetta davanti.
-    expect(toccati.has("entra")).toBe(true)
+    expect(toccati.has(qualify("er", "entra"))).toBe(true)
     // `dentro` finisce a −800 e `lontana` a 1100: nessuno dei due si vede.
-    expect(toccati.has("dentro")).toBe(false)
-    expect(toccati.has("lontana")).toBe(false)
-    expect(scritture).toContain("entra:translate(100 100)")
+    expect(toccati.has(qualify("er", "dentro"))).toBe(false)
+    expect(toccati.has(qualify("er", "lontana"))).toBe(false)
+    expect(scritture).toContain(`${qualify("er", "entra")}:translate(100 100)`)
   })
 
   it("un arco che attraversa l'inquadratura si aggiorna anche con entrambi i nodi fuori", () => {
     trascina()
     // `attraversa` va da y=−800 a y=100: i suoi estremi sono uno sopra e uno dentro lo schermo, e
     // il segmento lo taglia. Il criterio è l'ingombro dell'arco, non i suoi estremi.
-    expect(tocchi.get("attraversa") ?? 0).toBeGreaterThan(0)
-    expect(tocchi.get("unCapoDentro") ?? 0).toBeGreaterThan(0)
+    expect(tocchi.get(qualify("er", "attraversa")) ?? 0).toBeGreaterThan(0)
+    expect(tocchi.get(qualify("er", "unCapoDentro")) ?? 0).toBeGreaterThan(0)
     // `sottoTutto` resta interamente sotto l'inquadratura, con entrambi gli estremi.
-    expect(tocchi.get("sottoTutto") ?? 0).toBe(0)
+    expect(tocchi.get(qualify("er", "sottoTutto")) ?? 0).toBe(0)
   })
 
   it("il DOM saltato è un'anteprima, non lo stato: al rilascio si muovono tutti", () => {
@@ -152,7 +153,7 @@ describe("un comando al rilascio", () => {
     const prima = documentStore.getState().past.length
     const runner = createInteractionRunner()
     const partenza = { x: 100 + W / 2, y: 100 + H / 2 }
-    runner.step(giu({ world: partenza, hit: { kind: "node", key: "dentro" } }))
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("er", "dentro") } }))
     for (let i = 1; i <= 5; i++) runner.step(muovi({ world: { x: partenza.x, y: partenza.y - i * 20 } }))
     // Cinque `pointermove` e nessuna voce di storia: è l'invariante dello spike — il documento
     // riceve un comando solo, al rilascio, non uno per movimento.
@@ -172,7 +173,7 @@ describe("un comando al rilascio", () => {
     const prima = documentStore.getState().past.length
     const runner = createInteractionRunner()
     const partenza = { x: 100 + W / 2, y: 100 + H / 2 }
-    runner.step(giu({ world: partenza, hit: { kind: "node", key: "dentro" } }))
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("er", "dentro") } }))
     runner.step(su({ world: partenza }))
     expect(documentStore.getState().past.length).toBe(prima)
   })
@@ -182,7 +183,7 @@ describe("un comando al rilascio", () => {
     // corso: costerebbe un `getBoundingClientRect`, cioè uno stile e un layout forzati.
     const runner = createInteractionRunner()
     expect(runner.busy()).toBe(false)
-    runner.step(giu({ world: { x: 100, y: 100 }, hit: { kind: "node", key: "dentro" } }))
+    runner.step(giu({ world: { x: 100, y: 100 }, hit: { kind: "node", key: qualify("er", "dentro") } }))
     expect(runner.busy()).toBe(true)
     runner.step(su({ world: { x: 100, y: 100 } }))
     expect(runner.busy()).toBe(false)
@@ -193,15 +194,15 @@ describe("un comando al rilascio", () => {
     // secondo drag partirebbe dalle posizioni del primo e il nodo salterebbe indietro.
     const runner = createInteractionRunner()
     const primo = { x: 100 + W / 2, y: 100 + H / 2 }
-    runner.step(giu({ world: primo, hit: { kind: "node", key: "dentro" } }))
+    runner.step(giu({ world: primo, hit: { kind: "node", key: qualify("er", "dentro") } }))
     runner.step(muovi({ world: { x: primo.x, y: primo.y + 200 } }))
     runner.step(su({ world: { x: primo.x, y: primo.y + 200 } }))
 
     scritture.length = 0
     const secondo = { x: 100 + W / 2, y: 300 + H / 2 }
-    runner.step(giu({ world: secondo, hit: { kind: "node", key: "dentro" } }))
+    runner.step(giu({ world: secondo, hit: { kind: "node", key: qualify("er", "dentro") } }))
     runner.step(muovi({ world: { x: secondo.x, y: secondo.y + 100 } }))
-    expect(scritture).toContain("dentro:translate(100 400)")
+    expect(scritture).toContain(`${qualify("er", "dentro")}:translate(100 400)`)
   })
 })
 
@@ -229,13 +230,13 @@ describe("il rilascio del flowchart", () => {
     documentStore.getState().load(doc)
     sessionStore.getState().setViewport(IDENTITY)
     sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
-    sessionStore.getState().setSelection([selId("node", added.key)])
+    sessionStore.getState().setSelection([selId("node", qualify("flow", added.key))])
     const { el, attrs } = fintoNodoStato()
-    registerNode(added.key, el)
+    registerNode(qualify("flow", added.key), el)
 
     const runner = createInteractionRunner()
     const partenza = { x: 100 + 30, y: LANE_PAD + 20 }
-    runner.step(giu({ world: partenza, hit: { kind: "node", key: added.key } }))
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("flow", added.key) } }))
     // -60: resta dentro l'inquadratura (previewDrag scrive solo ciò che si vede), ma il centro del
     // nodo (a -20) è comunque fuori dalla banda [0, 160) — basta perché scatti il riallineamento.
     runner.step(muovi({ world: { x: partenza.x, y: partenza.y - 60 } }))
@@ -251,7 +252,7 @@ describe("il rilascio del flowchart", () => {
     // anteprima (`translate(100 -40)`, l'asserzione di sopra) invece della posizione di partenza.
     expect(attrs.transform).toBe(`translate(100 ${LANE_PAD})`)
 
-    registerNode(added.key, null)
+    registerNode(qualify("flow", added.key), null)
   })
 
   it("il cablaggio: il rilascio in un'altra corsia passa da commitDrag, non da moveNodes", () => {
@@ -268,21 +269,21 @@ describe("il rilascio del flowchart", () => {
     documentStore.getState().load(doc)
     sessionStore.getState().setViewport(IDENTITY)
     sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
-    sessionStore.getState().setSelection([selId("node", added.key)])
-    registerNode(added.key, fintoNodo(scritture, added.key))
+    sessionStore.getState().setSelection([selId("node", qualify("flow", added.key))])
+    registerNode(qualify("flow", added.key), fintoNodo(scritture, qualify("flow", added.key)))
 
     const runner = createInteractionRunner()
     const partenza = { x: 130, y: 40 }
-    runner.step(giu({ world: partenza, hit: { kind: "node", key: added.key } }))
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("flow", added.key) } }))
     runner.step(muovi({ world: { x: partenza.x, y: partenza.y + 100 } }))
     runner.step(su({ world: { x: partenza.x, y: partenza.y + 100 } }))
 
     // `moveNodes` (commands/view.ts) non scrive mai `model.nodes[key].lane`: se il cablaggio in
-    // `interaction-runner.ts` (`ops.commitDrag ? ops.commitDrag(...) : moveNodes(...)`) tornasse
+    // `canvas-ops.ts` (`o.commitDrag ? o.commitDrag(...) : moveNodes(...)`, per famiglia) tornasse
     // sempre a `moveNodes`, questa asserzione fallirebbe da sola, mentre il resto della suite —
     // scritta per l'ER — resterebbe verde.
     expect(flowDiagram(documentStore.getState().doc).model.nodes[added.key]!.lane).toBe(l2)
 
-    registerNode(added.key, null)
+    registerNode(qualify("flow", added.key), null)
   })
 })

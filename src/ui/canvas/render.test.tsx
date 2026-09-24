@@ -18,7 +18,7 @@ const entity: Entity = {
 describe("EntityNodeView", () => {
   it("disegna header, titolo qualificato e una riga per attributo", () => {
     const html = renderToStaticMarkup(<EntityNodeView nodeKey="auth.users" entity={entity} view={{ x: 10, y: 20, collapsed: false }} selected={false} />)
-    expect(html).toContain('data-node-id="auth.users"')
+    expect(html).toContain('data-node-id="er/auth.users"')
     expect(html).toContain('transform="translate(10 20)"')
     expect(html).toContain(">auth.users<")
     expect(html).toContain("PK id     bigint")
@@ -42,7 +42,7 @@ describe("RelationshipEdgeView", () => {
   }
   it("disegna linea tratteggiata, marker ed etichetta", () => {
     const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={rel} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} offset={0} />)
-    expect(html).toContain('data-edge-id="r"')
+    expect(html).toContain('data-edge-id="er/r"')
     expect(html).toContain('stroke-dasharray="6 4"')
     expect(html).toContain("data-edge-source")
     expect(html).toContain(">scrive<")

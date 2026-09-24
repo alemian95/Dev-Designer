@@ -4,7 +4,8 @@ import { setNoteText, setStereotype, updateRelation } from "@/editor/class/comma
 import { classDiagram } from "@/editor/class-access"
 import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
-import { selectedKeys, sessionStore } from "@/editor/session-store"
+import { familySelectedKeys, qualify } from "@/editor/families"
+import { sessionStore } from "@/editor/session-store"
 import {
   CLASS_RELATION_KINDS, RelationKindSchema, StereotypeSchema, type RelationKind, type Stereotype,
 } from "@/model/class/schema"
@@ -100,7 +101,7 @@ function ClassNodeProperties({ classKey: key }: { classKey: string }) {
  */
 function NoteProperties({ noteKey: key }: { noteKey: string }) {
   const note = useStore(documentStore, (s) => classDiagram(s.doc).model.notes[key])
-  const editingHere = useStore(sessionStore, (s) => s.editing?.key === key && s.editing.target === "body")
+  const editingHere = useStore(sessionStore, (s) => s.editing?.key === qualify("class", key) && s.editing.target === "body")
   if (!note) return null
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -185,12 +186,12 @@ function RelationProperties({ relationKey: key }: { relationKey: string }) {
  */
 export function ClassProperties() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const nodes = selectedKeys(selection, "node")
+  const nodes = familySelectedKeys(selection, "node", "class")
   const key = nodes.length === 1 ? nodes[0]! : undefined
   const isNote = useStore(documentStore, (s) => key !== undefined && key in classDiagram(s.doc).model.notes)
   if (key !== undefined) {
     return isNote ? <NoteProperties key={key} noteKey={key} /> : <ClassNodeProperties key={key} classKey={key} />
   }
-  const relations = selectedKeys(selection, "edge")
+  const relations = familySelectedKeys(selection, "edge", "class")
   return <RelationProperties key={relations[0]} relationKey={relations[0]!} />
 }

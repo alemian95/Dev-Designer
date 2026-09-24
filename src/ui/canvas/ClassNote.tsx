@@ -3,6 +3,7 @@ import { useStore } from "zustand"
 import { classDiagram } from "@/editor/class-access"
 import { noteSize, notePath } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import { PAD_X, ROW_H } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { ClassNote } from "@/model/class/schema"
@@ -24,17 +25,18 @@ interface Props {
  * Nessuno scomparto, nessun header: una nota è testo e basta, e `collapsed` non le si applica.
  */
 export const ClassNoteView = memo(function ClassNoteView({ nodeKey, note, view, selected }: Props) {
+  const id = qualify("class", nodeKey)
   const { w, h } = noteSize(note)
   const { body, fold } = notePath(w, h)
   const lines = note.text === "" ? [] : note.text.split("\n")
   const stroke = selected ? "var(--primary)" : "var(--border)"
   return (
     <g
-      data-node-id={nodeKey}
+      data-node-id={id}
       transform={`translate(${view.x} ${view.y})`}
       ref={(el) => {
-        registerNode(nodeKey, el)
-        return () => registerNode(nodeKey, null)
+        registerNode(id, el)
+        return () => registerNode(id, null)
       }}
     >
       <path d={body} fill="var(--card)" stroke={stroke} strokeWidth={selected ? 2 : 1} />
@@ -56,7 +58,7 @@ export const ClassNoteView = memo(function ClassNoteView({ nodeKey, note, view, 
 export function ClassNoteNode({ nodeKey }: { nodeKey: string }) {
   const note = useStore(documentStore, (s) => classDiagram(s.doc).model.notes[nodeKey])
   const view = useStore(documentStore, (s) => classDiagram(s.doc).view.nodes[nodeKey])
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", nodeKey)))
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", qualify("class", nodeKey))))
   if (!note || !view) return null
   return <ClassNoteView nodeKey={nodeKey} note={note} view={view} selected={selected} />
 }

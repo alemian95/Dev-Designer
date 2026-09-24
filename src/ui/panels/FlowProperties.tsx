@@ -5,9 +5,10 @@ import { useShallow } from "zustand/react/shallow"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { documentStore, type Recipe } from "@/editor/document-store"
+import { familySelectedKeys, qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { addLane, deleteLane, moveLane, renameLane, setEdgeLabel, setNodeLabel, setNodeLane, setNodeShape } from "@/editor/flow/commands"
-import { selectedKeys, sessionStore } from "@/editor/session-store"
+import { sessionStore } from "@/editor/session-store"
 import { FlowShapeSchema, nextLaneName, type FlowModel } from "@/model/flow/schema"
 import { FLOW_SHAPE_LABEL, FLOW_SHAPES } from "@/ui/flow-shapes"
 import { CommitInput } from "@/ui/panels/CommitInput"
@@ -23,7 +24,7 @@ function FlowNodeProperties({ nodeKey: key }: { nodeKey: string }) {
   // Come `NoteProperties` (`ClassProperties.tsx`): finché il doppio click ha aperto `FlowNodeEditor`
   // su *questo* nodo, il campo qui va in sola lettura — l'editor sul canvas è quello che l'utente
   // sta guardando, due campi modificabili per lo stesso dato divergerebbero.
-  const editingHere = useStore(sessionStore, (s) => s.editing?.key === key && s.editing.target === "body")
+  const editingHere = useStore(sessionStore, (s) => s.editing?.key === qualify("flow", key) && s.editing.target === "body")
   if (!node) return null
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -95,9 +96,9 @@ function FlowEdgeProperties({ edgeKey: key }: { edgeKey: string }) {
  */
 export function FlowProperties() {
   const selection = useStore(sessionStore, (s) => s.selection)
-  const nodes = selectedKeys(selection, "node")
+  const nodes = familySelectedKeys(selection, "node", "flow")
   if (nodes.length === 1) return <FlowNodeProperties key={nodes[0]} nodeKey={nodes[0]!} />
-  const edges = selectedKeys(selection, "edge")
+  const edges = familySelectedKeys(selection, "edge", "flow")
   return <FlowEdgeProperties key={edges[0]} edgeKey={edges[0]!} />
 }
 

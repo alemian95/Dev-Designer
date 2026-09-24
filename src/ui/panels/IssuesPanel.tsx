@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
-import { opsFor } from "@/editor/kinds/ops"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { Issue } from "@/model/issue"
 
@@ -18,7 +18,7 @@ export function IssuesPanel() {
   // `validateEr` costa un giro su tutte le relazioni per ogni entità — quindi il ricalcolo resta
   // legato al solo modello, non a ogni dispatch sul documento.
   const issues = useMemo(
-    () => opsFor(doc).validate(),
+    () => canvasOps(doc).validate(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `doc` è usato sopra di proposito senza essere qui: vedi il commento prima di `useMemo`.
     [doc.diagram.model],
   )

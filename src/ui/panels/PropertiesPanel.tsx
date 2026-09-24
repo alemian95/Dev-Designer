@@ -1,12 +1,13 @@
 import { useStore } from "zustand"
+import { splitKey } from "@/editor/families"
 import { selectedKeys, sessionStore } from "@/editor/session-store"
-import { useDiagramView } from "@/ui/canvas/kinds/registry"
+import { useDiagramView, viewFor } from "@/ui/canvas/kinds/registry"
 
 /**
  * Cornice, non contenuto: decide *se* c'è qualcosa da mostrare (esattamente un nodo o un arco
- * selezionato) e in tal caso monta `view.Properties`, il corpo specifico del tipo di diagramma
- * corrente. Il caso «niente selezionato» — zero o più selezioni miste — non dipende dal tipo,
- * quindi resta qui, con una frase unica: da quando gli strumenti sono per famiglia (Task 2) e
+ * selezionato) e in tal caso monta il `Properties` della famiglia di quell'elemento, letta dal
+ * prefisso della sua chiave. Il caso «niente selezionato» — zero o più selezioni miste — non
+ * dipende dal tipo, quindi resta qui, con una frase unica: da quando gli strumenti sono per famiglia (Task 2) e
  * «Collega» è comune a tutte, non c'è più un'etichetta di nodo/arco singola da comporre per tipo.
  *
  * **Selezione vuota**: di norma è anche lei neutra rispetto al tipo (la stessa frase sopra, con
@@ -21,7 +22,11 @@ export function PropertiesPanel() {
   const nodes = selectedKeys(selection, "node")
   const edges = selectedKeys(selection, "edge")
   const single = (nodes.length === 1 && edges.length === 0) || (edges.length === 1 && nodes.length === 0)
-  if (single) return <view.Properties />
+  if (single) {
+    const { family } = splitKey((nodes[0] ?? edges[0])!)
+    const { Properties } = viewFor(family)
+    return <Properties />
+  }
   if (selection.size === 0 && view.EmptyProperties) return <view.EmptyProperties />
   return (
     <p className="p-3 text-sm text-muted-foreground">

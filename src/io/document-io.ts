@@ -40,6 +40,8 @@ export interface DocumentIo {
   /** Da picker o da upload: il testo passa da `parseDocument`, che è il confine di fiducia. */
   openFile(opened: OpenedFile): Promise<void>
   openRecent(id: string): Promise<void>
+  /** Toglie il documento dall'archivio del browser; il file su disco, se c'è, non si tocca. */
+  removeRecent(id: string): Promise<void>
   save(): Promise<void>
   saveAs(): Promise<void>
   /** Chiede all'altra scheda di cedere e riparte dal suo ultimo autosave. */
@@ -236,6 +238,29 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     await safe(() => db.setLastOpenedId(rec.id), undefined)
   }
 
+  async function removeRecent(id: string): Promise<void> {
+    // Il documento aperto resterebbe negli store e il prossimo autosave rifarebbe il record.
+    if (id === session().docId) return
+    const rec = await safe(() => db.get(id), undefined)
+    if (!rec) return
+    const parsed = parseDocument(rec.json)
+    // Un record illeggibile non ha lavoro recuperabile: si elimina senza chiedere.
+    if (parsed.ok && hasUnsaved(rec, parsed.document) &&
+      !confirm(`"${rec.name}" ha modifiche che non sono in nessun file: eliminandolo dal browser andranno perse. Eliminarlo?`)) return
+    // Il lock dice se un'altra scheda lo tiene aperto: eliminato sotto di lei, il suo autosave lo
+    // riscriverebbe. Preso per il tempo della cancellazione, così nessuno lo apre a metà.
+    const held = await tryOwn(id, async () => {}, lock)
+    if (!held) {
+      notice(`"${rec.name}" è aperto in un'altra scheda: chiudilo lì prima di eliminarlo.`)
+      return
+    }
+    try {
+      await safe(() => db.remove(id), undefined)
+    } finally {
+      held.release()
+    }
+  }
+
   async function write(forceNew: boolean): Promise<void> {
     const s = session()
     if (s.readOnly) return
@@ -295,6 +320,7 @@ export function createDocumentIo(deps: DocumentIoDeps): DocumentIo {
     openWithPicker,
     openFile,
     openRecent,
+    removeRecent,
     save: () => write(false),
     saveAs: () => write(true),
     takeControl,

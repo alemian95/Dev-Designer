@@ -442,6 +442,52 @@ describe("takeControl", () => {
   })
 })
 
+describe("removeRecent", () => {
+  const busy: LockRequester = { request: (n, o, cb) => (o.ifAvailable ? cb(null) : cb({ name: n, mode: "exclusive" })) }
+
+  it("elimina senza chiedere un record già scritto su file", async () => {
+    const d = deps()
+    d.db.records.set("r1", record(withEntity("vecchio", "r1"), { updatedAt: 900, savedToFileAt: 900 }))
+    await createDocumentIo(d).removeRecent("r1")
+    expect(d.db.records.has("r1")).toBe(false)
+    expect(d.confirm).not.toHaveBeenCalled()
+  })
+
+  it("con lavoro non salvato chiede conferma, e al rifiuto non elimina", async () => {
+    const d = deps({ confirm: vi.fn(() => false) })
+    d.db.records.set("r2", record(withEntity("bozza", "r2")))
+    await createDocumentIo(d).removeRecent("r2")
+    expect(d.confirm).toHaveBeenCalledWith(expect.stringContaining('"bozza"'))
+    expect(d.db.records.has("r2")).toBe(true)
+  })
+
+  it("con lavoro non salvato e conferma, elimina", async () => {
+    const d = deps()
+    d.db.records.set("r3", record(withEntity("bozza", "r3")))
+    await createDocumentIo(d).removeRecent("r3")
+    expect(d.db.records.has("r3")).toBe(false)
+  })
+
+  it("il documento aperto non si elimina", async () => {
+    const d = deps()
+    const io = createDocumentIo(d)
+    await io.newDocument()
+    const id = documentSession.getState().docId
+    await io.removeRecent(id)
+    expect(d.db.records.has(id)).toBe(true)
+  })
+
+  it("un documento aperto in un'altra scheda non si elimina, e lo dice", async () => {
+    // Eliminato qui, l'autosave dell'altra scheda lo farebbe ricomparire.
+    const d = deps()
+    d.lock = { ...lock(), locks: busy }
+    d.db.records.set("r4", record(withEntity("altrove", "r4"), { updatedAt: 900, savedToFileAt: 900 }))
+    await createDocumentIo(d).removeRecent("r4")
+    expect(d.db.records.has("r4")).toBe(true)
+    expect(documentSession.getState().notice).toContain("un'altra scheda")
+  })
+})
+
 // Sanity: il round trip toJson → parseDocument regge un documento con entità (spec §7).
 it("round trip toJson/parseDocument", () => {
   const doc = withEntity("rt", "rt1")

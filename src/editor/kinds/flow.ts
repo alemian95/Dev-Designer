@@ -75,7 +75,7 @@ export function flowOps(doc: DevDocument): DiagramOps {
       const lane = laneAt(d, at.y) ?? nearestLane(d, at.y)
       if (lane === null) throw new Error("flowchart: il documento non ha nessuna corsia")
       const band = d.view.lanes[lane]
-      const size = flowNodeSize({ label: "", shape, lane })
+      const size = flowNodeSize({ label: "", shape })
       const y = band ? keepNodeInBand(band, size.h, at.y) : at.y
       return { ...addFlowNode({ x: at.x, y }, shape, lane), edit: "body" }
     },

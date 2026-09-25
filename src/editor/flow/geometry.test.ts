@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
 import type { FlowDiagram, FlowEdge, FlowNode } from "@/model/flow/schema"
+import { flowNodeSize as flowNodeSizeDelModello } from "@/model/flow/size"
+import { CHAR_W as CHAR_W_DEL_MODELLO } from "@/model/metrics"
 import { routeEdge } from "../edge-routing"
+import { CHAR_W } from "../geometry"
 import type { Rect } from "../geometry"
 import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, laneBandExtent, LANE_MARGIN, LANE_MIN_W, shapePath } from "./geometry"
 
@@ -30,6 +33,11 @@ describe("flowNodeSize", () => {
     const vuoto = flowNodeSize(node({ label: "" }))
     expect(vuoto.w).toBeGreaterThanOrEqual(60)
     expect(vuoto.h).toBeGreaterThanOrEqual(40)
+  })
+
+  it("è la funzione del modello riesportata, con le stesse metriche: una formula sola", () => {
+    expect(flowNodeSize).toBe(flowNodeSizeDelModello)
+    expect(CHAR_W).toBe(CHAR_W_DEL_MODELLO)
   })
 })
 

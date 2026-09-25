@@ -1,11 +1,11 @@
-export const FONT_SIZE = 13
-/** JetBrains Mono ha avanzamento 600/1000 em: larghezza carattere = 0,6 × font size. Nessuna misura nel DOM. */
-export const CHAR_W = FONT_SIZE * 0.6
+import { GRID } from "@/model/metrics"
+
+// Le metriche del testo vivono nel modello (spec 2b §3): qui si riesportano, così nessun chiamante
+// cambia import.
+export { CHAR_W, FONT_SIZE, GRID, PAD_X, ROW_H } from "@/model/metrics"
+
 export const HEADER_H = 28
-export const ROW_H = 22
-export const PAD_X = 10
 export const MIN_W = 160
-export const GRID = 10
 
 export interface Point { x: number; y: number }
 export interface Size { w: number; h: number }

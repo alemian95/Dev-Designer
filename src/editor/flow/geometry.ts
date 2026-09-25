@@ -1,38 +1,12 @@
 import type { FlowDiagram, FlowEdge, FlowNode, FlowShape } from "@/model/flow/schema"
+import { flowNodeSize } from "@/model/flow/size"
 import type { NodeView } from "@/model/shared"
 import { notePath } from "../class/geometry"
 import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
-import { CHAR_W, GRID, PAD_X, rectsBounds, ROW_H, type Point, type Rect, type Size } from "../geometry"
+import { rectsBounds, type Point, type Rect } from "../geometry"
 
-/**
- * Un rombo che deve contenere il rettangolo `w × h` del testo di un processo omologo ha bisogno di
- * `2w × 2h` (spec §7): il punto medio di ogni lato del rombo è a metà della sua diagonale, quindi
- * dimezzare il fattore vorrebbe dire che il rettangolo di testo esce dai lati obliqui. Non è una
- * scelta di stile — è la ragione per cui nei flowchart le decisioni si scrivono corte.
- */
-export const DECISION_FACTOR = 2
-
-/** Dimensione minima di un nodo appena creato, con etichetta vuota: deve restare afferrabile, non
- *  sparire in un punto. */
-const MIN_NODE_W = 60
-const MIN_NODE_H = 40
-
-/**
- * Dimensione di un nodo dalla sua etichetta, sulla falsariga di `noteSize` (`class/geometry.ts`):
- * larghezza dalla riga più lunga, altezza dal numero di righe. `decision` raddoppia entrambe le
- * misure con `DECISION_FACTOR` **dopo** aver applicato i minimi, così anche un rombo vuoto resta
- * un rombo — non un punto — e non solo il rettangolo che conterrebbe.
- */
-export function flowNodeSize(node: FlowNode): Size {
-  const lines = node.label.split("\n")
-  const chars = Math.max(0, ...lines.map((l) => l.length))
-  // Arrotondata alla griglia come `entitySize`, `classSize` e `noteSize`: il bordo sinistro di un
-  // nodo è già sulla griglia (`snap`, alla creazione e al drag), e senza questo arrotondamento
-  // quello destro non lo sarebbe — visibile ora che il nodo si disegna davvero (Task 7).
-  const w = Math.max(MIN_NODE_W, Math.ceil((chars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
-  const h = Math.max(MIN_NODE_H, lines.length * ROW_H)
-  return node.shape === "decision" ? { w: w * DECISION_FACTOR, h: h * DECISION_FACTOR } : { w, h }
-}
+// La misura dei nodi vive nel modello (spec 2b §3): qui si riesporta.
+export { DECISION_FACTOR, flowNodeSize } from "@/model/flow/size"
 
 export function flowNodeRect(node: FlowNode, view: NodeView): Rect {
   return { x: view.x, y: view.y, ...flowNodeSize(node) }

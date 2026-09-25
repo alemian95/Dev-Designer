@@ -163,8 +163,20 @@ export function createInteractionRunner(): InteractionRunner {
   /** Modo corrente e snapshot del drag: lo stato che vive fra un evento e il successivo. */
   let mode: Mode = IDLE
   let dragTargets: DragTargets | null = null
+  /** L'ultimo rifiuto che questo runner ha scritto nell'avviso, per poterlo togliere senza toccare
+   *  avvisi di altra origine (persistenza, autosave) che nel frattempo occupassero la barra. */
+  let lastRefusal: string | null = null
   const session = () => sessionStore.getState()
 
+  /**
+   * Toglie l'avviso solo se è ancora quello che questo runner ci aveva messo: un rifiuto del pool o
+   * di Collega non deve portarsi via un avviso arrivato dopo da un'altra fonte, come «Salvataggio
+   * automatico non disponibile» — quello resta finché l'utente non lo chiude da sé.
+   */
+  const clearOwnRefusal = (): void => {
+    if (documentSession.getState().notice === lastRefusal) documentSession.getState().patch({ notice: null })
+    lastRefusal = null
+  }
 
   const run = (fx: Effect): void => {
     switch (fx.type) {
@@ -203,14 +215,16 @@ export function createInteractionRunner(): InteractionRunner {
         const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target)
         if (!result) break
         if (result.type === "rejected") {
+          lastRefusal = result.notice
           documentSession.getState().patch({ notice: result.notice })
           break
         }
         if (result.type === "created") documentStore.getState().dispatch(result.recipe)
-        // Un collegamento riuscito fra famiglie toglie un eventuale rifiuto precedente dello stesso
-        // strumento: la chiave del risultato è `link/…` solo per un collegamento fra famiglie, mai per
-        // un arco dentro una famiglia (spec 4a §4, T6 della review finale).
-        if (linkId(result.key) !== null) documentSession.getState().patch({ notice: null })
+        // Un collegamento riuscito fra famiglie toglie il rifiuto precedente dello stesso strumento,
+        // non un avviso arrivato da altrove nel frattempo (es. autosave non disponibile): la chiave
+        // del risultato è `link/…` solo per un collegamento fra famiglie, mai per un arco dentro una
+        // famiglia (spec 4a §4, T6 della review finale).
+        if (linkId(result.key) !== null) clearOwnRefusal()
         session().setSelection([selId("edge", result.key)])
         session().setTool("select")
         break
@@ -220,13 +234,15 @@ export function createInteractionRunner(): InteractionRunner {
         const notice = ops.refuseNode(fx.at, fx.family, fx.variant)
         if (notice !== null) {
           // Come un rifiuto di Collega: l'avviso nella barra, e lo strumento resta attivo per riprovare.
+          lastRefusal = notice
           documentSession.getState().patch({ notice })
           break
         }
         const { key, recipe, edit } = ops.addNode(fx.at, fx.family, fx.variant)
         documentStore.getState().dispatch(recipe)
-        // Una creazione riuscita toglie un eventuale rifiuto precedente, come un collegamento riuscito.
-        documentSession.getState().patch({ notice: null })
+        // Una creazione riuscita toglie il rifiuto precedente dello stesso strumento, come un
+        // collegamento riuscito — non un avviso arrivato da altrove (es. autosave non disponibile).
+        clearOwnRefusal()
         session().setSelection([selId("node", key)])
         session().setTool("select")
         if (edit !== null) session().setEditing({ key, target: edit })

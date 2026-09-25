@@ -111,6 +111,7 @@ afterEach(() => {
   for (const k of CHIAVI) registerNode(qualify("er", k), null)
   for (const k of ARCHI) registerEdge(qualify("er", k), null)
   sessionStore.getState().setSelection([])
+  documentSession.getState().patch({ notice: null })
 })
 
 /** Presa sull'header di `dentro`, un solo spostamento di 900 unità verso l'alto, rilascio. */
@@ -274,6 +275,20 @@ describe("il rilascio del flowchart", () => {
     expect(documentSession.getState().notice).toBeNull()
   })
 
+  it("una creazione riuscita non tocca un avviso estraneo, come quello dell'autosave", () => {
+    // Un rifiuto del pool non c'entra: qui l'avviso a schermo è quello del persistence layer
+    // (autosave.ts / document-io.ts), che deve restare finché l'utente non lo chiude da sé.
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    documentSession.getState().patch({ notice: "Salvataggio automatico non disponibile" })
+    sessionStore.getState().setTool("node", "flow", "pool")
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: 100, y: 1000 }, hit: { kind: "canvas" } }))
+    const creato = Object.keys(flowDiagram(documentStore.getState().doc).model.pools).find((id) => id !== "p1")
+    expect(creato).toBeDefined()
+    expect(documentSession.getState().notice).toBe("Salvataggio automatico non disponibile")
+    sessionStore.getState().setTool("select")
+  })
+
   it("l'anteprima del drag di un pool muove anche i suoi nodi", () => {
     const base = withPool(createDocument("t", "t"))
     const added = addFlowNode({ x: 100, y: 20 }, "process", "l1")
@@ -321,10 +336,10 @@ describe("Collega fra famiglie", () => {
     return doc
   }
 
-  /** Il gesto Collega da `source` a `target`, con lo strumento attivo. */
-  function collega(source: string, target: string) {
+  /** Il gesto Collega da `source` a `target`, con lo strumento attivo. Un runner passato esplicito fa
+   *  proseguire lo stesso `lastRefusal`, come nell'app dove un solo runner vive per montaggio. */
+  function collega(source: string, target: string, runner = createInteractionRunner()) {
     sessionStore.getState().setTool("edge")
-    const runner = createInteractionRunner()
     runner.step(giu({ hit: { kind: "node", key: source } }))
     runner.step(muovi({ world: { x: 10, y: 10 } }))
     runner.step(su({ hit: { kind: "node", key: target } }))
@@ -356,11 +371,21 @@ describe("Collega fra famiglie", () => {
 
   it("un collegamento riuscito toglie l'avviso di un rifiuto precedente", () => {
     // T6 (review finale): un Collega riuscito fra famiglie non deve lasciare a schermo l'avviso di un
-    // rifiuto precedente dello stesso strumento.
-    collega(qualify("class", "Pagabile"), qualify("er", "ordini"))
+    // rifiuto precedente dello stesso strumento. Stesso runner per entrambi i gesti, come nell'app,
+    // dove è lui a ricordarsi il proprio ultimo rifiuto.
+    const runner = createInteractionRunner()
+    collega(qualify("class", "Pagabile"), qualify("er", "ordini"), runner)
     expect(documentSession.getState().notice).toBe("Un'interfaccia non si mappa su una tabella.")
-    collega(qualify("class", "Ordine"), qualify("er", "ordini"))
+    collega(qualify("class", "Ordine"), qualify("er", "ordini"), runner)
     expect(documentSession.getState().notice).toBeNull()
+  })
+
+  it("un collegamento riuscito non tocca un avviso estraneo, come quello dell'autosave", () => {
+    // Stesso principio del test sulla creazione: solo il rifiuto dello strumento va tolto, non un
+    // avviso del persistence layer che sta mostrando la sua unica occasione di farsi notare.
+    documentSession.getState().patch({ notice: "Salvataggio automatico non disponibile" })
+    collega(qualify("class", "Ordine"), qualify("er", "ordini"))
+    expect(documentSession.getState().notice).toBe("Salvataggio automatico non disponibile")
   })
 
   it("un collegamento già presente si seleziona, senza un passo di annulla in più", () => {

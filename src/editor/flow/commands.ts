@@ -131,8 +131,9 @@ export function setNodeShape(key: string, shape: FlowShape): Recipe {
 /**
  * Cambia la corsia di un nodo dal pannello — l'alternativa da tastiera al trascinamento (spec 2b §7).
  * Con `null` il nodo diventa libero e resta dov'è. Con una corsia ci entra: la `y` al centro della
- * corsia, e la `x` solo se il nodo sta fuori dalla corsia in orizzontale — per esempio quando passa
- * da libero, o da un altro pool. Entrambe rientrano nei margini con `keepInSpan`.
+ * corsia, e la `x` resta dov'è ma rientra sempre nei margini con `keepInSpan`, `LANE_PAD` dai bordi —
+ * cambia quindi anche per un nodo già dentro la corsia ma a meno di `LANE_PAD` da un bordo, oltre che
+ * per uno che ne sta fuori, per esempio quando passa da libero o da un altro pool.
  */
 export function setNodeLane(key: string, laneId: string | null): Recipe {
   return (draft) => {

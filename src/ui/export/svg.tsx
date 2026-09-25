@@ -86,7 +86,8 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
  * layer che solo il flowchart ha, disegnato con la stessa `PoolsLayerView` del canvas, così il
  * pool è identico nell'app e nell'export.
  *
- * `null` se non c'è nessun nodo con una view: non c'è niente da esportare.
+ * `null` se non c'è né un nodo con una view né un pool: non c'è niente da esportare. Un pool senza
+ * nodi esporta, come conta per «Adatta alla vista» e per Disponi (spec 2b §6).
  */
 export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions): string | null {
   // Una sezione per famiglia: chiavi, rettangoli e archi restano senza prefisso, perché le viste

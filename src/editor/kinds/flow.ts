@@ -4,7 +4,7 @@ import { validateFlow } from "@/model/flow/validate"
 import { addFlowEdge, addFlowNode, addPool, applyFlowLayout, clampLaneH, clampPoolW, deleteFlowItems, duplicateFlowNodes, moveFlowNodes, resizeLane, resizePool } from "../flow/commands"
 import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, flowNodeSize, laneAt, laneRect, poolAt, poolMembers, poolRect } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
-import { flowLayoutGraph, keepInSpan } from "../flow/layout"
+import { flowLayoutGraph, keepInSpan, placedBounds } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /** La variante dello strumento nodo che crea un pool invece di un nodo (spec 2b §5). */
@@ -82,7 +82,9 @@ export function flowOps(doc: DevDocument): DiagramOps {
 
     layoutGraph: () => flowLayoutGraph(diagram()),
 
-    layoutRecipe: (positions) => applyFlowLayout(positions),
+    layoutBounds: (positions) => placedBounds(diagram(), positions),
+
+    layoutRecipe: (positions, offset) => applyFlowLayout(positions, offset),
 
     resize: (key, lane, dx, dy) => {
       const d = diagram()

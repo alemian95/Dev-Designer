@@ -302,12 +302,24 @@ describe("applyFlowLayout", () => {
     next = apply(next, (draft) => {
       delete fd(draft).view.nodes[c.key]
     })
-    const d = fd(apply(next, applyFlowLayout({ [a.key]: { x: 10, y: 999 }, [b.key]: { x: 20, y: 999 }, [c.key]: { x: 30, y: 999 } })))
+    const d = fd(apply(next, applyFlowLayout({ [a.key]: { x: 10, y: 999 }, [b.key]: { x: 20, y: 999 }, [c.key]: { x: 30, y: 999 } }, { x: 0, y: 0 })))
     expect(d.view.nodes[a.key]).toMatchObject({ x: 10, y: LANE_PAD })
     expect(d.view.nodes[b.key]).toMatchObject({ x: 20, y: laneRect(d, "l2")!.y + LANE_PAD })
     expect(d.view.nodes[c.key]).toBeUndefined()
     expect(d.view.pools["p1"]!.y).toBe(0)
     expect(d.view.lanes["l1"]).toEqual({ h: LANE_MIN_H })
+  })
+
+  it("trasla di `offset` nodi e pool insieme, anche un pool senza nodi", () => {
+    const a = addFlowNode({ x: 0, y: 0 }, "process", "l1")
+    const base = fd(apply(apply(docWith(["l1"]), a.recipe), applyFlowLayout({ [a.key]: { x: 10, y: 0 } }, { x: 0, y: 0 })))
+    const moved = fd(apply(apply(docWith(["l1"]), a.recipe), applyFlowLayout({ [a.key]: { x: 10, y: 0 } }, { x: 300, y: 70 })))
+    expect(moved.view.nodes[a.key]).toMatchObject({ x: base.view.nodes[a.key]!.x + 300, y: base.view.nodes[a.key]!.y + 70 })
+    expect(moved.view.pools["p1"]).toEqual({ ...base.view.pools["p1"]!, x: base.view.pools["p1"]!.x + 300, y: base.view.pools["p1"]!.y + 70 })
+    expectLaneInvariant(moved)
+
+    const empty = fd(apply(docWith(["l1"]), applyFlowLayout({}, { x: 300, y: 70 })))
+    expect(empty.view.pools["p1"]).toMatchObject({ x: 300, y: 70 })
   })
 })
 

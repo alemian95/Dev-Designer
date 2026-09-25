@@ -1,7 +1,7 @@
 import { LANE_MARGIN, LANE_MIN_H, POOL_HEADER_W, POOL_MIN_W, type FlowDiagram, type LaneView, type PoolView } from "@/model/flow/schema"
 import type { LayoutEdge, LayoutGraph, LayoutNode, LayoutPositions } from "@/model/layout"
-import { snap, type Point, type Size } from "../geometry"
-import { flowNodeSize } from "./geometry"
+import { rectsBounds, snap, type Point, type Rect, type Size } from "../geometry"
+import { flowNodeSize, poolRect } from "./geometry"
 
 export const LANE_PAD = 20
 export const ROW_GAP = 24
@@ -155,4 +155,21 @@ export function placeInLanes(
   }
 
   return { positions: out, pools, lanes }
+}
+
+/**
+ * L'ingombro del flusso dopo `placeInLanes`: i nodi disposti e i pool, anche vuoti, con le altezze
+ * delle corsie appena calcolate. È il blocco del flusso che Disponi impacchetta accanto alle altre
+ * famiglie (spec 2b §6); `null` se non c'è né un nodo né un pool.
+ */
+export function placedBounds(diagram: FlowDiagram, positions: LayoutPositions): Rect | null {
+  const placed = placeInLanes(diagram, positions)
+  const part = { model: diagram.model, view: placed }
+  return rectsBounds([
+    ...Object.entries(placed.positions).flatMap(([key, p]) => {
+      const node = diagram.model.nodes[key]
+      return node ? [{ ...p, ...flowNodeSize(node) }] : []
+    }),
+    ...Object.keys(placed.pools).flatMap((id) => poolRect(part, id) ?? []),
+  ])
 }

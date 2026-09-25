@@ -395,20 +395,21 @@ export function moveLane(poolId: string, from: number, to: number): Recipe {
 /**
  * Posizioni, pool e altezze delle corsie in **una sola** recipe: più dispatch darebbero più passi di
  * undo per un gesto solo. `placeInLanes` è la funzione pura che fa il lavoro; qui si scrive il
- * risultato nel documento.
+ * risultato nel documento, traslato di `offset` — nodi e pool insieme, così la traslazione che
+ * l'impacchettamento dà al blocco vale anche per un flusso fatto solo di pool vuoti (spec 2b §6).
  */
-export function applyFlowLayout(positions: LayoutPositions): Recipe {
+export function applyFlowLayout(positions: LayoutPositions, offset: Point): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
     const placed = placeInLanes(d, positions)
     for (const [key, p] of Object.entries(placed.positions)) {
       const view = d.view.nodes[key]
       if (view) {
-        view.x = p.x
-        view.y = p.y
+        view.x = p.x + offset.x
+        view.y = p.y + offset.y
       }
     }
-    d.view.pools = placed.pools
+    d.view.pools = Object.fromEntries(Object.entries(placed.pools).map(([id, v]) => [id, { ...v, x: v.x + offset.x, y: v.y + offset.y }]))
     d.view.lanes = placed.lanes
   }
 }

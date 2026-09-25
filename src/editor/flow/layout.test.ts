@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { FlowDiagram } from "@/model/flow/schema"
 import { LANE_MARGIN, LANE_MIN_H, POOL_HEADER_W, POOL_MIN_W } from "@/model/flow/schema"
-import { flowLayoutGraph, keepInSpan, LANE_PAD, placeInLanes } from "./layout"
+import { flowLayoutGraph, keepInSpan, LANE_PAD, placedBounds, placeInLanes } from "./layout"
 
 const node = (lane: string | null) => ({ label: "x", shape: "process" as const, lane })
 
@@ -169,5 +169,17 @@ describe("flowLayoutGraph", () => {
 
   it("la direzione è RIGHT: le corsie occupano l'asse verticale", () => {
     expect(flowLayoutGraph(graphDiagram()).direction).toBe("RIGHT")
+  })
+})
+
+describe("placedBounds", () => {
+  it("comprende il pool, che sporge a sinistra dei nodi e può essere più largo", () => {
+    const b = placedBounds(diagram({ a: "l1" }), { a: { x: 100, y: 0 } })!
+    expect(b).toEqual({ x: 100 - LANE_MARGIN - POOL_HEADER_W, y: 0, w: POOL_MIN_W, h: LANE_MIN_H })
+  })
+
+  it("un pool vuoto è un blocco, senza nodi non c'è niente", () => {
+    expect(placedBounds(diagram({}), {})).toEqual({ x: 0, y: 0, w: POOL_MIN_W, h: LANE_MIN_H })
+    expect(placedBounds(diagram({}, {}), {})).toBeNull()
   })
 })

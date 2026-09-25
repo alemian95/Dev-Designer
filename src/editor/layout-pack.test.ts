@@ -2,32 +2,47 @@ import { describe, expect, it } from "vitest"
 import { createDocument } from "@/model/document"
 import type { LayoutGraph } from "@/model/layout"
 import { documentStore } from "./document-store"
+import { flowDiagram } from "./flow-access"
+import { expectLaneInvariant } from "./flow/lane-invariant"
+import { rectsIntersect } from "./geometry"
 import { canvasOps } from "./kinds/canvas-ops"
-import { LAYOUT_FAMILY_GAP, LAYOUT_MARGIN, layoutAll, packBlocks } from "./layout-pack"
+import { LAYOUT_FAMILY_GAP, LAYOUT_MARGIN, layoutAll, nodesBounds, packBlocks } from "./layout-pack"
 
 const node = (id: string, w = 100, h = 50) => ({ id, w, h })
+const rect = (x: number, y: number, w: number, h = 50) => ({ x, y, w, h })
 
 describe("packBlocks", () => {
   it("il primo blocco parte dal margine, qualunque sia l'origine di ELK", () => {
-    const out = packBlocks([{ family: "er", nodes: [node("a"), node("b")], positions: { a: { x: 12, y: 30 }, b: { x: 212, y: 130 } } }])
-    expect(out.get("er")).toEqual({ a: { x: LAYOUT_MARGIN, y: LAYOUT_MARGIN }, b: { x: LAYOUT_MARGIN + 200, y: LAYOUT_MARGIN + 100 } })
+    const out = packBlocks([{ family: "er", bounds: rect(12, 30, 300, 150) }])
+    expect(out.get("er")).toEqual({ x: LAYOUT_MARGIN - 12, y: LAYOUT_MARGIN - 30 })
   })
 
   it("i blocchi stanno in fila da sinistra a destra, separati dal margine fra famiglie, allineati in alto", () => {
     const out = packBlocks([
-      { family: "er", nodes: [node("a", 100)], positions: { a: { x: 0, y: 0 } } },
-      { family: "flow", nodes: [node("n", 80)], positions: { n: { x: 500, y: 90 } } },
+      { family: "er", bounds: rect(0, 0, 100) },
+      { family: "flow", bounds: rect(500, 90, 80) },
     ])
-    expect(out.get("flow")).toEqual({ n: { x: LAYOUT_MARGIN + 100 + LAYOUT_FAMILY_GAP, y: LAYOUT_MARGIN } })
+    expect(out.get("flow")).toEqual({ x: LAYOUT_MARGIN + 100 + LAYOUT_FAMILY_GAP - 500, y: LAYOUT_MARGIN - 90 })
   })
 
-  it("la larghezza di un blocco è l'ingombro reale dei nodi, non la sola posizione", () => {
+  it("un blocco vuoto non occupa posto e non si trasla", () => {
     const out = packBlocks([
-      { family: "er", nodes: [node("a", 100), node("b", 300)], positions: { a: { x: 0, y: 0 }, b: { x: 50, y: 200 } } },
-      { family: "class", nodes: [node("c")], positions: { c: { x: 0, y: 0 } } },
+      { family: "er", bounds: null },
+      { family: "class", bounds: rect(0, 0, 100) },
     ])
-    // Il blocco ER va da 0 a 350 (b parte a 50 ed è largo 300).
-    expect(out.get("class")!.c!.x).toBe(LAYOUT_MARGIN + 350 + LAYOUT_FAMILY_GAP)
+    expect(out.has("er")).toBe(false)
+    expect(out.get("class")).toEqual({ x: LAYOUT_MARGIN, y: LAYOUT_MARGIN })
+  })
+})
+
+describe("nodesBounds", () => {
+  it("la larghezza di un blocco è l'ingombro reale dei nodi, non la sola posizione", () => {
+    // b parte a 50 ed è largo 300: il blocco va da 0 a 350.
+    expect(nodesBounds([node("a", 100), node("b", 300)], { a: { x: 0, y: 0 }, b: { x: 50, y: 200 } })).toEqual(rect(0, 0, 350, 250))
+  })
+
+  it("i nodi senza posizione non contano, e senza nodi non c'è blocco", () => {
+    expect(nodesBounds([node("a")], {})).toBeNull()
   })
 })
 
@@ -56,6 +71,47 @@ describe("layoutAll", () => {
     const flow = ops.nodeKeys().filter((k) => k.startsWith("flow/")).map((k) => ops.rectOf(k)!)
     const erRight = Math.max(...er.map((r) => r.x + r.w))
     expect(Math.min(...flow.map((r) => r.x))).toBeGreaterThan(erRight)
+  })
+
+  /** ER e flusso, con un pool nell'angolo in cui l'ER finirà: lo strumento di forma dato crea il resto. */
+  function erEPool(conNodo: boolean) {
+    documentStore.getState().load(createDocument("t", "t"))
+    const add = (at: { x: number; y: number }, family: "er" | "flow", variant?: string) => {
+      const { recipe } = canvasOps(documentStore.getState().doc).addNode(at, family, variant)
+      documentStore.getState().dispatch(recipe)
+    }
+    add({ x: 0, y: 0 }, "er")
+    add({ x: 300, y: 0 }, "er")
+    add({ x: 0, y: 0 }, "flow", "pool")
+    if (conNodo) add({ x: 100, y: 40 }, "flow", "process")
+    return documentStore.getState().doc
+  }
+
+  /** I rettangoli dopo Disponi: le entità ER e i pool. */
+  async function disponi(doc: ReturnType<typeof erEPool>) {
+    documentStore.getState().dispatch((await layoutAll(doc, fila))!)
+    const ops = canvasOps(documentStore.getState().doc)
+    const er = ops.nodeKeys().filter((k) => k.startsWith("er/")).map((k) => ops.rectOf(k)!)
+    const pools = ops.frameKeys().map((k) => ops.rectOf(k)!)
+    return { er, pools, erRight: Math.max(...er.map((r) => r.x + r.w)) }
+  }
+
+  it("un pool vuoto conta come blocco del flusso: sta dopo l'ER, a LAYOUT_FAMILY_GAP, senza sovrapporsi", async () => {
+    const { er, pools, erRight } = await disponi(erEPool(false))
+    expect(pools).toHaveLength(1)
+    const pool = pools[0]!
+    expect(er.some((r) => rectsIntersect(r, pool))).toBe(false)
+    expect(pool.x - erRight).toBe(LAYOUT_FAMILY_GAP)
+    expect(pool.y).toBe(LAYOUT_MARGIN)
+  })
+
+  it("il blocco del flusso si misura dal bordo del pool, non dai suoi nodi", async () => {
+    const { pools, erRight } = await disponi(erEPool(true))
+    const pool = pools[0]!
+    expect(pool.x - erRight).toBe(LAYOUT_FAMILY_GAP)
+    expect(pool.y).toBe(LAYOUT_MARGIN)
+    // Il nodo resta nella sua corsia: la traslazione vale per nodi e pool insieme.
+    expectLaneInvariant(flowDiagram(documentStore.getState().doc))
   })
 
   it("un fallimento non applica niente", async () => {

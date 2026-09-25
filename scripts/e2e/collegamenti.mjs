@@ -171,6 +171,9 @@ export async function run(browser, base) {
       // Appena creato, il collegamento è selezionato e il pannello è il suo.
       await page.locator("#link-mode").selectOption("write")
       await expectText(page, LINK, "scrive")
+      // Toglie il focus dal <select>: altrimenti il prossimo `r` funzionerebbe solo perché
+      // `isTypingTarget` non esclude SELECT, non perché la scorciatoia è pensata per il canvas.
+      await page.locator("#link-mode").blur()
     })
 
     await step("lo stesso processo collegato alla classe: nasce «chiama»", async () => {

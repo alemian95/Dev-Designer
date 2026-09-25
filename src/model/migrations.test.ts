@@ -99,7 +99,7 @@ describe("migrazione 3 → 4", () => {
     expect(r.document.diagram.links).toEqual({})
   })
 
-  it("un documento v2 arriva alla 4 passando dalla 3", () => {
+  it("un documento v2 arriva alla 5 passando dalla 3", () => {
     const r = parseDocument(v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } }))
     expect(r.ok && r.document.diagram.links).toEqual({})
   })

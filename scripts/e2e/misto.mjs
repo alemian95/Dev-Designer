@@ -1,9 +1,9 @@
 /**
  * End-to-end del canvas unificato: un'entità, una classe e un nodo di flusso nello stesso documento.
  * Prova quello che senza un browser vero non esiste: che le chiavi del DOM portino la famiglia, che
- * Collega fra un'entità e un nodo di flusso crei un accesso «legge», mentre dentro una famiglia
- * crea una relazione, che il documento misto sopravviva a un ricaricamento, che Disponi metta le famiglie in
- * fila senza sovrapposizioni, e che l'export testo offra i formati di tutte e tre.
+ * Collega fra un'entità e un nodo di flusso crei un accesso «legge», mentre dentro una famiglia crea
+ * una relazione, che il documento misto sopravviva a un ricaricamento, che Disponi metta le famiglie
+ * in fila senza sovrapposizioni, e che l'export testo offra i formati di tutte e tre.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/misto.mjs`. `HEADLESS=0` per vedere.
  */

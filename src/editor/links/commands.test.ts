@@ -156,11 +156,12 @@ describe("deleteLinks e linksTouching", () => {
 })
 
 describe("setLinkMode", () => {
-  /** Un accesso `a1` in lettura e un «mappa su» `m1`. */
+  /** Un accesso `a1` in lettura, un «mappa su» `m1` e un «chiama» `c1`. */
   function accessi() {
     state().dispatch((draft) => {
       draft.diagram.links["a1"] = { kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "read" }
       draft.diagram.links["m1"] = { kind: "maps-to", source: "class/Ordine", target: "er/ordini" }
+      draft.diagram.links["c1"] = { kind: "calls", source: "flow/p1", target: "class/Ordine" }
     })
   }
 
@@ -173,12 +174,14 @@ describe("setLinkMode", () => {
   })
 
   it("lo stesso modo, un id che non c'è o un collegamento di un altro tipo non scrivono niente", () => {
-    // Review Focus 4: su un «mappa su» non deve comparire un campo `mode`.
+    // Review Focus 4: su un «mappa su» o un «chiama» non deve comparire un campo `mode`.
     accessi()
     expect(state().dispatch(setLinkMode("a1", "read"))).toBe(false)
     expect(state().dispatch(setLinkMode("fantasma", "write"))).toBe(false)
     expect(state().dispatch(setLinkMode("m1", "write"))).toBe(false)
     expect(links()["m1"]).toEqual({ kind: "maps-to", source: "class/Ordine", target: "er/ordini" })
+    expect(state().dispatch(setLinkMode("c1", "write"))).toBe(false)
+    expect(links()["c1"]).toEqual({ kind: "calls", source: "flow/p1", target: "class/Ordine" })
   })
 })
 

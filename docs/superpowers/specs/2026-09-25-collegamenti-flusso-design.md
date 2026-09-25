@@ -214,6 +214,9 @@ Il messaggio di `link-dangling` di un `maps-to` resta quindi quello del 4a:
 - «Disponi» continua a ignorare i collegamenti, e mette le famiglie in blocchi separati: un flusso
   può finire lontano dalle sue tabelle. Con il 4b il caso è più frequente; resta da rivalutare.
 - Tutti i tipi hanno lo stesso tratteggio: si distinguono solo dall'etichetta.
+- Un nodo di flusso che diventa nota **dopo** essere stato collegato conserva i suoi collegamenti, e
+  la validazione non lo segnala. Il gesto rifiuta la nota, ma la regola non si ricontrolla dopo: lo
+  scopo è documentare, e la spec non vuole codici di problema nuovi (scostamento 2 del piano).
 
 ## 11. Decisioni prese nel brainstorming
 

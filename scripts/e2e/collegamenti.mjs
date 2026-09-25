@@ -2,7 +2,9 @@
  * End-to-end dei collegamenti fra famiglie (spec 4a §9): una classe «mappa su» un'entità. Prova quello
  * che senza un browser vero non esiste: il gesto Collega fra due famiglie, il pannello Problemi che si
  * aggiorna, il collegamento che resta attaccato a una rinomina e sopravvive a un ricaricamento, Canc
- * che lo elimina, e l'avviso quando il gesto viene rifiutato.
+ * che lo elimina, e l'avviso quando il gesto viene rifiutato. Poi i collegamenti del flusso (spec 4b
+ * §9): un processo che legge l'entità, il modo cambiato dal pannello, un «chiama» verso la classe, e
+ * il rifiuto di una nota del flusso.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/collegamenti.mjs`. `HEADLESS=0` per vedere.
  */
@@ -13,6 +15,13 @@ async function centerOfId(page, id) {
   const rect = (await nodeRects(page)).find((r) => r.id === id)
   if (!rect) throw new Error(`nessun nodo ${id}`)
   return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }
+}
+
+/** Centro in coordinate schermo del nodo di flusso che mostra `text`. */
+async function centerOfFlow(page, text) {
+  const id = await page.evaluate((t) => [...document.querySelectorAll('[data-node-id^="flow/"]')].find((g) => g.textContent.includes(t))?.getAttribute("data-node-id"), text)
+  if (!id) throw new Error(`nessun nodo di flusso con «${text}»`)
+  return centerOfId(page, id)
 }
 
 async function drag(page, from, to) {
@@ -58,6 +67,7 @@ export async function run(browser, base) {
     const entityName = page.locator('[aria-label="Nome entità"]')
     const className = page.locator('[aria-label="Nome classe"]')
     const members = page.locator('[aria-label="Membri della classe"]')
+    const nodeText = page.locator('[aria-label="Testo del nodo"]')
 
     await step("un'entità ordini con la colonna totale", async () => {
       await page.keyboard.press("e")
@@ -140,6 +150,50 @@ export async function run(browser, base) {
       await drag(page, await centerOfId(page, "class/interface"), await centerOfId(page, "er/righe"))
       await expectText(page, "[data-notice-bar]", "Un'interfaccia non si mappa su una tabella.")
       if ((await page.locator(LINK).count()) !== 0) throw new Error("è nato un collegamento da un'interfaccia")
+      await page.keyboard.press("Escape")
+    })
+
+    await step("un processo collegato all'entità: nasce «legge»", async () => {
+      // `2` è il processo (spec flowchart §11); la prima corsia sta in alto (y 0–160 nel mondo).
+      await page.keyboard.press("2")
+      await page.mouse.click(canvas.x + 400, canvas.y + 60)
+      await nodeText.waitFor()
+      await nodeText.fill("Calcola totale")
+      await nodeText.blur()
+      await nodeText.waitFor({ state: "detached" })
+      await page.keyboard.press("r")
+      await drag(page, await centerOfFlow(page, "Calcola totale"), await centerOfId(page, "er/righe"))
+      await expectText(page, LINK, "legge")
+      if ((await page.locator(LINK).count()) !== 1) throw new Error("atteso un solo collegamento")
+    })
+
+    await step("dal pannello il modo diventa «Scrive», e l'etichetta segue", async () => {
+      // Appena creato, il collegamento è selezionato e il pannello è il suo.
+      await page.locator("#link-mode").selectOption("write")
+      await expectText(page, LINK, "scrive")
+    })
+
+    await step("lo stesso processo collegato alla classe: nasce «chiama»", async () => {
+      await page.keyboard.press("r")
+      await drag(page, await centerOfFlow(page, "Calcola totale"), await centerOfId(page, "class/Ordine"))
+      await expectText(page, LINK, "chiama")
+      if ((await page.locator(LINK).count()) !== 2) throw new Error("attesi due collegamenti")
+    })
+
+    await step("una nota del flusso verso l'entità: avviso, e nessun collegamento nuovo", async () => {
+      await page.keyboard.press("6")
+      // `700`, non `900`: a `900` il nodo (con l'etichetta) sconfina oltre il bordo destro del
+      // canvas, nel pannello proprietà — il clic e il trascinamento successivo cadono lì e non
+      // sul canvas.
+      await page.mouse.click(canvas.x + 700, canvas.y + 60)
+      await nodeText.waitFor()
+      await nodeText.fill("promemoria")
+      await nodeText.blur()
+      await nodeText.waitFor({ state: "detached" })
+      await page.keyboard.press("r")
+      await drag(page, await centerOfFlow(page, "promemoria"), await centerOfId(page, "er/righe"))
+      await expectText(page, "[data-notice-bar]", "Una nota non legge né scrive una tabella.")
+      if ((await page.locator(LINK).count()) !== 2) throw new Error("è nato un collegamento da una nota")
       await page.keyboard.press("Escape")
     })
 

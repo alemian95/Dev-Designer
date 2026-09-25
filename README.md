@@ -33,11 +33,15 @@ inline con doppio click, undo/redo su ogni azione.
   undo. Sei regole di validazione (archi penzolanti, decisioni con meno di due uscite, vicoli
   ciechi, nodi irraggiungibili, rami senza etichetta, nessun terminale) e export Mermaid
   `flowchart LR` con una `subgraph` per corsia.
-- **Collegamenti fra famiglie**: una classe si collega a un'entità con «mappa su» — lo strumento
-  Collega, trascinando in qualunque verso — e l'app verifica che ogni attributo della classe abbia la
-  sua colonna (`createdAt` e `created_at` sono lo stesso campo) e un tipo compatibile, e che una
-  classe non mappi su più tabelle. Il collegamento segue le rinomine e sparisce con i suoi nodi. Fra
-  due famiglie che non hanno un tipo di collegamento, il gesto lo dice invece di non fare niente.
+- **Collegamenti fra famiglie**, con lo strumento Collega, trascinando in qualunque verso:
+  - una classe **mappa su** un'entità, e l'app verifica che ogni attributo della classe abbia la sua
+    colonna (`createdAt` e `created_at` sono lo stesso campo) e un tipo compatibile, e che una
+    classe non mappi su più tabelle;
+  - un nodo di flusso **accede** a un'entità — legge, scrive, o legge e scrive, scelto nel pannello —
+    e **chiama** una classe.
+
+  I collegamenti seguono le rinomine e spariscono con i loro nodi. Una nota non si collega: il gesto
+  lo dice invece di non fare niente.
 
 La **validazione è live**: i problemi del documento compaiono in un pannello mentre si disegna, non a
 un comando esplicito.
@@ -223,15 +227,16 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   `subgraph`, un rombo `{"…"}` e l'etichetta sull'arco.
 - **Canvas misto**: crea un'entità, una classe e un nodo di flusso nello stesso documento e verifica
   che le chiavi del DOM portino il prefisso di famiglia, che «Collega» fra un'entità e un nodo di
-  flusso non crei niente e lo dica, mentre dentro la stessa famiglia colleghi (una seconda entità),
-  che il documento misto sopravviva a un ricaricamento, che «Disponi» metta le tre famiglie in fila
-  da sinistra a destra senza sovrapposizioni, e che «Esporta testo…» offra i formati di tutte e tre —
-  PostgreSQL, MySQL, Mermaid ER, Mermaid classi, Mermaid flowchart.
+  flusso crei un accesso «legge», mentre dentro la stessa famiglia crei una relazione (una seconda
+  entità), che il documento misto sopravviva a un ricaricamento, che «Disponi» metta le tre famiglie
+  in fila da sinistra a destra senza sovrapposizioni, e che «Esporta testo…» offra i formati di tutte
+  e tre — PostgreSQL, MySQL, Mermaid ER, Mermaid classi, Mermaid flowchart.
 - **Collegamenti**: crea un'entità `ordini` con la colonna `totale` e una classe `Ordine` con
   `totale` e `note`, le collega con «mappa su» e verifica che il pannello Problemi segnali solo
   `Ordine.note`. Poi rinomina l'entità e verifica che il collegamento resti attaccato, ricarica,
-  elimina il collegamento con Canc, e infine prova a collegare un'interfaccia all'entità e verifica
-  l'avviso.
+  elimina il collegamento con Canc, e prova a collegare un'interfaccia all'entità e verifica
+  l'avviso. Infine collega un processo all'entità («legge», poi «scrive» dal pannello) e alla
+  classe («chiama»), e verifica l'avviso per una nota del flusso.
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 

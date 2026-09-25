@@ -49,11 +49,15 @@ const SHAPE_TEMPLATE: Record<FlowShape, (id: string, label: string) => string> =
   },
 }
 
+/** Confronto per code unit UTF-16: lo stesso su ogni macchina, a differenza di `localeCompare`. */
+const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
 /**
  * Serializza il modello come `flowchart LR` (spec 2b §8): prima i nodi liberi, al livello più alto;
  * poi ogni pool come `subgraph`, con dentro un `subgraph` per corsia.
  *
- * **Ordine e id.** I pool escono per nome e, a parità, per id; le corsie nell'ordine del pool; dentro
+ * **Ordine e id.** I pool escono per nome e, a parità, per id, confrontati per code unit e non con
+ * `localeCompare`, che dipende dal locale della macchina; le corsie nell'ordine del pool; dentro
  * ogni corsia (e fra i liberi) le chiavi dei nodi in ordine alfabetico, lo stesso `sort()` di
  * `class-mermaid.ts` ed `er-mermaid.ts`. L'ordine viene tutto dal modello, mai dalla posizione:
  * lo stesso modello produce sempre lo stesso testo, byte per byte, anche dopo che un pool è stato
@@ -92,7 +96,7 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
 
   for (const key of emittable(null)) emitNode(key, "  ")
 
-  const pools = Object.entries(model.pools).sort(([a, p], [b, q]) => p.name.localeCompare(q.name) || (a < b ? -1 : 1))
+  const pools = Object.entries(model.pools).sort(([a, p], [b, q]) => byCodeUnit(p.name, q.name) || byCodeUnit(a, b))
   let laneCount = 0
   pools.forEach(([, pool], poolIndex) => {
     const lanes = pool.lanes.map((lane) => {

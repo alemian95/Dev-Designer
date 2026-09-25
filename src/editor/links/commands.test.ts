@@ -7,7 +7,7 @@ import { connectAcross, deleteLinks, followRename, linksTouching, retargetLinks 
 const state = () => documentStore.getState()
 const links = () => state().doc.diagram.links
 
-/** Un'entità `ordini`, una seconda entità `clienti`, e una classe, un'interfaccia, un enum e una nota. */
+/** Un'entità `ordini`, una seconda entità `clienti`, una classe, un'interfaccia, un enum, una nota di classe e un processo `p1`. */
 function documento(): DevDocument {
   const doc = createDocument("t", "t")
   // Un oggetto nuovo per nodo: una view condivisa fra due chiavi diventerebbe un alias nel documento.
@@ -22,6 +22,9 @@ function documento(): DevDocument {
   }
   doc.diagram.class.model.notes["n1"] = { text: "" }
   doc.diagram.class.view.nodes["n1"] = at()
+  const lane = doc.diagram.flow.model.lanes[0]!.id
+  doc.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane }
+  doc.diagram.flow.view.nodes["p1"] = at()
   return doc
 }
 
@@ -43,15 +46,24 @@ describe("connectAcross", () => {
     expect(Object.values(links())).toEqual([{ kind: "maps-to", source: "class/Ordine", target: "er/ordini" }])
   })
 
-  it("una coppia senza tipo è rifiutata, con le famiglie nell'ordine del gesto", () => {
-    expect(connectAcross(state().doc, "flow/n1", "er/ordini")).toEqual({
-      type: "rejected",
-      notice: "Non esiste un collegamento fra un nodo di flusso e un'entità.",
-    })
-    expect(connectAcross(state().doc, "class/Ordine", "flow/n1")).toEqual({
-      type: "rejected",
-      notice: "Non esiste un collegamento fra una classe e un nodo di flusso.",
-    })
+  it("nodo → entità ed entità → nodo creano lo stesso accesso, in lettura", () => {
+    for (const [from, to] of [["flow/p1", "er/ordini"], ["er/ordini", "flow/p1"]] as const) {
+      state().load(documento())
+      const r = connectAcross(state().doc, from, to)
+      if (r.type !== "created") throw new Error(`atteso created, arrivato ${r.type}`)
+      state().dispatch(r.recipe)
+      expect(Object.values(links())).toEqual([{ kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "read" }])
+    }
+  })
+
+  it("nodo → classe e classe → nodo creano lo stesso «chiama», anche verso un'interfaccia", () => {
+    for (const [from, to] of [["flow/p1", "class/Pagabile"], ["class/Pagabile", "flow/p1"]] as const) {
+      state().load(documento())
+      const r = connectAcross(state().doc, from, to)
+      if (r.type !== "created") throw new Error(`atteso created, arrivato ${r.type}`)
+      state().dispatch(r.recipe)
+      expect(Object.values(links())).toEqual([{ kind: "calls", source: "flow/p1", target: "class/Pagabile" }])
+    }
   })
 
   it("un'interfaccia, un enum e una nota non si mappano su una tabella", () => {

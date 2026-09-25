@@ -1,8 +1,8 @@
 /**
  * End-to-end del canvas unificato: un'entità, una classe e un nodo di flusso nello stesso documento.
  * Prova quello che senza un browser vero non esiste: che le chiavi del DOM portino la famiglia, che
- * Collega fra un'entità e un nodo di flusso non crei niente e lo dica, mentre dentro una famiglia
- * collega, che il documento misto sopravviva a un ricaricamento, che Disponi metta le famiglie in
+ * Collega fra un'entità e un nodo di flusso crei un accesso «legge», mentre dentro una famiglia
+ * crea una relazione, che il documento misto sopravviva a un ricaricamento, che Disponi metta le famiglie in
  * fila senza sovrapposizioni, e che l'export testo offra i formati di tutte e tre.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/misto.mjs`. `HEADLESS=0` per vedere.
@@ -73,12 +73,13 @@ export async function run(browser, base) {
       if (ids.join(",") !== "class,er,flow") throw new Error(`famiglie inattese: ${ids.join(",")}`)
     })
 
-    await step("Collega fra un'entità e un nodo di flusso non crea niente, e lo dice", async () => {
+    await step("Collega fra un'entità e un nodo di flusso crea «legge», e Canc lo toglie", async () => {
       await page.keyboard.press("r")
       await drag(page, await centerOf(page, "er/"), await centerOf(page, "flow/"))
-      await expectText(page, "[data-notice-bar]", "Non esiste un collegamento fra un'entità e un nodo di flusso.")
-      if ((await page.locator("[data-edge-id]").count()) !== 0) throw new Error("è nato un arco fra due famiglie senza tipo")
-      await page.keyboard.press("Escape")
+      await expectText(page, '[data-edge-id^="link/"]', "legge")
+      // Appena creato è selezionato: Canc lo toglie, e il resto dello scenario riparte senza archi.
+      await page.keyboard.press("Delete")
+      await page.waitForSelector('[data-edge-id^="link/"]', { state: "detached" })
     })
 
     await step("una seconda entità, e Collega fra le due crea una relazione ER", async () => {

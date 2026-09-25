@@ -51,17 +51,15 @@ describe("canvasOps (una famiglia)", () => {
     expect(canvasOps(state().doc).nodeKeys()).toContain(key)
   })
 
-  it("addEdge fra due nodi della stessa famiglia collega, fra due famiglie senza tipo rifiuta", () => {
+  it("addEdge fra due nodi della stessa famiglia collega, fra due famiglie crea un collegamento", () => {
     const { a, b } = erConDueEntita()
     const ops = canvasOps(state().doc)
     const r = ops.addEdge(`er/${a}`, `er/${b}`)
     expect(r?.type === "created" && r.key.startsWith("er/")).toBe(true)
-    // Basta la chiave per il rifiuto, che avviene prima di interrogare la famiglia: il caso con un
-    // nodo di flusso vero è in «famiglie mescolate», sotto.
-    expect(ops.addEdge(`er/${a}`, "flow/n1")).toEqual({
-      type: "rejected",
-      notice: "Non esiste un collegamento fra un'entità e un nodo di flusso.",
-    })
+    // Fra famiglie diverse decide `connectAcross`: il caso con un nodo di flusso vero è in
+    // «famiglie mescolate», sotto.
+    const across = ops.addEdge(`er/${a}`, "flow/n1")
+    expect(across?.type === "created" && across.key.startsWith("link/")).toBe(true)
   })
 
   it("deleteItems e duplicateNodes accettano e restituiscono chiavi con prefisso", () => {
@@ -125,13 +123,16 @@ describe("canvasOps (famiglie mescolate)", () => {
     expect(canvasOps(state().doc).nodeKeys().sort()).toEqual([entity.key, node.key].sort())
   })
 
-  it("Collega fra un'entità e un nodo di flusso non crea niente, e dice perché", () => {
+  it("Collega fra un'entità e un nodo di flusso crea un accesso in lettura", () => {
     state().load(createDocument("t", "t"))
     const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
     state().dispatch(entity.recipe)
     const node = canvasOps(state().doc).addNode({ x: 400, y: 40 }, "flow", "process")
     state().dispatch(node.recipe)
-    expect(canvasOps(state().doc).addEdge(entity.key, node.key)?.type).toBe("rejected")
+    const r = canvasOps(state().doc).addEdge(entity.key, node.key)
+    if (r?.type !== "created") throw new Error("atteso created")
+    state().dispatch(r.recipe)
+    expect(Object.values(state().doc.diagram.links)).toEqual([{ kind: "accesses", source: node.key, target: entity.key, mode: "read" }])
   })
 
   it("commitDrag misto: una recipe, ogni famiglia con la sua regola", () => {

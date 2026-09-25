@@ -30,7 +30,15 @@ function refusal(doc: DevDocument, kind: LinkKind, source: string): string | nul
       if (!cls) return "Una nota non si mappa su una tabella."
       return unmappableNotice(cls.stereotype)
     }
+    // I tipi del flusso: i rifiuti delle note arrivano con il Task 2.
+    default:
+      return null
   }
+}
+
+/** Il collegamento che nasce dal gesto: un accesso nasce in lettura, e il modo si cambia dal pannello. */
+function newLink(kind: LinkKind, source: string, target: string): Link {
+  return kind === "accesses" ? { kind, source, target, mode: "read" } : { kind, source, target }
 }
 
 /**
@@ -56,7 +64,7 @@ export function connectAcross(doc: DevDocument, from: string, to: string): Conne
     type: "created",
     key: linkKey(id),
     recipe: (draft) => {
-      draft.diagram.links[id] = { kind: rule.kind, source, target }
+      draft.diagram.links[id] = newLink(rule.kind, source, target)
     },
   }
 }

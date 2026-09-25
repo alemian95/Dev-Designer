@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe("pannello del collegamento", () => {
   it("mostra il tipo, gli estremi e i problemi del collegamento", () => {
-    expect(container.textContent).toContain("mappa su")
+    expect(container.textContent).toContain("Mappa su")
     expect(container.textContent).toContain("Ordine → ordini")
     expect(container.textContent).toContain("«Ordine.note» non ha una colonna in «ordini»")
   })

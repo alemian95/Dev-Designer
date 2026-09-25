@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button"
 import { deleteSelection } from "@/editor/actions"
 import { documentStore } from "@/editor/document-store"
 import { splitKey } from "@/editor/families"
+import { LINK_TITLE } from "@/model/links/labels"
 import { validateLinks } from "@/model/links/validate"
-import { LINK_LABEL } from "@/ui/canvas/link-label"
 
 /**
  * Il pannello di un collegamento fra famiglie (spec 4a §7): il tipo, i due estremi, i problemi di quel
@@ -22,7 +22,7 @@ export function LinkProperties({ linkId: id }: { linkId: string }) {
   if (!link) return null
   return (
     <div className="flex flex-col gap-3 p-3">
-      <p className="text-sm font-medium first-letter:uppercase">{LINK_LABEL[link.kind]}</p>
+      <p className="text-sm font-medium">{LINK_TITLE[link.kind]}</p>
       <p className="text-xs text-muted-foreground">
         {splitKey(link.source).key} → {splitKey(link.target).key}
       </p>

@@ -1,12 +1,13 @@
 import { enablePatches, produce, produceWithPatches } from "immer"
 import { describe, expect, it } from "vitest"
 import { createDocument, type DevDocument } from "@/model/document"
-import { LANE_MIN_H } from "@/model/flow/schema"
+import { LANE_MIN_H, POOL_MIN_W } from "@/model/flow/schema"
 import { snap } from "@/editor/geometry"
 import {
   addFlowEdge,
   addFlowNode,
   addLane,
+  addPool,
   applyFlowLayout,
   deleteFlowItems,
   deleteLane,
@@ -14,6 +15,7 @@ import {
   moveFlowNodes,
   moveLane,
   renameLane,
+  renamePool,
   setEdgeLabel,
   setNodeLabel,
   setNodeLane,
@@ -362,5 +364,57 @@ describe("moveFlowNodes", () => {
     const n = addFlowNode({ x: 0, y: 20 }, "process", "l1")
     const [, patches] = produceWithPatches(apply(dueCorsie(), n.recipe), moveFlowNodes([n.key], 3, 0)!)
     expect(patches).toHaveLength(0)
+  })
+})
+
+describe("addPool e renamePool", () => {
+  it("crea un pool allineato alla griglia, con una corsia «Corsia 1» alta il minimo", () => {
+    const { key, recipe } = addPool({ x: 33, y: 47 }, "Pool 1")
+    const d = fd(apply(createDocument("t", "t"), recipe))
+    expect(d.model.pools[key]).toEqual({ name: "Pool 1", lanes: [{ id: expect.any(String), name: "Corsia 1" }] })
+    expect(d.view.pools[key]).toEqual({ x: 30, y: 50, w: POOL_MIN_W })
+    expect(d.view.lanes[d.model.pools[key]!.lanes[0]!.id]).toEqual({ h: LANE_MIN_H })
+  })
+
+  it("rinomina il pool", () => {
+    expect(fd(apply(docWith(), renamePool("p1", "Ordini"))).model.pools["p1"]!.name).toBe("Ordini")
+  })
+})
+
+describe("moveFlowNodes con i pool", () => {
+  it("spostare un pool porta con sé i suoi nodi, senza cambiarne la corsia", () => {
+    const n = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    const next = apply(apply(docWith(), n.recipe), moveFlowNodes(["p1"], 200, 300)!)
+    // La fixture mette il pool a x = −32, fuori griglia: lo spostamento lo riallinea (−32 + 200 → 170).
+    expect(fd(next).view.pools["p1"]).toMatchObject({ x: 170, y: 300 })
+    expect(fd(next).view.nodes[n.key]).toMatchObject({ x: 300, y: 320 })
+    expect(fd(next).model.nodes[n.key]!.lane).toBe("l1")
+    expectLaneInvariant(fd(next))
+  })
+
+  it("un nodo libero sotto il pool non viene catturato, e non si sposta", () => {
+    // Review Focus 2.
+    const libero = addFlowNode({ x: 100, y: 20 }, "process", null)
+    const next = apply(apply(docWith(), libero.recipe), moveFlowNodes(["p1"], 200, 0)!)
+    expect(fd(next).view.nodes[libero.key]).toMatchObject({ x: 100, y: 20 })
+    expect(fd(next).model.nodes[libero.key]!.lane).toBeNull()
+  })
+
+  it("un nodo del pool che è anche fra le chiavi si sposta una volta sola", () => {
+    const n = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    const next = apply(apply(docWith(), n.recipe), moveFlowNodes(["p1", n.key], 200, 0)!)
+    expect(fd(next).view.nodes[n.key]!.x).toBe(300)
+  })
+})
+
+describe("deleteFlowItems con i pool", () => {
+  it("elimina il pool e le sue corsie, e i suoi nodi restano dove sono, liberi", () => {
+    const n = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    const next = apply(apply(docWith(), n.recipe), deleteFlowItems(["p1"], [])!)
+    expect(fd(next).model.pools).toEqual({})
+    expect(fd(next).view.pools).toEqual({})
+    expect(fd(next).view.lanes).toEqual({})
+    expect(fd(next).model.nodes[n.key]!.lane).toBeNull()
+    expect(fd(next).view.nodes[n.key]).toMatchObject({ x: 100, y: 20 })
   })
 })

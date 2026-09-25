@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createDocument } from "@/model/document"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
+import { withPool } from "@/editor/flow/pool-fixture"
 import { selId, sessionStore } from "@/editor/session-store"
 import { IDENTITY } from "@/editor/viewport"
 import { useCanvasInteraction } from "./use-canvas-interaction"
@@ -316,6 +317,16 @@ describe("il resto del cablaggio", () => {
     svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
     window.removeEventListener("error", onError)
     expect(errori).toEqual([])
+    expect(sessionStore.getState().editing).toBeNull()
+  })
+
+  it("il doppio click su un pool non apre niente", () => {
+    documentStore.getState().load(withPool(createDocument("f", "f")))
+    const pool = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    pool.setAttribute("data-node-id", qualify("flow", "p1"))
+    svg.append(pool)
+    sotto = pool
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
     expect(sessionStore.getState().editing).toBeNull()
   })
 

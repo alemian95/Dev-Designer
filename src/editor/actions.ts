@@ -1,6 +1,6 @@
 import { documentStore } from "./document-store"
 import { rectsBounds } from "./geometry"
-import { canvasOps } from "./kinds/canvas-ops"
+import { canvasOps, nodeRects } from "./kinds/canvas-ops"
 import { selId, selectedKeys, sessionStore } from "./session-store"
 import { fitToRect, IDENTITY, zoomAt } from "./viewport"
 
@@ -27,8 +27,7 @@ export function selectAllNodes(): void {
 }
 
 export function fitToContent(): void {
-  const ops = canvasOps(documentStore.getState().doc)
-  const rects = ops.nodeKeys().flatMap((key) => ops.rectOf(key) ?? [])
+  const rects = nodeRects(documentStore.getState().doc)
   const session = sessionStore.getState()
   session.setViewport(fitToRect(rectsBounds(rects), session.canvasSize))
 }

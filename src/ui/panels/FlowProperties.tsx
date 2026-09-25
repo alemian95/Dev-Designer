@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { familySelectedKeys, qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
-import { addLane, deleteLane, moveLane, renameLane, setEdgeLabel, setNodeLabel, setNodeLane, setNodeShape } from "@/editor/flow/commands"
+import { addLane, deleteLane, moveLane, renameLane, renamePool, setEdgeLabel, setNodeLabel, setNodeLane, setNodeShape } from "@/editor/flow/commands"
 import { poolIds } from "@/editor/flow/geometry"
 import { sessionStore } from "@/editor/session-store"
 import { FlowShapeSchema, nextName, type FlowModel, type Lane } from "@/model/flow/schema"
@@ -100,15 +100,35 @@ function FlowEdgeProperties({ edgeKey: key }: { edgeKey: string }) {
   )
 }
 
+/** Il pannello di un pool selezionato (spec 2b §7): il nome, e sotto le sue corsie. */
+function PoolProperties({ poolId }: { poolId: string }) {
+  const pool = useStore(documentStore, (s) => flowDiagram(s.doc).model.pools[poolId])
+  if (!pool) return null
+  return (
+    <div className="flex flex-col">
+      <div className="grid gap-1 p-3 pb-0">
+        <Label htmlFor="pool-name">Nome</Label>
+        <CommitInput key={pool.name} id="pool-name" value={pool.name} onCommit={(name) => dispatch(renamePool(poolId, name))} />
+      </div>
+      <PoolLanes poolId={poolId} />
+    </div>
+  )
+}
+
 /**
  * Corpo del pannello proprietà per il flowchart quando la selezione è esattamente un nodo o
  * esattamente un arco — stessa forma di `ClassProperties`/`kinds/er.tsx`: la cornice
  * (`PropertiesPanel`) garantisce che sia l'uno o l'altro, qui basta distinguere quale.
+ *
+ * Nodi e pool condividono lo spazio di chiavi di selezione: una chiave selezionata si distingue
+ * guardando in quale dei due record del modello compare, come fa `ClassProperties` per classi e note.
  */
 export function FlowProperties() {
   const selection = useStore(sessionStore, (s) => s.selection)
   const nodes = familySelectedKeys(selection, "node", "flow")
-  if (nodes.length === 1) return <FlowNodeProperties key={nodes[0]} nodeKey={nodes[0]!} />
+  const key = nodes.length === 1 ? nodes[0]! : undefined
+  const isPool = useStore(documentStore, (s) => key !== undefined && key in flowDiagram(s.doc).model.pools)
+  if (key !== undefined) return isPool ? <PoolProperties key={key} poolId={key} /> : <FlowNodeProperties key={key} nodeKey={key} />
   const edges = familySelectedKeys(selection, "edge", "flow")
   return <FlowEdgeProperties key={edges[0]} edgeKey={edges[0]!} />
 }

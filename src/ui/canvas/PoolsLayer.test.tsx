@@ -7,7 +7,9 @@ import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import { withPool } from "@/editor/flow/pool-fixture"
+import { selId, sessionStore } from "@/editor/session-store"
 import { createDocument } from "@/model/document"
 import { POOL_HEADER_W } from "@/model/flow/schema"
 import { PoolsLayer, PoolsLayerView } from "./PoolsLayer"
@@ -64,5 +66,15 @@ describe("PoolsLayer — connesso allo store", () => {
     const { html, smonta } = monta()
     expect(html()).toContain(">Pool 1<")
     smonta()
+  })
+
+  it("il pool è un nodo del canvas, e da selezionato ha il bordo evidenziato", () => {
+    documentStore.getState().load(withPool(createDocument("t")))
+    sessionStore.getState().setSelection([selId("node", qualify("flow", "p1"))])
+    const { html, smonta } = monta()
+    expect(html()).toContain('data-node-id="flow/p1"')
+    expect(html()).toContain('stroke="var(--primary)"')
+    smonta()
+    sessionStore.getState().setSelection([])
   })
 })

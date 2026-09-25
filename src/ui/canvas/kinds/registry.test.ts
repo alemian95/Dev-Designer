@@ -49,9 +49,9 @@ describe("terzo strumento", () => {
 })
 
 describe("flowchart", () => {
-  it("il flowchart dichiara sei strumenti, tutti con chiave distinta, tutti nella famiglia flow", () => {
+  it("il flowchart dichiara sei forme più il pool, tutti con chiave distinta, tutti nella famiglia flow", () => {
     const view = viewFor("flow")
-    expect(view.tools).toHaveLength(6)
+    expect(view.tools).toHaveLength(7)
     const keys = view.tools.map((t) => t.key)
     expect(new Set(keys).size).toBe(keys.length)
     expect(view.tools.every((t) => t.family === "flow")).toBe(true)
@@ -65,10 +65,12 @@ describe("flowchart", () => {
    * `undefined`: invisibile, e respinto da `FlowShapeSchema` al primo salvataggio. L'insieme delle
    * varianti deve coincidere esattamente con le forme dello schema, non solo essere non vuoto.
    */
-  it("le sei varianti del nodo sono esattamente le forme di FlowShapeSchema", () => {
+  it("le sei varianti di forma sono esattamente quelle di FlowShapeSchema, il pool a parte", () => {
     const view = viewFor("flow")
-    const nodeVariants = view.tools.filter((t) => t.tool === "node").map((t) => t.variant)
-    expect(new Set(nodeVariants)).toEqual(new Set(FlowShapeSchema.options))
+    // Il pool (spec 2b §5) è una variante dello strumento nodo ma non una forma: non appartiene a
+    // `FlowShapeSchema`, quindi va escluso da questo confronto.
+    const shapeVariants = view.tools.filter((t) => t.tool === "node" && t.variant !== "pool").map((t) => t.variant)
+    expect(new Set(shapeVariants)).toEqual(new Set(FlowShapeSchema.options))
   })
 
   it("la nota del flusso ha un'etichetta sua, distinta da quella delle classi", () => {

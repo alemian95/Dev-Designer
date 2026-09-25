@@ -1,11 +1,14 @@
 import type { DevDocument } from "@/model/document"
-import type { FlowShape } from "@/model/flow/schema"
+import { nextName, type FlowShape } from "@/model/flow/schema"
 import { validateFlow } from "@/model/flow/validate"
-import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes, moveFlowNodes } from "../flow/commands"
-import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, flowNodeSize, laneAt, laneRect } from "../flow/geometry"
+import { addFlowEdge, addFlowNode, addPool, applyFlowLayout, deleteFlowItems, duplicateFlowNodes, moveFlowNodes } from "../flow/commands"
+import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, flowNodeSize, laneAt, laneRect, poolAt, poolMembers, poolRect } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
 import { flowLayoutGraph, keepInSpan } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
+
+/** La variante dello strumento nodo che crea un pool invece di un nodo (spec 2b §5). */
+export const POOL_VARIANT = "pool"
 
 /**
  * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts` e `flow/layout.ts`,
@@ -22,9 +25,20 @@ export function flowOps(doc: DevDocument): DiagramOps {
   return {
     nodeKeys: () => Object.keys(diagram().view.nodes),
 
+    frameKeys: () => Object.keys(diagram().model.pools),
+
+    withFollowers: (keys) => {
+      const d = diagram()
+      return [...new Set([...keys, ...keys.flatMap((k) => (k in d.model.pools ? poolMembers(d, k) : []))])]
+    },
+
+    refuseNode: (at, variant) => (variant === POOL_VARIANT && poolAt(diagram(), at) !== null ? "Un pool non sta dentro un altro pool." : null),
+
     rectOf: (key, at) => {
-      const node = diagram().model.nodes[key]
-      const view = diagram().view.nodes[key]
+      const d = diagram()
+      if (key in d.model.pools) return poolRect(d, key, at)
+      const node = d.model.nodes[key]
+      const view = d.view.nodes[key]
       if (!node || !view) return null
       return flowNodeRect(node, at ? { ...view, ...at } : view)
     },
@@ -48,6 +62,7 @@ export function flowOps(doc: DevDocument): DiagramOps {
      */
     addNode: (at, variant) => {
       const d = diagram()
+      if (variant === POOL_VARIANT) return { ...addPool(at, nextName("Pool", Object.values(d.model.pools))), edit: null }
       const shape = (variant ?? "process") as FlowShape
       const lane = laneAt(d, at)
       const rect = lane === null ? null : laneRect(d, lane)

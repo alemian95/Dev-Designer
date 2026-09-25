@@ -175,7 +175,8 @@ export function createInteractionRunner(): InteractionRunner {
         session().setViewport(panBy(session().viewport, fx.dx, fx.dy))
         break
       case "preview-drag":
-        dragTargets ??= collectDragTargets(fx.keys)
+        // I nodi di un pool trascinato si muovono con lui già nell'anteprima (spec 2b §5).
+        dragTargets ??= collectDragTargets(canvasOps(documentStore.getState().doc).withFollowers(fx.keys))
         previewDrag(dragTargets, fx.dx, fx.dy)
         break
       case "commit-drag": {
@@ -215,11 +216,18 @@ export function createInteractionRunner(): InteractionRunner {
         break
       }
       case "create-node": {
-        const { key, recipe, edit } = canvasOps(documentStore.getState().doc).addNode(fx.at, fx.family, fx.variant)
+        const ops = canvasOps(documentStore.getState().doc)
+        const notice = ops.refuseNode(fx.at, fx.family, fx.variant)
+        if (notice !== null) {
+          // Come un rifiuto di Collega: l'avviso nella barra, e lo strumento resta attivo per riprovare.
+          documentSession.getState().patch({ notice })
+          break
+        }
+        const { key, recipe, edit } = ops.addNode(fx.at, fx.family, fx.variant)
         documentStore.getState().dispatch(recipe)
         session().setSelection([selId("node", key)])
         session().setTool("select")
-        session().setEditing({ key, target: edit })
+        if (edit !== null) session().setEditing({ key, target: edit })
         break
       }
     }

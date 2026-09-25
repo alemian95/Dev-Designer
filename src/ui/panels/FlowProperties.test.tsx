@@ -122,3 +122,16 @@ describe("PoolLanes", () => {
     expect(container.querySelector<HTMLButtonElement>('[aria-label="Elimina corsia l1"]')!.disabled).toBe(true)
   })
 })
+
+describe("pannello del pool", () => {
+  it("con un pool selezionato mostra il nome, modificabile, e le sue corsie", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    sessionStore.getState().setSelection([selId("node", qualify("flow", "p1"))])
+    act(() => root.render(<FlowProperties />))
+    const nome = container.querySelector<HTMLInputElement>("#pool-name")!
+    expect(nome.value).toBe("Pool 1")
+    expect(container.textContent).toContain("Corsie")
+    act(() => editAndBlur(nome, "Ordini"))
+    expect(flowDiagram(documentStore.getState().doc).model.pools["p1"]!.name).toBe("Ordini")
+  })
+})

@@ -1,8 +1,10 @@
+import { Rows3 } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { flowDiagram } from "@/editor/flow-access"
 import { flowEdgeOffsets } from "@/editor/flow/geometry"
+import { POOL_VARIANT } from "@/editor/kinds/flow"
 import type { FlowEdge as FlowEdgeModel, FlowNode as FlowNodeModel } from "@/model/flow/schema"
 import { FLOW_SHAPE_ICON, FLOW_SHAPE_LABEL, FLOW_SHAPES } from "@/ui/flow-shapes"
 import { FlowProperties } from "@/ui/panels/FlowProperties"
@@ -62,13 +64,17 @@ export const flowView: DiagramView = {
   // Sei varianti, una per forma: l'ordine e il tasto (`1`..`6`, spec §11) seguono `FLOW_SHAPES`,
   // cioè l'ordine di `FlowShapeSchema`. Etichetta e icona vengono da `flow-shapes.ts`, non
   // ridichiarate qui — è la stessa fonte che usa il select del pannello proprietà.
-  tools: FLOW_SHAPES.map((shape, i) => ({
-    // La nota ha un'etichetta sua solo qui: il select delle forme nel pannello resta «Nota».
-    label: shape === "note" ? "Nota di flusso" : FLOW_SHAPE_LABEL[shape],
-    key: String(i + 1),
-    Icon: FLOW_SHAPE_ICON[shape],
-    tool: "node" as const,
-    family: "flow" as const,
-    variant: shape,
-  })),
+  tools: [
+    ...FLOW_SHAPES.map((shape, i) => ({
+      // La nota ha un'etichetta sua solo qui: il select delle forme nel pannello resta «Nota».
+      label: shape === "note" ? "Nota di flusso" : FLOW_SHAPE_LABEL[shape],
+      key: String(i + 1),
+      Icon: FLOW_SHAPE_ICON[shape],
+      tool: "node" as const,
+      family: "flow" as const,
+      variant: shape,
+    })),
+    // Il pool è una variante dello strumento nodo che crea un contenitore (spec 2b §5).
+    { label: "Pool", key: "p", Icon: Rows3, tool: "node" as const, family: "flow" as const, variant: POOL_VARIANT },
+  ],
 }

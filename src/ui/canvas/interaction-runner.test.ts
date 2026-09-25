@@ -25,6 +25,13 @@ function fintoNodo(scritture: string[], key: string) {
   return { setAttribute: (_n: string, v: string) => scritture.push(`${key}:${v}`) } as unknown as SVGGElement
 }
 
+/** Un finto elemento nodo che registra solo l'ultimo valore scritto per attributo, per leggere il `transform` finale. */
+function fintoNodoStato(): { el: SVGGElement; attrs: Record<string, string> } {
+  const attrs: Record<string, string> = {}
+  const el = { setAttribute: (n: string, v: string) => (attrs[n] = v) } as unknown as SVGGElement
+  return { el, attrs }
+}
+
 /** `setEdgeGeometry` cerca i propri figli con `querySelector`: contarne le chiamate dice se l'arco è stato toccato. */
 function fintoArco(tocchi: Map<string, number>, key: string) {
   return {
@@ -234,6 +241,39 @@ describe("il rilascio del flowchart", () => {
     // scritta per l'ER — resterebbe verde.
     expect(flowDiagram(documentStore.getState().doc).model.nodes[added.key]!.lane).toBe("l2")
 
+    registerNode(qualify("flow", added.key), null)
+  })
+
+  it("lo strumento Pool dentro un pool non crea niente: avviso, e lo strumento resta attivo", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    documentSession.getState().patch({ notice: null })
+    sessionStore.getState().setTool("node", "flow", "pool")
+    const prima = documentStore.getState().doc
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: 100, y: 50 }, hit: { kind: "canvas" } }))
+    expect(documentStore.getState().doc).toBe(prima)
+    expect(documentSession.getState().notice).toBe("Un pool non sta dentro un altro pool.")
+    expect(sessionStore.getState().tool).toBe("node")
+    sessionStore.getState().setTool("select")
+  })
+
+  it("l'anteprima del drag di un pool muove anche i suoi nodi", () => {
+    const base = withPool(createDocument("t", "t"))
+    const added = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    documentStore.getState().load(produce(base, added.recipe))
+    sessionStore.getState().setViewport(IDENTITY)
+    sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
+    const pool = fintoNodoStato()
+    const nodo = fintoNodoStato()
+    registerNode(qualify("flow", "p1"), pool.el)
+    registerNode(qualify("flow", added.key), nodo.el)
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: -20, y: 50 }, hit: { kind: "node", key: qualify("flow", "p1") } }))
+    runner.step(muovi({ world: { x: 80, y: 50 } }))
+    expect(pool.attrs.transform).toBe("translate(70 0)")
+    expect(nodo.attrs.transform).toBe("translate(200 20)")
+    runner.step({ type: "cancel" })
+    registerNode(qualify("flow", "p1"), null)
     registerNode(qualify("flow", added.key), null)
   })
 })

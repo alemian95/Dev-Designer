@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { expectLaneInvariant } from "@/editor/flow/lane-invariant"
 import { withPool } from "@/editor/flow/pool-fixture"
 import { createDocument } from "@/model/document"
+import { POOL_VARIANT } from "./flow"
 import { familyOps } from "./ops"
 
 describe("flowOps.addNode", () => {
@@ -73,5 +74,48 @@ describe("rectOf", () => {
     const doc = createDocument("test", "id-1")
     const { key, recipe } = familyOps(doc, "flow").addNode({ x: 40, y: 40 }, "process")
     expect(familyOps(produce(doc, recipe), "flow").rectOf(key, { x: 200, y: 300 })).toEqual({ x: 200, y: 300, w: 60, h: 40 })
+  })
+})
+
+describe("flowOps e i pool", () => {
+  it("lo strumento Pool fuori da ogni pool crea un pool, senza aprire un editor", () => {
+    const doc = createDocument("test", "id-1")
+    const ops = familyOps(doc, "flow")
+    expect(ops.refuseNode?.({ x: 0, y: 0 }, POOL_VARIANT)).toBeNull()
+    const { key, recipe, edit } = ops.addNode({ x: 0, y: 0 }, POOL_VARIANT)
+    expect(produce(doc, recipe).diagram.flow.model.pools[key]!.name).toBe("Pool 1")
+    expect(edit).toBeNull()
+  })
+
+  it("il secondo pool si chiama «Pool 2»", () => {
+    const doc = withPool(createDocument("test", "id-1"))
+    const { key, recipe } = familyOps(doc, "flow").addNode({ x: 0, y: 1000 }, POOL_VARIANT)
+    expect(produce(doc, recipe).diagram.flow.model.pools[key]!.name).toBe("Pool 2")
+  })
+
+  it("lo strumento Pool dentro un pool rifiuta, con il suo avviso", () => {
+    const doc = withPool(createDocument("test", "id-1"))
+    expect(familyOps(doc, "flow").refuseNode?.({ x: 100, y: 50 }, POOL_VARIANT)).toBe("Un pool non sta dentro un altro pool.")
+  })
+
+  it("un nodo dentro un pool non è mai rifiutato", () => {
+    const doc = withPool(createDocument("test", "id-1"))
+    expect(familyOps(doc, "flow").refuseNode?.({ x: 100, y: 50 }, "process")).toBeNull()
+  })
+
+  it("i pool sono frame e non nodi, e rectOf ne dà il rettangolo", () => {
+    const ops = familyOps(withPool(createDocument("test", "id-1")), "flow")
+    expect(ops.frameKeys?.()).toEqual(["p1"])
+    expect(ops.nodeKeys()).toEqual([])
+    expect(ops.rectOf("p1")).toEqual({ x: -32, y: 0, w: 672, h: 160 })
+    expect(ops.rectOf("p1", { x: 5, y: 6 })).toEqual({ x: 5, y: 6, w: 672, h: 160 })
+  })
+
+  it("con un pool si trascinano anche i suoi nodi, una volta sola", () => {
+    const base = withPool(createDocument("test", "id-1"))
+    const { key, recipe } = familyOps(base, "flow").addNode({ x: 100, y: 20 }, "process")
+    const ops = familyOps(produce(base, recipe), "flow")
+    expect(new Set(ops.withFollowers?.(["p1", key]))).toEqual(new Set(["p1", key]))
+    expect(ops.withFollowers?.(["p1"])).toHaveLength(2)
   })
 })

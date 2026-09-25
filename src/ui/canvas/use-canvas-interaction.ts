@@ -5,6 +5,7 @@ import { documentStore } from "@/editor/document-store"
 import { linkId, splitKey } from "@/editor/families"
 import type { Point } from "@/editor/geometry"
 import type { Hit, PointerInfo } from "@/editor/interaction"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { sessionStore } from "@/editor/session-store"
 import { panBy, screenToWorld, zoomAt } from "@/editor/viewport"
 import { createInteractionRunner } from "./interaction-runner"
@@ -141,6 +142,8 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       // Un collegamento fra famiglie non ha niente da modificare sul canvas (spec 4a §7), e la sua
       // chiave non ha una famiglia: `splitKey` la rifiuterebbe.
       if (linkId(hit.key) !== null) return
+      // Un pool non ha niente da modificare sul canvas: si rinomina dal pannello (spec 2b §7).
+      if (canvasOps(documentStore.getState().doc).isFrame(hit.key)) return
       // La famiglia viene dal prefisso della chiave colpita. `setEditing` riceve la chiave con il
       // prefisso, `classEditTarget` quella senza, perché legge il modello di famiglia.
       const { family, key } = splitKey(hit.key)

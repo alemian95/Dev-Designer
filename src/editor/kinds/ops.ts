@@ -22,6 +22,20 @@ export type EditTarget = "name" | "body"
  */
 export interface DiagramOps {
   nodeKeys(): string[]
+  /**
+   * Chiavi di elementi che contengono nodi ma non sono nodi: i pool del flowchart (spec 2b §5). Si
+   * selezionano, si trascinano e si eliminano come nodi, `rectOf` ne dà il rettangolo, ma non
+   * entrano nella selezione a riquadro, in «Seleziona tutto» né nei collegamenti. Assente: nessuno.
+   */
+  frameKeys?(): string[]
+  /** Le chiavi date più i nodi che un drag delle chiavi porta con sé (i nodi di un pool). Assente: le chiavi date. */
+  withFollowers?(keys: readonly string[]): string[]
+  /**
+   * Il motivo per cui `addNode` non va chiamato in quel punto, o `null`. Si chiede **prima** di
+   * creare, come `connectAcross` prima di collegare: un pool non nasce dentro un altro pool.
+   * Assente: niente è mai rifiutato.
+   */
+  refuseNode?(at: Point, variant?: string): string | null
   /** `at` sovrascrive la posizione: serve all'anteprima del drag. */
   rectOf(key: string, at?: Point): Rect | null
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
@@ -29,9 +43,10 @@ export interface DiagramOps {
   /**
    * Crea un nodo. `variant` è una stringa opaca per la giuntura: la dichiara `DiagramView.tools` e
    * la interpreta solo il modulo `kinds/` del tipo che l'ha dichiarata. `edit` dice dove va il
-   * fuoco: sostituisce il caso speciale che `addNote` era prima di questo cambiamento.
+   * fuoco: sostituisce il caso speciale che `addNote` era prima di questo cambiamento. `edit` è
+   * `null` quando non c'è niente da scrivere: un pool appena creato si rinomina dal pannello.
    */
-  addNode(at: Point, variant?: string): { key: string; recipe: Recipe; edit: EditTarget }
+  addNode(at: Point, variant?: string): { key: string; recipe: Recipe; edit: EditTarget | null }
   /** `null` quando i due estremi non possono essere collegati: due note (un ancoraggio ha senso
    *  solo verso una classe), o una classe che non esiste. Una nota **e** una classe producono
    *  invece un ancoraggio (`note-link`, spec note ancorate §4). L'ER non ha note e continua a

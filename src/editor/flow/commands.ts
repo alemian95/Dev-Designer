@@ -1,9 +1,9 @@
-import { LANE_MIN_H, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
+import { LANE_MIN_H, POOL_MIN_W, nextName, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
 import type { LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
 import { snap, type Point } from "../geometry"
-import { flowNodeSize, laneAt, laneRect, poolLaneRects } from "./geometry"
+import { flowNodeSize, laneAt, laneRect, poolLaneRects, poolMembers } from "./geometry"
 import { keepInSpan, placeInLanes } from "./layout"
 
 const DUPLICATE_OFFSET = 20
@@ -28,14 +28,32 @@ export function addFlowNode(at: Point, shape: FlowShape, lane: string | null): {
  * Sposta i nodi come `moveNodes` (`commands/view.ts`) — stesso `snap`, stessa regola «niente si
  * muove» con `dx` e `dy` entrambi zero — e poi decide la corsia dal **centro** di ognuno: la corsia
  * in cui cade, o `null` se cade fuori da ogni pool o sulla striscia (spec 2b §5). Posizione e
- * corsia stanno nella stessa recipe: un solo passo di annulla. Un nodo non viene più trattenuto in
- * una banda: uscire da un pool lo libera.
+ * corsia stanno nella stessa recipe: un solo passo di annulla.
+ *
+ * Fra le chiavi possono esserci **pool**: il pool si sposta con tutti i suoi nodi, che non cambiano
+ * corsia, e un suo nodo che è anche fra le chiavi si sposta una volta sola. Un nodo libero che sta
+ * sotto il pool non lo segue: spostare un pool non cattura niente (spec 2b §5).
  */
 export function moveFlowNodes(keys: readonly string[], dx: number, dy: number): Recipe | null {
   if (dx === 0 && dy === 0) return null
   return (draft) => {
     const d = flowDiagram(draft)
+    const pools = keys.filter((k) => k in d.model.pools)
+    const carried = new Set(pools.flatMap((id) => poolMembers(d, id)))
+    for (const id of pools) {
+      const view = d.view.pools[id]
+      if (!view) continue
+      view.x = snap(view.x + dx)
+      view.y = snap(view.y + dy)
+    }
+    for (const key of carried) {
+      const view = d.view.nodes[key]
+      if (!view) continue
+      view.x = snap(view.x + dx)
+      view.y = snap(view.y + dy)
+    }
     for (const key of keys) {
+      if (carried.has(key)) continue
       const node = d.model.nodes[key]
       const view = d.view.nodes[key]
       if (!node || !view) continue
@@ -142,11 +160,24 @@ export function setEdgeLabel(key: string, label: string): Recipe {
   }
 }
 
+/**
+ * Cancella nodi e archi; gli archi che toccano un nodo cancellato se ne vanno con lui. Fra le chiavi
+ * dei nodi possono esserci **pool**: il pool se ne va con le sue corsie, e i suoi nodi restano dove
+ * sono, liberi (spec 2b §5) — niente sparisce se non il contenitore.
+ */
 export function deleteFlowItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null {
   if (nodeKeys.length === 0 && edgeKeys.length === 0) return null
   const nodes = new Set(nodeKeys)
   return (draft) => {
     const d = flowDiagram(draft)
+    for (const key of nodeKeys) {
+      const pool = d.model.pools[key]
+      if (!pool) continue
+      for (const member of poolMembers(d, key)) d.model.nodes[member]!.lane = null
+      for (const lane of pool.lanes) delete d.view.lanes[lane.id]
+      delete d.model.pools[key]
+      delete d.view.pools[key]
+    }
     for (const key of edgeKeys) delete d.model.edges[key]
     for (const [key, edge] of Object.entries(d.model.edges)) {
       if (nodes.has(edge.source) || nodes.has(edge.target)) delete d.model.edges[key]
@@ -204,6 +235,32 @@ function keepNodesWithLanes(d: FlowDiagram, poolId: string, mutate: () => void):
       const view = d.view.nodes[key]
       if (view) view.y = snap(view.y + rect.y - old)
     }
+  }
+}
+
+/**
+ * Nuovo pool con l'angolo superiore sinistro sul punto dato, allineato alla griglia: una corsia
+ * «Corsia 1» alta il minimo, larghezza `POOL_MIN_W` (spec 2b §5). Il nome lo sceglie chi chiama,
+ * con `nextName("Pool", …)`, perché dipende dai pool che ci sono già.
+ */
+export function addPool(at: Point, name: string): { key: string; recipe: Recipe } {
+  const key = crypto.randomUUID()
+  const laneId = crypto.randomUUID()
+  return {
+    key,
+    recipe: (draft) => {
+      const d = flowDiagram(draft)
+      d.model.pools[key] = { name, lanes: [{ id: laneId, name: nextName("Corsia", []) }] }
+      d.view.pools[key] = { x: snap(at.x), y: snap(at.y), w: POOL_MIN_W }
+      d.view.lanes[laneId] = { h: LANE_MIN_H }
+    },
+  }
+}
+
+export function renamePool(id: string, name: string): Recipe {
+  return (draft) => {
+    const pool = flowDiagram(draft).model.pools[id]
+    if (pool && pool.name !== name) pool.name = name
   }
 }
 

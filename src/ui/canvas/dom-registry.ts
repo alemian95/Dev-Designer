@@ -49,9 +49,13 @@ export function setEdgeGeometry(key: string, geo: EdgeGeometry): void {
   if (geo.targetEnd) positionLabel(g, "[data-edge-target-label]", geo.targetEnd)
 }
 
-/** Rettangolo di selezione: `null` lo nasconde. */
-export function showMarquee(rect: Rect | null): void {
-  const el = overlay?.querySelector("[data-marquee]")
+/**
+ * Scrive un rettangolo sull'elemento overlay che risponde a `selector`, o lo nasconde con `rect`
+ * `null`: la stessa forma serve al marquee di selezione e alla guida del ridimensionamento, due
+ * rettangoli che appaiono e scompaiono nello stesso modo sull'overlay.
+ */
+function showRect(selector: string, rect: Rect | null): void {
+  const el = overlay?.querySelector(selector)
   if (!el) return
   if (!rect) {
     el.setAttribute("visibility", "hidden")
@@ -64,19 +68,14 @@ export function showMarquee(rect: Rect | null): void {
   el.setAttribute("height", String(rect.h))
 }
 
+/** Rettangolo di selezione: `null` lo nasconde. */
+export function showMarquee(rect: Rect | null): void {
+  showRect("[data-marquee]", rect)
+}
+
 /** La guida del ridimensionamento: il contorno che il frame avrà al rilascio. `null` la nasconde. */
 export function showGuide(rect: Rect | null): void {
-  const el = overlay?.querySelector("[data-guide]")
-  if (!el) return
-  if (!rect) {
-    el.setAttribute("visibility", "hidden")
-    return
-  }
-  el.setAttribute("visibility", "visible")
-  el.setAttribute("x", String(rect.x))
-  el.setAttribute("y", String(rect.y))
-  el.setAttribute("width", String(rect.w))
-  el.setAttribute("height", String(rect.h))
+  showRect("[data-guide]", rect)
 }
 
 /** Anteprima della connessione in corso: un estremo `null` la nasconde. */

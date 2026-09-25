@@ -198,6 +198,8 @@ describe("canvasOps (famiglie mescolate)", () => {
     const node = canvasOps(state().doc).addNode({ x: 100, y: 20 }, "flow", "process")
     state().dispatch(node.recipe)
     expect(canvasOps(state().doc).withFollowers(["flow/p1"]).sort()).toEqual(["flow/p1", node.key].sort())
+    // Un nodo del pool già fra le chiavi non si ripete.
+    expect(canvasOps(state().doc).withFollowers(["flow/p1", node.key]).sort()).toEqual(["flow/p1", node.key].sort())
     const past = state().past.length
     state().dispatch(canvasOps(state().doc).commitDrag(["flow/p1"], 100, 0)!)
     expect(state().past.length).toBe(past + 1)

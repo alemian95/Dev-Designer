@@ -115,7 +115,7 @@ describe("flowOps e i pool", () => {
     const base = withPool(createDocument("test", "id-1"))
     const { key, recipe } = familyOps(base, "flow").addNode({ x: 100, y: 20 }, "process")
     const ops = familyOps(produce(base, recipe), "flow")
-    expect(new Set(ops.withFollowers?.(["p1", key]))).toEqual(new Set(["p1", key]))
+    expect(ops.withFollowers?.(["p1", key])?.sort()).toEqual(["p1", key].sort())
     expect(ops.withFollowers?.(["p1"])).toHaveLength(2)
   })
 })

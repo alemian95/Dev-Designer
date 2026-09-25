@@ -23,7 +23,7 @@ import {
   setNodeLane,
   setNodeShape,
 } from "./commands"
-import { laneRect } from "./geometry"
+import { flowNodeSize, laneRect } from "./geometry"
 import { expectLaneInvariant } from "./lane-invariant"
 import { LANE_PAD } from "./layout"
 import { withPool } from "./pool-fixture"
@@ -399,9 +399,37 @@ describe("moveFlowNodes con i pool", () => {
   it("spostare un pool porta con sé i suoi nodi, senza cambiarne la corsia", () => {
     const n = addFlowNode({ x: 100, y: 20 }, "process", "l1")
     const next = apply(apply(docWith(), n.recipe), moveFlowNodes(["p1"], 200, 300)!)
-    // La fixture mette il pool a x = −32, fuori griglia: lo spostamento lo riallinea (−32 + 200 → 170).
+    // La fixture mette il pool a x = −32, fuori griglia: lo spostamento lo riallinea (−32 + 200 → 170),
+    // e il nodo si sposta dello stesso delta effettivo, 202, senza riallinearsi per conto suo.
     expect(fd(next).view.pools["p1"]).toMatchObject({ x: 170, y: 300 })
-    expect(fd(next).view.nodes[n.key]).toMatchObject({ x: 300, y: 320 })
+    expect(fd(next).view.nodes[n.key]).toMatchObject({ x: 302, y: 320 })
+    expect(fd(next).model.nodes[n.key]!.lane).toBe("l1")
+    expectLaneInvariant(fd(next))
+  })
+
+  it("il pool fuori griglia e i suoi nodi si spostano dello stesso delta: la distanza non cambia", () => {
+    const n = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    const before = apply(docWith(), n.recipe)
+    const next = apply(before, moveFlowNodes(["p1"], 203, 57)!)
+    const gap = (doc: DevDocument) => ({
+      x: fd(doc).view.nodes[n.key]!.x - fd(doc).view.pools["p1"]!.x,
+      y: fd(doc).view.nodes[n.key]!.y - fd(doc).view.pools["p1"]!.y,
+    })
+    expect(gap(next)).toEqual(gap(before))
+  })
+
+  it("un nodo vicino al bordo della corsia resta nella sua corsia anche disegnato", () => {
+    // Il pool sta a y = 4, fuori griglia: l1 va da 4 a 104. Il nodo ha il centro a 101, 3 px sopra
+    // il bordo. Lo spostamento riporta il pool a y = 0: un nodo allineato per conto suo (81 → 80)
+    // finirebbe col centro a 100, sul bordo di l2, con la corsia ancora «l1».
+    let doc = docWith(["l1", "l2"], 100)
+    const n = addFlowNode({ x: 100, y: 0 }, "process", "l1")
+    const { h } = flowNodeSize(fd(apply(doc, n.recipe)).model.nodes[n.key]!)
+    doc = apply(apply(doc, n.recipe), (draft) => {
+      fd(draft).view.pools["p1"]!.y = 4
+      fd(draft).view.nodes[n.key]!.y = 101 - h / 2
+    })
+    const next = apply(doc, moveFlowNodes(["p1"], 200, 0)!)
     expect(fd(next).model.nodes[n.key]!.lane).toBe("l1")
     expectLaneInvariant(fd(next))
   })
@@ -417,7 +445,8 @@ describe("moveFlowNodes con i pool", () => {
   it("un nodo del pool che è anche fra le chiavi si sposta una volta sola", () => {
     const n = addFlowNode({ x: 100, y: 20 }, "process", "l1")
     const next = apply(apply(docWith(), n.recipe), moveFlowNodes(["p1", n.key], 200, 0)!)
-    expect(fd(next).view.nodes[n.key]!.x).toBe(300)
+    // Una volta sola, del delta del pool: −32 → 170, quindi 202 e non 402.
+    expect(fd(next).view.nodes[n.key]!.x).toBe(302)
   })
 })
 

@@ -201,7 +201,8 @@ describe("canvasOps (famiglie mescolate)", () => {
     const past = state().past.length
     state().dispatch(canvasOps(state().doc).commitDrag(["flow/p1"], 100, 0)!)
     expect(state().past.length).toBe(past + 1)
-    expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(200)
+    // Il pool fuori griglia va da −32 a 70: il nodo si sposta dello stesso delta, 102.
+    expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(202)
     state().undo()
     expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(100)
     expect(canvasOps(state().doc).rectOf("flow/p1")!.x).toBe(-32)

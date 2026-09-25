@@ -31,26 +31,32 @@ export function addFlowNode(at: Point, shape: FlowShape, lane: string | null): {
  * corsia stanno nella stessa recipe: un solo passo di annulla.
  *
  * Fra le chiavi possono esserci **pool**: il pool si sposta con tutti i suoi nodi, che non cambiano
- * corsia, e un suo nodo che è anche fra le chiavi si sposta una volta sola. Un nodo libero che sta
- * sotto il pool non lo segue: spostare un pool non cattura niente (spec 2b §5).
+ * corsia, e un suo nodo che è anche fra le chiavi si sposta una volta sola. Il pool si allinea alla
+ * griglia e i suoi nodi si spostano del suo stesso delta effettivo, senza allinearsi per conto loro:
+ * altrimenti un nodo deriverebbe fino a mezza griglia dal suo pool (che Disponi lascia fuori griglia)
+ * e potrebbe finire disegnato nella corsia accanto. Un nodo libero che sta sotto il pool non lo
+ * segue: spostare un pool non cattura niente (spec 2b §5).
  */
 export function moveFlowNodes(keys: readonly string[], dx: number, dy: number): Recipe | null {
   if (dx === 0 && dy === 0) return null
   return (draft) => {
     const d = flowDiagram(draft)
-    const pools = keys.filter((k) => k in d.model.pools)
-    const carried = new Set(pools.flatMap((id) => poolMembers(d, id)))
-    for (const id of pools) {
+    const carried = new Set<string>()
+    for (const id of keys.filter((k) => k in d.model.pools)) {
       const view = d.view.pools[id]
       if (!view) continue
-      view.x = snap(view.x + dx)
-      view.y = snap(view.y + dy)
-    }
-    for (const key of carried) {
-      const view = d.view.nodes[key]
-      if (!view) continue
-      view.x = snap(view.x + dx)
-      view.y = snap(view.y + dy)
+      const x = snap(view.x + dx)
+      const y = snap(view.y + dy)
+      const delta = { x: x - view.x, y: y - view.y }
+      view.x = x
+      view.y = y
+      for (const key of poolMembers(d, id)) {
+        carried.add(key)
+        const member = d.view.nodes[key]
+        if (!member) continue
+        member.x += delta.x
+        member.y += delta.y
+      }
     }
     for (const key of keys) {
       if (carried.has(key)) continue

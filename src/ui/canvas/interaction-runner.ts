@@ -225,6 +225,8 @@ export function createInteractionRunner(): InteractionRunner {
         }
         const { key, recipe, edit } = ops.addNode(fx.at, fx.family, fx.variant)
         documentStore.getState().dispatch(recipe)
+        // Una creazione riuscita toglie un eventuale rifiuto precedente, come un collegamento riuscito.
+        documentSession.getState().patch({ notice: null })
         session().setSelection([selId("node", key)])
         session().setTool("select")
         if (edit !== null) session().setEditing({ key, target: edit })

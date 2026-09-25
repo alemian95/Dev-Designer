@@ -257,6 +257,23 @@ describe("il rilascio del flowchart", () => {
     sessionStore.getState().setTool("select")
   })
 
+  it("un pool creato dopo un rifiuto toglie l'avviso, lo seleziona e non apre nessun editor", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    documentSession.getState().patch({ notice: null })
+    sessionStore.getState().setTool("node", "flow", "pool")
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: 100, y: 50 }, hit: { kind: "canvas" } }))
+    expect(documentSession.getState().notice).toBe("Un pool non sta dentro un altro pool.")
+
+    runner.step(giu({ world: { x: 100, y: 1000 }, hit: { kind: "canvas" } }))
+    const creato = Object.keys(flowDiagram(documentStore.getState().doc).model.pools).find((id) => id !== "p1")
+    expect(creato).toBeDefined()
+    expect([...sessionStore.getState().selection]).toEqual([selId("node", qualify("flow", creato!))])
+    expect(sessionStore.getState().tool).toBe("select")
+    expect(sessionStore.getState().editing).toBeNull()
+    expect(documentSession.getState().notice).toBeNull()
+  })
+
   it("l'anteprima del drag di un pool muove anche i suoi nodi", () => {
     const base = withPool(createDocument("t", "t"))
     const added = addFlowNode({ x: 100, y: 20 }, "process", "l1")

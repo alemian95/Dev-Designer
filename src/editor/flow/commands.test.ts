@@ -16,6 +16,8 @@ import {
   moveLane,
   renameLane,
   renamePool,
+  resizeLane,
+  resizePool,
   setEdgeLabel,
   setNodeLabel,
   setNodeLane,
@@ -404,6 +406,46 @@ describe("moveFlowNodes con i pool", () => {
     const n = addFlowNode({ x: 100, y: 20 }, "process", "l1")
     const next = apply(apply(docWith(), n.recipe), moveFlowNodes(["p1", n.key], 200, 0)!)
     expect(fd(next).view.nodes[n.key]!.x).toBe(300)
+  })
+})
+
+describe("resizePool e resizeLane", () => {
+  it("il pool si allarga, allineato alla griglia", () => {
+    const d = fd(apply(docWith(), resizePool("p1", 1003)))
+    expect(d.view.pools["p1"]!.w).toBe(1000)
+  })
+
+  it("il pool non scende sotto POOL_MIN_W, né sotto i suoi nodi", () => {
+    // Review Focus 4.
+    expect(fd(apply(docWith(), resizePool("p1", 100))).view.pools["p1"]!.w).toBe(POOL_MIN_W)
+    const n = addFlowNode({ x: 900, y: 20 }, "process", null)
+    let next = apply(apply(docWith(), n.recipe), setNodeLane(n.key, "l1"))
+    next = apply(next, resizePool("p1", 3000))
+    next = apply(next, moveFlowNodes([n.key], 1500, 0)!)
+    // Il nodo sta a x = 560 + 1500 = 2060, largo 60: il bordo del pool resta oltre 2060 + 60 + 20.
+    next = apply(next, resizePool("p1", 100))
+    const pool = fd(next).view.pools["p1"]!
+    expect(pool.x + pool.w).toBeGreaterThanOrEqual(2060 + 60 + LANE_PAD)
+    expect(fd(next).model.nodes[n.key]!.lane).toBe("l1")
+  })
+
+  it("una corsia si abbassa e le corsie sotto scendono con i loro nodi", () => {
+    const n2 = addFlowNode({ x: 0, y: 120 }, "process", "l2")
+    const next = apply(apply(docWith(["l1", "l2"], 100), n2.recipe), resizeLane("l1", 300))
+    expect(fd(next).view.lanes["l1"]).toEqual({ h: 300 })
+    expect(topOf(next, "l2")).toBe(300)
+    expect(fd(next).view.nodes[n2.key]!.y).toBe(320)
+    expectLaneInvariant(fd(next))
+  })
+
+  it("una corsia non scende sotto LANE_MIN_H, né sotto i suoi nodi", () => {
+    // Review Focus 4.
+    expect(fd(apply(docWith(), resizeLane("l1", 10))).view.lanes["l1"]).toEqual({ h: LANE_MIN_H })
+    const doc = docWith(["l1"], 400)
+    const n = addFlowNode({ x: 0, y: 300 }, "process", "l1")
+    const next = apply(apply(doc, n.recipe), resizeLane("l1", 10))
+    expect(fd(next).view.lanes["l1"]!.h).toBeGreaterThanOrEqual(300 + 40 + LANE_PAD)
+    expectLaneInvariant(fd(next))
   })
 })
 

@@ -276,6 +276,19 @@ describe("il rilascio del flowchart", () => {
     registerNode(qualify("flow", "p1"), null)
     registerNode(qualify("flow", added.key), null)
   })
+
+  it("il ridimensionamento scrive la larghezza al rilascio, in un solo passo", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    const past = documentStore.getState().past.length
+    const runner = createInteractionRunner()
+    const hit = { kind: "resize" as const, key: qualify("flow", "p1"), lane: null }
+    runner.step(giu({ world: { x: 640, y: 50 }, hit }))
+    runner.step(muovi({ world: { x: 840, y: 50 } }))
+    runner.step(su({ world: { x: 840, y: 50 } }))
+    // 672 + 200 = 872, allineato alla griglia: 870.
+    expect(flowDiagram(documentStore.getState().doc).view.pools["p1"]!.w).toBe(870)
+    expect(documentStore.getState().past.length).toBe(past + 1)
+  })
 })
 
 describe("Collega fra famiglie", () => {

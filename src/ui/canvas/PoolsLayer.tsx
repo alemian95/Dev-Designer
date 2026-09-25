@@ -9,6 +9,9 @@ import { selId, sessionStore } from "@/editor/session-store"
 import { POOL_HEADER_W } from "@/model/flow/schema"
 import { registerNode } from "./dom-registry"
 
+/** Spessore delle maniglie di ridimensionamento, in unità di mondo: abbastanza da prenderle, non da coprire i nodi. */
+const HANDLE = 8
+
 /**
  * Vista pura dei pool (spec 2b §3): per ognuno le bande delle corsie, la striscia a sinistra con il
  * nome ruotato come in BPMN e il contorno. La usano il canvas (`PoolsLayer`, sotto) e l'export
@@ -19,19 +22,21 @@ import { registerNode } from "./dom-registry"
  * e drag lo trattano come un nodo, e l'anteprima del drag riscrive solo il suo `transform`, perché le
  * coordinate interne sono relative al suo angolo. Si afferra solo la striscia: bande e contorno non
  * ricevono il puntatore, quindi un clic sul corpo di una corsia arriva al canvas, e da lì partono
- * selezione a riquadro e pan.
+ * selezione a riquadro e pan. Sul canvas porta anche le maniglie del ridimensionamento — il bordo
+ * destro del pool e il bordo inferiore di ogni corsia (spec 2b §5) — che hanno un riempimento
+ * trasparente per ricevere il puntatore; l'export non le disegna.
  */
-export function PoolsLayerView({ part, selected = new Set() }: { part: PoolsPart; selected?: ReadonlySet<string> }) {
+export function PoolsLayerView({ part, selected = new Set(), handles = false }: { part: PoolsPart; selected?: ReadonlySet<string>; handles?: boolean }) {
   return (
     <g data-layer="pools">
       {poolIds(part).map((id) => (
-        <PoolFrame key={id} part={part} poolId={id} selected={selected.has(id)} />
+        <PoolFrame key={id} part={part} poolId={id} selected={selected.has(id)} handles={handles} />
       ))}
     </g>
   )
 }
 
-function PoolFrame({ part, poolId, selected }: { part: PoolsPart; poolId: string; selected: boolean }) {
+function PoolFrame({ part, poolId, selected, handles }: { part: PoolsPart; poolId: string; selected: boolean; handles: boolean }) {
   const pool = part.model.pools[poolId]
   const rect = poolRect(part, poolId)
   if (!pool || !rect) return null
@@ -67,6 +72,24 @@ function PoolFrame({ part, poolId, selected }: { part: PoolsPart; poolId: string
         {pool.name}
       </text>
       <rect x={0} y={0} width={rect.w} height={rect.h} fill="none" stroke={selected ? "var(--primary)" : "var(--border)"} strokeWidth={selected ? 2 : 1} pointerEvents="none" />
+      {handles && (
+        <>
+          <rect data-resize={id} x={rect.w - HANDLE / 2} y={0} width={HANDLE} height={rect.h} fill="transparent" style={{ cursor: "ew-resize" }} />
+          {lanes.map((lane) => (
+            <rect
+              key={`maniglia-${lane.id}`}
+              data-resize={id}
+              data-resize-lane={lane.id}
+              x={POOL_HEADER_W}
+              y={lane.y - rect.y + lane.h - HANDLE / 2}
+              width={lane.w}
+              height={HANDLE}
+              fill="transparent"
+              style={{ cursor: "ns-resize" }}
+            />
+          ))}
+        </>
+      )}
     </g>
   )
 }
@@ -83,5 +106,5 @@ export function PoolsLayer() {
   const selection = useStore(sessionStore, (s) => s.selection)
   const part = useMemo(() => ({ model: { pools }, view: { pools: poolViews, lanes: laneViews } }), [pools, poolViews, laneViews])
   const selected = useMemo(() => new Set(Object.keys(pools).filter((id) => selection.has(selId("node", qualify("flow", id))))), [pools, selection])
-  return <PoolsLayerView part={part} selected={selected} />
+  return <PoolsLayerView part={part} selected={selected} handles />
 }

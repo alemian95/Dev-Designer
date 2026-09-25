@@ -45,6 +45,8 @@ export interface CanvasOps {
   commitDrag(keys: readonly string[], dx: number, dy: number): Recipe | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
+  /** Il ridimensionamento di un frame, sulla chiave con prefisso (vedi `DiagramOps.resize`). */
+  resize(key: string, lane: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
   /** Solo le famiglie con contenuto: una famiglia vuota non ha problemi da segnalare. Poi i collegamenti. */
   validate(): Issue[]
 }
@@ -153,6 +155,11 @@ export function canvasOps(doc: DevDocument): CanvasOps {
         ...[...touched].map((f) => ops(f).deleteItems(nodes.get(f) ?? [], edges.get(f) ?? [])),
         linkIds.length > 0 ? deleteLinks(linkIds) : null,
       ])
+    },
+
+    resize: (qualified, lane, dx, dy) => {
+      const { family, key } = splitKey(qualified)
+      return ops(family).resize?.(key, lane, dx, dy) ?? null
     },
 
     duplicateNodes: (keys) => {

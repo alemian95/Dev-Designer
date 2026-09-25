@@ -1,7 +1,7 @@
 import type { DevDocument } from "@/model/document"
 import { nextName, type FlowShape } from "@/model/flow/schema"
 import { validateFlow } from "@/model/flow/validate"
-import { addFlowEdge, addFlowNode, addPool, applyFlowLayout, deleteFlowItems, duplicateFlowNodes, moveFlowNodes } from "../flow/commands"
+import { addFlowEdge, addFlowNode, addPool, applyFlowLayout, clampLaneH, clampPoolW, deleteFlowItems, duplicateFlowNodes, moveFlowNodes, resizeLane, resizePool } from "../flow/commands"
 import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, flowNodeSize, laneAt, laneRect, poolAt, poolMembers, poolRect } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
 import { flowLayoutGraph, keepInSpan } from "../flow/layout"
@@ -83,6 +83,21 @@ export function flowOps(doc: DevDocument): DiagramOps {
     layoutGraph: () => flowLayoutGraph(diagram()),
 
     layoutRecipe: (positions) => applyFlowLayout(positions),
+
+    resize: (key, lane, dx, dy) => {
+      const d = diagram()
+      if (lane === null) {
+        const view = d.view.pools[key]
+        const rect = poolRect(d, key)
+        if (!view || !rect) return null
+        const w = clampPoolW(d, key, view.w + dx)
+        return { rect: { ...rect, w }, recipe: resizePool(key, w) }
+      }
+      const rect = laneRect(d, lane)
+      if (!rect || rect.poolId !== key) return null
+      const h = clampLaneH(d, lane, rect.h + dy)
+      return { rect: { ...rect, h }, recipe: resizeLane(lane, h) }
+    },
 
     validate: () => validateFlow(diagram().model),
   }

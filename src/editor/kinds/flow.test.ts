@@ -119,3 +119,23 @@ describe("flowOps e i pool", () => {
     expect(ops.withFollowers?.(["p1"])).toHaveLength(2)
   })
 })
+
+describe("flowOps.resize", () => {
+  it("il bordo destro dà la guida del pool e la recipe con la larghezza limitata", () => {
+    const doc = withPool(createDocument("test", "id-1"))
+    const r = familyOps(doc, "flow").resize?.("p1", null, -500, 0)
+    expect(r?.rect).toEqual({ x: -32, y: 0, w: 640, h: 160 })
+    expect(produce(doc, r!.recipe).diagram.flow.view.pools["p1"]!.w).toBe(640)
+  })
+
+  it("il bordo di una corsia dà la guida della corsia", () => {
+    const doc = withPool(createDocument("test", "id-1"), ["l1", "l2"], 200)
+    const r = familyOps(doc, "flow").resize?.("p1", "l2", 0, 100)
+    expect(r?.rect).toMatchObject({ id: "l2", y: 200, h: 300 })
+  })
+
+  it("una corsia di un altro pool non si ridimensiona da qui", () => {
+    const doc = withPool(createDocument("test", "id-1"))
+    expect(familyOps(doc, "flow").resize?.("p9", "l1", 0, 100)).toBeNull()
+  })
+})

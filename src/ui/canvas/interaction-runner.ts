@@ -7,7 +7,7 @@ import type { EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import { panBy, visibleWorldRect } from "@/editor/viewport"
 import { documentSession } from "@/io/document-session"
-import { setEdgeGeometry, setNodePosition, showConnect, showMarquee } from "./dom-registry"
+import { setEdgeGeometry, setNodePosition, showConnect, showGuide, showMarquee } from "./dom-registry"
 
 /**
  * Margine, in unità di mondo, attorno all'inquadratura entro cui l'anteprima del drag scrive
@@ -230,6 +230,18 @@ export function createInteractionRunner(): InteractionRunner {
         if (edit !== null) session().setEditing({ key, target: edit })
         break
       }
+      case "preview-resize":
+        // Solo una guida sul DOM durante il gesto: il documento cambia una volta sola, al rilascio.
+        showGuide(canvasOps(documentStore.getState().doc).resize(fx.key, fx.lane, fx.dx, fx.dy)?.rect ?? null)
+        break
+      case "commit-resize": {
+        const result = canvasOps(documentStore.getState().doc).resize(fx.key, fx.lane, fx.dx, fx.dy)
+        if (result) documentStore.getState().dispatch(result.recipe)
+        break
+      }
+      case "clear-resize":
+        showGuide(null)
+        break
     }
   }
 

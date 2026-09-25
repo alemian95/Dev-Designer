@@ -330,6 +330,20 @@ describe("il resto del cablaggio", () => {
     expect(sessionStore.getState().editing).toBeNull()
   })
 
+  it("un down su una maniglia di un pool la trascina, e il pool si allarga", () => {
+    documentStore.getState().load(withPool(createDocument("f", "f")))
+    const maniglia = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+    maniglia.setAttribute("data-resize", qualify("flow", "p1"))
+    svg.append(maniglia)
+    sotto = maniglia
+    giu()
+    muovi()
+    su()
+    // `giu` a x = 100, `muovi` e `su` a x = 160: sessanta unità di mondo alla scala 1. 672 + 60 = 732,
+    // allineato alla griglia: 730.
+    expect(documentStore.getState().doc.diagram.flow.view.pools["p1"]!.w).toBe(730)
+  })
+
   it("lo smontaggio stacca tutti i listener, su svg e su window", () => {
     act(() => root.unmount())
     giu()

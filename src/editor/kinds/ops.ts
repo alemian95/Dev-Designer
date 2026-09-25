@@ -67,6 +67,13 @@ export interface DiagramOps {
    * che col layout riscrive anche le bande: due dispatch darebbero due passi di undo.
    */
   layoutRecipe?(positions: LayoutPositions): Recipe
+  /**
+   * Il ridimensionamento di un frame da una sua maniglia (spec 2b §5): `lane` è `null` per il bordo
+   * destro del pool, l'id di una corsia per il suo bordo inferiore. Torna il rettangolo da mostrare
+   * come guida durante il gesto e la recipe da applicare al rilascio, calcolati con la stessa regola;
+   * `null` se la maniglia non appartiene al frame. Assente: niente si ridimensiona.
+   */
+  resize?(key: string, lane: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
   validate(): Issue[]
 }
 

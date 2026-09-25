@@ -2,9 +2,9 @@ import { LANE_MIN_H, POOL_MIN_W, nextName, type FlowDiagram, type FlowModel, typ
 import type { LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
-import { snap, type Point } from "../geometry"
-import { flowNodeSize, laneAt, laneRect, poolLaneRects, poolMembers } from "./geometry"
-import { keepInSpan, placeInLanes } from "./layout"
+import { GRID, snap, type Point } from "../geometry"
+import { flowNodeSize, laneAt, laneOwner, laneRect, poolLaneRects, poolMembers } from "./geometry"
+import { keepInSpan, LANE_PAD, placeInLanes } from "./layout"
 
 const DUPLICATE_OFFSET = 20
 
@@ -261,6 +261,63 @@ export function renamePool(id: string, name: string): Recipe {
   return (draft) => {
     const pool = flowDiagram(draft).model.pools[id]
     if (pool && pool.name !== name) pool.name = name
+  }
+}
+
+/** Il primo multiplo della griglia che non sta sotto `v`: un minimo arrotondato per difetto lascerebbe fuori un nodo. */
+const ceilToGrid = (v: number) => Math.ceil(v / GRID) * GRID
+
+/**
+ * La larghezza che un pool può avere quando si chiede `w`: allineata alla griglia, mai sotto
+ * `POOL_MIN_W` né sotto quanto serve perché ogni suo nodo resti dentro con `LANE_PAD` a destra —
+ * così ridimensionare non cambia mai l'appartenenza (spec 2b §5). La usano il comando e la guida
+ * dell'anteprima: una regola sola.
+ */
+export function clampPoolW(d: FlowDiagram, poolId: string, w: number): number {
+  const view = d.view.pools[poolId]
+  if (!view) return w
+  let min = POOL_MIN_W
+  for (const key of poolMembers(d, poolId)) {
+    const node = d.model.nodes[key]
+    const v = d.view.nodes[key]
+    if (node && v) min = Math.max(min, v.x + flowNodeSize(node).w + LANE_PAD - view.x)
+  }
+  return Math.max(snap(w), ceilToGrid(min))
+}
+
+/** Come `clampPoolW`, per l'altezza di una corsia: mai sotto `LANE_MIN_H` né sotto i suoi nodi. */
+export function clampLaneH(d: FlowDiagram, laneId: string, h: number): number {
+  const rect = laneRect(d, laneId)
+  if (!rect) return h
+  let min = LANE_MIN_H
+  for (const [key, node] of Object.entries(d.model.nodes)) {
+    if (node.lane !== laneId) continue
+    const v = d.view.nodes[key]
+    if (v) min = Math.max(min, v.y + flowNodeSize(node).h + LANE_PAD - rect.y)
+  }
+  return Math.max(snap(h), ceilToGrid(min))
+}
+
+/** Il bordo destro del pool (spec 2b §5), con i limiti di `clampPoolW`. */
+export function resizePool(poolId: string, w: number): Recipe {
+  return (draft) => {
+    const d = flowDiagram(draft)
+    const view = d.view.pools[poolId]
+    if (view) view.w = clampPoolW(d, poolId, w)
+  }
+}
+
+/** Il bordo inferiore di una corsia, con i limiti di `clampLaneH`: le corsie sotto scendono o salgono con i loro nodi. */
+export function resizeLane(laneId: string, h: number): Recipe {
+  return (draft) => {
+    const d = flowDiagram(draft)
+    const poolId = laneOwner(d, laneId)
+    const view = d.view.lanes[laneId]
+    if (poolId === null || !view) return
+    const next = clampLaneH(d, laneId, h)
+    keepNodesWithLanes(d, poolId, () => {
+      view.h = next
+    })
   }
 }
 

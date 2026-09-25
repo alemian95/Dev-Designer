@@ -64,6 +64,21 @@ export function showMarquee(rect: Rect | null): void {
   el.setAttribute("height", String(rect.h))
 }
 
+/** La guida del ridimensionamento: il contorno che il frame avrà al rilascio. `null` la nasconde. */
+export function showGuide(rect: Rect | null): void {
+  const el = overlay?.querySelector("[data-guide]")
+  if (!el) return
+  if (!rect) {
+    el.setAttribute("visibility", "hidden")
+    return
+  }
+  el.setAttribute("visibility", "visible")
+  el.setAttribute("x", String(rect.x))
+  el.setAttribute("y", String(rect.y))
+  el.setAttribute("width", String(rect.w))
+  el.setAttribute("height", String(rect.h))
+}
+
 /** Anteprima della connessione in corso: un estremo `null` la nasconde. */
 export function showConnect(from: Point | null, to: Point | null): void {
   const el = overlay?.querySelector("[data-connect]")

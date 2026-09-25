@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe("pannello del collegamento", () => {
   it("mostra il tipo, gli estremi e i problemi del collegamento", () => {
-    expect(container.textContent).toContain("mappa su")
+    expect(container.textContent).toContain("Mappa su")
     expect(container.textContent).toContain("Ordine → ordini")
     expect(container.textContent).toContain("«Ordine.note» non ha una colonna in «ordini»")
   })
@@ -62,5 +62,47 @@ describe("pannello del collegamento", () => {
     act(() => button.click())
     expect(documentStore.getState().doc.diagram.links).toEqual({})
     expect(sessionStore.getState().selection.size).toBe(0)
+  })
+})
+
+describe("pannello di un collegamento del flusso", () => {
+  /** Aggiunge il processo `p1` «Calcola totale», un accesso `a1` e un «chiama» `c1`, e seleziona `id`. */
+  function seleziona(id: string) {
+    act(() => {
+      documentStore.getState().dispatch((draft) => {
+        const lane = draft.diagram.flow.model.lanes[0]!.id
+        draft.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane }
+        draft.diagram.flow.view.nodes["p1"] = { x: 0, y: 40, collapsed: false }
+        draft.diagram.links["a1"] = { kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "read" }
+        draft.diagram.links["c1"] = { kind: "calls", source: "flow/p1", target: "class/Ordine" }
+      })
+      sessionStore.getState().setSelection([selId("edge", `link/${id}`)])
+    })
+  }
+
+  it("un accesso mostra il titolo, gli estremi con l'etichetta del nodo e la select del modo", () => {
+    seleziona("a1")
+    expect(container.textContent).toContain("Accesso")
+    expect(container.textContent).toContain("Calcola totale → ordini")
+    const select = container.querySelector<HTMLSelectElement>("#link-mode")!
+    expect(select.value).toBe("read")
+    expect([...select.options].map((o) => o.textContent)).toEqual(["Legge", "Scrive", "Legge e scrive"])
+  })
+
+  it("cambiare il modo aggiorna il documento", () => {
+    seleziona("a1")
+    const select = container.querySelector<HTMLSelectElement>("#link-mode")!
+    act(() => {
+      select.value = "write"
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    expect(documentStore.getState().doc.diagram.links["a1"]).toEqual({ kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "write" })
+  })
+
+  it("un «chiama» mostra il titolo e nessuna select", () => {
+    seleziona("c1")
+    expect(container.textContent).toContain("Chiama")
+    expect(container.textContent).toContain("Calcola totale → Ordine")
+    expect(container.querySelector("#link-mode")).toBeNull()
   })
 })

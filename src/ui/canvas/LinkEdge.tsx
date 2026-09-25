@@ -7,9 +7,9 @@ import type { Rect } from "@/editor/geometry"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { linkGeometry } from "@/editor/links/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
+import { linkLabel } from "@/model/links/labels"
 import type { Link } from "@/model/links/schema"
 import { registerEdge } from "./dom-registry"
-import { LINK_LABEL } from "./link-label"
 
 interface Props {
   id: string
@@ -40,7 +40,7 @@ export const LinkEdgeView = memo(function LinkEdgeView({ id, link, source, targe
       <path data-edge-line d={geo.d} fill="none" stroke={stroke} strokeWidth={selected ? 2 : 1.5} strokeDasharray="6 4" />
       <path data-edge-target d={geo.targetMarker} fill="none" stroke={stroke} strokeWidth={1.5} />
       <text data-edge-label x={geo.label.x} y={geo.label.y - 6} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
-        {LINK_LABEL[link.kind]}
+        {linkLabel(link)}
       </text>
     </g>
   )

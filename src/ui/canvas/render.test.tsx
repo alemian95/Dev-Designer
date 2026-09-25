@@ -73,4 +73,17 @@ describe("LinkEdgeView", () => {
     expect(html).toContain('stroke-dasharray="6 4"')
     expect(html).toContain(">mappa su<")
   })
+
+  it("un accesso in scrittura ha l'etichetta del suo modo", () => {
+    const html = renderToStaticMarkup(
+      <LinkEdgeView
+        id="a1"
+        link={{ kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "write" }}
+        source={{ x: 0, y: 0, w: 100, h: 40 }}
+        target={{ x: 300, y: 0, w: 100, h: 40 }}
+        selected={false}
+      />,
+    )
+    expect(html).toContain(">scrive<")
+  })
 })

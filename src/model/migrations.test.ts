@@ -23,7 +23,7 @@ describe("migrazione 1 → 2", () => {
     const out = migrateDocument(v1Class)
     expect(out.ok).toBe(true)
     const doc = (out as { ok: true; value: Record<string, unknown> }).value
-    expect(doc.schemaVersion).toBe(4)
+    expect(doc.schemaVersion).toBe(5)
     expect((doc.diagram as { class: { model: { notes: unknown } } }).class.model.notes).toEqual({})
   })
 
@@ -31,7 +31,7 @@ describe("migrazione 1 → 2", () => {
     const out = migrateDocument(v1Er)
     expect(out.ok).toBe(true)
     const doc = (out as { ok: true; value: Record<string, unknown> }).value
-    expect(doc.schemaVersion).toBe(4)
+    expect(doc.schemaVersion).toBe(5)
     expect((doc.diagram as { er: { model: Record<string, unknown> } }).er.model).toEqual({ entities: {}, relationships: {} })
   })
 
@@ -41,7 +41,7 @@ describe("migrazione 1 → 2", () => {
     expect(v1Class).toEqual(before)
   })
 
-  it("un documento già alla versione corrente (4) passa senza toccare niente", () => {
+  it("un documento già alla versione corrente (5) passa senza toccare niente", () => {
     const v3 = createDocument("Prova", "a")
     expect(migrateDocument(v3)).toEqual({ ok: true, value: v3 })
   })
@@ -55,7 +55,7 @@ describe("migrazione 2 → 3", () => {
     const r = parseDocument(v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(4)
+    expect(r.document.schemaVersion).toBe(5)
     expect(r.document.diagram.class.model.classes).toEqual({})
     expect(r.document.diagram.flow.model.lanes).toHaveLength(1)
   })
@@ -95,12 +95,24 @@ describe("migrazione 3 → 4", () => {
     const r = parseDocument(v3Text())
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(4)
+    expect(r.document.schemaVersion).toBe(5)
     expect(r.document.diagram.links).toEqual({})
   })
 
-  it("un documento v2 arriva alla 4 passando dalla 3", () => {
+  it("un documento v2 arriva alla 5 passando dalla 3", () => {
     const r = parseDocument(v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } }))
     expect(r.ok && r.document.diagram.links).toEqual({})
+  })
+})
+
+describe("migrazione 4 → 5", () => {
+  it("un documento v4 con un «mappa su» passa intatto, alla versione 5", () => {
+    const doc = JSON.parse(toJson(createDocument("Prova", "v4doc"))) as { schemaVersion: number; diagram: { links: Record<string, unknown> } }
+    doc.diagram.links["l1"] = { kind: "maps-to", source: "class/Ordine", target: "er/ordini" }
+    const r = parseDocument(JSON.stringify({ ...doc, schemaVersion: 4 }))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.document.schemaVersion).toBe(5)
+    expect(r.document.diagram.links).toEqual({ l1: { kind: "maps-to", source: "class/Ordine", target: "er/ordini" } })
   })
 })

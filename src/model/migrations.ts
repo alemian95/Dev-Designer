@@ -51,10 +51,17 @@ const addLinks: Migration = (raw) => {
 }
 
 /**
+ * 4 → 5: nessun cambiamento di forma. I tipi del flusso (spec 4b §3) allargano quello che un file può
+ * contenere, e un file v4 è già un v5 valido. La versione sale perché un'app ferma alla 4 rifiuti un
+ * file con i tipi nuovi dicendo che è più recente, invece che con un errore di schema.
+ */
+const sameShape: Migration = (raw) => raw
+
+/**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
  */
-const migrations: ReadonlyMap<number, Migration> = new Map([[1, addClassNotes], [2, unifyDiagram], [3, addLinks]])
+const migrations: ReadonlyMap<number, Migration> = new Map([[1, addClassNotes], [2, unifyDiagram], [3, addLinks], [4, sameShape]])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }
 

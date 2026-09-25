@@ -1,10 +1,11 @@
 import type { DevDocument } from "@/model/document"
 import type { Family } from "@/model/family"
 import { unmappableNotice } from "@/model/links/mappable"
-import { linkRule, type Link, type LinkKind } from "@/model/links/schema"
+import { linkRule, type AccessMode, type Link, type LinkKind } from "@/model/links/schema"
 import { classDiagram } from "../class-access"
 import type { Recipe } from "../document-store"
 import { linkKey, qualify, splitKey } from "../families"
+import { flowDiagram } from "../flow-access"
 import { familyOps } from "../kinds/ops"
 
 /** L'esito del gesto Collega fra due famiglie diverse (spec 4a §4). Le chiavi sono `link/<uuid>`. */
@@ -17,11 +18,13 @@ export type ConnectResult =
 const FAMILY_NOUN: Record<Family, string> = { er: "un'entità", class: "una classe", flow: "un nodo di flusso" }
 
 /**
- * Il motivo per cui un estremo non ammette il tipo, o `null` se lo ammette. `source` è già nel verso
- * del tipo. La regola «solo class e abstract» vive nel modello (`unmappableNotice`, review finale F1):
- * qui la si usa per l'avviso, e `validateLinks` la stessa fonte per l'errore `link-unmappable`.
+ * Il motivo per cui gli estremi non ammettono il tipo, o `null` se lo ammettono. `source` e `target`
+ * sono già nel verso del tipo. La regola «solo class e abstract» vive nel modello (`unmappableNotice`,
+ * review finale F1 del 4a): qui la si usa per l'avviso, e `validateLinks` la stessa fonte per l'errore
+ * `link-unmappable`. Le note, di flusso e di classe, non partecipano ai collegamenti del flusso
+ * (spec 4b §4).
  */
-function refusal(doc: DevDocument, kind: LinkKind, source: string): string | null {
+function refusal(doc: DevDocument, kind: LinkKind, source: string, target: string): string | null {
   switch (kind) {
     case "maps-to": {
       const key = splitKey(source).key
@@ -30,7 +33,22 @@ function refusal(doc: DevDocument, kind: LinkKind, source: string): string | nul
       if (!cls) return "Una nota non si mappa su una tabella."
       return unmappableNotice(cls.stereotype)
     }
+    case "accesses":
+      return isFlowNote(doc, source) ? "Una nota non legge né scrive una tabella." : null
+    case "calls":
+      if (isFlowNote(doc, source)) return "Una nota non chiama una classe."
+      return classDiagram(doc).model.notes[splitKey(target).key] ? "Una nota non si chiama." : null
   }
+}
+
+/** `true` se `key` è un nodo di flusso con la forma della nota. */
+function isFlowNote(doc: DevDocument, key: string): boolean {
+  return flowDiagram(doc).model.nodes[splitKey(key).key]?.shape === "note"
+}
+
+/** Il collegamento che nasce dal gesto: un accesso nasce in lettura, e il modo si cambia dal pannello. */
+function newLink(kind: LinkKind, source: string, target: string): Link {
+  return kind === "accesses" ? { kind, source, target, mode: "read" } : { kind, source, target }
 }
 
 /**
@@ -45,7 +63,7 @@ export function connectAcross(doc: DevDocument, from: string, to: string): Conne
   const rule = linkRule(a, b)
   if (!rule) return { type: "rejected", notice: `Non esiste un collegamento fra ${FAMILY_NOUN[a]} e ${FAMILY_NOUN[b]}.` }
   const [source, target] = rule.reversed ? [to, from] : [from, to]
-  const refused = refusal(doc, rule.kind, source)
+  const refused = refusal(doc, rule.kind, source, target)
   if (refused) return { type: "rejected", notice: refused }
   const existing = Object.entries(doc.diagram.links).find(
     ([, l]) => l.kind === rule.kind && l.source === source && l.target === target,
@@ -56,7 +74,7 @@ export function connectAcross(doc: DevDocument, from: string, to: string): Conne
     type: "created",
     key: linkKey(id),
     recipe: (draft) => {
-      draft.diagram.links[id] = { kind: rule.kind, source, target }
+      draft.diagram.links[id] = newLink(rule.kind, source, target)
     },
   }
 }
@@ -92,6 +110,18 @@ export function followRename(rename: Recipe, family: Family, oldKey: string, new
 export function deleteLinks(ids: readonly string[]): Recipe {
   return (draft) => {
     for (const id of ids) delete draft.diagram.links[id]
+  }
+}
+
+/**
+ * Il modo di un accesso (spec 4b §6). Su un id che non c'è o su un collegamento di un altro tipo non
+ * scrive niente; con lo stesso modo nemmeno, perché Immer non registra un'assegnazione che non cambia
+ * il valore, e `dispatch` non aggiunge un passo di annulla.
+ */
+export function setLinkMode(id: string, mode: AccessMode): Recipe {
+  return (draft) => {
+    const link = draft.diagram.links[id]
+    if (link?.kind === "accesses") link.mode = mode
   }
 }
 

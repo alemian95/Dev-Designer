@@ -2,9 +2,16 @@ import * as z from "zod"
 import { inFamily, type Family } from "../family"
 import { Identifier } from "../shared"
 
-/** I tipi di collegamento fra famiglie. Lo step 4b aggiunge i suoi a questa unione. */
-export const LinkKindSchema = z.enum(["maps-to"])
+/** I tipi di collegamento fra famiglie: «mappa su» (4a), l'accesso e la chiamata del flusso (4b). */
+export const LinkKindSchema = z.enum(["maps-to", "accesses", "calls"])
 export type LinkKind = z.infer<typeof LinkKindSchema>
+
+/**
+ * Il modo di un accesso. Fra un nodo di flusso e un'entità c'è un solo accesso, qualunque cosa il
+ * nodo ne faccia: il modo lo dice, e si cambia dal pannello (spec 4b §3).
+ */
+export const AccessModeSchema = z.enum(["read", "write", "read-write"])
+export type AccessMode = z.infer<typeof AccessModeSchema>
 
 /**
  * Le famiglie agli estremi di ogni tipo, nel verso del tipo: la sola definizione. La usano lo schema,
@@ -12,16 +19,25 @@ export type LinkKind = z.infer<typeof LinkKindSchema>
  */
 export const LINK_ENDS: Readonly<Record<LinkKind, { source: Family; target: Family }>> = {
   "maps-to": { source: "class", target: "er" },
+  accesses: { source: "flow", target: "er" },
+  calls: { source: "flow", target: "class" },
 }
+
+const ends = { source: Identifier, target: Identifier }
 
 /**
  * Un collegamento: gli estremi sono chiavi **con prefisso** (`class/Ordine`, `er/ordini`), il solo
  * punto in cui il prefisso entra nel modello, perché un collegamento attraversa le famiglie per
- * definizione. Lo schema controlla la forma, non che gli estremi esistano: un collegamento pendente
- * è un problema di validazione (`links/validate.ts`), non un file illeggibile.
+ * definizione. Un'unione discriminata su `kind`, perché solo l'accesso ha il modo. Lo schema controlla
+ * la forma, non che gli estremi esistano: un collegamento pendente è un problema di validazione
+ * (`links/validate.ts`), non un file illeggibile.
  */
 export const LinkSchema = z
-  .object({ kind: LinkKindSchema, source: Identifier, target: Identifier })
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("maps-to"), ...ends }),
+    z.object({ kind: z.literal("accesses"), ...ends, mode: AccessModeSchema }),
+    z.object({ kind: z.literal("calls"), ...ends }),
+  ])
   .refine((l) => inFamily(l.source, LINK_ENDS[l.kind].source) && inFamily(l.target, LINK_ENDS[l.kind].target), {
     message: "gli estremi del collegamento non appartengono alle famiglie del suo tipo",
   })

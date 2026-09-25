@@ -153,7 +153,16 @@ export function runMigrations(
   for (let v = version; v < target; v++) {
     const step = steps.get(v)
     if (!step) return { ok: false, error: `manca la migrazione dalla versione ${v}` }
-    doc = { ...step(doc), schemaVersion: v + 1 }
+    // Una migrazione presuppone la forma del file alla propria versione, ma non è lei a
+    // validarla (lo fa zod dopo l'ultimo passo): un file corrotto o scritto a mano può avere una
+    // forma diversa da quella attesa e far esplodere lo step (es. un nodo senza `label`). Un
+    // errore qui è un file non valido, non un bug di questa funzione: si racconta come tale
+    // invece di risalire come eccezione non gestita fino a chi ha chiamato `parseDocument`.
+    try {
+      doc = { ...step(doc), schemaVersion: v + 1 }
+    } catch (e) {
+      return { ok: false, error: `migrazione dalla versione ${v} fallita: ${e instanceof Error ? e.message : String(e)}` }
+    }
   }
   return { ok: true, value: doc }
 }

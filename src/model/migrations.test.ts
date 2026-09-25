@@ -164,4 +164,13 @@ describe("migrazione 5 → 6", () => {
     const r = parseDocument(toJson(doc))
     expect(r.ok && r.document.diagram.flow).toEqual(doc.diagram.flow)
   })
+
+  it("un nodo senza label non fa esplodere la migrazione: il file è segnalato non valido, non lanciato", () => {
+    const nodes = { n1: { shape: "process", lane: "l1" } }
+    const views = { n1: { x: 0, y: 0, collapsed: false } }
+    expect(() => parseDocument(v5({ model: { lanes, nodes, edges: {} }, view: { nodes: views, lanes: bands } }))).not.toThrow()
+    const r = parseDocument(v5({ model: { lanes, nodes, edges: {} }, view: { nodes: views, lanes: bands } }))
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.error).toContain("migrazione dalla versione 5 fallita")
+  })
 })

@@ -1,8 +1,9 @@
 /**
- * End-to-end del flowchart: da un documento nuovo, senza corsie visibili, crea un primo nodo con
- * cui la banda compare, aggiunge una seconda corsia, altri due nodi di forme diverse, collega due
- * nodi e scrive l'etichetta sull'arco col doppio click, dispone, trascina un nodo nell'altra corsia
- * con eventi veri, annulla con un solo ⌘Z e esporta in Mermaid.
+ * End-to-end del flowchart: da un documento nuovo senza pool, crea un pool con lo strumento `P`, ne
+ * aggiunge una seconda corsia dal pannello del pool, tre nodi di forme diverse dentro le corsie,
+ * collega due nodi e scrive l'etichetta sull'arco col doppio click, dispone, trascina un nodo
+ * nell'altra corsia con eventi veri, annulla con un solo ⌘Z, trascina lo stesso nodo fuori dal pool
+ * (diventa libero) ed esporta in Mermaid.
  *
  * Copre le tre cose che senza un browser vero non esistono, tutte specifiche a questo tipo di
  * diagramma (spec §5, §6):
@@ -25,19 +26,19 @@
  * Le corsie non hanno un `data-lane-id` sul loro rettangolo (spec §5: «le bande non sono nodi»,
  * nessun attributo di hit-test): la banda che contiene un nodo si legge quindi dal DOM come la
  * userebbe l'occhio, confrontando il rettangolo del nodo (`getBoundingClientRect`) con quello della
- * banda, nello stesso ordine documentale di `model.lanes` — la stessa idea di `rectByName` sotto,
+ * banda, nello stesso ordine documentale di `model.lanes` — la stessa idea di `rectByLabel` sotto,
  * che cerca il nodo per il suo testo invece che per un id generato.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/flow.mjs`. `HEADLESS=0` per vedere.
  */
 import { expectMenu, expectNodes, expectText, isMainModule, nodeRects, overlappingPairs, signature, startEnv } from "./helpers.mjs"
 
-/** Rettangolo del nodo il cui testo contiene `label`, in coordinate schermo. Un nodo di flowchart
- *  disegna la sua forma con un solo `<path>` (`FlowNodeView`), non un `<rect>` come entità e
- *  classi — a differenza di `rectByName` in `class.mjs`, qui si legge sempre `path`. */
+/** Rettangolo del nodo il cui testo contiene `label`, in coordinate schermo, escluso ogni pool. Un
+ *  nodo di flowchart disegna la sua forma con un solo `<path>` (`FlowNodeView`), non un `<rect>`
+ *  come entità e classi — a differenza di `rectByName` in `class.mjs`, qui si legge sempre `path`. */
 async function rectByLabel(page, label) {
   return page.evaluate((label) => {
-    const groups = [...document.querySelectorAll("[data-node-id]")]
+    const groups = [...document.querySelectorAll("[data-node-id]:not([data-pool])")]
     const g = groups.find((el) => el.textContent.includes(label))
     if (!g) return null
     const r = g.querySelector("path").getBoundingClientRect()
@@ -45,11 +46,11 @@ async function rectByLabel(page, label) {
   }, label)
 }
 
-/** Rettangoli schermo delle bande delle corsie, nell'ordine documentale — quello di `model.lanes`
- *  (`LanesLayerView` le monta in quell'ordine, una `<rect>` per corsia). */
+/** Rettangoli schermo delle bande delle corsie, nell'ordine documentale: dentro ogni pool una `<g>`
+ *  per corsia, con la sua `<rect>` (`PoolsLayerView`). */
 async function laneBandRects(page) {
   return page.evaluate(() =>
-    [...document.querySelectorAll('[data-layer="lanes"] rect')].map((r) => {
+    [...document.querySelectorAll('[data-layer="pools"] [data-pool] > g > rect')].map((r) => {
       const rect = r.getBoundingClientRect()
       return { y: rect.y, h: rect.height }
     }),
@@ -94,49 +95,48 @@ export async function run(browser, base) {
     await page.goto(base)
     await page.waitForSelector("[data-canvas]")
 
-    await step("Nuovo documento: il canvas è vuoto e nessuna corsia è visibile", async () => {
+    await step("Nuovo documento: il canvas è vuoto e non c'è nessun pool", async () => {
       await expectMenu(page, "closed")
       await page.locator("[data-document-menu]").click()
       await expectMenu(page, "open")
       await page.getByRole("menuitem", { name: "Nuovo documento" }).click()
       await expectMenu(page, "closed")
       await expectNodes(page, 0)
-      // La corsia c'è nel modello (`lanes` è `.min(1)`), ma si vede solo con un nodo di flusso (spec §5).
-      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 0)
+      await page.waitForFunction(() => document.querySelectorAll("[data-pool]").length === 0)
     })
 
     const canvas = await page.locator("svg.dd-canvas").boundingBox()
 
-    await step("il primo nodo, un terminale nella prima corsia: la banda compare con lui", async () => {
-      // La creazione apre già l'editor del testo (spec §7, stesso editor della nota di classe):
-      // si scrive lì, non con un doppio click separato.
+    await step("un pool con P: nasce con una corsia, selezionato, e il pannello è il suo", async () => {
+      // Il pool nasce con l'angolo sul clic: a (60, 20) nel mondo il corpo delle corsie va da x = 92 a 700.
+      await page.keyboard.press("p")
+      await page.mouse.click(canvas.x + 60, canvas.y + 20)
+      await page.waitForFunction(() => document.querySelectorAll("[data-pool]").length === 1)
+      if ((await laneBandRects(page)).length !== 1) throw new Error("il pool non è nato con una corsia")
+      await page.locator("#pool-name").waitFor()
+    })
+
+    await step("aggiungi una seconda corsia dal pannello del pool", async () => {
+      await page.getByRole("button", { name: "Aggiungi" }).click()
+      await page.waitForFunction(() => document.querySelectorAll('[data-layer="pools"] [data-pool] > g > rect').length === 2)
+    })
+
+    await step("tre nodi dentro le corsie: terminale e processo nella prima, decisione nella seconda", async () => {
+      // Lascia il pannello del pool prima di scegliere uno strumento di nodo.
+      await page.keyboard.press("Escape")
+
       await page.getByRole("radio", { name: "Terminale" }).click()
-      await page.mouse.click(canvas.x + 150, canvas.y + 20)
+      await page.mouse.click(canvas.x + 150, canvas.y + 40)
       await expectNodes(page, 1)
       await nodeTextEditor.waitFor()
       await nodeTextEditor.fill("Inizio")
       await nodeTextEditor.blur()
       await nodeTextEditor.waitFor({ state: "detached" })
-      // La prima banda (y 0–160) compare con il primo nodo di flusso, e il nodo ci sta dentro.
-      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 1)
-      const [band0] = await laneBandRects(page)
-      if (!withinBand(await rectByLabel(page, "Inizio"), band0)) throw new Error("«Inizio» non è nato nella prima corsia")
-    })
 
-    await step("aggiungi una seconda corsia dal pannello", async () => {
-      // Il pannello delle corsie (`FlowLanesPanel`, `PropertiesPanel.tsx`) compare solo con la
-      // selezione vuota e un nodo di flusso nel documento: il terminale appena creato è selezionato,
-      // quindi prima si deseleziona con Escape.
-      await page.keyboard.press("Escape")
-      await page.getByRole("button", { name: "Aggiungi" }).click()
-      await page.waitForFunction(() => document.querySelectorAll('[data-layer="lanes"] rect').length === 2)
-    })
-
-    await step("altri due nodi di forme diverse: processo nella prima corsia, decisione nella seconda", async () => {
       // `exact`: "Processo" senza vincolo combacerebbe anche con "Sottoprocesso" (substring match
       // di default di Playwright su `name`).
       await page.getByRole("radio", { name: "Processo", exact: true }).click()
-      await page.mouse.click(canvas.x + 450, canvas.y + 20)
+      await page.mouse.click(canvas.x + 450, canvas.y + 40)
       await expectNodes(page, 2)
       await nodeTextEditor.waitFor()
       await nodeTextEditor.fill("Processo A")
@@ -144,7 +144,7 @@ export async function run(browser, base) {
       await nodeTextEditor.waitFor({ state: "detached" })
 
       await page.getByRole("radio", { name: "Decisione" }).click()
-      await page.mouse.click(canvas.x + 150, canvas.y + 180)
+      await page.mouse.click(canvas.x + 150, canvas.y + 200)
       await expectNodes(page, 3)
       await nodeTextEditor.waitFor()
       await nodeTextEditor.fill("Decisione")
@@ -152,9 +152,7 @@ export async function run(browser, base) {
       await nodeTextEditor.waitFor({ state: "detached" })
 
       // Sanità delle coordinate di piazzamento, prima ancora di «Disponi»: il terminale e il
-      // processo sono nati dentro la prima banda, la decisione dentro la seconda — `laneAt`
-      // (`editor/flow/geometry.ts`) decide la corsia dalla y del click, non da uno strumento a
-      // parte, quindi è già verificabile qui.
+      // processo sono nati dentro la prima banda, la decisione dentro la seconda.
       const [band0, band1] = await laneBandRects(page)
       const inizio = await rectByLabel(page, "Inizio")
       const processo = await rectByLabel(page, "Processo A")
@@ -262,6 +260,20 @@ export async function run(browser, base) {
       const decisione = await rectByLabel(page, "Decisione")
       if (withinBand(decisione, band0)) throw new Error("«Decisione» è rimasta nella prima corsia dopo ⌘Z")
       if (!withinBand(decisione, band1)) throw new Error("«Decisione» non è tornata nella seconda corsia dopo ⌘Z")
+    })
+
+    await step("trascinata fuori dal pool, «Decisione» diventa libera", async () => {
+      const decisione = await rectByLabel(page, "Decisione")
+      const bands = await laneBandRects(page)
+      const last = bands[bands.length - 1]
+      const fromX = decisione.x + decisione.w / 2
+      const fromY = decisione.y + decisione.h / 2
+      await page.mouse.move(fromX, fromY)
+      await page.mouse.down()
+      await page.mouse.move(fromX, last.y + last.h + 150, { steps: 8 })
+      await page.mouse.up()
+      // Il drag la lascia selezionata: il pannello dice che non ha più una corsia.
+      await page.waitForFunction(() => document.querySelector("#flow-node-lane")?.value === "")
     })
 
     await step("«Esporta testo…»: subgraph, un rombo e l'etichetta sull'arco", async () => {

@@ -2,7 +2,7 @@ import type { Family } from "@/model/family"
 import type { Point, Rect } from "./geometry"
 import { selId, selectedKeys, type Tool } from "./session-store"
 
-export type Hit = { kind: "node"; key: string } | { kind: "edge"; key: string } | { kind: "canvas" }
+export type Hit = { kind: "node"; key: string } | { kind: "edge"; key: string } | { kind: "resize"; key: string; lane: string | null } | { kind: "canvas" }
 
 /** Stato della macchina: uno solo alla volta sul root SVG (spec §4.3). */
 export type Mode =
@@ -11,6 +11,7 @@ export type Mode =
   | { type: "drag"; keys: string[]; start: Point; moved: boolean }
   | { type: "marquee"; start: Point; additive: boolean }
   | { type: "connect"; source: string }
+  | { type: "resize"; key: string; lane: string | null; start: Point; moved: boolean }
 
 export const IDLE: Mode = { type: "idle" }
 
@@ -40,6 +41,9 @@ export type Effect =
   | { type: "preview-connect"; source: string; to: Point | null }
   | { type: "commit-connect"; source: string; target: string }
   | { type: "create-node"; at: Point; family: Family; variant?: string }
+  | { type: "preview-resize"; key: string; lane: string | null; dx: number; dy: number }
+  | { type: "commit-resize"; key: string; lane: string | null; dx: number; dy: number }
+  | { type: "clear-resize" }
 
 export interface Context {
   tool: Tool
@@ -83,6 +87,13 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
       return { mode: { type: "connect", source: info.hit.key }, effects: [{ type: "preview-connect", source: info.hit.key, to: info.world }] }
     }
     return { mode: IDLE, effects: [] }
+  }
+
+  // Una maniglia di ridimensionamento (spec 2b §5): seleziona il frame e apre il gesto. Sta prima
+  // dello switch, che così resta sui soli nodi, archi e canvas.
+  if (info.hit.kind === "resize") {
+    const { key, lane } = info.hit
+    return { mode: { type: "resize", key, lane, start: info.world, moved: false }, effects: [{ type: "select", ids: [selId("node", key)] }] }
   }
 
   switch (info.hit.kind) {
@@ -131,6 +142,11 @@ function onMove(mode: Mode, info: PointerInfo): Step {
       return { mode, effects: [{ type: "preview-marquee", rect: normalizeRect(mode.start, info.world) }] }
     case "connect":
       return { mode, effects: [{ type: "preview-connect", source: mode.source, to: info.world }] }
+    case "resize": {
+      const dx = info.world.x - mode.start.x
+      const dy = info.world.y - mode.start.y
+      return { mode: { ...mode, moved: true }, effects: [{ type: "preview-resize", key: mode.key, lane: mode.lane, dx, dy }] }
+    }
   }
 }
 
@@ -156,6 +172,13 @@ function onUp(mode: Mode, info: PointerInfo): Step {
       if (info.hit.kind === "node") effects.push({ type: "commit-connect", source: mode.source, target: info.hit.key })
       return { mode: IDLE, effects }
     }
+    case "resize": {
+      const effects: Effect[] = [{ type: "clear-resize" }]
+      if (mode.moved) {
+        effects.push({ type: "commit-resize", key: mode.key, lane: mode.lane, dx: info.world.x - mode.start.x, dy: info.world.y - mode.start.y })
+      }
+      return { mode: IDLE, effects }
+    }
   }
 }
 
@@ -167,6 +190,8 @@ function onCancel(mode: Mode): Step {
       return { mode: IDLE, effects: [{ type: "preview-marquee", rect: null }] }
     case "connect":
       return { mode: IDLE, effects: [{ type: "preview-connect", source: mode.source, to: null }] }
+    case "resize":
+      return { mode: IDLE, effects: [{ type: "clear-resize" }] }
     default:
       return { mode: IDLE, effects: [] }
   }

@@ -756,6 +756,28 @@ Le voci aperte dalla revisione finale di `feat/export-testo`, chiuse insieme.
 - **`mysql.test.ts`**: il test dell'`UNIQUE` in linea asserisce `warnings` e
   `skipped` come il suo gemello, e il refuso nel commento è corretto.
 
+### Minori chiuse il 2026-09-25
+
+Voci d'Archivio chiuse dal 2b, pool e corsie
+(`docs/superpowers/specs/2026-09-25-pool-corsie-design.md`): le corsie non sono più bande globali
+ricavate dai nodi ma stanno dentro pool che hanno una posizione e una larghezza salvate.
+
+- **Le bande delle corsie passavano sotto entità e classi** («Canvas unificato»). La banda prendeva
+  x e larghezza dai soli nodi di flusso, e poteva disegnarsi sopra un nodo di un'altra famiglia. Un
+  pool sta dove l'utente l'ha messo e non si allarga da solo; «Disponi» nel canvas misto lo conta nel
+  blocco del flusso, che si impacchetta accanto agli altri con il loro stesso spazio
+  (`layoutBounds`, `src/editor/layout-pack.ts`).
+- **Il pannello delle corsie compariva solo dal primo nodo di flusso** («Canvas unificato»). Il
+  pannello globale non c'è più: le corsie si gestiscono dal pannello del pool selezionato
+  (`PoolLanes`, `src/ui/panels/FlowProperties.tsx`), e un pool si crea con lo strumento Pool anche su
+  un documento senza nodi di flusso.
+- **`fitToContent` ignorava le bande** («Correzione finale del flowchart»). Oggi i rettangoli da
+  inquadrare vengono da `nodeRects` (`src/editor/kinds/canvas-ops.ts`), che comprende i frame di ogni
+  famiglia: un pool vuoto o più largo dei suoi nodi entra nella vista.
+- **Le corsie non si ridimensionavano** («Flowchart», metà della voce). Si ridimensionano dal bordo
+  inferiore, con un minimo che non scende sotto i loro nodi (`resizeLane`, `clampLaneH`,
+  `src/editor/flow/commands.ts`). L'altra metà, il riordino per trascinamento, resta in Archivio.
+
 ---
 
 ## Archivio
@@ -1103,13 +1125,14 @@ stesso momento in cui si decide**, non quando il piano chiude.
   richiesto uno spike proprio. Costo-se-sbagliato: leggibilità su flowchart con
   molte corsie e molti archi che le attraversano; nessuna misura dice a che
   densità diventa fastidioso, perché non è mai stata cercata.
-- **Le corsie non si ridimensionano né si riordinano per trascinamento.**
-  `FlowLanesPanel` (`src/ui/panels/FlowProperties.tsx`) sposta una corsia solo
-  con le due frecce su/giù, e l'altezza di ciascuna è sempre il massimo fra il
-  contenuto impilato e il minimo — mai una misura scelta a mano. Deciso fuori
-  scopo dalla spec (§2): due frecce nell'intestazione bastano finché non danno
-  fastidio, e il trascinamento di una corsia intera è un gesto nuovo che
-  tocca lo stesso codice caldo del drag dei nodi. Costo-se-sbagliato: un
+- **Le corsie non si riordinano per trascinamento.** Dal 2b (pool e corsie,
+  2026-09-25) si ridimensionano dal bordo inferiore, e quella metà della voce è
+  chiusa (vedi «Minori chiuse il 2026-09-25» in **Corretti**). Resta l'ordine:
+  il pannello del pool (`PoolLanes`, `src/ui/panels/FlowProperties.tsx`) sposta
+  una corsia solo con le due frecce su/giù. Deciso fuori scopo dalla spec (§2):
+  due frecce bastano finché non danno fastidio, e il trascinamento di una corsia
+  intera è un gesto nuovo che tocca lo stesso codice caldo del drag dei nodi.
+  Costo-se-sbagliato: un
   flowchart con molte corsie che vanno riordinate spesso costringe a
   cancellare e ricreare invece di trascinare — attrito per chi disegna, non
   perdita di dati.
@@ -1135,8 +1158,8 @@ stesso momento in cui si decide**, non quando il piano chiude.
   (passo 4) per decisione esplicita di chi ha commissionato il lavoro — e il
   gate non è stato rieseguito. Il percorso di drag fra corsie
   (`moveFlowNodes`, `src/editor/flow/commands.ts`) e il layer delle bande
-  (`LanesLayer`, `src/ui/canvas/LanesLayer.tsx`, che non si ridisegna durante
-  il trascinamento) sono stati controllati leggendo il
+  (che non si ridisegnava durante il trascinamento; dal 2b l'ha sostituito
+  `PoolsLayer`, `src/ui/canvas/PoolsLayer.tsx`, mai misurato neanche lui) sono stati controllati leggendo il
   codice in tre revisioni separate durante questo piano, non misurati: una
   lettura non è una misura, per quanto ripetuta. Rinviato per decisione
   esplicita, non per dimenticanza. Costo-se-sbagliato: una regressione nel
@@ -1214,37 +1237,20 @@ dimenticanza.
   `snap`. Dopo «Disponi» i nodi di un flowchart possono finire fuori
   griglia, e il primo trascinamento li fa saltare di qualche pixel per
   allinearsi — lo stesso sintomo che il docblock di `applyLayout` descrive
-  per il caso che quella funzione previene. `fitToContent`
-  (`src/editor/actions.ts`) ha un limite gemello: usa solo `ops.rectOf` di
-  ogni nodo, ignorando le bande delle corsie (`laneBandExtent`) — un
-  flowchart con una corsia più larga dei nodi che contiene (I1) o una banda
-  vuota sotto `LANE_MIN_W` può centrare la vista senza inquadrare tutta la
-  corsia. Costo-se-sbagliato: un salto di pochi pixel al primo drag dopo
-  «Disponi», e una vista che non inquadra una corsia larga o vuota fino al
-  primo zoom manuale — nessuno dei due perde un dato.
+  per il caso che quella funzione previene. Il limite gemello di
+  `fitToContent` sulle bande delle corsie è chiuso dal 2b (vedi «Minori chiuse
+  il 2026-09-25» in **Corretti**). Costo-se-sbagliato: un salto di pochi pixel
+  al primo drag dopo «Disponi» — non perde un dato.
 
 ### Canvas unificato (2026-09-24)
 
 Limiti accettati scrivendo il primo giro del canvas unificato — un solo documento con le tre
 famiglie (`doc.diagram = { er, class, flow }`), chiavi con prefisso `famiglia/` in tutto lo stack.
 Nessuno dei quattro tocca la correttezza del modello: sono margini di questo giro, non difetti
-scoperti dopo.
+scoperti dopo. Due sono stati chiusi dal 2b (vedi «Minori chiuse il 2026-09-25» in **Corretti**):
+le bande che passavano sotto entità e classi e il pannello delle corsie che compariva solo dal primo
+nodo.
 
-- **Le bande delle corsie possono passare sotto entità e classi.**
-  `laneBandExtent` (`src/editor/flow/geometry.ts`) calcola x e larghezza dai soli nodi di flusso, con
-  un margine e un minimo (`LANE_MIN_W`): finché «Disponi» non ha ancora messo le tre famiglie in fila
-  — subito dopo aver creato un nodo di flusso vicino a un'entità o a una classe, per esempio — la
-  banda può disegnarsi sopra un nodo di un'altra famiglia, che non le appartiene e non dovrebbe
-  starci sotto. Un passo dedicato a restringere l'estensione della banda a ciò che effettivamente
-  condivide lo spazio col resto del documento risolverebbe il caso, ma non è stato scritto in questo
-  giro.
-- **Il pannello delle corsie compare solo dal primo nodo di flusso, quindi non si possono preparare
-  le corsie prima.** `FlowLanesPanel` (`src/ui/panels/FlowProperties.tsx`) e le sue bande
-  (`LanesLayer`) seguono entrambi `familyHasContent(doc, "flow")` (spec §5, §10): chi vuole disegnare
-  un flowchart deve prima piazzare una forma qualsiasi con lo strumento, e solo allora può nominare o
-  aggiungere corsie. Le corsie esistono comunque nel modello fin dalla creazione del documento
-  (`lanes` è `.min(1)`), quindi non è un dato mancante — è un ordine di lavoro imposto dall'interfaccia
-  che un utente abituato a preparare prima la struttura di un diagramma potrebbe non aspettarsi.
 - **Due note, quella di classe e quella di flusso, restano due implementazioni separate.** Lo stesso
   editor di testo aperto dalla creazione (spec §7) e la stessa forma concettuale — un rettangolo di
   testo libero, senza campi — vivono in due schemi e due componenti che non condividono codice al di
@@ -1259,6 +1265,66 @@ scoperti dopo.
   rivalutare con lo step 4 della roadmap, i collegamenti tipizzati fra famiglie (spec del canvas
   unificato, §1): un layout che ragionasse sulla vicinanza avrebbe bisogno di sapere cosa, fra due
   blocchi, li rende vicini.
+
+### Pool e corsie (2026-09-25)
+
+Rilievi della review finale del 2b (`.superpowers/sdd/2026-09-25-pool-corsie/`) che il giro di
+correzione ha deciso di non chiudere. Nessuno perde dati: sono ambiguità della spec, buchi di
+copertura e piccole asimmetrie di interazione.
+
+- **`POOL_MIN_W` vale due cose diverse.** La migrazione da v5 lo usa come larghezza minima del
+  **corpo** delle corsie e ci aggiunge la striscia (`src/model/migrations.ts`: un pool migrato vuoto
+  è largo 672), mentre Disponi e `addPool` lo usano come larghezza **totale** (640). Un documento
+  migrato stretto perde 32 px al primo Disponi. Non si corregge nel codice perché è un'ambiguità della
+  spec (§3 e §4 contro §6): va decisa lì quale delle due letture vale, poi una riga la allinea.
+  Costo-se-sbagliato: un pool che si restringe di una striscia senza che nessuno l'abbia chiesto.
+- **`resetDragTargets` non ha un test diretto del runner.**
+  `src/ui/canvas/interaction-runner.ts` è l'unica rete contro il `transform` dell'anteprima rimasto
+  sul DOM quando la griglia annulla un gesto (uno spostamento che si arrotonda a zero dà una recipe
+  senza patch, e React non ridisegna). Rinviato perché il caso si vede solo con un finto DOM costruito
+  apposta e la funzione è di tre righe. Costo-se-sbagliato: un nodo o un pool disegnato qualche pixel
+  fuori dalla sua posizione vera fino al render successivo.
+- **Pool e nodi condividono lo spazio delle chiavi senza un controllo di disgiunzione.**
+  `FlowModelSchema` (`src/model/flow/schema.ts`) verifica che gli id delle corsie siano unici, non che
+  una chiave di pool non sia anche una chiave di nodo: un nodo v5 chiamato `pool-1` renderebbe
+  irraggiungibile il nodo o il pool della migrazione. Le chiavi che l'app genera sono uuid, quindi il
+  caso nasce solo da un file scritto a mano; rinviato finché non se ne vede uno. Costo-se-sbagliato:
+  un elemento che non si seleziona più, in un documento scritto fuori dall'app.
+- **Il cablaggio della guida di ridimensionamento non ha test.** Gli effetti `preview-resize` e
+  `clear-resize` del runner scrivono la guida sul DOM con `showGuide`
+  (`src/ui/canvas/dom-registry.ts`), senza un test che lo verifichi, come già `showMarquee` per il
+  riquadro di selezione. La regola del ridimensionamento è coperta da `flowOps.resize`; manca solo la
+  scrittura sul DOM, che l'e2e dei pool esercita. Costo-se-sbagliato: una guida che non compare durante
+  il gesto, con il ridimensionamento che al rilascio funziona lo stesso.
+- **Un test di `resizePool` è tautologico.** In «il pool non scende sotto POOL_MIN_W, né sotto i suoi
+  nodi» (`src/editor/flow/commands.test.ts`) l'asserzione `lane toBe("l1")` non può fallire:
+  `resizePool` non scrive mai la corsia. Andrebbe sostituita da `expectLaneInvariant`, che verifica
+  la cosa che conta, cioè che il nodo resti dentro la sua corsia anche disegnato. Rinviato perché la
+  regola che la protegge, `clampPoolW`, ha già i suoi numeri nello stesso test. Costo-se-sbagliato: un
+  test che resta verde se il ridimensionamento lasciasse un nodo fuori dal pool.
+- **Con lo strumento Pool o di forma, intestazione e maniglie di un pool vincono sulla creazione.** Un
+  clic sull'intestazione di un pool seleziona il pool invece di rifiutare con l'avviso, e un clic su una
+  maniglia (8 px a cavallo dei bordi) avvia un ridimensionamento invece di creare. Il riduttore delle
+  interazioni (`src/editor/interaction.ts`) crea solo su un clic sul canvas vuoto: un frame colpito
+  cade nel ramo di selezione e trascinamento, una maniglia in quello del ridimensionamento. Rinviato perché nessuno dei due casi crea qualcosa di
+  sbagliato: fa un'altra cosa innocua, e lo strumento resta attivo. Costo-se-sbagliato: un clic che non
+  fa quello che l'utente si aspettava.
+- **Disponi impila i pool senza spazio fra l'uno e l'altro.** `placeInLanes`
+  (`src/editor/flow/layout.ts`) mette il pool successivo dove finisce l'ultima corsia del precedente,
+  e i contorni si toccano. La spec (§6) non chiede uno spazio; aggiungerlo è una costante e una
+  riga, da decidere quando un documento con più pool lo mostrerà. Costo-se-sbagliato: due pool che si
+  leggono come uno solo finché non si guarda l'intestazione.
+- **Un flusso fatto solo di pool vuoti abilita l'export Mermaid e dà un `flowchart LR` nudo.** Il pool
+  vuoto conta come contenuto (`familyHasContent`, spec §6), quindi il formato si abilita, ma
+  l'emettitore (`src/io/emit/flow-mermaid.ts`) non emette un pool senza nodi, e il testo resta la
+  sola intestazione, senza avviso. Rinviato perché il risultato è corretto, solo povero. Si
+  corregge con un avviso nell'emettitore, se qualcuno lo trova strano. Costo-se-sbagliato: un export
+  vuoto senza spiegazione.
+- **Collega che parte dall'intestazione di un pool disegna la linea di anteprima.** Al rilascio non
+  si crea niente (Review Focus 1 del piano), ma durante il gesto la linea tratteggiata compare come se
+  il collegamento fosse possibile. Rinviato perché l'anteprima non sa ancora che l'origine è un frame, e
+  insegnarglielo tocca il riduttore delle interazioni per un caso che al rilascio è già innocuo.
+  Costo-se-sbagliato: un'anteprima che promette un collegamento che non arriva.
 
 ---
 

@@ -125,8 +125,7 @@ describe("validateLinks (collegamenti del flusso)", () => {
   function flusso(): DevDocument {
     const doc = documento([], [])
     delete doc.diagram.links["l1"]
-    const lane = doc.diagram.flow.model.lanes[0]!.id
-    doc.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane }
+    doc.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane: null }
     doc.diagram.links["a1"] = { kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "write" }
     doc.diagram.links["c1"] = { kind: "calls", source: "flow/p1", target: "class/Ordine" }
     return doc

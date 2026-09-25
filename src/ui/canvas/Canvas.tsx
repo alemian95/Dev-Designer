@@ -4,11 +4,11 @@ import { FAMILIES } from "@/model/family"
 import { FlowNodeEditor } from "./FlowNodeEditor"
 import { InlineEditor } from "./InlineEditor"
 import { viewFor } from "./kinds/registry"
-import { LanesLayer } from "./LanesLayer"
 import { LinksLayer } from "./LinkEdge"
 import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
 import { Overlay } from "./Overlay"
+import { PoolsLayer } from "./PoolsLayer"
 import { useCanvasInteraction } from "./use-canvas-interaction"
 import { ViewportGroup } from "./ViewportGroup"
 
@@ -30,9 +30,9 @@ export function Canvas({ children }: { children?: ReactNode }) {
         </defs>
         <ViewportGroup>
           <rect data-canvas x={-GRID_EXTENT} y={-GRID_EXTENT} width={2 * GRID_EXTENT} height={2 * GRID_EXTENT} fill="url(#dd-grid)" />
-          {/* Le corsie non sono un `DiagramView.NodesLayer`: sono un terzo layer che solo il
-              flowchart popola (spec §5). `LanesLayer` decide da sé se montarsi. */}
-          <LanesLayer />
+          {/* I pool non sono un `DiagramView.NodesLayer`: sono un layer che solo il flowchart popola,
+              sotto archi e nodi (spec 2b §3). */}
+          <PoolsLayer />
           {/* Tutti gli archi sotto tutti i nodi: un arco ER non deve coprire una classe (spec §5). */}
           {/* Tutte le famiglie, nell'ordine canonico: ogni layer disegna la propria parte, vuota o no. */}
           {FAMILIES.map((f) => {

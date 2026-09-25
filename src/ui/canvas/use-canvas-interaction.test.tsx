@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createDocument } from "@/model/document"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
+import { withPool } from "@/editor/flow/pool-fixture"
 import { selId, sessionStore } from "@/editor/session-store"
 import { IDENTITY } from "@/editor/viewport"
 import { useCanvasInteraction } from "./use-canvas-interaction"
@@ -261,9 +262,8 @@ describe("il resto del cablaggio", () => {
     documentStore.getState().load(createDocument("f", "f"))
     documentStore.getState().dispatch((draft) => {
       const d = draft.diagram.flow
-      const lane = d.model.lanes[0]!.id
-      d.model.nodes["a"] = { label: "", shape: "process", lane }
-      d.model.nodes["b"] = { label: "", shape: "process", lane }
+      d.model.nodes["a"] = { label: "", shape: "process", lane: null }
+      d.model.nodes["b"] = { label: "", shape: "process", lane: null }
       d.view.nodes["a"] = { x: 0, y: 0, collapsed: false }
       d.view.nodes["b"] = { x: 200, y: 0, collapsed: false }
       d.model.edges["e1"] = { source: "a", target: "b", label: "" }
@@ -318,6 +318,30 @@ describe("il resto del cablaggio", () => {
     window.removeEventListener("error", onError)
     expect(errori).toEqual([])
     expect(sessionStore.getState().editing).toBeNull()
+  })
+
+  it("il doppio click su un pool non apre niente", () => {
+    documentStore.getState().load(withPool(createDocument("f", "f")))
+    const pool = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    pool.setAttribute("data-node-id", qualify("flow", "p1"))
+    svg.append(pool)
+    sotto = pool
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
+    expect(sessionStore.getState().editing).toBeNull()
+  })
+
+  it("un down su una maniglia di un pool la trascina, e il pool si allarga", () => {
+    documentStore.getState().load(withPool(createDocument("f", "f")))
+    const maniglia = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+    maniglia.setAttribute("data-resize", qualify("flow", "p1"))
+    svg.append(maniglia)
+    sotto = maniglia
+    giu()
+    muovi()
+    su()
+    // `giu` a x = 100, `muovi` e `su` a x = 160: sessanta unità di mondo alla scala 1. 672 + 60 = 732,
+    // allineato alla griglia: 730.
+    expect(documentStore.getState().doc.diagram.flow.view.pools["p1"]!.w).toBe(730)
   })
 
   it("lo smontaggio stacca tutti i listener, su svg e su window", () => {

@@ -67,7 +67,7 @@ export async function run(browser, base) {
     await step("un'entità, una classe e un processo sullo stesso canvas", async () => {
       await create("e", 200, 320, 1)
       await create("c", 650, 320, 2)
-      // Il processo finisce nella banda della prima corsia (y 0–160 nel mondo): sta sopra gli altri due.
+      // Il processo nasce libero, perché il documento non ha pool (y 60 nel mondo): sta sopra gli altri due.
       await create("2", 400, 60, 3)
       const ids = (await nodeRects(page)).map((r) => r.id.split("/")[0]).sort()
       if (ids.join(",") !== "class,er,flow") throw new Error(`famiglie inattese: ${ids.join(",")}`)

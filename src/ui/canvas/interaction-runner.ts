@@ -7,7 +7,7 @@ import type { EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import { panBy, visibleWorldRect } from "@/editor/viewport"
 import { documentSession } from "@/io/document-session"
-import { setEdgeGeometry, setNodePosition, showConnect, showMarquee } from "./dom-registry"
+import { setEdgeGeometry, setNodePosition, showConnect, showGuide, showMarquee } from "./dom-registry"
 
 /**
  * Margine, in unità di mondo, attorno all'inquadratura entro cui l'anteprima del drag scrive
@@ -106,15 +106,10 @@ function previewDrag(targets: DragTargets, dx: number, dy: number): void {
  * rilascio, non a ogni frame, e su ciò che il gesto ha davvero toccato, quindi il costo è quello
  * della selezione trascinata, non del documento intero.
  *
- * Gira a ogni rilascio, prima della dispatch. Serve per primo al flowchart (spec §6), dove la
- * posizione scritta al rilascio può differire da quella dell'anteprima: se il centro del nodo cade
- * fuori da ogni banda, il comando lo riallinea alla sua banda di partenza, e quel riallineamento
- * può riportarlo **esattamente** dov'era prima del drag. In quel caso `documentStore.dispatch` non
- * produce patch per quel nodo (e per gli archi che lo toccano), React non ridisegna niente perché
- * per lei nulla è cambiato, e il `transform` scritto a mano dall'anteprima — fermo all'ultima
- * posizione del puntatore, non a quella di partenza — resterebbe sul DOM. Scrivendo qui le
- * posizioni di partenza *prima* della dispatch, il DOM è già corretto se la dispatch non fa nulla,
- * e viene comunque sovrascritto da React se la fa.
+ * Gira a ogni rilascio, prima della dispatch: se la recipe non produce patch — uno spostamento che
+ * la griglia annulla — React non ridisegna niente, e senza questo reset il transform scritto a mano
+ * dall'anteprima resterebbe sul DOM. Scrivendo qui le posizioni di partenza prima della dispatch, il
+ * DOM è corretto in entrambi i casi.
  *
  * Il reset è **incondizionato**: una selezione mista può contenere nodi di una famiglia con
  * `commitDrag` e nodi di un'altra senza, e decidere famiglia per famiglia non varrebbe la pena. Per
@@ -168,8 +163,20 @@ export function createInteractionRunner(): InteractionRunner {
   /** Modo corrente e snapshot del drag: lo stato che vive fra un evento e il successivo. */
   let mode: Mode = IDLE
   let dragTargets: DragTargets | null = null
+  /** L'ultimo rifiuto che questo runner ha scritto nell'avviso, per poterlo togliere senza toccare
+   *  avvisi di altra origine (persistenza, autosave) che nel frattempo occupassero la barra. */
+  let lastRefusal: string | null = null
   const session = () => sessionStore.getState()
 
+  /**
+   * Toglie l'avviso solo se è ancora quello che questo runner ci aveva messo: un rifiuto del pool o
+   * di Collega non deve portarsi via un avviso arrivato dopo da un'altra fonte, come «Salvataggio
+   * automatico non disponibile» — quello resta finché l'utente non lo chiude da sé.
+   */
+  const clearOwnRefusal = (): void => {
+    if (documentSession.getState().notice === lastRefusal) documentSession.getState().patch({ notice: null })
+    lastRefusal = null
+  }
 
   const run = (fx: Effect): void => {
     switch (fx.type) {
@@ -180,7 +187,8 @@ export function createInteractionRunner(): InteractionRunner {
         session().setViewport(panBy(session().viewport, fx.dx, fx.dy))
         break
       case "preview-drag":
-        dragTargets ??= collectDragTargets(fx.keys)
+        // I nodi di un pool trascinato si muovono con lui già nell'anteprima (spec 2b §5).
+        dragTargets ??= collectDragTargets(canvasOps(documentStore.getState().doc).withFollowers(fx.keys))
         previewDrag(dragTargets, fx.dx, fx.dy)
         break
       case "commit-drag": {
@@ -207,26 +215,51 @@ export function createInteractionRunner(): InteractionRunner {
         const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target)
         if (!result) break
         if (result.type === "rejected") {
+          lastRefusal = result.notice
           documentSession.getState().patch({ notice: result.notice })
           break
         }
         if (result.type === "created") documentStore.getState().dispatch(result.recipe)
-        // Un collegamento riuscito fra famiglie toglie un eventuale rifiuto precedente dello stesso
-        // strumento: la chiave del risultato è `link/…` solo per un collegamento fra famiglie, mai per
-        // un arco dentro una famiglia (spec 4a §4, T6 della review finale).
-        if (linkId(result.key) !== null) documentSession.getState().patch({ notice: null })
+        // Un collegamento riuscito fra famiglie toglie il rifiuto precedente dello stesso strumento,
+        // non un avviso arrivato da altrove nel frattempo (es. autosave non disponibile): la chiave
+        // del risultato è `link/…` solo per un collegamento fra famiglie, mai per un arco dentro una
+        // famiglia (spec 4a §4, T6 della review finale).
+        if (linkId(result.key) !== null) clearOwnRefusal()
         session().setSelection([selId("edge", result.key)])
         session().setTool("select")
         break
       }
       case "create-node": {
-        const { key, recipe, edit } = canvasOps(documentStore.getState().doc).addNode(fx.at, fx.family, fx.variant)
+        const ops = canvasOps(documentStore.getState().doc)
+        const notice = ops.refuseNode(fx.at, fx.family, fx.variant)
+        if (notice !== null) {
+          // Come un rifiuto di Collega: l'avviso nella barra, e lo strumento resta attivo per riprovare.
+          lastRefusal = notice
+          documentSession.getState().patch({ notice })
+          break
+        }
+        const { key, recipe, edit } = ops.addNode(fx.at, fx.family, fx.variant)
         documentStore.getState().dispatch(recipe)
+        // Una creazione riuscita toglie il rifiuto precedente dello stesso strumento, come un
+        // collegamento riuscito — non un avviso arrivato da altrove (es. autosave non disponibile).
+        clearOwnRefusal()
         session().setSelection([selId("node", key)])
         session().setTool("select")
-        session().setEditing({ key, target: edit })
+        if (edit !== null) session().setEditing({ key, target: edit })
         break
       }
+      case "preview-resize":
+        // Solo una guida sul DOM durante il gesto: il documento cambia una volta sola, al rilascio.
+        showGuide(canvasOps(documentStore.getState().doc).resize(fx.key, fx.lane, fx.dx, fx.dy)?.rect ?? null)
+        break
+      case "commit-resize": {
+        const result = canvasOps(documentStore.getState().doc).resize(fx.key, fx.lane, fx.dx, fx.dy)
+        if (result) documentStore.getState().dispatch(result.recipe)
+        break
+      }
+      case "clear-resize":
+        showGuide(null)
+        break
     }
   }
 

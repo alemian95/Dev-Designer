@@ -2,11 +2,10 @@ import { describe, expect, it } from "vitest"
 import type { FlowModel, FlowShape } from "@/model/flow/schema"
 import { validateFlow } from "./validate"
 
-const lane = { id: "l1", name: "a" }
-const n = (shape: FlowShape) => ({ label: "x", shape, lane: "l1" })
+const n = (shape: FlowShape) => ({ label: "x", shape, lane: null })
 const e = (source: string, target: string, label = "") => ({ source, target, label })
 
-const model = (over: Partial<FlowModel>): FlowModel => ({ lanes: [lane], nodes: {}, edges: {}, ...over })
+const model = (over: Partial<FlowModel>): FlowModel => ({ pools: {}, nodes: {}, edges: {}, ...over })
 
 /** terminale → processo → terminale: il flusso minimo che non deve produrre niente. */
 const sano = model({

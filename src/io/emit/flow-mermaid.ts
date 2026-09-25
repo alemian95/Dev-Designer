@@ -49,19 +49,23 @@ const SHAPE_TEMPLATE: Record<FlowShape, (id: string, label: string) => string> =
   },
 }
 
+/** Confronto per code unit UTF-16: lo stesso su ogni macchina, a differenza di `localeCompare`. */
+const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
 /**
- * Serializza il modello come `flowchart LR`, una `subgraph` per corsia (spec §10).
+ * Serializza il modello come `flowchart LR` (spec 2b §8): prima i nodi liberi, al livello più alto;
+ * poi ogni pool come `subgraph`, con dentro un `subgraph` per corsia.
  *
- * **Ordine di assegnazione degli id** (nodi `n1..nN`, corsie `l1..lN`): corsia nell'ordine di
- * `model.lanes` — già un array ordinato, è l'informazione stessa (schema.ts) — e dentro ciascuna
- * corsia le chiavi dei nodi in ordine alfabetico, lo stesso `Object.keys(...).sort()` usato in
- * `class-mermaid.ts` ed `er-mermaid.ts`. Questo ordine non dipende dall'ordine di inserimento delle
- * proprietà dell'oggetto `nodes` — che un giro per `JSON.parse`/store non garantisce identico — né
- * da quale corsia contenga quale nodo oltre a quanto il modello stesso dichiara: lo stesso modello
- * produce sempre lo stesso testo, byte per byte.
+ * **Ordine e id.** I pool escono per nome e, a parità, per id, confrontati per code unit e non con
+ * `localeCompare`, che dipende dal locale della macchina; le corsie nell'ordine del pool; dentro
+ * ogni corsia (e fra i liberi) le chiavi dei nodi in ordine alfabetico, lo stesso `sort()` di
+ * `class-mermaid.ts` ed `er-mermaid.ts`. L'ordine viene tutto dal modello, mai dalla posizione:
+ * lo stesso modello produce sempre lo stesso testo, byte per byte, anche dopo che un pool è stato
+ * spostato. Gli id sono `n1..nN` per i nodi, `p1..pN` per i pool e `l1..lN` per le corsie, contate
+ * tutte in quell'ordine, anche quelle vuote.
  *
- * Le note sono escluse dalla numerazione: non emettono mai un nodo, quindi non consumano un id, e
- * non lasciano un buco nella sequenza `n1..nN` che segue.
+ * Le note sono escluse dalla numerazione: non emettono mai un nodo, quindi non consumano un id. Un
+ * pool o una corsia senza nodi emettibili non escono: sarebbero un riquadro vuoto.
  */
 export function emitFlowMermaid(model: FlowModel): EmitResult {
   const out = ["flowchart LR"]
@@ -71,35 +75,42 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
   let hasSubgraph = false
   let noteEdgeCount = 0
 
-  model.lanes.forEach((lane, laneIndex) => {
-    const keysInLane = Object.keys(model.nodes)
-      .filter((key) => model.nodes[key]!.lane === lane.id)
+  /** Le chiavi emettibili di una corsia (o dei liberi, con `null`), in ordine; le note si contano e basta. */
+  const emittable = (lane: string | null): string[] =>
+    Object.keys(model.nodes)
+      .filter((key) => model.nodes[key]!.lane === lane)
       .sort()
-
-    const emittableKeys: string[] = []
-    for (const key of keysInLane) {
-      if (model.nodes[key]!.shape === "note") {
+      .filter((key) => {
+        if (model.nodes[key]!.shape !== "note") return true
         noteCount += 1
-      } else {
-        emittableKeys.push(key)
-      }
-    }
+        return false
+      })
 
-    // Una corsia senza nodi visibili non emette una subgraph vuota: un modello senza nodi resta
-    // il solo `flowchart LR`, senza corsie a fare da rumore né l'avviso che le accompagna — è la
-    // lettura di "modello vuoto" della tabella del brief, che altrimenti contraddirebbe "almeno una
-    // subgraph produce sempre un avviso".
-    if (emittableKeys.length === 0) return
+  const emitNode = (key: string, indent: string) => {
+    const node = model.nodes[key]!
+    const nodeId = `n${nextNodeId}`
+    nextNodeId += 1
+    nodeIdByKey.set(key, nodeId)
+    out.push(`${indent}${SHAPE_TEMPLATE[node.shape](nodeId, escapeLabel(node.label))}`)
+  }
 
+  for (const key of emittable(null)) emitNode(key, "  ")
+
+  const pools = Object.entries(model.pools).sort(([a, p], [b, q]) => byCodeUnit(p.name, q.name) || byCodeUnit(a, b))
+  let laneCount = 0
+  pools.forEach(([, pool], poolIndex) => {
+    const lanes = pool.lanes.map((lane) => {
+      laneCount += 1
+      return { id: `l${laneCount}`, name: lane.name, keys: emittable(lane.id) }
+    })
+    const full = lanes.filter((l) => l.keys.length > 0)
+    if (full.length === 0) return
     hasSubgraph = true
-    const laneId = `l${laneIndex + 1}`
-    out.push(`  subgraph ${laneId}["${escapeLabel(lane.name)}"]`)
-    for (const key of emittableKeys) {
-      const node = model.nodes[key]!
-      const nodeId = `n${nextNodeId}`
-      nextNodeId += 1
-      nodeIdByKey.set(key, nodeId)
-      out.push(`    ${SHAPE_TEMPLATE[node.shape](nodeId, escapeLabel(node.label))}`)
+    out.push(`  subgraph p${poolIndex + 1}["${escapeLabel(pool.name)}"]`)
+    for (const lane of full) {
+      out.push(`    subgraph ${lane.id}["${escapeLabel(lane.name)}"]`)
+      for (const key of lane.keys) emitNode(key, "      ")
+      out.push("    end")
     }
     out.push("  end")
   })
@@ -127,7 +138,7 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
   const warnings: string[] = []
   if (hasSubgraph) {
     warnings.push(
-      "Le corsie sono uscite come riquadri (subgraph): Mermaid non disegna corsie come bande orizzontali vere, solo come contenitori annidati.",
+      "I pool e le corsie sono usciti come riquadri annidati (subgraph): Mermaid non disegna corsie come bande orizzontali vere.",
     )
   }
   if (noteCount > 0) {

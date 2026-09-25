@@ -5,6 +5,7 @@ import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import { splitKey } from "../families"
 import { flowDiagram } from "../flow-access"
+import { withPool } from "../flow/pool-fixture"
 import { canvasOps, familyHasContent } from "./canvas-ops"
 
 const state = () => documentStore.getState()
@@ -167,6 +168,55 @@ describe("canvasOps (famiglie mescolate)", () => {
     expect(state().past.length).toBe(past + 1)
     state().undo()
     expect(Object.keys(state().doc.diagram.links)).toHaveLength(1)
+  })
+
+  it("un pool è un frame: non un nodo, ma contenuto della famiglia", () => {
+    state().load(withPool(createDocument("t", "t")))
+    const ops = canvasOps(state().doc)
+    expect(ops.isFrame("flow/p1")).toBe(true)
+    expect(ops.isFrame("er/p1")).toBe(false)
+    expect(ops.nodeKeys()).toEqual([])
+    expect(ops.frameKeys()).toEqual(["flow/p1"])
+    expect(familyHasContent(state().doc, "flow")).toBe(true)
+  })
+
+  it("Collega da un pool non crea niente, nemmeno verso un'altra famiglia", () => {
+    // Review Focus 1.
+    state().load(withPool(createDocument("t", "t")))
+    const entity = canvasOps(state().doc).addNode({ x: 0, y: 900 }, "er")
+    state().dispatch(entity.recipe)
+    const node = canvasOps(state().doc).addNode({ x: 900, y: 900 }, "flow", "process")
+    state().dispatch(node.recipe)
+    expect(canvasOps(state().doc).addEdge("flow/p1", entity.key)).toBeNull()
+    expect(canvasOps(state().doc).addEdge(entity.key, "flow/p1")).toBeNull()
+    expect(canvasOps(state().doc).addEdge("flow/p1", node.key)).toBeNull()
+  })
+
+  it("trascinare un pool porta i suoi nodi in un solo passo, e un annulla riporta tutto", () => {
+    // Review Focus 2.
+    state().load(withPool(createDocument("t", "t")))
+    const node = canvasOps(state().doc).addNode({ x: 100, y: 20 }, "flow", "process")
+    state().dispatch(node.recipe)
+    expect(canvasOps(state().doc).withFollowers(["flow/p1"]).sort()).toEqual(["flow/p1", node.key].sort())
+    // Un nodo del pool già fra le chiavi non si ripete.
+    expect(canvasOps(state().doc).withFollowers(["flow/p1", node.key]).sort()).toEqual(["flow/p1", node.key].sort())
+    const past = state().past.length
+    state().dispatch(canvasOps(state().doc).commitDrag(["flow/p1"], 100, 0)!)
+    expect(state().past.length).toBe(past + 1)
+    // Il pool fuori griglia va da −32 a 70: il nodo si sposta dello stesso delta, 102.
+    expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(202)
+    state().undo()
+    expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(100)
+    expect(canvasOps(state().doc).rectOf("flow/p1")!.x).toBe(-32)
+  })
+
+  it("eliminare un pool lascia i suoi nodi, liberi", () => {
+    state().load(withPool(createDocument("t", "t")))
+    const node = canvasOps(state().doc).addNode({ x: 100, y: 20 }, "flow", "process")
+    state().dispatch(node.recipe)
+    state().dispatch(canvasOps(state().doc).deleteItems(["flow/p1"], [])!)
+    expect(canvasOps(state().doc).frameKeys()).toEqual([])
+    expect(canvasOps(state().doc).nodeKeys()).toEqual([node.key])
   })
 })
 

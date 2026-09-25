@@ -23,10 +23,18 @@ export type { ConnectResult }
  */
 export interface CanvasOps {
   nodeKeys(): string[]
+  /** I frame di tutte le famiglie, con prefisso (i pool, spec 2b §5). */
+  frameKeys(): string[]
+  /** Vero se la chiave è un frame e non un nodo. */
+  isFrame(key: string): boolean
+  /** Le chiavi date più i nodi che un drag porta con sé. */
+  withFollowers(keys: readonly string[]): string[]
+  /** Il motivo per cui lo strumento non crea niente in quel punto, o `null`. */
+  refuseNode(at: Point, family: Family, variant?: string): string | null
   rectOf(key: string, at?: Point): Rect | null
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
   edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
-  addNode(at: Point, family: Family, variant?: string): { key: string; recipe: Recipe; edit: EditTarget }
+  addNode(at: Point, family: Family, variant?: string): { key: string; recipe: Recipe; edit: EditTarget | null }
   /**
    * Dentro una famiglia: l'arco della famiglia, oppure `null` se i due nodi non si possono collegare
    * (due note). Fra famiglie diverse: un collegamento tipizzato creato, uno già presente da
@@ -37,6 +45,8 @@ export interface CanvasOps {
   commitDrag(keys: readonly string[], dx: number, dy: number): Recipe | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
+  /** Il ridimensionamento di un frame, sulla chiave con prefisso (vedi `DiagramOps.resize`). */
+  resize(key: string, lane: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
   /** Solo le famiglie con contenuto: una famiglia vuota non ha problemi da segnalare. Poi i collegamenti. */
   validate(): Issue[]
 }
@@ -67,8 +77,26 @@ const NOOP: Recipe = () => {}
 export function canvasOps(doc: DevDocument): CanvasOps {
   const ops = (family: Family) => familyOps(doc, family)
 
+  const isFrame = (qualified: string): boolean => {
+    if (linkId(qualified) !== null) return false
+    const { family, key } = splitKey(qualified)
+    return ops(family).frameKeys?.().includes(key) ?? false
+  }
+
   return {
     nodeKeys: () => FAMILIES.flatMap((f) => ops(f).nodeKeys().map((k) => qualify(f, k))),
+
+    frameKeys: () => FAMILIES.flatMap((f) => (ops(f).frameKeys?.() ?? []).map((k) => qualify(f, k))),
+
+    isFrame,
+
+    withFollowers: (keys) =>
+      [...byFamily(keys)].flatMap(([f, ks]) => {
+        const o = ops(f)
+        return (o.withFollowers ? o.withFollowers(ks) : ks).map((k) => qualify(f, k))
+      }),
+
+    refuseNode: (at, family, variant) => ops(family).refuseNode?.(at, variant) ?? null,
 
     rectOf: (qualified, at) => {
       const { family, key } = splitKey(qualified)
@@ -97,6 +125,8 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     },
 
     addEdge: (source, target) => {
+      // Un frame non è un estremo (spec 2b §2): niente arco, niente collegamento, niente avviso.
+      if (isFrame(source) || isFrame(target)) return null
       const a = splitKey(source)
       const b = splitKey(target)
       if (a.family !== b.family) return connectAcross(doc, source, target)
@@ -127,6 +157,11 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       ])
     },
 
+    resize: (qualified, lane, dx, dy) => {
+      const { family, key } = splitKey(qualified)
+      return ops(family).resize?.(key, lane, dx, dy) ?? null
+    },
+
     duplicateNodes: (keys) => {
       const parts = [...byFamily(keys)].map(([f, ks]) => {
         const dup = ops(f).duplicateNodes(ks)
@@ -151,13 +186,15 @@ export function canvasOps(doc: DevDocument): CanvasOps {
   }
 }
 
-/** La famiglia ha almeno un nodo. È la sola definizione di «ha contenuto»: export, menu e documento la usano. */
+/** La famiglia ha almeno un nodo o un frame (un pool vuoto conta, spec 2b §6). È la sola definizione
+ *  di «ha contenuto»: export, menu, documento e Disponi la usano. */
 export function familyHasContent(doc: DevDocument, family: Family): boolean {
-  return familyOps(doc, family).nodeKeys().length > 0
+  const ops = familyOps(doc, family)
+  return ops.nodeKeys().length > 0 || (ops.frameKeys?.().length ?? 0) > 0
 }
 
-/** I rettangoli di tutti i nodi del canvas, di ogni famiglia: lo spazio già occupato. */
+/** I rettangoli di tutti i nodi e i frame del canvas, di ogni famiglia: lo spazio già occupato. */
 export function nodeRects(doc: DevDocument): Rect[] {
   const ops = canvasOps(doc)
-  return ops.nodeKeys().flatMap((key) => ops.rectOf(key) ?? [])
+  return [...ops.nodeKeys(), ...ops.frameKeys()].flatMap((key) => ops.rectOf(key) ?? [])
 }

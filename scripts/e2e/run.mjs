@@ -4,14 +4,14 @@
  * l'e2e della persistenza esercita il lock fra schede e IndexedDB sulla stessa origine, e due
  * scenari concorrenti se li disturberebbero a vicenda — gli scenari della persistenza, dell'import,
  * dell'export immagini, dell'export testo, dell'auto layout, del class diagram, della sua nota, del
- * flowchart, del canvas misto e dei collegamenti fra famiglie. Ognuno apre il proprio contesto di
- * browser, cosa che isola l'IndexedDB fra loro senza pagare due volte il costo fisso di build,
- * server e avvio del browser (avvio condiviso con `helpers.mjs#startEnv`, la stessa funzione usata
- * dalla guardia di esecuzione diretta di ciascuno scenario). Per lanciare un solo scenario in
+ * flowchart, del canvas misto, dei collegamenti fra famiglie, e dei pool. Ognuno apre il proprio
+ * contesto di browser, cosa che isola l'IndexedDB fra loro senza pagare due volte il costo fisso di
+ * build, server e avvio del browser (avvio condiviso con `helpers.mjs#startEnv`, la stessa funzione
+ * usata dalla guardia di esecuzione diretta di ciascuno scenario). Per lanciare un solo scenario in
  * isolamento, dopo `pnpm build`: `node scripts/e2e/import.mjs`, `node scripts/e2e/persistenza.mjs`,
  * `node scripts/e2e/export.mjs`, `node scripts/e2e/export-testo.mjs`, `node scripts/e2e/layout.mjs`,
  * `node scripts/e2e/class.mjs`, `node scripts/e2e/class-note.mjs`, `node scripts/e2e/flow.mjs`,
- * `node scripts/e2e/misto.mjs` o `node scripts/e2e/collegamenti.mjs`.
+ * `node scripts/e2e/misto.mjs`, `node scripts/e2e/collegamenti.mjs` o `node scripts/e2e/pool.mjs`.
  *
  * Uso: `pnpm e2e`. `HEADLESS=0` per vedere il browser.
  */
@@ -26,6 +26,7 @@ import { run as runImport } from "./import.mjs"
 import { run as runLayout } from "./layout.mjs"
 import { run as runMisto } from "./misto.mjs"
 import { run as runPersistenza } from "./persistenza.mjs"
+import { run as runPool } from "./pool.mjs"
 
 let ok = false
 let preview, browser
@@ -42,7 +43,8 @@ try {
   const flowOk = await runFlow(browser, base)
   const mistoOk = await runMisto(browser, base)
   const collegamentiOk = await runCollegamenti(browser, base)
-  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && classNoteOk && flowOk && mistoOk && collegamentiOk
+  const poolOk = await runPool(browser, base)
+  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && classNoteOk && flowOk && mistoOk && collegamentiOk && poolOk
 } catch (e) {
   console.error("\nFALLITO:", e)
 } finally {

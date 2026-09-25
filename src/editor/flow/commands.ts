@@ -1,18 +1,18 @@
-import { LANE_MIN_H, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
+import { LANE_MIN_H, POOL_MIN_W, nextName, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
 import type { LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
-import { snap, type Point } from "../geometry"
-import { flowNodeSize, laneAt } from "./geometry"
-import { keepNodeInBand, placeInLanes } from "./layout"
+import { GRID, snap, type Point } from "../geometry"
+import { flowNodeSize, laneAt, laneOwner, laneRect, poolLaneRects, poolMembers } from "./geometry"
+import { keepInSpan, LANE_PAD, placeInLanes } from "./layout"
 
 const DUPLICATE_OFFSET = 20
 
 /**
- * Nuovo nodo vuoto. La chiave è un uuid e non un nome unico come `uniqueKey` (er.ts): un nodo di
- * flowchart non ha un nome che la identifichi, solo un'etichetta libera che cambia a ogni battitura.
+ * Nuovo nodo vuoto, nella corsia data o libero con `null`. La chiave è un uuid e non un nome unico
+ * come `uniqueKey` (er.ts): un nodo di flowchart non ha un nome che la identifichi.
  */
-export function addFlowNode(at: Point, shape: FlowShape, lane: string): { key: string; recipe: Recipe } {
+export function addFlowNode(at: Point, shape: FlowShape, lane: string | null): { key: string; recipe: Recipe } {
   const key = crypto.randomUUID()
   return {
     key,
@@ -25,46 +25,48 @@ export function addFlowNode(at: Point, shape: FlowShape, lane: string): { key: s
 }
 
 /**
- * Sposta i nodi come `moveNodes` (`commands/view.ts`) — stesso `snap`, stesso invariante "niente
- * si muove" quando `dx`/`dy` sono entrambi zero — e in più guarda dove cade il **centro** di
- * ognuno dopo lo spostamento: se `laneAt` torna una banda diversa da quella di partenza, la scrive
- * nella stessa recipe, così posizione e corsia sono un solo passo di undo (spec §6).
+ * Sposta i nodi come `moveNodes` (`commands/view.ts`) — stesso `snap`, stessa regola «niente si
+ * muove» con `dx` e `dy` entrambi zero — e poi decide la corsia dal **centro** di ognuno: la corsia
+ * in cui cade, o `null` se cade fuori da ogni pool o sulla striscia (spec 2b §5). Posizione e
+ * corsia stanno nella stessa recipe: un solo passo di annulla.
  *
- * Se il centro cade fuori da ogni banda — sopra la prima o sotto l'ultima — la corsia di partenza
- * non si tocca: la scrive `laneAt` solo quando trova una banda, quindi qui basta non chiamarla.
- * La `y` però deve rientrare nella banda di partenza lo stesso: `keepNodeInBand` (`flow/layout.ts`,
- * l'unico posto che scrive questa formula, usato anche da `setNodeLane`, `setNodeShape`,
- * `duplicateFlowNodes` e `deleteLane` qui sotto) la riaggancia dentro, coi margini `LANE_PAD` —
- * un nodo fuori da ogni banda è uno stato che il modello non ammette (il refine di
- * `FlowModelSchema`), non un caso da sistemare a valle.
+ * Fra le chiavi possono esserci **pool**: il pool si sposta con tutti i suoi nodi, che non cambiano
+ * corsia, e un suo nodo che è anche fra le chiavi si sposta una volta sola. Il pool si allinea alla
+ * griglia e i suoi nodi si spostano del suo stesso delta effettivo, senza allinearsi per conto loro:
+ * altrimenti un nodo deriverebbe fino a mezza griglia dal suo pool (che Disponi lascia fuori griglia)
+ * e potrebbe finire disegnato nella corsia accanto. Un nodo libero che sta sotto il pool non lo
+ * segue: spostare un pool non cattura niente (spec 2b §5).
  */
 export function moveFlowNodes(keys: readonly string[], dx: number, dy: number): Recipe | null {
   if (dx === 0 && dy === 0) return null
   return (draft) => {
     const d = flowDiagram(draft)
+    const carried = new Set<string>()
+    for (const id of keys.filter((k) => k in d.model.pools)) {
+      const view = d.view.pools[id]
+      if (!view) continue
+      const x = snap(view.x + dx)
+      const y = snap(view.y + dy)
+      const delta = { x: x - view.x, y: y - view.y }
+      view.x = x
+      view.y = y
+      for (const key of poolMembers(d, id)) {
+        carried.add(key)
+        const member = d.view.nodes[key]
+        if (!member) continue
+        member.x += delta.x
+        member.y += delta.y
+      }
+    }
     for (const key of keys) {
+      if (carried.has(key)) continue
       const node = d.model.nodes[key]
       const view = d.view.nodes[key]
       if (!node || !view) continue
-
       view.x = snap(view.x + dx)
       view.y = snap(view.y + dy)
-
-      const size = flowNodeSize(node)
-      const centerY = view.y + size.h / 2
-      const lane = laneAt(d, centerY)
-      if (lane !== null) {
-        node.lane = lane
-        continue
-      }
-
-      // Fuori da ogni banda: `node.lane` non è cambiato in questo giro, quindi è ancora la corsia
-      // di partenza — e per l'invariante dello schema esiste sempre in `model.lanes`. Se manca la
-      // sua banda in `view.lanes` (non dovrebbe: le due mappe sono tenute allineate da
-      // `restackLanes`) non c'è nulla a cui agganciare la y, quindi si lascia dov'è.
-      const band = d.view.lanes[node.lane]
-      if (!band) continue
-      view.y = keepNodeInBand(band, size.h, view.y)
+      const { w, h } = flowNodeSize(node)
+      node.lane = laneAt(d, { x: view.x + w / 2, y: view.y + h / 2 })
     }
   }
 }
@@ -95,54 +97,67 @@ export function setNodeLabel(key: string, label: string): Recipe {
 }
 
 /**
+ * Riporta un nodo dentro la sua corsia, su entrambi gli assi, con `keepInSpan`: l'unico punto dei
+ * comandi che lo fa, usato dove un comando può lasciare un nodo a cavallo del bordo (un cambio di
+ * forma che lo allarga, una copia spostata dall'offset, una corsia cancellata). Un nodo libero non
+ * ha niente in cui rientrare.
+ */
+function keepInLane(d: FlowDiagram, key: string): void {
+  const node = d.model.nodes[key]
+  const view = d.view.nodes[key]
+  if (!node || !view || node.lane === null) return
+  const rect = laneRect(d, node.lane)
+  if (!rect) return
+  const { w, h } = flowNodeSize(node)
+  view.x = keepInSpan(rect.x, rect.w, w, view.x)
+  view.y = keepInSpan(rect.y, rect.h, h, view.y)
+}
+
+/**
  * Cambia la forma di un nodo. Una `decision` è circa il doppio del rettangolo omologo
- * (`DECISION_FACTOR`, `flow/geometry.ts`): il cambio può allargare il nodo abbastanza da far
- * uscire il centro dalla banda, quindi rientra con lo stesso `keepNodeInBand` del resto di questa
- * famiglia (stessa famiglia di C1/C2, brief della correzione finale).
+ * (`DECISION_FACTOR`): il cambio può allargare il nodo abbastanza da farlo uscire dalla corsia,
+ * quindi rientra con `keepInLane`.
  */
 export function setNodeShape(key: string, shape: FlowShape): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
     const node = d.model.nodes[key]
-    const view = d.view.nodes[key]
     if (!node || node.shape === shape) return
     node.shape = shape
-    if (!view) return
-    const band = d.view.lanes[node.lane]
-    if (!band) return
-    view.y = keepNodeInBand(band, flowNodeSize(node).h, view.y)
+    keepInLane(d, key)
   }
 }
 
 /**
- * Cambia la corsia di un nodo dal pannello proprietà — l'alternativa da tastiera al trascinamento
- * fra corsie di `moveFlowNodes` (spec §11). A differenza di quello, qui non c'è un gesto che porti
- * già una `y` sensata nella banda di arrivo: il nodo viene da una banda diversa per costruzione
- * (la guardia sotto esce quando la corsia non cambia), quindi il candidato di partenza è il centro
- * della nuova banda — non un aggancio al bordo come fa il fallback del drag. `keepNodeInBand` lo
- * riporta comunque dentro i margini `LANE_PAD`: per una banda della misura minima usuale il centro
- * ci sta già e il rientro non cambia nulla, ma per una banda piccola (nodo enorme, corsia quasi
- * vuota) il centro grezzo potrebbe uscirne — la stessa formula che serve altrove, non una seconda.
+ * Cambia la corsia di un nodo dal pannello — l'alternativa da tastiera al trascinamento (spec 2b §7).
+ * Con `null` il nodo diventa libero e resta dov'è. Con una corsia ci entra: la `y` al centro della
+ * corsia, e la `x` resta dov'è ma rientra sempre nei margini con `keepInSpan`, `LANE_PAD` dai bordi —
+ * cambia quindi anche per un nodo già dentro la corsia ma a meno di `LANE_PAD` da un bordo, oltre che
+ * per uno che ne sta fuori, per esempio quando passa da libero o da un altro pool.
  */
-export function setNodeLane(key: string, laneId: string): Recipe {
+export function setNodeLane(key: string, laneId: string | null): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
     const node = d.model.nodes[key]
     const view = d.view.nodes[key]
-    const band = d.view.lanes[laneId]
-    if (!node || !view || !band || node.lane === laneId) return
+    if (!node || !view || node.lane === laneId) return
+    if (laneId === null) {
+      node.lane = null
+      return
+    }
+    const rect = laneRect(d, laneId)
+    if (!rect) return
     node.lane = laneId
-    const size = flowNodeSize(node)
-    view.y = keepNodeInBand(band, size.h, band.y + band.h / 2 - size.h / 2)
+    const { w, h } = flowNodeSize(node)
+    view.y = keepInSpan(rect.y, rect.h, h, rect.y + rect.h / 2 - h / 2)
+    view.x = keepInSpan(rect.x, rect.w, w, view.x)
   }
 }
 
 /**
  * Scarta gli spazi ai margini: è una regola di dominio, non solo cosmetica — un'etichetta di soli
- * spazi non è "vuota" per `===` (`model/flow/validate.ts:71`, `flow-branch-unlabeled` confronta
- * `edge.label === ""`) e zittirebbe l'avviso in silenzio. Prima lo faceva solo il doppio click
- * (`InlineEditor.tsx`); qui è l'unico posto, così ogni via che scrive l'etichetta — pannello
- * proprietà compreso — rispetta la stessa regola.
+ * spazi non è "vuota" per `===` (`model/flow/validate.ts`, `flow-branch-unlabeled` confronta
+ * `edge.label === ""`) e zittirebbe l'avviso in silenzio.
  */
 export function setEdgeLabel(key: string, label: string): Recipe {
   return (draft) => {
@@ -152,11 +167,24 @@ export function setEdgeLabel(key: string, label: string): Recipe {
   }
 }
 
+/**
+ * Cancella nodi e archi; gli archi che toccano un nodo cancellato se ne vanno con lui. Fra le chiavi
+ * dei nodi possono esserci **pool**: il pool se ne va con le sue corsie, e i suoi nodi restano dove
+ * sono, liberi (spec 2b §5) — niente sparisce se non il contenitore.
+ */
 export function deleteFlowItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null {
   if (nodeKeys.length === 0 && edgeKeys.length === 0) return null
   const nodes = new Set(nodeKeys)
   return (draft) => {
     const d = flowDiagram(draft)
+    for (const key of nodeKeys) {
+      const pool = d.model.pools[key]
+      if (!pool) continue
+      for (const member of poolMembers(d, key)) d.model.nodes[member]!.lane = null
+      for (const lane of pool.lanes) delete d.view.lanes[lane.id]
+      delete d.model.pools[key]
+      delete d.view.pools[key]
+    }
     for (const key of edgeKeys) delete d.model.edges[key]
     for (const [key, edge] of Object.entries(d.model.edges)) {
       if (nodes.has(edge.source) || nodes.has(edge.target)) delete d.model.edges[key]
@@ -169,10 +197,9 @@ export function deleteFlowItems(nodeKeys: readonly string[], edgeKeys: readonly 
 }
 
 /**
- * Copia i nodi con un uuid nuovo ciascuno e li lascia nella stessa corsia; gli archi non si
- * duplicano. `DUPLICATE_OFFSET` può spingere la copia oltre il bordo della banda — la stessa
- * famiglia di C1/C2 (brief della correzione finale) — quindi rientra con `keepNodeInBand`, senza
- * cambiare corsia: resta quella dell'originale, come già richiesto.
+ * Copia i nodi con un uuid nuovo ciascuno, nella stessa corsia dell'originale (o liberi, come lui);
+ * gli archi non si duplicano. `DUPLICATE_OFFSET` può spingere la copia oltre il bordo della corsia,
+ * quindi rientra con `keepInLane`.
  */
 export function duplicateFlowNodes(model: FlowModel, keys: readonly string[]): { keys: string[]; recipe: Recipe } {
   const plan = keys.filter((k) => k in model.nodes).map((from) => ({ from, to: crypto.randomUUID() }))
@@ -185,159 +212,211 @@ export function duplicateFlowNodes(model: FlowModel, keys: readonly string[]): {
         const view = d.view.nodes[from]
         if (!node) continue
         d.model.nodes[to] = { ...node }
-        const y = (view?.y ?? 0) + DUPLICATE_OFFSET
-        const band = d.view.lanes[node.lane]
         d.view.nodes[to] = {
           x: (view?.x ?? 0) + DUPLICATE_OFFSET,
-          y: band ? keepNodeInBand(band, flowNodeSize(node).h, y) : y,
+          y: (view?.y ?? 0) + DUPLICATE_OFFSET,
           collapsed: view?.collapsed ?? false,
         }
+        keepInLane(d, to)
       }
     },
   }
 }
 
 /**
- * Ricalcola la `y` di ogni banda impilandole nell'ordine di `model.lanes`. La `y` non è un dato:
- * è una conseguenza dell'ordine dell'array e delle altezze, e tenerla per conto suo l'ha già fatta
- * divergere tre volte (una banda nuova sopra una esistente dopo una cancellazione, e l'ordine
- * sullo schermo diverso da quello dell'array dopo uno spostamento). Qui è calcolata in un posto
- * solo, e i tre comandi che toccano l'ordine o l'insieme delle corsie la richiamano.
- *
- * L'altezza **resta un dato**, non derivato: il layout del Task 5 può allargare una corsia per
- * farci stare le righe, e questa funzione la preserva leggendola da `view.lanes` invece di
- * riazzerarla al minimo.
- *
- * **Trasla i nodi con la banda** (correzione C2): una corsia che aveva già una banda e la ritrova
- * a una `y` diversa — `moveLane` la sposta d'ordine, `deleteLane` toglie quella sopra — porta con
- * sé tutti i suoi nodi dello stesso `delta`, non li riallinea né li ricentra: la disposizione
- * interna della corsia (chi sta sopra chi, le distanze) è dell'utente e non è compito di questa
- * funzione cambiarla. Prima non lo faceva affatto: i nodi restavano fermi, disegnati nella banda
- * sbagliata, e il primo drag riscriveva `node.lane` su quella sbagliata — perdita di dato. Una
- * corsia nuova (nessuna banda precedente) non ha nodi da traslare per costruzione.
+ * Esegue `mutate` sulle corsie del pool e poi trasla i nodi di ogni corsia di quanto è cambiata la
+ * sua `y`. La `y` di una corsia non è un dato ma una conseguenza dell'ordine e delle altezze
+ * (`laneRects`): quando una corsia sale o scende perché un'altra è stata spostata, cancellata o
+ * ridimensionata, i suoi nodi la seguono dello stesso `delta`, senza essere riallineati né ricentrati
+ * — la disposizione dentro la corsia è dell'utente. Senza questo resterebbero fermi, disegnati nella
+ * corsia sbagliata, e il primo drag riscriverebbe la loro corsia su quella sbagliata.
  */
-function restackLanes(d: FlowDiagram): void {
-  const oldY = new Map<string, number>()
-  for (const lane of d.model.lanes) {
-    const band = d.view.lanes[lane.id]
-    if (band) oldY.set(lane.id, band.y)
-  }
-
-  let y = 0
-  for (const lane of d.model.lanes) {
-    const h = d.view.lanes[lane.id]?.h ?? LANE_MIN_H
-    d.view.lanes[lane.id] = { y, h }
-
-    const before = oldY.get(lane.id)
-    const delta = before !== undefined ? y - before : 0
-    if (delta !== 0) {
-      for (const [key, node] of Object.entries(d.model.nodes)) {
-        if (node.lane !== lane.id) continue
-        const view = d.view.nodes[key]
-        if (view) view.y = snap(view.y + delta)
-      }
+function keepNodesWithLanes(d: FlowDiagram, poolId: string, mutate: () => void): void {
+  const before = new Map(poolLaneRects(d, poolId).map((r) => [r.id, r.y]))
+  mutate()
+  for (const rect of poolLaneRects(d, poolId)) {
+    const old = before.get(rect.id)
+    if (old === undefined || old === rect.y) continue
+    for (const [key, node] of Object.entries(d.model.nodes)) {
+      if (node.lane !== rect.id) continue
+      const view = d.view.nodes[key]
+      if (view) view.y = snap(view.y + rect.y - old)
     }
-
-    y += h
   }
 }
 
-/** Nuova corsia in coda, sotto l'ultima: la `y` la assegna `restackLanes`, non un calcolo qui. */
-export function addLane(name: string): Recipe {
+/**
+ * Nuovo pool con l'angolo superiore sinistro sul punto dato, allineato alla griglia: una corsia
+ * «Corsia 1» alta il minimo, larghezza `POOL_MIN_W` (spec 2b §5). Il nome lo sceglie chi chiama,
+ * con `nextName("Pool", …)`, perché dipende dai pool che ci sono già.
+ */
+export function addPool(at: Point, name: string): { key: string; recipe: Recipe } {
+  const key = crypto.randomUUID()
+  const laneId = crypto.randomUUID()
+  return {
+    key,
+    recipe: (draft) => {
+      const d = flowDiagram(draft)
+      d.model.pools[key] = { name, lanes: [{ id: laneId, name: nextName("Corsia", []) }] }
+      d.view.pools[key] = { x: snap(at.x), y: snap(at.y), w: POOL_MIN_W }
+      d.view.lanes[laneId] = { h: LANE_MIN_H }
+    },
+  }
+}
+
+export function renamePool(id: string, name: string): Recipe {
+  return (draft) => {
+    const pool = flowDiagram(draft).model.pools[id]
+    if (pool && pool.name !== name) pool.name = name
+  }
+}
+
+/** Il primo multiplo della griglia che non sta sotto `v`: un minimo arrotondato per difetto lascerebbe fuori un nodo. */
+const ceilToGrid = (v: number) => Math.ceil(v / GRID) * GRID
+
+/**
+ * La larghezza che un pool può avere quando si chiede `w`: allineata alla griglia, mai sotto
+ * `POOL_MIN_W` né sotto quanto serve perché ogni suo nodo resti dentro con `LANE_PAD` a destra —
+ * così ridimensionare non cambia mai l'appartenenza (spec 2b §5). La usano il comando e la guida
+ * dell'anteprima: una regola sola.
+ */
+export function clampPoolW(d: FlowDiagram, poolId: string, w: number): number {
+  const view = d.view.pools[poolId]
+  if (!view) return w
+  let min = POOL_MIN_W
+  for (const key of poolMembers(d, poolId)) {
+    const node = d.model.nodes[key]
+    const v = d.view.nodes[key]
+    if (node && v) min = Math.max(min, v.x + flowNodeSize(node).w + LANE_PAD - view.x)
+  }
+  return Math.max(snap(w), ceilToGrid(min))
+}
+
+/** Come `clampPoolW`, per l'altezza di una corsia: mai sotto `LANE_MIN_H` né sotto i suoi nodi. */
+export function clampLaneH(d: FlowDiagram, laneId: string, h: number): number {
+  const rect = laneRect(d, laneId)
+  if (!rect) return h
+  let min = LANE_MIN_H
+  for (const [key, node] of Object.entries(d.model.nodes)) {
+    if (node.lane !== laneId) continue
+    const v = d.view.nodes[key]
+    if (v) min = Math.max(min, v.y + flowNodeSize(node).h + LANE_PAD - rect.y)
+  }
+  return Math.max(snap(h), ceilToGrid(min))
+}
+
+/** Il bordo destro del pool (spec 2b §5), con i limiti di `clampPoolW`. */
+export function resizePool(poolId: string, w: number): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
-    d.model.lanes.push({ id: crypto.randomUUID(), name })
-    restackLanes(d)
+    const view = d.view.pools[poolId]
+    if (view) view.w = clampPoolW(d, poolId, w)
+  }
+}
+
+/** Il bordo inferiore di una corsia, con i limiti di `clampLaneH`: le corsie sotto scendono o salgono con i loro nodi. */
+export function resizeLane(laneId: string, h: number): Recipe {
+  return (draft) => {
+    const d = flowDiagram(draft)
+    const poolId = laneOwner(d, laneId)
+    const view = d.view.lanes[laneId]
+    if (poolId === null || !view) return
+    const next = clampLaneH(d, laneId, h)
+    keepNodesWithLanes(d, poolId, () => {
+      view.h = next
+    })
+  }
+}
+
+/** Nuova corsia in fondo al pool, alta il minimo: le corsie sopra non si muovono, e nemmeno i loro nodi. */
+export function addLane(poolId: string, name: string): Recipe {
+  return (draft) => {
+    const d = flowDiagram(draft)
+    const pool = d.model.pools[poolId]
+    if (!pool) return
+    const id = crypto.randomUUID()
+    pool.lanes.push({ id, name })
+    d.view.lanes[id] = { h: LANE_MIN_H }
   }
 }
 
 export function renameLane(id: string, name: string): Recipe {
   return (draft) => {
-    const lane = flowDiagram(draft).model.lanes.find((l) => l.id === id)
-    if (lane && lane.name !== name) lane.name = name
+    for (const pool of Object.values(flowDiagram(draft).model.pools)) {
+      const lane = pool.lanes.find((l) => l.id === id)
+      if (lane && lane.name !== name) lane.name = name
+    }
   }
 }
 
 /**
- * Cancella una corsia spostando i suoi nodi in `moveTo`, così l'invariante "ogni nodo ha una
- * corsia esistente" (`model/flow/schema.ts`) non si rompe mai. Il predicato vero è **l'ultima
- * corsia**, non `id === moveTo`: quest'ultimo è solo il caso degenere in cui spostare i nodi
- * nella corsia che sta per sparire non avrebbe senso in ogni caso.
+ * Cancella una corsia spostando i suoi nodi in `moveTo`, che deve stare **nello stesso pool**:
+ * l'ultima corsia di un pool non si cancella — si cancella il pool (spec 2b §5).
  *
- * Le tre guardie stanno qui e non dentro la recipe: non per evitare una voce di undo fantasma —
- * `document-store.ts` scarta già le recipe che non producono patch — ma perché così il chiamante
- * scopre "non si può" *prima* di dispatchare, e può disabilitare il controllo nella UI invece di
- * offrire un'azione che non fa niente. Per deciderle serve leggere il modello, esattamente come
- * fanno già `addFlowEdge` e `duplicateFlowNodes` — un comando che legge il modello lo riceve, non
- * lo indovina.
- *
- * **I nodi spostati rientrano nella banda di `moveTo`** (correzione C2): la loro `y` viene da una
- * banda che non esiste più — `restackLanes` non la conosce, quindi non li trasla — e dopo il
- * restack può cadere ovunque rispetto alla banda nuova. Possono sovrapporsi ad altri nodi già in
- * `moveTo`: è accettabile, «Disponi» li risistema; l'invariante di corsia è quella che conta qui.
+ * Le guardie stanno fuori dalla recipe perché così il chiamante scopre «non si può» *prima* di
+ * dispatchare, e può disabilitare il controllo nella UI. Le corsie sotto quella cancellata salgono con
+ * i loro nodi (`keepNodesWithLanes`); i nodi spostati rientrano in `moveTo` con `keepInLane`, e
+ * possono sovrapporsi a quelli che c'erano già — «Disponi» li risistema.
  */
 export function deleteLane(model: FlowModel, id: string, moveTo: string): Recipe | null {
-  if (model.lanes.length <= 1) return null
   if (id === moveTo) return null
-  if (!model.lanes.some((l) => l.id === id)) return null
-  if (!model.lanes.some((l) => l.id === moveTo)) return null
+  const entry = Object.entries(model.pools).find(([, pool]) => pool.lanes.some((l) => l.id === id))
+  if (!entry) return null
+  const [poolId, pool] = entry
+  if (pool.lanes.length <= 1) return null
+  if (!pool.lanes.some((l) => l.id === moveTo)) return null
   return (draft) => {
     const d = flowDiagram(draft)
-    d.model.lanes.splice(
-      d.model.lanes.findIndex((l) => l.id === id),
-      1,
-    )
-    delete d.view.lanes[id]
-    const movedKeys: string[] = []
+    keepNodesWithLanes(d, poolId, () => {
+      // ponytail: `!` non copre un'incognita — il pool l'ha trovato la guardia qui sopra, sullo stesso stato.
+      const lanes = d.model.pools[poolId]!.lanes
+      lanes.splice(
+        lanes.findIndex((l) => l.id === id),
+        1,
+      )
+      delete d.view.lanes[id]
+    })
     for (const [key, node] of Object.entries(d.model.nodes)) {
-      if (node.lane === id) {
-        node.lane = moveTo
-        movedKeys.push(key)
-      }
-    }
-    restackLanes(d)
-
-    const band = d.view.lanes[moveTo]
-    if (band) {
-      for (const key of movedKeys) {
-        const node = d.model.nodes[key]
-        const view = d.view.nodes[key]
-        if (!node || !view) continue
-        view.y = keepNodeInBand(band, flowNodeSize(node).h, view.y)
-      }
+      if (node.lane !== id) continue
+      node.lane = moveTo
+      keepInLane(d, key)
     }
   }
 }
 
-export function moveLane(from: number, to: number): Recipe {
+/** Sposta una corsia dentro il suo pool; le corsie che cambiano posto portano con sé i loro nodi. */
+export function moveLane(poolId: string, from: number, to: number): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
-    const lanes = d.model.lanes
-    if (from === to || from < 0 || to < 0 || from >= lanes.length || to >= lanes.length) return
-    const [item] = lanes.splice(from, 1)
-    // ponytail: `!` non copre un'incognita — i bound sono controllati due righe sopra, come fa
-    // `moveAttribute` (commands/er.ts:129) per lo stesso motivo.
-    lanes.splice(to, 0, item!)
-    restackLanes(d)
+    const lanes = d.model.pools[poolId]?.lanes
+    if (!lanes || from === to || from < 0 || to < 0 || from >= lanes.length || to >= lanes.length) return
+    keepNodesWithLanes(d, poolId, () => {
+      const [item] = lanes.splice(from, 1)
+      // ponytail: `!` non copre un'incognita — i bound sono controllati sopra, come fa
+      // `moveAttribute` (commands/er.ts) per lo stesso motivo.
+      lanes.splice(to, 0, item!)
+    })
   }
 }
 
 /**
- * Posizioni e bande in **una sola** recipe: due dispatch darebbero due passi di undo per un
- * gesto solo (spec §5). `placeInLanes` è la funzione pura che fa il lavoro; qui si scrive il
- * risultato nel documento.
+ * Posizioni, pool e altezze delle corsie in **una sola** recipe: più dispatch darebbero più passi di
+ * undo per un gesto solo. `placeInLanes` è la funzione pura che fa il lavoro; qui si scrive il
+ * risultato nel documento, traslato di `offset` — nodi e pool insieme, così la traslazione che
+ * l'impacchettamento dà al blocco vale anche per un flusso fatto solo di pool vuoti (spec 2b §6).
  */
-export function applyFlowLayout(positions: LayoutPositions): Recipe {
+export function applyFlowLayout(positions: LayoutPositions, offset: Point): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
     const placed = placeInLanes(d, positions)
     for (const [key, p] of Object.entries(placed.positions)) {
       const view = d.view.nodes[key]
       if (view) {
-        view.x = p.x
-        view.y = p.y
+        view.x = p.x + offset.x
+        view.y = p.y + offset.y
       }
     }
+    d.view.pools = Object.fromEntries(Object.entries(placed.pools).map(([id, v]) => [id, { ...v, x: v.x + offset.x, y: v.y + offset.y }]))
     d.view.lanes = placed.lanes
   }
 }

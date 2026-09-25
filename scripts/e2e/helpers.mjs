@@ -79,7 +79,8 @@ export function isMainModule(moduleUrl) {
 }
 
 export async function expectNodes(page, n) {
-  await page.waitForFunction((n) => document.querySelectorAll("[data-node-id]").length === n, n, { timeout: 5000 })
+  // Un pool ha data-node-id per la selezione e il drag, ma non è un nodo (spec 2b §5): non si conta e non entra nelle sovrapposizioni.
+  await page.waitForFunction((n) => document.querySelectorAll("[data-node-id]:not([data-pool])").length === n, n, { timeout: 5000 })
 }
 
 export async function expectText(page, selector, text) {
@@ -134,7 +135,8 @@ export async function signature(page) {
  */
 export async function nodeRects(page) {
   return page.evaluate(() =>
-    [...document.querySelectorAll("[data-node-id]")].map((g) => {
+    // Un pool ha data-node-id per la selezione e il drag, ma non è un nodo (spec 2b §5): non si conta e non entra nelle sovrapposizioni.
+    [...document.querySelectorAll("[data-node-id]:not([data-pool])")].map((g) => {
       const r = g.querySelector("rect, path").getBoundingClientRect()
       return { id: g.getAttribute("data-node-id"), x: r.x, y: r.y, w: r.width, h: r.height }
     }),

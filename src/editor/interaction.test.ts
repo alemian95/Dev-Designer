@@ -139,6 +139,26 @@ describe("reduce", () => {
     expect(r.effects.at(-1)).toEqual({ type: "preview-drag", keys: ["a"], dx: 0, dy: 0 })
     expect(r.mode).toEqual(IDLE)
   })
+
+  it("una maniglia di ridimensionamento: seleziona il pool, anteprima a ogni move, un solo commit", () => {
+    const hit: Hit = { kind: "resize", key: "flow/p1", lane: null }
+    const r = run([down({ hit, world: { x: 100, y: 0 } }), move({ world: { x: 150, y: 10 } }), up({ world: { x: 160, y: 10 } })])
+    expect(r.effects).toEqual([
+      { type: "select", ids: [selId("node", "flow/p1")] },
+      { type: "preview-resize", key: "flow/p1", lane: null, dx: 50, dy: 10 },
+      { type: "clear-resize" },
+      { type: "commit-resize", key: "flow/p1", lane: null, dx: 60, dy: 10 },
+    ])
+    expect(r.mode).toEqual(IDLE)
+  })
+
+  it("una maniglia rilasciata senza movimento non committa, e Escape annulla", () => {
+    const hit: Hit = { kind: "resize", key: "flow/p1", lane: "l1" }
+    expect(run([down({ hit }), up({})]).effects).toEqual([{ type: "select", ids: [selId("node", "flow/p1")] }, { type: "clear-resize" }])
+    const cancel = run([down({ hit }), move({ world: { x: 0, y: 30 } }), { type: "cancel" }])
+    expect(cancel.effects.at(-1)).toEqual({ type: "clear-resize" })
+    expect(cancel.mode).toEqual(IDLE)
+  })
 })
 
 describe("strumento nodo con variante", () => {

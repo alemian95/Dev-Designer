@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest"
-import type { FlowDiagram, FlowEdge, FlowNode } from "@/model/flow/schema"
+import { POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode } from "@/model/flow/schema"
+import { flowNodeSize as flowNodeSizeDelModello } from "@/model/flow/size"
+import { CHAR_W as CHAR_W_DEL_MODELLO } from "@/model/metrics"
 import { routeEdge } from "../edge-routing"
+import { CHAR_W } from "../geometry"
 import type { Rect } from "../geometry"
-import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, laneBandExtent, LANE_MARGIN, LANE_MIN_W, shapePath } from "./geometry"
+import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, laneOwner, laneRects, poolAt, poolLaneRects, poolMembers, poolRect, shapePath } from "./geometry"
 
-const node = (over: Partial<FlowNode> = {}): FlowNode => ({ label: "Verifica", shape: "process", lane: "l1", ...over })
+const node = (over: Partial<FlowNode> = {}): FlowNode => ({ label: "Verifica", shape: "process", lane: null, ...over })
 
 describe("flowNodeSize", () => {
   it("cresce con la riga più lunga", () => {
@@ -30,6 +33,11 @@ describe("flowNodeSize", () => {
     const vuoto = flowNodeSize(node({ label: "" }))
     expect(vuoto.w).toBeGreaterThanOrEqual(60)
     expect(vuoto.h).toBeGreaterThanOrEqual(40)
+  })
+
+  it("è la funzione del modello riesportata, con le stesse metriche: una formula sola", () => {
+    expect(flowNodeSize).toBe(flowNodeSizeDelModello)
+    expect(CHAR_W).toBe(CHAR_W_DEL_MODELLO)
   })
 })
 
@@ -69,71 +77,98 @@ describe("shapePath", () => {
   })
 })
 
-describe("laneAt", () => {
-  const d = {
-    model: { lanes: [{ id: "l1", name: "a" }, { id: "l2", name: "b" }], nodes: {}, edges: {} },
-    view: { nodes: {}, lanes: { l1: { y: 0, h: 100 }, l2: { y: 100, h: 100 } } },
-  } as FlowDiagram
+/** Due pool: `a` a (0, 0), largo 400, con a1 (alta 100) e a2 (50); `b` a (300, 50), largo 400, con
+ *  b1 (100). `b` viene dopo `a` nell'ordine di disegno, quindi sta sopra. */
+function duePool(): FlowDiagram {
+  return {
+    model: {
+      pools: {
+        a: { name: "A", lanes: [{ id: "a1", name: "a1" }, { id: "a2", name: "a2" }] },
+        b: { name: "B", lanes: [{ id: "b1", name: "b1" }] },
+      },
+      nodes: {
+        n1: { label: "x", shape: "process", lane: "a1" },
+        n2: { label: "y", shape: "process", lane: "b1" },
+        n3: { label: "z", shape: "process", lane: null },
+      },
+      edges: {},
+    },
+    view: {
+      nodes: {},
+      pools: { a: { x: 0, y: 0, w: 400 }, b: { x: 300, y: 50, w: 400 } },
+      lanes: { a1: { h: 100 }, a2: { h: 50 }, b1: { h: 100 } },
+    },
+  }
+}
 
-  it("trova la corsia che contiene la coordinata", () => {
-    expect(laneAt(d, 50)).toBe("l1")
-    expect(laneAt(d, 150)).toBe("l2")
+describe("laneRects", () => {
+  it("impila le corsie di un pool dalle altezze, e salta la striscia", () => {
+    expect(poolLaneRects(duePool(), "a")).toEqual([
+      { id: "a1", poolId: "a", x: POOL_HEADER_W, y: 0, w: 400 - POOL_HEADER_W, h: 100 },
+      { id: "a2", poolId: "a", x: POOL_HEADER_W, y: 100, w: 400 - POOL_HEADER_W, h: 50 },
+    ])
   })
 
-  it("il confine appartiene alla corsia di sotto, senza buchi né sovrapposizioni", () => {
-    expect(laneAt(d, 100)).toBe("l2")
+  it("tutte le corsie, nell'ordine di disegno dei pool", () => {
+    expect(laneRects(duePool()).map((r) => r.id)).toEqual(["a1", "a2", "b1"])
   })
 
-  it("fuori da ogni banda torna null: chi chiama decide, qui non si indovina", () => {
-    expect(laneAt(d, -10)).toBeNull()
-    expect(laneAt(d, 5000)).toBeNull()
+  it("un pool senza vista non ha corsie, invece di rompersi", () => {
+    const d = duePool()
+    delete d.view.pools["a"]
+    expect(poolLaneRects(d, "a")).toEqual([])
   })
 })
 
-describe("laneBandExtent", () => {
-  /**
-   * Unico posto che calcola x e larghezza delle bande: sia `LanesLayerView` (canvas) sia
-   * `buildSvg` (export) lo chiamano, invece di ricavare ciascuno la propria versione — la ragione
-   * del Task 11, spec §5 ("la stessa banda nell'app e nell'export").
-   */
-  const flowDiagram = (): FlowDiagram => ({
-    model: {
-      lanes: [{ id: "l1", name: "a" }],
-      nodes: { n1: { label: "x", shape: "process", lane: "l1" } },
-      edges: {},
-    },
-    view: { nodes: { n1: { x: 100, y: 0, collapsed: false } }, lanes: { l1: { y: 0, h: 100 } } },
+describe("poolRect", () => {
+  it("è alto quanto le sue corsie, striscia compresa", () => {
+    expect(poolRect(duePool(), "a")).toEqual({ x: 0, y: 0, w: 400, h: 150 })
   })
 
-  it("allarga i limiti dei nodi del margine di corsia su entrambi i lati, quando superano il minimo", () => {
-    const d = flowDiagram()
-    // Un solo nodo di 60px non basta a superare `LANE_MIN_W`: il test deve provare che la
-    // larghezza *segue i nodi*, quindi qui ne serve uno abbastanza largo da superarlo davvero.
-    d.model.nodes["n1"] = { label: "un'etichetta lunga abbastanza da superare la larghezza minima della banda", shape: "process", lane: "l1" }
-    const { w: nodeW } = flowNodeSize(d.model.nodes["n1"]!)
-    expect(nodeW + 2 * LANE_MARGIN).toBeGreaterThan(LANE_MIN_W)
-    const extent = laneBandExtent(d)
-    expect(extent.x).toBe(100 - LANE_MARGIN)
-    expect(extent.w).toBe(nodeW + 2 * LANE_MARGIN)
+  it("con `at` cambia solo la posizione", () => {
+    expect(poolRect(duePool(), "a", { x: 5, y: 6 })).toEqual({ x: 5, y: 6, w: 400, h: 150 })
   })
 
-  /**
-   * I1 della correzione finale: senza nodi (o con nodi piccoli) la banda non si riduce a
-   * `2 × LANE_MARGIN` (80px, uno stelo) — resta larga almeno `LANE_MIN_W`.
-   */
-  it("senza nodi la larghezza non scende sotto LANE_MIN_W", () => {
-    const d = flowDiagram()
-    d.model.nodes = {}
-    d.view.nodes = {}
-    const extent = laneBandExtent(d)
-    expect(extent.x).toBe(-LANE_MARGIN)
-    expect(extent.w).toBe(LANE_MIN_W)
+  it("null per un pool che non c'è", () => {
+    expect(poolRect(duePool(), "fantasma")).toBeNull()
+  })
+})
+
+describe("poolAt e laneAt", () => {
+  it("trovano il pool e la corsia che contengono il punto", () => {
+    expect(poolAt(duePool(), { x: 100, y: 120 })).toBe("a")
+    expect(laneAt(duePool(), { x: 100, y: 120 })).toBe("a2")
   })
 
-  it("con nodi più stretti del minimo, la larghezza resta comunque LANE_MIN_W", () => {
-    const d = flowDiagram()
-    const extent = laneBandExtent(d)
-    expect(extent.w).toBe(LANE_MIN_W)
+  it("il confine fra due corsie appartiene a quella di sotto", () => {
+    expect(laneAt(duePool(), { x: 100, y: 100 })).toBe("a2")
+  })
+
+  it("sulla striscia di intestazione c'è il pool ma nessuna corsia", () => {
+    expect(poolAt(duePool(), { x: 10, y: 10 })).toBe("a")
+    expect(laneAt(duePool(), { x: 10, y: 10 })).toBeNull()
+  })
+
+  it("fuori da ogni pool: null", () => {
+    expect(poolAt(duePool(), { x: -5, y: 10 })).toBeNull()
+    expect(laneAt(duePool(), { x: 100, y: 500 })).toBeNull()
+  })
+
+  it("nella zona comune a due pool vince quello disegnato sopra", () => {
+    // (350, 60) sta in a1 e in b1: `b` è disegnato dopo, quindi sopra.
+    expect(laneAt(duePool(), { x: 350, y: 60 })).toBe("b1")
+  })
+})
+
+describe("laneOwner e poolMembers", () => {
+  it("il pool di una corsia", () => {
+    expect(laneOwner(duePool(), "a2")).toBe("a")
+    expect(laneOwner(duePool(), "fantasma")).toBeNull()
+  })
+
+  it("i nodi di un pool sono quelli nelle sue corsie, non i liberi", () => {
+    expect(poolMembers(duePool(), "a")).toEqual(["n1"])
+    expect(poolMembers(duePool(), "b")).toEqual(["n2"])
   })
 })
 

@@ -26,13 +26,17 @@ inline con doppio click, undo/redo su ogni azione.
   dichiarare la classe che commenta — un tratteggio senza punta, con lo strumento relazione — e il
   legame esce nell'export Mermaid come `note for`; «Disponi» tiene la nota accanto alla sua classe.
 - **Flowchart**: sei forme di nodo (terminale, processo, decisione, input/output, sottoprocesso,
-  nota) organizzate in **corsie** — bande orizzontali con un nome, una per attore — e archi
-  etichettabili col doppio click. «Disponi» dispone il flusso con ELK in direzione `RIGHT` (ADR
-  0007) e poi corregge solo l'asse trasversale per far stare ogni nodo nella banda della sua
-  corsia; trascinare un nodo in un'altra corsia scrive posizione e corsia in un solo passo di
-  undo. Sei regole di validazione (archi penzolanti, decisioni con meno di due uscite, vicoli
-  ciechi, nodi irraggiungibili, rami senza etichetta, nessun terminale) e export Mermaid
-  `flowchart LR` con una `subgraph` per corsia.
+  nota) e archi etichettabili col doppio click. «Disponi» dispone il flusso con ELK in direzione
+  `RIGHT` (ADR 0007) e poi corregge solo l'asse trasversale per far stare ogni nodo nella banda
+  della sua corsia; trascinare un nodo in un'altra corsia scrive posizione e corsia in un solo
+  passo di undo. Sei regole di validazione (archi penzolanti, decisioni con meno di due uscite,
+  vicoli ciechi, nodi irraggiungibili, rami senza etichetta, nessun terminale) e export Mermaid
+  `flowchart LR` con una `subgraph` per pool e una per corsia.
+- **Pool e corsie**, facoltativi: un nodo di flusso nasce libero, e chi vuole gli attori crea un
+  pool con `P`. Un pool ha un nome, una striscia a sinistra e le sue corsie; si sposta
+  dall'intestazione con i suoi nodi, si allarga dal bordo destro, e ogni corsia cresce dal bordo
+  inferiore. Un nodo trascinato in una corsia ci entra, trascinato fuori torna libero. Più pool
+  possono stare sullo stesso canvas.
 - **Collegamenti fra famiglie**, con lo strumento Collega, trascinando in qualunque verso:
   - una classe **mappa su** un'entità, e l'app verifica che ogni attributo della classe abbia la sua
     colonna (`createdAt` e `created_at` sono lo stesso campo) e un tipo compatibile, e che una
@@ -181,13 +185,13 @@ significano niente. Il deploy su Vercel parte dal push: perché aspetti la CI va
 ### Test end-to-end
 
 ```bash
-pnpm e2e       # nove scenari provati in un browser vero
+pnpm e2e       # undici scenari provati in un browser vero
 ```
 
 Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
-condivisi dai nove scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il lock fra
-schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a vicenda) —
-ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
+condivisi dagli undici scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il
+lock fra schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a
+vicenda) — ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
 
 - **Persistenza**: disegna un'entità, ricarica e la ritrova dal buffer IndexedDB, salva come
   download, apre un documento nuovo, ricarica il file e la ritrova, rifiuta un file non valido, apre
@@ -216,15 +220,16 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   ⌘Z, la ancora a una classe con lo strumento relazione — verificando che il pannello dica
   «Ancoraggio nota» e non offra il menu «Tipo» — poi «Disponi» e verifica che non resti sotto nessun
   nodo, e infine verifica che esca come riga `note for` nell'export Mermaid.
-- **Flowchart**: crea un flowchart, aggiunge una seconda corsia dal pannello, tre nodi di forme
-  diverse (un terminale e un processo nella prima corsia, una decisione nella seconda), collega due
-  nodi e scrive l'etichetta sull'arco col doppio click. «Disponi» verifica che ogni nodo stia nella
-  banda della sua corsia e che nessuna coppia si sovrapponga — l'altro collaudo, insieme all'auto
-  layout, che prova che elkjs si carica davvero. Poi trascina un nodo nell'altra corsia con eventi di
-  mouse veri e verifica che ci resti, un solo ⌘Z lo rimette nella corsia di prima **e** dov'era —
-  posizione e corsia sono un passo unico di undo (spec §6), ed è la sola asserzione di tutta la
-  suite che li controlla insieme — e infine esporta in Mermaid e verifica che compaiano una
-  `subgraph`, un rombo `{"…"}` e l'etichetta sull'arco.
+- **Flowchart**: crea un pool con `P`, aggiunge una seconda corsia dal pannello del pool, tre nodi di
+  forme diverse dentro le corsie (un terminale e un processo nella prima, una decisione nella
+  seconda), collega due nodi e scrive l'etichetta sull'arco col doppio click. «Disponi» verifica che
+  ogni nodo stia nella banda della sua corsia e che nessuna coppia si sovrapponga — l'altro
+  collaudo, insieme all'auto layout, che prova che elkjs si carica davvero. Poi trascina un nodo
+  nell'altra corsia con eventi di mouse veri e verifica che ci resti, un solo ⌘Z lo rimette nella
+  corsia di prima **e** dov'era — posizione e corsia sono un passo unico di undo (spec §6), ed è la
+  sola asserzione di tutta la suite che li controlla insieme — poi lo trascina fuori dal pool e
+  verifica che diventi libero, e infine esporta in Mermaid e verifica che compaiano una `subgraph`,
+  un rombo `{"…"}` e l'etichetta sull'arco.
 - **Canvas misto**: crea un'entità, una classe e un nodo di flusso nello stesso documento e verifica
   che le chiavi del DOM portino il prefisso di famiglia, che «Collega» fra un'entità e un nodo di
   flusso crei un accesso «legge», mentre dentro la stessa famiglia crei una relazione (una seconda
@@ -237,10 +242,14 @@ ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'alt
   elimina il collegamento con Canc, e prova a collegare un'interfaccia all'entità e verifica
   l'avviso. Infine collega un processo all'entità («legge», poi «scrive» dal pannello) e alla
   classe («chiama»), e verifica l'avviso per una nota del flusso.
+- **Pool**: crea un processo libero e un pool, trascina il processo dentro e fuori dal pool,
+  sposta il pool dall'intestazione e verifica che il nodo lo segua, elimina il pool e verifica che
+  il nodo resti, e carica un file della versione precedente per verificare che le sue corsie siano
+  finite in «Pool 1».
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei dieci scenari non regge.
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno degli undici scenari non regge.
 
 ### Misura prestazioni
 

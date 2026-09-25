@@ -1,15 +1,16 @@
 import fontUrl from "@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url"
 import { documentStore } from "@/editor/document-store"
-import { canvasOps } from "@/editor/kinds/canvas-ops"
+import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { download } from "@/io/file"
 import type { DevDocument } from "@/model/document"
+import { FAMILIES } from "@/model/family"
 import { documentFileName } from "./file-name"
 import { svgToPng } from "./png"
 import { buildSvg } from "./svg"
 
-/** Vero se il documento ha almeno un nodo, in qualunque famiglia: il caso vuoto di `copyPng`. */
+/** Vero se il documento ha contenuto in qualunque famiglia, un pool vuoto compreso: il caso vuoto di `copyPng`. */
 function hasNodes(doc: DevDocument): boolean {
-  return canvasOps(doc).nodeKeys().length > 0
+  return FAMILIES.some((f) => familyHasContent(doc, f))
 }
 
 /**

@@ -6,8 +6,8 @@ import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { qualify } from "@/editor/families"
 import { addFlowNode } from "@/editor/flow/commands"
-import { LANE_PAD } from "@/editor/flow/layout"
 import { flowDiagram } from "@/editor/flow-access"
+import { withPool } from "@/editor/flow/pool-fixture"
 import { HEADER_H, MIN_W } from "@/editor/geometry"
 import type { InteractionEvent, PointerInfo } from "@/editor/interaction"
 import { selId, sessionStore } from "@/editor/session-store"
@@ -23,6 +23,13 @@ import { createInteractionRunner } from "./interaction-runner"
  */
 function fintoNodo(scritture: string[], key: string) {
   return { setAttribute: (_n: string, v: string) => scritture.push(`${key}:${v}`) } as unknown as SVGGElement
+}
+
+/** Un finto elemento nodo che registra solo l'ultimo valore scritto per attributo, per leggere il `transform` finale. */
+function fintoNodoStato(): { el: SVGGElement; attrs: Record<string, string> } {
+  const attrs: Record<string, string> = {}
+  const el = { setAttribute: (n: string, v: string) => (attrs[n] = v) } as unknown as SVGGElement
+  return { el, attrs }
 }
 
 /** `setEdgeGeometry` cerca i propri figli con `querySelector`: contarne le chiamate dice se l'arco è stato toccato. */
@@ -104,6 +111,7 @@ afterEach(() => {
   for (const k of CHIAVI) registerNode(qualify("er", k), null)
   for (const k of ARCHI) registerEdge(qualify("er", k), null)
   sessionStore.getState().setSelection([])
+  documentSession.getState().patch({ notice: null })
 })
 
 /** Presa sull'header di `dentro`, un solo spostamento di 900 unità verso l'alto, rilascio. */
@@ -207,66 +215,15 @@ describe("un comando al rilascio", () => {
   })
 })
 
-/** Un elemento finto che tiene l'ultimo valore scritto per ogni attributo, non solo la sequenza
- *  delle scritture: qui serve sapere **cosa mostra il DOM adesso**, dopo il rilascio, non se un
- *  certo valore è passato di lì durante il gesto. */
-function fintoNodoStato(): { el: SVGGElement; attrs: Record<string, string> } {
-  const attrs: Record<string, string> = {}
-  const el = { setAttribute: (n: string, v: string) => (attrs[n] = v) } as unknown as SVGGElement
-  return { el, attrs }
-}
-
 describe("il rilascio del flowchart", () => {
   afterEach(() => {
     sessionStore.getState().setSelection([])
   })
 
-  it("un nodo riallineato esattamente dov'era non lascia il DOM fermo all'anteprima", () => {
-    // Una sola corsia (`emptyFlowDiagram`, via `createDocument`), banda [0, 160): un nodo in prima riga, a
-    // `y = LANE_PAD`, è dove lo metterebbe `placeInLanes` — lo scenario del revisore.
-    const base = createDocument("t", "t")
-    const laneId = base.diagram.flow.model.lanes[0]!.id
-    const added = addFlowNode({ x: 100, y: LANE_PAD }, "process", laneId)
-    const doc = produce(base, added.recipe)
-    documentStore.getState().load(doc)
-    sessionStore.getState().setViewport(IDENTITY)
-    sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
-    sessionStore.getState().setSelection([selId("node", qualify("flow", added.key))])
-    const { el, attrs } = fintoNodoStato()
-    registerNode(qualify("flow", added.key), el)
-
-    const runner = createInteractionRunner()
-    const partenza = { x: 100 + 30, y: LANE_PAD + 20 }
-    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("flow", added.key) } }))
-    // -60: resta dentro l'inquadratura (previewDrag scrive solo ciò che si vede), ma il centro del
-    // nodo (a -20) è comunque fuori dalla banda [0, 160) — basta perché scatti il riallineamento.
-    runner.step(muovi({ world: { x: partenza.x, y: partenza.y - 60 } }))
-    // Anteprima: il nodo è scritto sopra la sua banda, fermo alla posizione del puntatore.
-    expect(attrs.transform).toBe("translate(100 -40)")
-    runner.step(su({ world: { x: partenza.x, y: partenza.y - 60 } }))
-
-    // Il riallineamento (Task 8, regola 4) lo riporta esattamente dov'era: il modello non cambia.
-    const modello = flowDiagram(documentStore.getState().doc)
-    expect(modello.view.nodes[added.key]).toMatchObject({ x: 100, y: LANE_PAD })
-    // E il DOM deve dirlo altrettanto. Senza `resetDragTargets`, la recipe non produce patch (il
-    // nodo torna dov'era), la dispatch non fa nulla, e qui resterebbe la scrittura dell'ultima
-    // anteprima (`translate(100 -40)`, l'asserzione di sopra) invece della posizione di partenza.
-    expect(attrs.transform).toBe(`translate(100 ${LANE_PAD})`)
-
-    registerNode(qualify("flow", added.key), null)
-  })
-
   it("il cablaggio: il rilascio in un'altra corsia passa da commitDrag, non da moveNodes", () => {
-    const base = createDocument("t", "t")
-    const l1 = base.diagram.flow.model.lanes[0]!.id
-    const l2 = crypto.randomUUID()
-    let doc = produce(base, (d) => {
-      const f = d.diagram.flow
-      f.model.lanes.push({ id: l2, name: "Seconda" })
-      f.view.lanes = { [l1]: { y: 0, h: 100 }, [l2]: { y: 100, h: 100 } }
-    })
-    const added = addFlowNode({ x: 100, y: 20 }, "process", l1)
-    doc = produce(doc, added.recipe)
+    const base = withPool(createDocument("t", "t"), ["l1", "l2"], 100)
+    const added = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    const doc = produce(base, added.recipe)
     documentStore.getState().load(doc)
     sessionStore.getState().setViewport(IDENTITY)
     sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
@@ -283,9 +240,86 @@ describe("il rilascio del flowchart", () => {
     // `canvas-ops.ts` (`o.commitDrag ? o.commitDrag(...) : moveNodes(...)`, per famiglia) tornasse
     // sempre a `moveNodes`, questa asserzione fallirebbe da sola, mentre il resto della suite —
     // scritta per l'ER — resterebbe verde.
-    expect(flowDiagram(documentStore.getState().doc).model.nodes[added.key]!.lane).toBe(l2)
+    expect(flowDiagram(documentStore.getState().doc).model.nodes[added.key]!.lane).toBe("l2")
 
     registerNode(qualify("flow", added.key), null)
+  })
+
+  it("lo strumento Pool dentro un pool non crea niente: avviso, e lo strumento resta attivo", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    documentSession.getState().patch({ notice: null })
+    sessionStore.getState().setTool("node", "flow", "pool")
+    const prima = documentStore.getState().doc
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: 100, y: 50 }, hit: { kind: "canvas" } }))
+    expect(documentStore.getState().doc).toBe(prima)
+    expect(documentSession.getState().notice).toBe("Un pool non sta dentro un altro pool.")
+    expect(sessionStore.getState().tool).toBe("node")
+    sessionStore.getState().setTool("select")
+  })
+
+  it("un pool creato dopo un rifiuto toglie l'avviso, lo seleziona e non apre nessun editor", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    documentSession.getState().patch({ notice: null })
+    sessionStore.getState().setTool("node", "flow", "pool")
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: 100, y: 50 }, hit: { kind: "canvas" } }))
+    expect(documentSession.getState().notice).toBe("Un pool non sta dentro un altro pool.")
+
+    runner.step(giu({ world: { x: 100, y: 1000 }, hit: { kind: "canvas" } }))
+    const creato = Object.keys(flowDiagram(documentStore.getState().doc).model.pools).find((id) => id !== "p1")
+    expect(creato).toBeDefined()
+    expect([...sessionStore.getState().selection]).toEqual([selId("node", qualify("flow", creato!))])
+    expect(sessionStore.getState().tool).toBe("select")
+    expect(sessionStore.getState().editing).toBeNull()
+    expect(documentSession.getState().notice).toBeNull()
+  })
+
+  it("una creazione riuscita non tocca un avviso estraneo, come quello dell'autosave", () => {
+    // Un rifiuto del pool non c'entra: qui l'avviso a schermo è quello del persistence layer
+    // (autosave.ts / document-io.ts), che deve restare finché l'utente non lo chiude da sé.
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    documentSession.getState().patch({ notice: "Salvataggio automatico non disponibile" })
+    sessionStore.getState().setTool("node", "flow", "pool")
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: 100, y: 1000 }, hit: { kind: "canvas" } }))
+    const creato = Object.keys(flowDiagram(documentStore.getState().doc).model.pools).find((id) => id !== "p1")
+    expect(creato).toBeDefined()
+    expect(documentSession.getState().notice).toBe("Salvataggio automatico non disponibile")
+    sessionStore.getState().setTool("select")
+  })
+
+  it("l'anteprima del drag di un pool muove anche i suoi nodi", () => {
+    const base = withPool(createDocument("t", "t"))
+    const added = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    documentStore.getState().load(produce(base, added.recipe))
+    sessionStore.getState().setViewport(IDENTITY)
+    sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
+    const pool = fintoNodoStato()
+    const nodo = fintoNodoStato()
+    registerNode(qualify("flow", "p1"), pool.el)
+    registerNode(qualify("flow", added.key), nodo.el)
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: { x: -20, y: 50 }, hit: { kind: "node", key: qualify("flow", "p1") } }))
+    runner.step(muovi({ world: { x: 80, y: 50 } }))
+    expect(pool.attrs.transform).toBe("translate(70 0)")
+    expect(nodo.attrs.transform).toBe("translate(200 20)")
+    runner.step({ type: "cancel" })
+    registerNode(qualify("flow", "p1"), null)
+    registerNode(qualify("flow", added.key), null)
+  })
+
+  it("il ridimensionamento scrive la larghezza al rilascio, in un solo passo", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    const past = documentStore.getState().past.length
+    const runner = createInteractionRunner()
+    const hit = { kind: "resize" as const, key: qualify("flow", "p1"), lane: null }
+    runner.step(giu({ world: { x: 640, y: 50 }, hit }))
+    runner.step(muovi({ world: { x: 840, y: 50 } }))
+    runner.step(su({ world: { x: 840, y: 50 } }))
+    // 672 + 200 = 872, allineato alla griglia: 870.
+    expect(flowDiagram(documentStore.getState().doc).view.pools["p1"]!.w).toBe(870)
+    expect(documentStore.getState().past.length).toBe(past + 1)
   })
 })
 
@@ -302,10 +336,10 @@ describe("Collega fra famiglie", () => {
     return doc
   }
 
-  /** Il gesto Collega da `source` a `target`, con lo strumento attivo. */
-  function collega(source: string, target: string) {
+  /** Il gesto Collega da `source` a `target`, con lo strumento attivo. Un runner passato esplicito fa
+   *  proseguire lo stesso `lastRefusal`, come nell'app dove un solo runner vive per montaggio. */
+  function collega(source: string, target: string, runner = createInteractionRunner()) {
     sessionStore.getState().setTool("edge")
-    const runner = createInteractionRunner()
     runner.step(giu({ hit: { kind: "node", key: source } }))
     runner.step(muovi({ world: { x: 10, y: 10 } }))
     runner.step(su({ hit: { kind: "node", key: target } }))
@@ -337,11 +371,21 @@ describe("Collega fra famiglie", () => {
 
   it("un collegamento riuscito toglie l'avviso di un rifiuto precedente", () => {
     // T6 (review finale): un Collega riuscito fra famiglie non deve lasciare a schermo l'avviso di un
-    // rifiuto precedente dello stesso strumento.
-    collega(qualify("class", "Pagabile"), qualify("er", "ordini"))
+    // rifiuto precedente dello stesso strumento. Stesso runner per entrambi i gesti, come nell'app,
+    // dove è lui a ricordarsi il proprio ultimo rifiuto.
+    const runner = createInteractionRunner()
+    collega(qualify("class", "Pagabile"), qualify("er", "ordini"), runner)
     expect(documentSession.getState().notice).toBe("Un'interfaccia non si mappa su una tabella.")
-    collega(qualify("class", "Ordine"), qualify("er", "ordini"))
+    collega(qualify("class", "Ordine"), qualify("er", "ordini"), runner)
     expect(documentSession.getState().notice).toBeNull()
+  })
+
+  it("un collegamento riuscito non tocca un avviso estraneo, come quello dell'autosave", () => {
+    // Stesso principio del test sulla creazione: solo il rifiuto dello strumento va tolto, non un
+    // avviso del persistence layer che sta mostrando la sua unica occasione di farsi notare.
+    documentSession.getState().patch({ notice: "Salvataggio automatico non disponibile" })
+    collega(qualify("class", "Ordine"), qualify("er", "ordini"))
+    expect(documentSession.getState().notice).toBe("Salvataggio automatico non disponibile")
   })
 
   it("un collegamento già presente si seleziona, senza un passo di annulla in più", () => {

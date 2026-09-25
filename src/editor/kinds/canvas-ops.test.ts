@@ -151,6 +151,23 @@ describe("canvasOps (famiglie mescolate)", () => {
     expect(canvasOps(state().doc).rectOf(node.key)!.x).toBe(xBefore + 20)
     expect(flowDiagram(state().doc).model.nodes[flowKey]!.lane).toBe(laneBefore)
   })
+
+  it("eliminare un nodo di flusso elimina i suoi collegamenti, in un solo passo di annulla", () => {
+    state().load(createDocument("t", "t"))
+    const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
+    state().dispatch(entity.recipe)
+    const node = canvasOps(state().doc).addNode({ x: 400, y: 40 }, "flow", "process")
+    state().dispatch(node.recipe)
+    const link = canvasOps(state().doc).addEdge(node.key, entity.key)
+    if (link?.type !== "created") throw new Error("atteso created")
+    state().dispatch(link.recipe)
+    const past = state().past.length
+    state().dispatch(canvasOps(state().doc).deleteItems([node.key], [])!)
+    expect(state().doc.diagram.links).toEqual({})
+    expect(state().past.length).toBe(past + 1)
+    state().undo()
+    expect(Object.keys(state().doc.diagram.links)).toHaveLength(1)
+  })
 })
 
 describe("canvasOps (collegamenti)", () => {

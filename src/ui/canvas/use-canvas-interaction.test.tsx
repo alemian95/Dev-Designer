@@ -261,9 +261,8 @@ describe("il resto del cablaggio", () => {
     documentStore.getState().load(createDocument("f", "f"))
     documentStore.getState().dispatch((draft) => {
       const d = draft.diagram.flow
-      const lane = d.model.lanes[0]!.id
-      d.model.nodes["a"] = { label: "", shape: "process", lane }
-      d.model.nodes["b"] = { label: "", shape: "process", lane }
+      d.model.nodes["a"] = { label: "", shape: "process", lane: null }
+      d.model.nodes["b"] = { label: "", shape: "process", lane: null }
       d.view.nodes["a"] = { x: 0, y: 0, collapsed: false }
       d.view.nodes["b"] = { x: 200, y: 0, collapsed: false }
       d.model.edges["e1"] = { source: "a", target: "b", label: "" }

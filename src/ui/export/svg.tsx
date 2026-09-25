@@ -4,15 +4,15 @@ import { edgeOffsets } from "@/editor/edge-routing"
 import { erDiagram } from "@/editor/er-access"
 import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
-import { laneBandExtent } from "@/editor/flow/geometry"
+import { poolIds, poolRect } from "@/editor/flow/geometry"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
-import { canvasOps, familyHasContent } from "@/editor/kinds/canvas-ops"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
 import type { DevDocument } from "@/model/document"
 import { FAMILIES, type Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
-import { LanesLayerView } from "@/ui/canvas/LanesLayer"
 import { LinkEdgeView } from "@/ui/canvas/LinkEdge"
+import { PoolsLayerView } from "@/ui/canvas/PoolsLayer"
 import { viewFor } from "@/ui/canvas/kinds/registry"
 
 /**
@@ -82,12 +82,9 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
  * comandi, non lettura del modello). `view.nodes` invece è già uniforme fra le famiglie
  * (`NodeViewSchema` condiviso, `model/shared.ts`), quindi non serve distinguerlo.
  *
- * Le corsie sono l'unica parte del flowchart che non passa da `DiagramOps`/`DiagramView`: sono un
- * terzo layer che solo il flowchart ha (spec §5), disegnato con `LanesLayerView` pura
- * (`@/ui/canvas/LanesLayer.tsx`) — la stessa che il canvas monta, così è garantito che la banda
- * sia identica nell'app e nell'export. La sua estensione orizzontale viene da `laneBandExtent`
- * (`@/editor/flow/geometry.ts`), lo stesso calcolo che fa `LanesLayer`: un solo punto, non due
- * copie della formula che potrebbero divergere.
+ * I pool sono l'unica parte del flowchart che non passa da `DiagramOps`/`DiagramView`: sono un
+ * layer che solo il flowchart ha, disegnato con la stessa `PoolsLayerView` del canvas, così il
+ * pool è identico nell'app e nell'export.
  *
  * `null` se non c'è nessun nodo con una view: non c'è niente da esportare.
  */
@@ -117,17 +114,11 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
     }
   })
 
-  const flow = familyHasContent(doc, "flow") ? flowDiagram(doc) : null
-  const laneExtent = flow ? laneBandExtent(flow) : null
-  const laneRects: Rect[] = []
-  if (flow && laneExtent) {
-    for (const lane of flow.model.lanes) {
-      const band = flow.view.lanes[lane.id]
-      if (band) laneRects.push({ x: laneExtent.x, y: band.y, w: laneExtent.w, h: band.h })
-    }
-  }
+  const flow = flowDiagram(doc)
+  // I pool sono contenuto anche senza nodi (spec 2b §6): entrano nei limiti dell'export.
+  const poolRects = poolIds(flow).flatMap((id) => poolRect(flow, id) ?? [])
 
-  const bounds = rectsBounds([...sections.flatMap((s) => [...s.rects.values()]), ...laneRects])
+  const bounds = rectsBounds([...sections.flatMap((s) => [...s.rects.values()]), ...poolRects])
   if (!bounds) return null
 
   const x = bounds.x - EXPORT_PADDING
@@ -138,14 +129,14 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
   // Gli estremi dei collegamenti sono chiavi con prefisso, di famiglie diverse: li risolve `CanvasOps`.
   const allOps = canvasOps(doc)
 
-  // Le corsie sotto tutto, come nel canvas (`Canvas.tsx`: `LanesLayer` monta prima dei layer di
+  // I pool sotto tutto, come nel canvas (`Canvas.tsx`: `PoolsLayer` monta prima dei layer di
   // famiglia). Poi tutti gli archi sotto tutti i nodi. Il fondo sotto tutto: nell'app lo dipinge il
   // div attorno all'svg, quindi qui va aggiunto, altrimenti il PNG esce trasparente e il testo del
   // tema chiaro diventa illeggibile su una pagina scura.
   const body = renderToStaticMarkup(
     <>
       <rect data-background x={x} y={y} width={w} height={h} fill="var(--background)" />
-      {flow && laneExtent && <LanesLayerView lanes={flow.model.lanes} bands={flow.view.lanes} x={laneExtent.x} w={laneExtent.w} />}
+      {poolRects.length > 0 && <PoolsLayerView part={flow} />}
       <g data-layer="edges">
         {sections.flatMap((s) =>
           s.edges.map((edge) => {

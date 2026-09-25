@@ -106,15 +106,10 @@ function previewDrag(targets: DragTargets, dx: number, dy: number): void {
  * rilascio, non a ogni frame, e su ciò che il gesto ha davvero toccato, quindi il costo è quello
  * della selezione trascinata, non del documento intero.
  *
- * Gira a ogni rilascio, prima della dispatch. Serve per primo al flowchart (spec §6), dove la
- * posizione scritta al rilascio può differire da quella dell'anteprima: se il centro del nodo cade
- * fuori da ogni banda, il comando lo riallinea alla sua banda di partenza, e quel riallineamento
- * può riportarlo **esattamente** dov'era prima del drag. In quel caso `documentStore.dispatch` non
- * produce patch per quel nodo (e per gli archi che lo toccano), React non ridisegna niente perché
- * per lei nulla è cambiato, e il `transform` scritto a mano dall'anteprima — fermo all'ultima
- * posizione del puntatore, non a quella di partenza — resterebbe sul DOM. Scrivendo qui le
- * posizioni di partenza *prima* della dispatch, il DOM è già corretto se la dispatch non fa nulla,
- * e viene comunque sovrascritto da React se la fa.
+ * Gira a ogni rilascio, prima della dispatch: se la recipe non produce patch — uno spostamento che
+ * la griglia annulla — React non ridisegna niente, e senza questo reset il transform scritto a mano
+ * dall'anteprima resterebbe sul DOM. Scrivendo qui le posizioni di partenza prima della dispatch, il
+ * DOM è corretto in entrambi i casi.
  *
  * Il reset è **incondizionato**: una selezione mista può contenere nodi di una famiglia con
  * `commitDrag` e nodi di un'altra senza, e decidere famiglia per famiglia non varrebbe la pena. Per

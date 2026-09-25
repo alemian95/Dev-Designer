@@ -70,8 +70,7 @@ describe("pannello di un collegamento del flusso", () => {
   function seleziona(id: string) {
     act(() => {
       documentStore.getState().dispatch((draft) => {
-        const lane = draft.diagram.flow.model.lanes[0]!.id
-        draft.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane }
+        draft.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane: null }
         draft.diagram.flow.view.nodes["p1"] = { x: 0, y: 40, collapsed: false }
         draft.diagram.links["a1"] = { kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "read" }
         draft.diagram.links["c1"] = { kind: "calls", source: "flow/p1", target: "class/Ordine" }

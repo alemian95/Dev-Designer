@@ -12,8 +12,9 @@ import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { addFlowNode, setNodeLabel } from "@/editor/flow/commands"
+import { withPool } from "@/editor/flow/pool-fixture"
 import { selId, sessionStore } from "@/editor/session-store"
-import { FlowProperties } from "./FlowProperties"
+import { FlowProperties, PoolLanes } from "./FlowProperties"
 
 // Senza questo, React avvisa che l'ambiente "non supporta act(...)" e non garantisce che gli
 // aggiornamenti sincroni dentro `act()` siano già applicati quando la prossima riga li legge.
@@ -56,8 +57,7 @@ afterEach(() => {
 
 describe("FlowNodeProperties: campo etichetta", () => {
   it("un'etichetta multiriga modificata dal pannello conserva gli a capo", () => {
-    const lane = flowDiagram(documentStore.getState().doc).model.lanes[0]!.id
-    const { key, recipe } = addFlowNode({ x: 0, y: 0 }, "process", lane)
+    const { key, recipe } = addFlowNode({ x: 0, y: 0 }, "process", null)
     documentStore.getState().dispatch(recipe)
     documentStore.getState().dispatch(setNodeLabel(key, "verifica\nordine"))
     sessionStore.getState().setSelection([selId("node", qualify("flow", key))])
@@ -68,5 +68,57 @@ describe("FlowNodeProperties: campo etichetta", () => {
     act(() => editAndBlur(field, "verifica\nordine!"))
 
     expect(flowDiagram(documentStore.getState().doc).model.nodes[key]?.label).toBe("verifica\nordine!")
+  })
+})
+
+describe("FlowNodeProperties: corsia", () => {
+  function nodoSelezionato(lane: string | null): string {
+    documentStore.getState().load(withPool(createDocument("t", "t"), ["l1", "l2"]))
+    const { key, recipe } = addFlowNode({ x: 0, y: 0 }, "process", lane)
+    documentStore.getState().dispatch(recipe)
+    sessionStore.getState().setSelection([selId("node", qualify("flow", key))])
+    act(() => root.render(<FlowProperties />))
+    return key
+  }
+
+  it("la select ha «Nessuna» in testa e le corsie raggruppate per pool", () => {
+    nodoSelezionato(null)
+    const select = container.querySelector<HTMLSelectElement>("#flow-node-lane")!
+    expect(select.value).toBe("")
+    expect(select.options[0]!.textContent).toBe("Nessuna")
+    const group = select.querySelector("optgroup")!
+    expect(group.label).toBe("Pool 1")
+    expect([...group.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["l1", "l2"])
+  })
+
+  it("scegliere una corsia ci porta il nodo, e «Nessuna» lo libera", () => {
+    const key = nodoSelezionato(null)
+    const select = container.querySelector<HTMLSelectElement>("#flow-node-lane")!
+    act(() => {
+      select.value = "l2"
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    expect(flowDiagram(documentStore.getState().doc).model.nodes[key]!.lane).toBe("l2")
+    act(() => {
+      select.value = ""
+      select.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+    expect(flowDiagram(documentStore.getState().doc).model.nodes[key]!.lane).toBeNull()
+  })
+})
+
+describe("PoolLanes", () => {
+  it("«Aggiungi» mette in fondo al pool una corsia con il primo nome libero", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    act(() => root.render(<PoolLanes poolId="p1" />))
+    const aggiungi = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Aggiungi"))!
+    act(() => aggiungi.click())
+    expect(flowDiagram(documentStore.getState().doc).model.pools["p1"]!.lanes.map((l) => l.name)).toEqual(["l1", "Corsia 2"])
+  })
+
+  it("l'ultima corsia di un pool non si elimina", () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    act(() => root.render(<PoolLanes poolId="p1" />))
+    expect(container.querySelector<HTMLButtonElement>('[aria-label="Elimina corsia l1"]')!.disabled).toBe(true)
   })
 })

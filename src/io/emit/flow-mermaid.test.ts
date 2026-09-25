@@ -2,11 +2,10 @@ import { describe, expect, it } from "vitest"
 import type { FlowModel, FlowShape } from "@/model/flow/schema"
 import { emitFlowMermaid } from "./flow-mermaid"
 
-/** Stessa forma del `model()` di `validate.test.ts`: una corsia sola di default, chiamante libero
- *  di sovrascriverla con `lanes` quando il caso vuole più corsie. */
+/** Un pool `p1` con una corsia sola di default; il chiamante può sostituire `pools` quando il caso vuole più corsie o più pool. */
 const lane = { id: "l1", name: "corsia" }
-const model = (over: Partial<FlowModel>): FlowModel => ({ lanes: [lane], nodes: {}, edges: {}, ...over })
-const n = (label: string, shape: FlowShape, l = "l1") => ({ label, shape, lane: l })
+const model = (over: Partial<FlowModel>): FlowModel => ({ pools: { p1: { name: "pool", lanes: [lane] } }, nodes: {}, edges: {}, ...over })
+const n = (label: string, shape: FlowShape, l: string | null = "l1") => ({ label, shape, lane: l })
 const e = (source: string, target: string, label = "") => ({ source, target, label })
 
 describe("emitFlowMermaid: apertura e struttura", () => {
@@ -21,9 +20,9 @@ describe("emitFlowMermaid: apertura e struttura", () => {
     expect(warnings).toEqual([])
   })
 
-  it("due corsie escono come due subgraph, nell'ordine di model.lanes", () => {
+  it("due corsie escono come due subgraph, nell'ordine del pool", () => {
     const m = model({
-      lanes: [{ id: "l1", name: "prima" }, { id: "l2", name: "seconda" }],
+      pools: { p1: { name: "pool", lanes: [{ id: "l1", name: "prima" }, { id: "l2", name: "seconda" }] } },
       nodes: { a: n("A", "process", "l1"), b: n("B", "process", "l2") },
       edges: {},
     })
@@ -42,12 +41,38 @@ describe("emitFlowMermaid: apertura e struttura", () => {
 
   it("una corsia senza nodi visibili non emette una subgraph vuota", () => {
     const m = model({
-      lanes: [{ id: "l1", name: "piena" }, { id: "l2", name: "vuota" }],
+      pools: { p1: { name: "pool", lanes: [{ id: "l1", name: "piena" }, { id: "l2", name: "vuota" }] } },
       nodes: { a: n("A", "process", "l1") },
       edges: {},
     })
     const { text } = emitFlowMermaid(m)
     expect(text).not.toContain("vuota")
+  })
+
+  it("un pool esce come subgraph che contiene quelle delle sue corsie", () => {
+    const { text } = emitFlowMermaid(model({ nodes: { a: n("x", "process") } }))
+    expect(text).toContain('  subgraph p1["pool"]\n    subgraph l1["corsia"]\n      n1["x"]\n    end\n  end\n')
+  })
+
+  it("i nodi liberi escono fuori da ogni subgraph, e senza pool non c'è l'avviso sulle corsie", () => {
+    const { text, warnings } = emitFlowMermaid(model({ pools: {}, nodes: { a: n("A", "process", null) } }))
+    expect(text).toBe('flowchart LR\n  n1["A"]\n')
+    expect(warnings).toEqual([])
+  })
+
+  it("i liberi vengono prima dei pool", () => {
+    const { text } = emitFlowMermaid(model({ nodes: { a: n("dentro", "process"), b: n("fuori", "process", null) } }))
+    expect(text.indexOf('"fuori"')).toBeLessThan(text.indexOf("subgraph p1"))
+  })
+
+  it("i pool escono per nome, non per id né per posizione", () => {
+    const { text } = emitFlowMermaid(
+      model({
+        pools: { z: { name: "A", lanes: [{ id: "l1", name: "uno" }] }, a: { name: "B", lanes: [{ id: "l2", name: "due" }] } },
+        nodes: { x: n("X", "process", "l1"), y: n("Y", "process", "l2") },
+      }),
+    )
+    expect(text.indexOf('["A"]')).toBeLessThan(text.indexOf('["B"]'))
   })
 })
 
@@ -142,7 +167,7 @@ describe("emitFlowMermaid: note omesse", () => {
 
   it("una corsia con solo note non emette una subgraph, ma le conta comunque nell'avviso", () => {
     const m = model({
-      lanes: [{ id: "l1", name: "vera" }, { id: "l2", name: "solo-note" }],
+      pools: { p1: { name: "pool", lanes: [{ id: "l1", name: "vera" }, { id: "l2", name: "solo-note" }] } },
       nodes: { a: n("A", "process", "l1"), x: n("nota", "note", "l2") },
       edges: {},
     })
@@ -259,7 +284,7 @@ describe("emitFlowMermaid: escaping", () => {
 
   it("un nome di corsia con virgolette e a capo è scappato come le etichette dei nodi", () => {
     const m = model({
-      lanes: [{ id: "l1", name: 'corsia "1"\nbis' }],
+      pools: { p1: { name: "pool", lanes: [{ id: "l1", name: 'corsia "1"\nbis' }] } },
       nodes: { a: n("x", "process") },
       edges: {},
     })

@@ -1,15 +1,15 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { useStore } from "zustand"
-import { useShallow } from "zustand/react/shallow"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { familySelectedKeys, qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { addLane, deleteLane, moveLane, renameLane, setEdgeLabel, setNodeLabel, setNodeLane, setNodeShape } from "@/editor/flow/commands"
+import { poolIds } from "@/editor/flow/geometry"
 import { sessionStore } from "@/editor/session-store"
-import { FlowShapeSchema, nextLaneName, type FlowModel } from "@/model/flow/schema"
+import { FlowShapeSchema, nextName, type FlowModel, type Lane } from "@/model/flow/schema"
 import { FLOW_SHAPE_LABEL, FLOW_SHAPES } from "@/ui/flow-shapes"
 import { CommitInput } from "@/ui/panels/CommitInput"
 import { CommitTextarea } from "@/ui/panels/CommitTextarea"
@@ -20,7 +20,7 @@ const dispatch = (recipe: Recipe | null) => {
 
 function FlowNodeProperties({ nodeKey: key }: { nodeKey: string }) {
   const node = useStore(documentStore, (s) => flowDiagram(s.doc).model.nodes[key])
-  const lanes = useStore(documentStore, useShallow((s) => flowDiagram(s.doc).model.lanes))
+  const flow = useStore(documentStore, (s) => flowDiagram(s.doc))
   // Come `NoteProperties` (`ClassProperties.tsx`): finché il doppio click ha aperto `FlowNodeEditor`
   // su *questo* nodo, il campo qui va in sola lettura — l'editor sul canvas è quello che l'utente
   // sta guardando, due campi modificabili per lo stesso dato divergerebbero.
@@ -59,15 +59,28 @@ function FlowNodeProperties({ nodeKey: key }: { nodeKey: string }) {
       </div>
       <div className="grid gap-1">
         <Label htmlFor="flow-node-lane">Corsia</Label>
-        {/* Alternativa da tastiera al trascinamento fra corsie (spec §11): stesso dato di
-         *  `node.lane`, un'altra via per scriverlo. */}
+        {/* Alternativa da tastiera al trascinamento (spec 2b §7): «Nessuna» libera il nodo dove sta,
+         *  una corsia ce lo porta. Le corsie sono raggruppate per pool, nell'ordine di disegno. */}
         <select
           id="flow-node-lane"
-          value={node.lane}
-          onChange={(e) => dispatch(setNodeLane(key, e.target.value))}
+          value={node.lane ?? ""}
+          onChange={(e) => dispatch(setNodeLane(key, e.target.value === "" ? null : e.target.value))}
           className="h-8 rounded-md border bg-background px-2 text-sm"
         >
-          {lanes.map((lane) => <option key={lane.id} value={lane.id}>{lane.name}</option>)}
+          <option value="">Nessuna</option>
+          {poolIds(flow).map((id) => {
+            // `poolIds` viene dalle chiavi di `model.pools`: il pool c'è.
+            const pool = flow.model.pools[id]!
+            return (
+              <optgroup key={id} label={pool.name}>
+                {pool.lanes.map((lane) => (
+                  <option key={lane.id} value={lane.id}>
+                    {lane.name}
+                  </option>
+                ))}
+              </optgroup>
+            )
+          })}
         </select>
       </div>
     </div>
@@ -91,8 +104,6 @@ function FlowEdgeProperties({ edgeKey: key }: { edgeKey: string }) {
  * Corpo del pannello proprietà per il flowchart quando la selezione è esattamente un nodo o
  * esattamente un arco — stessa forma di `ClassProperties`/`kinds/er.tsx`: la cornice
  * (`PropertiesPanel`) garantisce che sia l'uno o l'altro, qui basta distinguere quale.
- * Il terzo caso, nessuna selezione, non passa da qui: è `FlowLanesPanel`, montato da
- * `PropertiesPanel` quando il flusso ha nodi — un nodo o un arco da passare qui non c'è.
  */
 export function FlowProperties() {
   const selection = useStore(sessionStore, (s) => s.selection)
@@ -102,24 +113,25 @@ export function FlowProperties() {
   return <FlowEdgeProperties key={edges[0]} edgeKey={edges[0]!} />
 }
 
-function nodeCountByLane(nodes: Readonly<Record<string, { lane: string }>>): Map<string, number> {
+function nodeCountByLane(nodes: Readonly<Record<string, { lane: string | null }>>): Map<string, number> {
   const counts = new Map<string, number>()
-  for (const node of Object.values(nodes)) counts.set(node.lane, (counts.get(node.lane) ?? 0) + 1)
+  for (const node of Object.values(nodes)) {
+    if (node.lane !== null) counts.set(node.lane, (counts.get(node.lane) ?? 0) + 1)
+  }
   return counts
 }
 
 /**
- * Riga di una corsia: nome, ordine, elimina. **L'eliminazione dell'ultima corsia è disabilitata**
- * — si usa `deleteLane` stesso per deciderlo (`canDelete`), non se ne reimplementa la regola qui
- * (SSOT): una `moveTo` candidata qualunque, la prima corsia diversa da questa, e se anche con
- * quella `deleteLane` torna `null` non c'è nessuna eliminazione possibile.
+ * Riga di una corsia: nome, ordine, elimina. **L'eliminazione dell'ultima corsia del pool è
+ * disabilitata** — lo decide `deleteLane` stesso (`canDelete`), non una copia della regola qui (SSOT).
  *
- * **Una corsia con dentro dei nodi chiede in quale spostarli** prima di eliminarla (spec §11): il
- * click su «elimina» apre un select inline invece di dispatchare subito. Una corsia vuota non ha
- * niente da spostare e si elimina subito, nella prima corsia diversa da questa.
+ * **Una corsia con dentro dei nodi chiede in quale spostarli** prima di eliminarla: il click su
+ * «elimina» apre un select inline con le altre corsie dello stesso pool. Una corsia vuota si elimina
+ * subito.
  */
-function LaneRow({ model, lane, index, nodeCount }: { model: FlowModel; lane: FlowModel["lanes"][number]; index: number; nodeCount: number }) {
-  const others = model.lanes.filter((l) => l.id !== lane.id)
+function LaneRow({ model, poolId, lane, index, nodeCount }: { model: FlowModel; poolId: string; lane: Lane; index: number; nodeCount: number }) {
+  const lanes = model.pools[poolId]?.lanes ?? []
+  const others = lanes.filter((l) => l.id !== lane.id)
   const firstOther = others[0]
   const canDelete = firstOther !== undefined && deleteLane(model, lane.id, firstOther.id) !== null
   const [moveTo, setMoveTo] = useState<string | null>(null)
@@ -142,8 +154,8 @@ function LaneRow({ model, lane, index, nodeCount }: { model: FlowModel; lane: Fl
       <div className="flex items-center gap-1">
         <CommitInput key={lane.name} value={lane.name} aria-label={`Nome corsia ${index + 1}`} onCommit={(name) => dispatch(renameLane(lane.id, name))} className="h-7 text-xs" />
         <span className="ml-auto flex">
-          <Button variant="ghost" size="icon" className="size-6" disabled={index === 0} aria-label={`Sposta su ${lane.name}`} onClick={() => dispatch(moveLane(index, index - 1))}><ArrowUp /></Button>
-          <Button variant="ghost" size="icon" className="size-6" disabled={index === model.lanes.length - 1} aria-label={`Sposta giù ${lane.name}`} onClick={() => dispatch(moveLane(index, index + 1))}><ArrowDown /></Button>
+          <Button variant="ghost" size="icon" className="size-6" disabled={index === 0} aria-label={`Sposta su ${lane.name}`} onClick={() => dispatch(moveLane(poolId, index, index - 1))}><ArrowUp /></Button>
+          <Button variant="ghost" size="icon" className="size-6" disabled={index === lanes.length - 1} aria-label={`Sposta giù ${lane.name}`} onClick={() => dispatch(moveLane(poolId, index, index + 1))}><ArrowDown /></Button>
           <Button variant="ghost" size="icon" className="size-6" disabled={!canDelete} aria-label={`Elimina corsia ${lane.name}`} onClick={startDelete}><Trash2 /></Button>
         </span>
       </div>
@@ -161,28 +173,26 @@ function LaneRow({ model, lane, index, nodeCount }: { model: FlowModel; lane: Fl
   )
 }
 
-
 /**
- * Corpo del pannello proprietà per il flowchart **senza selezione** (spec §11): l'elenco delle
- * corsie, con rinomina, aggiungi, elimina e ordine — l'unico posto della UI che gestisce le
- * corsie come oggetti a sé, a differenza del pannello del nodo (sopra) che ne cambia solo
- * l'appartenenza di un nodo.
+ * Le corsie di un pool (spec 2b §7): rinomina, aggiungi, elimina e ordine — l'unico posto della UI che
+ * gestisce le corsie come oggetti a sé. La monta il pannello del pool, sotto il nome.
  */
-export function FlowLanesPanel() {
-  const model = useStore(documentStore, useShallow((s) => flowDiagram(s.doc).model))
+export function PoolLanes({ poolId }: { poolId: string }) {
+  const model = useStore(documentStore, (s) => flowDiagram(s.doc).model)
+  const pool = model.pools[poolId]
+  if (!pool) return null
   const counts = nodeCountByLane(model.nodes)
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex items-center justify-between">
-        {/* Titolo di sezione, non un'etichetta di campo: `<Label>` di Radix è un `<label>` HTML e
-         *  senza `htmlFor` non è associato a nessun controllo. `IssuesPanel.tsx` titola il proprio
-         *  pannello con un `<h2>` per lo stesso motivo — stessa forma qui. */}
+        {/* Titolo di sezione, non un'etichetta di campo: un `<Label>` senza `htmlFor` non è associato a
+         *  nessun controllo. `IssuesPanel.tsx` titola il proprio pannello con un `<h2>` per lo stesso motivo. */}
         <h2 className="text-xs font-semibold uppercase text-muted-foreground">Corsie</h2>
-        <Button variant="outline" size="sm" onClick={() => dispatch(addLane(nextLaneName(model.lanes)))}><Plus /> Aggiungi</Button>
+        <Button variant="outline" size="sm" onClick={() => dispatch(addLane(poolId, nextName("Corsia", pool.lanes)))}><Plus /> Aggiungi</Button>
       </div>
       <ul className="flex flex-col gap-2">
-        {model.lanes.map((lane, index) => (
-          <LaneRow key={lane.id} model={model} lane={lane} index={index} nodeCount={counts.get(lane.id) ?? 0} />
+        {pool.lanes.map((lane, index) => (
+          <LaneRow key={lane.id} model={model} poolId={poolId} lane={lane} index={index} nodeCount={counts.get(lane.id) ?? 0} />
         ))}
       </ul>
     </div>

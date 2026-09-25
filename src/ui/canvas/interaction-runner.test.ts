@@ -6,8 +6,8 @@ import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { qualify } from "@/editor/families"
 import { addFlowNode } from "@/editor/flow/commands"
-import { LANE_PAD } from "@/editor/flow/layout"
 import { flowDiagram } from "@/editor/flow-access"
+import { withPool } from "@/editor/flow/pool-fixture"
 import { HEADER_H, MIN_W } from "@/editor/geometry"
 import type { InteractionEvent, PointerInfo } from "@/editor/interaction"
 import { selId, sessionStore } from "@/editor/session-store"
@@ -207,66 +207,15 @@ describe("un comando al rilascio", () => {
   })
 })
 
-/** Un elemento finto che tiene l'ultimo valore scritto per ogni attributo, non solo la sequenza
- *  delle scritture: qui serve sapere **cosa mostra il DOM adesso**, dopo il rilascio, non se un
- *  certo valore è passato di lì durante il gesto. */
-function fintoNodoStato(): { el: SVGGElement; attrs: Record<string, string> } {
-  const attrs: Record<string, string> = {}
-  const el = { setAttribute: (n: string, v: string) => (attrs[n] = v) } as unknown as SVGGElement
-  return { el, attrs }
-}
-
 describe("il rilascio del flowchart", () => {
   afterEach(() => {
     sessionStore.getState().setSelection([])
   })
 
-  it("un nodo riallineato esattamente dov'era non lascia il DOM fermo all'anteprima", () => {
-    // Una sola corsia (`emptyFlowDiagram`, via `createDocument`), banda [0, 160): un nodo in prima riga, a
-    // `y = LANE_PAD`, è dove lo metterebbe `placeInLanes` — lo scenario del revisore.
-    const base = createDocument("t", "t")
-    const laneId = base.diagram.flow.model.lanes[0]!.id
-    const added = addFlowNode({ x: 100, y: LANE_PAD }, "process", laneId)
-    const doc = produce(base, added.recipe)
-    documentStore.getState().load(doc)
-    sessionStore.getState().setViewport(IDENTITY)
-    sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
-    sessionStore.getState().setSelection([selId("node", qualify("flow", added.key))])
-    const { el, attrs } = fintoNodoStato()
-    registerNode(qualify("flow", added.key), el)
-
-    const runner = createInteractionRunner()
-    const partenza = { x: 100 + 30, y: LANE_PAD + 20 }
-    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("flow", added.key) } }))
-    // -60: resta dentro l'inquadratura (previewDrag scrive solo ciò che si vede), ma il centro del
-    // nodo (a -20) è comunque fuori dalla banda [0, 160) — basta perché scatti il riallineamento.
-    runner.step(muovi({ world: { x: partenza.x, y: partenza.y - 60 } }))
-    // Anteprima: il nodo è scritto sopra la sua banda, fermo alla posizione del puntatore.
-    expect(attrs.transform).toBe("translate(100 -40)")
-    runner.step(su({ world: { x: partenza.x, y: partenza.y - 60 } }))
-
-    // Il riallineamento (Task 8, regola 4) lo riporta esattamente dov'era: il modello non cambia.
-    const modello = flowDiagram(documentStore.getState().doc)
-    expect(modello.view.nodes[added.key]).toMatchObject({ x: 100, y: LANE_PAD })
-    // E il DOM deve dirlo altrettanto. Senza `resetDragTargets`, la recipe non produce patch (il
-    // nodo torna dov'era), la dispatch non fa nulla, e qui resterebbe la scrittura dell'ultima
-    // anteprima (`translate(100 -40)`, l'asserzione di sopra) invece della posizione di partenza.
-    expect(attrs.transform).toBe(`translate(100 ${LANE_PAD})`)
-
-    registerNode(qualify("flow", added.key), null)
-  })
-
   it("il cablaggio: il rilascio in un'altra corsia passa da commitDrag, non da moveNodes", () => {
-    const base = createDocument("t", "t")
-    const l1 = base.diagram.flow.model.lanes[0]!.id
-    const l2 = crypto.randomUUID()
-    let doc = produce(base, (d) => {
-      const f = d.diagram.flow
-      f.model.lanes.push({ id: l2, name: "Seconda" })
-      f.view.lanes = { [l1]: { y: 0, h: 100 }, [l2]: { y: 100, h: 100 } }
-    })
-    const added = addFlowNode({ x: 100, y: 20 }, "process", l1)
-    doc = produce(doc, added.recipe)
+    const base = withPool(createDocument("t", "t"), ["l1", "l2"], 100)
+    const added = addFlowNode({ x: 100, y: 20 }, "process", "l1")
+    const doc = produce(base, added.recipe)
     documentStore.getState().load(doc)
     sessionStore.getState().setViewport(IDENTITY)
     sessionStore.getState().setCanvasSize({ w: 800, h: 600 })
@@ -283,7 +232,7 @@ describe("il rilascio del flowchart", () => {
     // `canvas-ops.ts` (`o.commitDrag ? o.commitDrag(...) : moveNodes(...)`, per famiglia) tornasse
     // sempre a `moveNodes`, questa asserzione fallirebbe da sola, mentre il resto della suite —
     // scritta per l'ER — resterebbe verde.
-    expect(flowDiagram(documentStore.getState().doc).model.nodes[added.key]!.lane).toBe(l2)
+    expect(flowDiagram(documentStore.getState().doc).model.nodes[added.key]!.lane).toBe("l2")
 
     registerNode(qualify("flow", added.key), null)
   })

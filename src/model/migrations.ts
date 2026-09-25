@@ -1,3 +1,5 @@
+import { LANE_MARGIN, LANE_MIN_H, POOL_HEADER_W, POOL_MIN_W, type FlowNode } from "./flow/schema"
+import { flowNodeSize } from "./flow/size"
 import { SCHEMA_VERSION } from "./shared"
 
 type RawDocument = Record<string, unknown>
@@ -57,11 +59,77 @@ const addLinks: Migration = (raw) => {
  */
 const sameShape: Migration = (raw) => raw
 
+/** Il pool in cui la migrazione 5 → 6 raccoglie le corsie di un file v5: id fisso, perché la migrazione è pura. */
+const MIGRATED_POOL_ID = "pool-1"
+
+type Obj = Record<string, unknown>
+const isObj = (v: unknown): v is Obj => v !== null && typeof v === "object" && !Array.isArray(v)
+
+/**
+ * L'estensione orizzontale delle bande di un file v5, come la calcolava `laneBandExtent` prima del
+ * 2b: l'ingombro dei nodi più `LANE_MARGIN` per lato, con la larghezza minima delle bande (640, oggi
+ * `POOL_MIN_W`). Serve solo qui: dal 2b la larghezza di un pool è un dato.
+ */
+function v5BandExtent(nodes: Record<string, FlowNode>, views: Record<string, { x: number }>): { x: number; w: number } {
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  for (const [key, node] of Object.entries(nodes)) {
+    const view = views[key]
+    if (!view) continue
+    minX = Math.min(minX, view.x)
+    maxX = Math.max(maxX, view.x + flowNodeSize(node).w)
+  }
+  if (minX > maxX) return { x: -LANE_MARGIN, w: POOL_MIN_W }
+  return { x: minX - LANE_MARGIN, w: Math.max(POOL_MIN_W, maxX - minX + 2 * LANE_MARGIN) }
+}
+
+/**
+ * 5 → 6: le corsie entrano in un pool (spec 2b §4).
+ *
+ * - Una parte di flusso **senza nodi** perde le corsie: erano quella che `lanes.min(1)` imponeva.
+ * - Una parte **con nodi** raccoglie le corsie nel pool `pool-1` «Pool 1», nello stesso ordine e con
+ *   le stesse altezze. La `y` del pool è quella della prima banda; `x` e `w` sono quelle che le bande
+ *   avevano, più la striscia a sinistra. Le bande del v5 sono impilate senza buchi (`restackLanes`),
+ *   quindi ricavare la `y` dalle altezze dà le stesse bande. I nodi non si muovono.
+ */
+const lanesIntoPool: Migration = (raw) => {
+  const diagram = raw.diagram
+  if (!isObj(diagram) || !isObj(diagram.flow)) return raw
+  const flow = diagram.flow
+  if (!isObj(flow.model) || !isObj(flow.view)) return raw
+  const { lanes, ...model } = flow.model
+  const { lanes: bands, ...view } = flow.view
+  const nodes = (isObj(model.nodes) ? model.nodes : {}) as Record<string, FlowNode>
+  const nodeViews = (isObj(view.nodes) ? view.nodes : {}) as Record<string, { x: number }>
+  const laneList = (Array.isArray(lanes) ? lanes : []) as { id: string; name: string }[]
+  const bandMap = (isObj(bands) ? bands : {}) as Record<string, { y: number; h: number } | undefined>
+  const pools: Obj = {}
+  const poolViews: Obj = {}
+  const laneViews: Obj = {}
+  const first = laneList[0]
+  if (Object.keys(nodes).length > 0 && first) {
+    const extent = v5BandExtent(nodes, nodeViews)
+    pools[MIGRATED_POOL_ID] = { name: "Pool 1", lanes: laneList }
+    poolViews[MIGRATED_POOL_ID] = { x: extent.x - POOL_HEADER_W, y: bandMap[first.id]?.y ?? 0, w: extent.w + POOL_HEADER_W }
+    for (const lane of laneList) laneViews[lane.id] = { h: bandMap[lane.id]?.h ?? LANE_MIN_H }
+  }
+  return {
+    ...raw,
+    diagram: { ...diagram, flow: { ...flow, model: { ...model, pools }, view: { ...view, pools: poolViews, lanes: laneViews } } },
+  }
+}
+
 /**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
  */
-const migrations: ReadonlyMap<number, Migration> = new Map([[1, addClassNotes], [2, unifyDiagram], [3, addLinks], [4, sameShape]])
+const migrations: ReadonlyMap<number, Migration> = new Map([
+  [1, addClassNotes],
+  [2, unifyDiagram],
+  [3, addLinks],
+  [4, sameShape],
+  [5, lanesIntoPool],
+])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }
 

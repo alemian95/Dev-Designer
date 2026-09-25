@@ -22,10 +22,9 @@ describe("endName", () => {
   /** Un'entità, una classe e tre nodi di flusso: con etichetta, su due righe, senza etichetta. */
   function documento() {
     const doc = createDocument("t", "t")
-    const lane = doc.diagram.flow.model.lanes[0]!.id
-    doc.diagram.flow.model.nodes["n1"] = { label: "Calcola totale", shape: "process", lane }
-    doc.diagram.flow.model.nodes["n2"] = { label: "Calcola\n  totale", shape: "process", lane }
-    doc.diagram.flow.model.nodes["n3"] = { label: "  ", shape: "process", lane }
+    doc.diagram.flow.model.nodes["n1"] = { label: "Calcola totale", shape: "process", lane: null }
+    doc.diagram.flow.model.nodes["n2"] = { label: "Calcola\n  totale", shape: "process", lane: null }
+    doc.diagram.flow.model.nodes["n3"] = { label: "  ", shape: "process", lane: null }
     return doc
   }
 

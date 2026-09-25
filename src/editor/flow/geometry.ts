@@ -1,9 +1,9 @@
-import type { FlowDiagram, FlowEdge, FlowNode, FlowShape } from "@/model/flow/schema"
+import { LANE_MIN_H, POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode, type FlowShape, type LaneView, type Pool, type PoolView } from "@/model/flow/schema"
 import { flowNodeSize } from "@/model/flow/size"
 import type { NodeView } from "@/model/shared"
 import { notePath } from "../class/geometry"
 import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
-import { rectsBounds, type Point, type Rect } from "../geometry"
+import type { Point, Rect } from "../geometry"
 
 // La misura dei nodi vive nel modello (spec 2b §3): qui si riesporta.
 export { DECISION_FACTOR, flowNodeSize } from "@/model/flow/size"
@@ -55,57 +55,105 @@ export function shapePath(shape: FlowShape, w: number, h: number): string {
   }
 }
 
+/** La parte del diagramma che descrive i pool: basta questa per ricavarne la geometria. `FlowDiagram` la soddisfa. */
+export interface PoolsPart {
+  model: { pools: Readonly<Record<string, Pool>> }
+  view: { pools: Readonly<Record<string, PoolView>>; lanes: Readonly<Record<string, LaneView>> }
+}
+
+/** Il rettangolo assoluto di una corsia, con il pool a cui appartiene. */
+export interface LaneRect extends Rect {
+  id: string
+  poolId: string
+}
+
 /**
- * La corsia che contiene `y`, o `null` fuori da ogni banda.
- *
- * Il confronto è chiuso sopra e aperto sotto, così il confine fra due bande appartiene a quella di
- * sotto e non a entrambe: nessun buco, nessuna doppia appartenenza. Fuori da ogni banda torna
- * `null` invece di agganciare alla più vicina — indovinare qui vorrebbe dire decidere al posto di
- * chi chiama, che sa se sta creando un nodo (allora la prima corsia) o trascinandone uno (allora
- * quella di partenza).
+ * Gli id dei pool nell'ordine di disegno: per id. Un `Record` non ha un ordine suo che sopravviva a
+ * un giro per il file, e l'ordine serve due volte: chi sta sopra quando due pool si sovrappongono
+ * (l'ultimo, spec 2b §10) e l'ordine in cui canvas ed export li disegnano.
  */
-export function laneAt(diagram: FlowDiagram, y: number): string | null {
-  for (const lane of diagram.model.lanes) {
-    const band = diagram.view.lanes[lane.id]
-    if (band && y >= band.y && y < band.y + band.h) return lane.id
+export function poolIds(part: PoolsPart): string[] {
+  return Object.keys(part.model.pools).sort()
+}
+
+/** Le corsie di un pool, dall'alto in basso: la `y` di ognuna è la `y` del pool più le altezze delle
+ *  precedenti, la `x` salta la striscia (spec 2b §3). */
+export function poolLaneRects(part: PoolsPart, poolId: string): LaneRect[] {
+  const pool = part.model.pools[poolId]
+  const view = part.view.pools[poolId]
+  if (!pool || !view) return []
+  let y = view.y
+  return pool.lanes.map((lane) => {
+    const h = part.view.lanes[lane.id]?.h ?? LANE_MIN_H
+    const rect = { id: lane.id, poolId, x: view.x + POOL_HEADER_W, y, w: view.w - POOL_HEADER_W, h }
+    y += h
+    return rect
+  })
+}
+
+/**
+ * Le corsie di tutti i pool, nell'ordine di disegno. **L'unico posto** che ricava i rettangoli delle
+ * corsie: canvas, hit test, comandi, layout ed export passano di qui, e nessuno salva una `y`.
+ */
+export function laneRects(part: PoolsPart): LaneRect[] {
+  return poolIds(part).flatMap((id) => poolLaneRects(part, id))
+}
+
+/** Il rettangolo della corsia `laneId`, o `null`. */
+export function laneRect(part: PoolsPart, laneId: string): LaneRect | null {
+  return laneRects(part).find((r) => r.id === laneId) ?? null
+}
+
+/** Il rettangolo di un pool, striscia compresa: alto quanto le sue corsie. `at` sostituisce la
+ *  posizione, per l'anteprima del drag. `null` se il pool non c'è. */
+export function poolRect(part: PoolsPart, poolId: string, at?: Point): Rect | null {
+  const pool = part.model.pools[poolId]
+  const view = part.view.pools[poolId]
+  if (!pool || !view) return null
+  const h = pool.lanes.reduce((sum, lane) => sum + (part.view.lanes[lane.id]?.h ?? LANE_MIN_H), 0)
+  return { x: at?.x ?? view.x, y: at?.y ?? view.y, w: view.w, h }
+}
+
+/** Chiuso a sinistra e in alto, aperto a destra e in basso: il confine fra due corsie appartiene a
+ *  quella di sotto, senza buchi né doppie appartenenze. */
+function contains(r: Rect, p: Point): boolean {
+  return p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
+}
+
+/** Il pool disegnato più in alto che contiene `p`, o `null`. */
+export function poolAt(part: PoolsPart, p: Point): string | null {
+  for (const id of poolIds(part).reverse()) {
+    const r = poolRect(part, id)
+    if (r && contains(r, p)) return id
   }
   return null
 }
 
-/** Margine oltre l'ingombro dei nodi: una banda che finisse esattamente al bordo dell'ultimo nodo
- *  lo toccherebbe, e un nodo appena creato sul bordo sinistro sembrerebbe a cavallo del contorno. */
-export const LANE_MARGIN = 40
-
 /**
- * Larghezza minima di una banda (I1 della correzione finale): senza nodi `rectsBounds` torna
- * `null` e la banda si riduceva a `2 × LANE_MARGIN` (80px) — visibilmente uno stelo, non una
- * corsia, per un flowchart appena creato o con una corsia ancora vuota. Accanto a `LANE_MARGIN` e
- * non altrove: sono le due misure che governano `laneBandExtent`, e tenerle vicine è la ragione
- * per cui la seconda esiste in questo file e non duplicata in `LanesLayer.tsx`/`svg.tsx`.
+ * La corsia che contiene `p`, o `null` fuori da ogni pool o sulla striscia di intestazione. Decide
+ * il pool disegnato più in alto (spec 2b §10): un punto nella zona comune a due pool va a quello
+ * sopra. `null` non indovina: chi crea o trascina un nodo lo rende libero.
  */
-export const LANE_MIN_W = 640
+export function laneAt(part: PoolsPart, p: Point): string | null {
+  const poolId = poolAt(part, p)
+  if (poolId === null) return null
+  return poolLaneRects(part, poolId).find((r) => contains(r, p))?.id ?? null
+}
 
-/**
- * Estensione orizzontale comune a ogni banda: x e larghezza dai limiti dei nodi (`rectsBounds`)
- * più `LANE_MARGIN`, non dal viewport — il viewport dipende da dove sta guardando chi disegna in
- * questo momento, e l'export (`buildSvg`) non ne ha uno affatto (Task 11, spec §5: «la stessa
- * banda nell'app e nell'export»). La larghezza non scende mai sotto `LANE_MIN_W`: sotto quella
- * soglia segue comunque i nodi, mai il contrario.
- *
- * **Unico posto che fa questo calcolo**: `LanesLayerView` (canvas, `ui/canvas/LanesLayer.tsx`) e
- * `buildSvg` (export, `ui/export/svg.tsx`) lo chiamano entrambi invece di ricavare ciascuno la
- * propria versione — due copie della stessa formula divergono il giorno che una delle due cambia.
- */
-export function laneBandExtent(diagram: FlowDiagram): { x: number; w: number } {
-  const rects: Rect[] = []
-  for (const [key, node] of Object.entries(diagram.model.nodes)) {
-    const view = diagram.view.nodes[key]
-    if (view) rects.push(flowNodeRect(node, view))
+/** Il pool che contiene la corsia, o `null`. */
+export function laneOwner(part: PoolsPart, laneId: string): string | null {
+  for (const [id, pool] of Object.entries(part.model.pools)) {
+    if (pool.lanes.some((l) => l.id === laneId)) return id
   }
-  const bounds = rectsBounds(rects)
-  const x = (bounds?.x ?? 0) - LANE_MARGIN
-  const w = Math.max(LANE_MIN_W, (bounds?.w ?? 0) + 2 * LANE_MARGIN)
-  return { x, w }
+  return null
+}
+
+/** I nodi di un pool: quelli la cui corsia sta nel pool. */
+export function poolMembers(d: FlowDiagram, poolId: string): string[] {
+  const lanes = new Set(d.model.pools[poolId]?.lanes.map((l) => l.id) ?? [])
+  return Object.entries(d.model.nodes)
+    .filter(([, n]) => n.lane !== null && lanes.has(n.lane))
+    .map(([key]) => key)
 }
 
 /** Lunghezza e semilarghezza della freccia piena: l'unico marker dell'arco di flowchart, sempre

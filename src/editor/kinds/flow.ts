@@ -1,32 +1,11 @@
 import type { DevDocument } from "@/model/document"
-import type { FlowDiagram, FlowShape } from "@/model/flow/schema"
+import type { FlowShape } from "@/model/flow/schema"
 import { validateFlow } from "@/model/flow/validate"
 import { addFlowEdge, addFlowNode, applyFlowLayout, deleteFlowItems, duplicateFlowNodes, moveFlowNodes } from "../flow/commands"
-import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, flowNodeSize, laneAt } from "../flow/geometry"
+import { flowEdgeGeometry, flowEdgeOffsets, flowNodeRect, flowNodeSize, laneAt, laneRect } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
-import { flowLayoutGraph, keepNodeInBand } from "../flow/layout"
+import { flowLayoutGraph, keepInSpan } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
-
-/**
- * Corsia da assegnare a un click fuori da ogni banda — sopra la prima o sotto l'ultima. `laneAt`
- * non indovina apposta (il suo stesso docblock, `flow/geometry.ts`): decide chi chiama, e chi crea
- * un nodo sa che l'intenzione è "la corsia più vicina", non "nessuna corsia". Le bande sono
- * contigue dall'origine (`restackLanes`, `flow/commands.ts`), quindi basta guardare la prima e
- * l'ultima: sopra l'una o sotto l'altra sono gli unici due modi di restare fuori da ogni banda.
- * `null` resta per il solo caso che lo schema rende impossibile — un documento senza corsie
- * (`FlowModelSchema.lanes` è `.min(1)`) — e qui è un ripiego difensivo, non un percorso atteso.
- */
-function nearestLane(d: FlowDiagram, y: number): string | null {
-  const lanes = d.model.lanes
-  const first = lanes[0]
-  const last = lanes[lanes.length - 1]
-  if (!first || !last) return null
-  const firstBand = d.view.lanes[first.id]
-  const lastBand = d.view.lanes[last.id]
-  if (firstBand && y < firstBand.y) return first.id
-  if (lastBand && y >= lastBand.y + lastBand.h) return last.id
-  return null
-}
 
 /**
  * `DiagramOps` per il flowchart: cablaggio verso i comandi di `flow/commands.ts` e `flow/layout.ts`,
@@ -62,22 +41,20 @@ export function flowOps(doc: DevDocument): DiagramOps {
     },
 
     /**
-     * C1: `laneAt(d, at.y)` torna `null` anche per un click sopra la prima banda o sotto
-     * l'ultima — il caso normale in un documento con poche corsie, non più un errore da quando
-     * `laneAt` è reale (`flow/geometry.ts`). La corsia si decide dal punto del click (è
-     * l'intenzione di chi disegna: `nearestLane` sopra), poi il nodo rientra in quella banda con
-     * `keepNodeInBand` — altrimenti un click vicino al bordo di una banda creerebbe un nodo a
-     * cavallo di quella successiva pur appartenendo a questa.
+     * Dentro una corsia il nodo nasce in quella corsia e rientra nei suoi margini su entrambi gli
+     * assi: un clic vicino al bordo non deve creare un nodo a cavallo della corsia accanto o del
+     * bordo del pool. Fuori da ogni pool, o sulla sua striscia, nasce libero dove si è cliccato
+     * (spec 2b §5).
      */
     addNode: (at, variant) => {
       const d = diagram()
       const shape = (variant ?? "process") as FlowShape
-      const lane = laneAt(d, at.y) ?? nearestLane(d, at.y)
-      if (lane === null) throw new Error("flowchart: il documento non ha nessuna corsia")
-      const band = d.view.lanes[lane]
-      const size = flowNodeSize({ label: "", shape })
-      const y = band ? keepNodeInBand(band, size.h, at.y) : at.y
-      return { ...addFlowNode({ x: at.x, y }, shape, lane), edit: "body" }
+      const lane = laneAt(d, at)
+      const rect = lane === null ? null : laneRect(d, lane)
+      if (!rect) return { ...addFlowNode(at, shape, null), edit: "body" }
+      const { w, h } = flowNodeSize({ label: "", shape })
+      const inLane = { x: keepInSpan(rect.x, rect.w, w, at.x), y: keepInSpan(rect.y, rect.h, h, at.y) }
+      return { ...addFlowNode(inLane, shape, rect.id), edit: "body" }
     },
 
     addEdge: (source, target) => addFlowEdge(diagram().model, source, target),

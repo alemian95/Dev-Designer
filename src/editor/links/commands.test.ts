@@ -23,10 +23,9 @@ function documento(): DevDocument {
   }
   doc.diagram.class.model.notes["n1"] = { text: "" }
   doc.diagram.class.view.nodes["n1"] = at()
-  const lane = doc.diagram.flow.model.lanes[0]!.id
-  doc.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane }
+  doc.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane: null }
   doc.diagram.flow.view.nodes["p1"] = at()
-  doc.diagram.flow.model.nodes["f1"] = { label: "promemoria", shape: "note", lane }
+  doc.diagram.flow.model.nodes["f1"] = { label: "promemoria", shape: "note", lane: null }
   doc.diagram.flow.view.nodes["f1"] = at()
   return doc
 }

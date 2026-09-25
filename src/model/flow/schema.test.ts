@@ -1,33 +1,34 @@
 import { describe, expect, it } from "vitest"
-import { emptyFlowDiagram, FlowModelSchema, nextLaneName } from "./schema"
+import { emptyFlowDiagram, FlowModelSchema, nextName } from "./schema"
 
-const lane = { id: "l1", name: "Cliente" }
-const node = { label: "Verifica", shape: "process" as const, lane: "l1" }
+const pool = (...ids: string[]) => ({ name: "Pool 1", lanes: ids.map((id) => ({ id, name: id })) })
+const node = (lane: string | null) => ({ label: "Verifica", shape: "process" as const, lane })
 
 describe("FlowModelSchema", () => {
-  it("accetta un modello coerente", () => {
-    const r = FlowModelSchema.safeParse({ lanes: [lane], nodes: { n1: node }, edges: {} })
-    expect(r.success).toBe(true)
+  it("accetta un flowchart senza pool, con i nodi liberi", () => {
+    expect(FlowModelSchema.safeParse({ pools: {}, nodes: { n1: node(null) }, edges: {} }).success).toBe(true)
   })
 
-  it("rifiuta un modello senza corsie: ogni nodo ne ha una, e senza corsie non ce ne sarebbe", () => {
-    const r = FlowModelSchema.safeParse({ lanes: [], nodes: {}, edges: {} })
-    expect(r.success).toBe(false)
+  it("accetta un nodo nella corsia di un pool", () => {
+    expect(FlowModelSchema.safeParse({ pools: { p1: pool("l1") }, nodes: { n1: node("l1") }, edges: {} }).success).toBe(true)
   })
 
-  it("rifiuta un nodo la cui corsia non esiste", () => {
-    const r = FlowModelSchema.safeParse({
-      lanes: [lane],
-      nodes: { n1: { ...node, lane: "fantasma" } },
-      edges: {},
-    })
-    expect(r.success).toBe(false)
+  it("rifiuta un nodo la cui corsia non esiste in nessun pool", () => {
+    expect(FlowModelSchema.safeParse({ pools: { p1: pool("l1") }, nodes: { n1: node("fantasma") }, edges: {} }).success).toBe(false)
+  })
+
+  it("rifiuta due corsie con lo stesso id in due pool", () => {
+    expect(FlowModelSchema.safeParse({ pools: { p1: pool("l1"), p2: pool("l1") }, nodes: {}, edges: {} }).success).toBe(false)
+  })
+
+  it("rifiuta un pool senza corsie", () => {
+    expect(FlowModelSchema.safeParse({ pools: { p1: pool() }, nodes: {}, edges: {} }).success).toBe(false)
   })
 
   it("accetta un'etichetta d'arco vuota: è il caso normale di un arco appena creato", () => {
     const r = FlowModelSchema.safeParse({
-      lanes: [lane],
-      nodes: { n1: node, n2: node },
+      pools: {},
+      nodes: { n1: node(null), n2: node(null) },
       edges: { e1: { source: "n1", target: "n2", label: "" } },
     })
     expect(r.success).toBe(true)
@@ -35,39 +36,30 @@ describe("FlowModelSchema", () => {
 })
 
 describe("emptyFlowDiagram", () => {
-  it("nasce con una corsia sola, nessun nodo e la banda già nella view", () => {
-    const flow = emptyFlowDiagram()
-    expect(FlowModelSchema.safeParse(flow.model).success).toBe(true)
-    expect(flow.model.lanes).toHaveLength(1)
-    expect(flow.model.nodes).toEqual({})
-    const laneId = flow.model.lanes[0]!.id
-    expect(flow.view.lanes[laneId]).toEqual({ y: 0, h: 160 })
-  })
-
-  it("chiama nextLaneName per il nome della prima corsia: «Corsia 1», non un letterale ridondante", () => {
-    expect(emptyFlowDiagram().model.lanes[0]!.name).toBe("Corsia 1")
+  it("nasce senza pool, senza nodi e senza bande", () => {
+    expect(emptyFlowDiagram()).toEqual({ model: { pools: {}, nodes: {}, edges: {} }, view: { nodes: {}, pools: {}, lanes: {} } })
   })
 })
 
-describe("nextLaneName", () => {
-  it("propone il numero successivo al conteggio, senza corsie esistenti", () => {
-    expect(nextLaneName([])).toBe("Corsia 1")
+describe("nextName", () => {
+  it("propone il numero successivo al conteggio, senza nomi esistenti", () => {
+    expect(nextName("Corsia", [])).toBe("Corsia 1")
   })
 
   it("propone N = conteggio + 1 quando quel nome non è già in uso", () => {
-    expect(nextLaneName([{ name: "Corsia 1" }, { name: "Corsia 2" }])).toBe("Corsia 3")
+    expect(nextName("Corsia", [{ name: "Corsia 1" }, { name: "Corsia 2" }])).toBe("Corsia 3")
   })
 
-  /**
-   * Il bug corretto a mano nel Task 12: cancellare una corsia di mezzo lascia un buco nella
-   * numerazione (qui resta solo «Corsia 2»), e `lanes.length + 1` (2) ripropone un nome già in
-   * uso invece di saltarlo.
-   */
+  /** Cancellare un elemento di mezzo lascia un buco: `length + 1` riproporrebbe un nome già in uso. */
   it("salta un nome già in uso, anche se coincide col conteggio + 1", () => {
-    expect(nextLaneName([{ name: "Corsia 2" }])).toBe("Corsia 3")
+    expect(nextName("Corsia", [{ name: "Corsia 2" }])).toBe("Corsia 3")
   })
 
-  it("un nome fuori schema («Corsia 2» rinominata) non blocca la proposta", () => {
-    expect(nextLaneName([{ name: "Preparazione" }])).toBe("Corsia 2")
+  it("un nome fuori schema non blocca la proposta", () => {
+    expect(nextName("Corsia", [{ name: "Preparazione" }])).toBe("Corsia 2")
+  })
+
+  it("vale per i pool con il loro prefisso", () => {
+    expect(nextName("Pool", [{ name: "Pool 1" }])).toBe("Pool 2")
   })
 })

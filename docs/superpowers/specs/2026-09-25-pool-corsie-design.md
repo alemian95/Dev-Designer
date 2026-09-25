@@ -77,7 +77,8 @@ FlowViewSchema = z.object({
   l'hit test del drag e della creazione, `setNodeLane`, il layout e l'export. Sostituisce `laneAt`
   sui dati salvati e `laneBandExtent`, che spariscono.
 - **Costanti** in `model/flow/schema.ts`, accanto a `LANE_MIN_H` (160, invariata):
-  `POOL_MIN_W = 640` (prende il posto di `LANE_MIN_W`) e `POOL_HEADER_W = 32`.
+  `POOL_MIN_W = 640` (prende il posto di `LANE_MIN_W`) e `POOL_HEADER_W = 32`, e `LANE_MARGIN = 40`,
+  che la migrazione usa (scostamento 2 del piano).
 - **Nomi:** `nextLaneName` si generalizza in una funzione che dà il primo «`<Prefisso>` N» libero,
   usata per «Pool N» (fra i pool del documento) e per «Corsia N» (fra le corsie del pool).
 - **Documento nuovo:** `emptyFlowDiagram()` dà `pools: {}`, `view.pools: {}`, `view.lanes: {}`.
@@ -197,8 +198,10 @@ conta come contenuto della famiglia `flow` (`familyHasContent`), come «Adatta a
 ## 8. Export
 
 - **Mermaid** (`flowchart LR`): ogni pool è un `subgraph` con il suo nome, e dentro un `subgraph` per
-  corsia, nell'ordine delle corsie. I pool escono nell'ordine della loro `y`. I nodi liberi stanno al
-  livello più alto, prima dei pool. La disposizione la decide Mermaid, come oggi.
+  corsia, nell'ordine delle corsie. I pool escono per nome e, a parità, per id: l'emettitore riceve
+  solo il modello, e lo stesso modello deve dare lo stesso testo anche dopo che un pool è stato
+  spostato (scostamento 1 del piano). I nodi liberi stanno al livello più alto, prima dei pool. La
+  disposizione la decide Mermaid, come oggi.
 - **SVG e PNG:** i pool si disegnano con lo stesso componente del canvas (`LanesLayerView` diventa
   `PoolsLayerView`), e il riquadro dell'export comprende i pool.
 

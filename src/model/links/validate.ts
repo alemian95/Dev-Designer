@@ -1,15 +1,30 @@
 import type { DevDocument } from "../document"
 import { splitKey } from "../family"
 import type { Issue } from "../issue"
+import { endName, linkLabel } from "./labels"
 import { unmappableNotice } from "./mappable"
 import { typesCompatible } from "./types"
 
 /** Nome di attributo o di colonna nella forma di confronto: `createdAt`, `created_at` e `CreatedAt` coincidono. */
 const normalize = (name: string): string => name.toLowerCase().replaceAll("_", "")
 
+/** `true` se l'estremo esiste: un'entità, una classe (non una nota) o un nodo di flusso. */
+function endExists(doc: DevDocument, key: string): boolean {
+  const { family, key: bare } = splitKey(key)
+  switch (family) {
+    case "er":
+      return doc.diagram.er.model.entities[bare] !== undefined
+    case "class":
+      return doc.diagram.class.model.classes[bare] !== undefined
+    case "flow":
+      return doc.diagram.flow.model.nodes[bare] !== undefined
+  }
+}
+
 /**
  * I problemi dei collegamenti fra famiglie. Legge il documento intero: servono le due famiglie e i
- * collegamenti. Oggi il solo tipo è «mappa su» (classe → entità); il 4b aggiungerà i suoi.
+ * collegamenti. Ogni tipo può essere pendente; solo «mappa su» ha regole sue (spec 4a §5). L'accesso e
+ * «chiama» servono a documentare e non ne hanno (spec 4b §7).
  *
  * **Obiettivi dei problemi.** `edge` è l'id del collegamento **senza** il namespace `link/`, che
  * aggiunge `CanvasOps.validate`, come fa con il prefisso delle famiglie. `node` è la chiave con
@@ -20,20 +35,23 @@ export function validateLinks(doc: DevDocument): Issue[] {
   const issues: Issue[] = []
   const bySource = new Map<string, number>()
   for (const [id, link] of Object.entries(links)) {
-    const s = splitKey(link.source)
-    const t = splitKey(link.target)
-    const cls = classPart.model.classes[s.key]
-    const entity = er.model.entities[t.key]
-    if (!cls || !entity) {
-      // Manca uno dei due lati da confrontare: niente avvisi sugli attributi.
+    if (!endExists(doc, link.source) || !endExists(doc, link.target)) {
+      // Manca uno dei due lati: niente altri controlli su questo collegamento.
       issues.push({
         code: "link-dangling",
         severity: "error",
-        message: `Il collegamento «mappa su» fra «${s.key}» e «${t.key}» punta a un elemento che non esiste più`,
+        message: `Il collegamento «${linkLabel(link)}» fra «${endName(doc, link.source)}» e «${endName(doc, link.target)}» punta a un elemento che non esiste più`,
         edge: id,
       })
       continue
     }
+    if (link.kind !== "maps-to") continue
+    const s = splitKey(link.source)
+    const t = splitKey(link.target)
+    const cls = classPart.model.classes[s.key]
+    const entity = er.model.entities[t.key]
+    // Già garantiti da `endExists`: il controllo serve solo a restringere il tipo.
+    if (!cls || !entity) continue
     bySource.set(link.source, (bySource.get(link.source) ?? 0) + 1)
     // La regola «solo class e abstract» (F1, review finale): una classe collegata che non si mappa su
     // una tabella è un errore sul collegamento, e per quel collegamento non ha senso confrontare gli

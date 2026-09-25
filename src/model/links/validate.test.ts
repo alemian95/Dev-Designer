@@ -119,3 +119,59 @@ describe("validateLinks", () => {
     ])
   })
 })
+
+describe("validateLinks (collegamenti del flusso)", () => {
+  /** L'entità `ordini`, la classe `Ordine` e un processo `p1`, con un accesso e un «chiama». */
+  function flusso(): DevDocument {
+    const doc = documento([], [])
+    delete doc.diagram.links["l1"]
+    const lane = doc.diagram.flow.model.lanes[0]!.id
+    doc.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane }
+    doc.diagram.links["a1"] = { kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "write" }
+    doc.diagram.links["c1"] = { kind: "calls", source: "flow/p1", target: "class/Ordine" }
+    return doc
+  }
+
+  it("un accesso e un «chiama» validi non hanno problemi", () => {
+    expect(validateLinks(flusso())).toEqual([])
+  })
+
+  it("un accesso e un «chiama» non hanno le regole degli attributi", () => {
+    // La classe ha un attributo senza colonna: con un «mappa su» sarebbe un avviso, qui no.
+    const doc = flusso()
+    doc.diagram.class.model.classes["Ordine"]!.attributes.push(attr("note", "string"))
+    expect(validateLinks(doc)).toEqual([])
+  })
+
+  it("con il nodo di flusso eliminato sono pendenti, con «(nodo eliminato)» nel messaggio", () => {
+    const doc = flusso()
+    delete doc.diagram.flow.model.nodes["p1"]
+    expect(validateLinks(doc)).toEqual([
+      {
+        code: "link-dangling",
+        severity: "error",
+        message: "Il collegamento «scrive» fra «(nodo eliminato)» e «ordini» punta a un elemento che non esiste più",
+        edge: "a1",
+      },
+      {
+        code: "link-dangling",
+        severity: "error",
+        message: "Il collegamento «chiama» fra «(nodo eliminato)» e «Ordine» punta a un elemento che non esiste più",
+        edge: "c1",
+      },
+    ])
+  })
+
+  it("con la classe eliminata, il «chiama» è pendente e nomina il nodo con la sua etichetta", () => {
+    const doc = flusso()
+    delete doc.diagram.class.model.classes["Ordine"]
+    expect(validateLinks(doc)).toEqual([
+      {
+        code: "link-dangling",
+        severity: "error",
+        message: "Il collegamento «chiama» fra «Calcola totale» e «Ordine» punta a un elemento che non esiste più",
+        edge: "c1",
+      },
+    ])
+  })
+})

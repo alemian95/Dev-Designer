@@ -7,7 +7,7 @@ import { anchorGeometry } from "@/editor/note/geometry"
 import { noteDiagram } from "@/editor/note-access"
 import { selId, sessionStore } from "@/editor/session-store"
 import { registerEdge } from "./dom-registry"
-import { useNodeRect } from "./LinkEdge"
+import { useNodeRect } from "./use-node-rect"
 
 interface Props {
   noteKey: string

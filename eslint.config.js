@@ -36,15 +36,6 @@ export default defineConfig([
     },
   },
   {
-    // `LinkEdge.tsx` esporta anche `useNodeRect`, un hook e non un componente: lo riusano i
-    // collegamenti e le linee di ancoraggio delle note (`NoteAnchor.tsx`). Stessa ragione degli
-    // override sopra.
-    files: ['src/ui/canvas/LinkEdge.tsx'],
-    rules: {
-      'react-refresh/only-export-components': 'off',
-    },
-  },
-  {
     // Strato model: TypeScript puro. Solo zod.
     files: ['src/model/**/*.{ts,tsx}'],
     rules: {

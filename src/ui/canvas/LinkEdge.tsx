@@ -4,12 +4,12 @@ import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { linkKey } from "@/editor/families"
 import type { Rect } from "@/editor/geometry"
-import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { linkGeometry } from "@/editor/links/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import { linkLabel } from "@/model/links/labels"
 import type { Link } from "@/model/links/schema"
 import { registerEdge } from "./dom-registry"
+import { useNodeRect } from "./use-node-rect"
 
 interface Props {
   id: string
@@ -45,12 +45,6 @@ export const LinkEdgeView = memo(function LinkEdgeView({ id, link, source, targe
     </g>
   )
 })
-
-/** Il rettangolo di un nodo o di un frame di qualunque famiglia, dalla chiave con prefisso: lo usano
- *  i collegamenti e le linee di ancoraggio. `useShallow` per la stessa ragione di `ClassEdge`. */
-export function useNodeRect(key: string | undefined): Rect | null {
-  return useStore(documentStore, useShallow((s) => (key ? canvasOps(s.doc).rectOf(key) : null)))
-}
 
 function LinkEdge({ id }: { id: string }) {
   const link = useStore(documentStore, (s) => s.doc.diagram.links[id])

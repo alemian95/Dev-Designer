@@ -1,9 +1,8 @@
 import * as z from "zod"
 import { Identifier, NodeViewSchema } from "../shared"
 
-/** Le cinque forme della notazione più la nota. La nota è una forma e non una specie: a
- *  differenza di quella del class diagram non si àncora a niente, è un riquadro con del testo. */
-export const FlowShapeSchema = z.enum(["terminal", "process", "decision", "io", "subprocess", "note"])
+/** Le cinque forme della notazione. La nota non è una forma: è la famiglia `note` (spec 3a). */
+export const FlowShapeSchema = z.enum(["terminal", "process", "decision", "io", "subprocess"])
 export type FlowShape = z.infer<typeof FlowShapeSchema>
 
 export const LaneSchema = z.object({ id: Identifier, name: z.string() })

@@ -65,7 +65,7 @@ function onKeyDown(e: KeyboardEvent): void {
  * Scorciatoie globali. mod = cmd su macOS, ctrl altrove.
  * mod+s salva · mod+shift+s salva con nome · mod+o apri
  * mod+z undo · mod+shift+z / mod+y redo · mod+d duplica · mod+a seleziona tutto · canc/backspace elimina
- * v tool selezione · le lettere degli strumenti vengono da `canvasTools` (E entità · C I U N classi · 1–6 forme del flusso · R collega)
+ * v tool selezione · le lettere degli strumenti vengono da `canvasTools` (E entità · C I U classi · N nota · 1–5 forme del flusso · R collega)
  * f fit · l disponi · mod+= / mod+- zoom · mod+0 reset · esc deseleziona e torna al tool select
  */
 export function useKeyboardShortcuts(): void {

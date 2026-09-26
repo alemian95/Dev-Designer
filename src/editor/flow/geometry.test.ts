@@ -43,7 +43,7 @@ describe("flowNodeSize", () => {
 
 describe("shapePath", () => {
   it("ogni forma produce un path non vuoto", () => {
-    for (const shape of ["terminal", "process", "decision", "io", "subprocess", "note"] as const) {
+    for (const shape of ["terminal", "process", "decision", "io", "subprocess"] as const) {
       expect(shapePath(shape, 100, 50).length).toBeGreaterThan(0)
     }
   })

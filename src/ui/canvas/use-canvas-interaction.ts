@@ -42,8 +42,6 @@ function hitTest(el: Element | null): Hit {
  */
 function classEditTarget(key: string, headerHit: boolean): "name" | "body" {
   const diagram = classDiagram(documentStore.getState().doc)
-  // Una nota non ha nome: qualunque punto del suo rettangolo apre il corpo.
-  if (diagram.model.notes[key]) return "body"
   const cls = diagram.model.classes[key]
   const view = diagram.view.nodes[key]
   const emptyExpanded = !!cls && !view?.collapsed && cls.attributes.length === 0 && cls.methods.length === 0
@@ -163,10 +161,9 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
         session().setEditing({ key: hit.key, target: classEditTarget(key, headerHit) })
         return
       }
-      // Un nodo di flowchart non ha un nome distinto dal corpo, come una nota del class diagram:
-      // qualunque punto del nodo apre l'editor di testo (spec §7, «geometria ed editor inline si
-      // riusano»), a differenza dell'header che l'ER usa per il nome dell'entità.
-      if (family === "flow") {
+      // Un nodo di flowchart e una nota non hanno un nome distinto dal corpo: qualunque punto del
+      // nodo apre l'editor di testo, a differenza dell'header che l'ER usa per il nome dell'entità.
+      if (family === "flow" || family === "note") {
         session().setEditing({ key: hit.key, target: "body" })
         return
       }

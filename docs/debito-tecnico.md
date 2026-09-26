@@ -726,9 +726,30 @@ un nodo isolato che ELK dispone non finisce mai sotto un altro nodo, mentre
 prima «Disponi» lasciava le note esattamente dov'erano e una classe vicina
 spostata poteva finirci sopra.
 
-> **Osservato e non chiuso:** una nota si ancora a una classe, non a una
-> relazione, e ne ha al più una. Entrambi i limiti vengono da ciò che Mermaid
-> sa rappresentare, non da ciò che l'UML permette.
+> **Osservato e non chiuso:** una nota si ancora a un elemento, non a una
+> relazione, e ne ha al più uno. Il secondo limite viene da ciò che Mermaid sa
+> rappresentare, non da ciò che l'UML permette; il primo — «si ancora a una
+> classe» — è superato dalla nota unica, sotto.
+
+**Riaperta il 2026-09-26 (step 3a, la nota unica,
+`docs/superpowers/specs/2026-09-26-nota-unica-design.md`).** Su master l'ancoraggio viveva **dentro**
+il grafo ELK della famiglia delle classi: `classLayoutGraph` includeva l'arco `note-link`, quindi
+Disponi non poteva mai lasciare una nota ancorata sotto un'altra classe — ELK la vedeva come un nodo
+con un arco, come le altre. La nota unica generalizza l'ancoraggio a un elemento di *qualunque*
+famiglia (entità, classe, nodo di flusso o pool), non solo le classi: un arco nel grafo ELK di
+un'altra famiglia non si può scrivere senza far dipendere quella famiglia dalla famiglia `note`, cosa
+che la spec 3a esclude (§6). L'ancoraggio è uscito da ELK: `followAnchors`
+(`src/editor/note/layout.ts`) fa seguire alla nota lo scarto dal suo elemento con un passo esplicito,
+**dopo** che ELK ha disposto tutte le famiglie.
+
+Questo riapre, in una forma più stretta, il secondo taglio che DT-29 aveva chiuso: **dentro** la
+famiglia del suo elemento, una nota ancorata può di nuovo finire sotto un altro nodo dopo Disponi,
+perché quella famiglia dispone col suo grafo ELK, che non vede le note. Il giro di correzione dello
+step 3a ha chiuso solo la metà fra famiglie diverse: `layoutAll` (`src/editor/layout-pack.ts`) include
+il rettangolo previsto di ogni nota ancorata nell'ingombro del blocco della famiglia della sua àncora,
+così un blocco non vi si sovrappone più. Per chiudere anche l'altra metà servirebbe passare le note
+ancorate al grafo ELK della famiglia della loro àncora, con un arco — la stessa idea di
+`classLayoutGraph` su master, generalizzata a tutte e tre le famiglie — e cambierebbe la spec 3a §6.
 
 ### Minori chiuse il 2026-09-09
 
@@ -777,6 +798,17 @@ ricavate dai nodi ma stanno dentro pool che hanno una posizione e una larghezza 
 - **Le corsie non si ridimensionavano** («Flowchart», metà della voce). Si ridimensionano dal bordo
   inferiore, con un minimo che non scende sotto i loro nodi (`resizeLane`, `clampLaneH`,
   `src/editor/flow/commands.ts`). L'altra metà, il riordino per trascinamento, resta in Archivio.
+
+### Minori chiuse il 2026-09-26
+
+Voce d'Archivio chiusa dallo step 3a, la nota unica
+(`docs/superpowers/specs/2026-09-26-nota-unica-design.md`).
+
+- **Due note, quella di classe e quella di flusso, restavano due implementazioni separate** («Canvas
+  unificato»). Ora sono un'unica famiglia `note` (`src/model/note/schema.ts`), libera o ancorata a un
+  elemento di qualunque famiglia — entità, classe, nodo di flusso o pool — con un solo schema, un solo
+  componente sul canvas e un solo editor di testo, invece di vivere una nella famiglia delle classi e
+  una in quella del flusso.
 
 ---
 
@@ -1247,16 +1279,10 @@ dimenticanza.
 Limiti accettati scrivendo il primo giro del canvas unificato — un solo documento con le tre
 famiglie (`doc.diagram = { er, class, flow }`), chiavi con prefisso `famiglia/` in tutto lo stack.
 Nessuno dei quattro tocca la correttezza del modello: sono margini di questo giro, non difetti
-scoperti dopo. Due sono stati chiusi dal 2b (vedi «Minori chiuse il 2026-09-25» in **Corretti**):
-le bande che passavano sotto entità e classi e il pannello delle corsie che compariva solo dal primo
-nodo.
+scoperti dopo. Tre sono stati chiusi (vedi «Minori chiuse il 2026-09-25» e «Minori chiuse il
+2026-09-26» in **Corretti**): le bande che passavano sotto entità e classi, il pannello delle corsie
+che compariva solo dal primo nodo, e le due note (di classe e di flusso) come implementazioni separate.
 
-- **Due note, quella di classe e quella di flusso, restano due implementazioni separate.** Lo stesso
-  editor di testo aperto dalla creazione (spec §7) e la stessa forma concettuale — un rettangolo di
-  testo libero, senza campi — vivono in due schemi e due componenti che non condividono codice al di
-  là delle primitive comuni del canvas. Unificarle chiederebbe di far emergere una nozione di «nota»
-  comune alle famiglie, che oggi non esiste e che nessuna delle due sole occorrenze giustifica da
-  sola (DRY: due copie non sono ancora una duplicazione da correggere).
 - **«Disponi» mette le famiglie in fila senza ragionare sulla vicinanza.** `packBlocks`
   (`src/editor/layout-pack.ts`) impacchetta i blocchi da sinistra a destra nell'ordine canonico
   (`er`, `class`, `flow`), allineati in alto: non guarda se un arco collega un nodo di una famiglia a
@@ -1325,6 +1351,25 @@ copertura e piccole asimmetrie di interazione.
   il collegamento fosse possibile. Rinviato perché l'anteprima non sa ancora che l'origine è un frame, e
   insegnarglielo tocca il riduttore delle interazioni per un caso che al rilascio è già innocuo.
   Costo-se-sbagliato: un'anteprima che promette un collegamento che non arriva.
+
+### La nota unica (2026-09-26)
+
+Rilievi della review finale dello step 3a (`.superpowers/sdd/2026-09-26-nota-unica/`), accettati nel
+giro di correzione: vedi anche la voce riaperta in DT-29.
+
+- **La linea di ancoraggio instrada verso i lati opposti anche quando la nota sta dentro il suo
+  elemento.** `routeEdge` (`src/editor/edge-routing.ts:130`) sceglie i lati in base alla posizione
+  relativa dei due rettangoli, senza un caso per un rettangolo dentro l'altro — una nota trascinata
+  dentro il suo pool, per esempio: il percorso ortogonale torna indietro attraversando la nota invece
+  di uscire dal lato più vicino. Rinviato perché il caso nasce solo trascinando la nota sopra il suo
+  stesso elemento, cosa che l'utente fa di rado apposta. Costo-se-sbagliato: una linea che si legge
+  male per un istante, nessun dato sbagliato.
+- **Il conteggio delle note ancorate è ripetuto in due emettitori.** `er-mermaid.ts:123` e
+  `flow-mermaid.ts:117` contano ciascuno per conto proprio le note ancorate alla propria famiglia, per
+  l'avviso «N note ancorate … non sono uscite» (spec §8): la stessa forma di conteggio, scritta due
+  volte perché finora bastava. Un helper `anchoredIn(notes, family)` la unificherebbe se arrivasse un
+  terzo emettitore con lo stesso bisogno (YAGNI: due copie non sono ancora una duplicazione da
+  correggere).
 
 ---
 

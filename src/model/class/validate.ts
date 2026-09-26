@@ -1,5 +1,5 @@
 import type { Issue } from "../issue"
-import { isClassRelation, type ClassMethod, type ClassModel, type ClassRelation } from "./schema"
+import type { ClassMethod, ClassModel, ClassRelation } from "./schema"
 
 /** Firma di un metodo per il confronto di duplicati: nome e *tipi* dei
  *  parametri, non i nomi. Un overload con parametri di tipo diverso è legale
@@ -93,21 +93,10 @@ export function validateClass(model: ClassModel): Issue[] {
   }
 
   for (const [key, rel] of Object.entries(model.relations)) {
-    if (isClassRelation(rel)) {
-      for (const end of [rel.source, rel.target]) {
-        if (!(end.class in model.classes)) {
-          issues.push({ code: "dangling-relation", severity: "error", edge: key, message: `relazione "${key}": classe "${end.class}" inesistente` })
-        }
+    for (const end of [rel.source, rel.target]) {
+      if (!(end.class in model.classes)) {
+        issues.push({ code: "dangling-relation", severity: "error", edge: key, message: `relazione "${key}": classe "${end.class}" inesistente` })
       }
-      continue
-    }
-    // L'ancoraggio di una nota: la sorgente si cerca fra le note, non fra le classi. Stesso codice
-    // di issue — per chi legge il pannello è lo stesso guasto, un arco con un capo nel vuoto.
-    if (!(rel.source.class in model.notes)) {
-      issues.push({ code: "dangling-relation", severity: "error", edge: key, message: `ancoraggio "${key}": nota "${rel.source.class}" inesistente` })
-    }
-    if (!(rel.target.class in model.classes)) {
-      issues.push({ code: "dangling-relation", severity: "error", edge: key, message: `ancoraggio "${key}": classe "${rel.target.class}" inesistente` })
     }
   }
 

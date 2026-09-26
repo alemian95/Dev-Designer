@@ -1,7 +1,6 @@
 import { LANE_MIN_H, POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode, type FlowShape, type LaneView, type Pool, type PoolView } from "@/model/flow/schema"
 import { flowNodeSize } from "@/model/flow/size"
 import type { NodeView } from "@/model/shared"
-import { notePath } from "../class/geometry"
 import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
 
@@ -20,12 +19,12 @@ const IO_SKEW = 16
 const SUBPROCESS_BAR_OFFSET = 8
 
 /**
- * L'attributo `d` di un `<path>` per una forma, in coordinate locali (origine in alto a sinistra,
- * come `notePath`): chi disegna applica `translate(x y)` sul nodo, non su questo path.
+ * L'attributo `d` di un `<path>` per una forma, in coordinate locali (origine in alto a sinistra):
+ * chi disegna applica `translate(x y)` sul nodo, non su questo path.
  *
- * `subprocess` e `note` tornano più di un sottopercorso nello stesso `d` — due barre verticali
- * aperte, o il contorno con l'angolo tagliato: un sottopercorso aperto non riempie nulla (area
- * nulla), quindi convive nello stesso path di uno chiuso senza sporcare il riempimento.
+ * `subprocess` torna più di un sottopercorso nello stesso `d`: due barre verticali aperte — un
+ * sottopercorso aperto non riempie nulla (area nulla), quindi convive nello stesso path di uno
+ * chiuso senza sporcare il riempimento.
  */
 export function shapePath(shape: FlowShape, w: number, h: number): string {
   switch (shape) {
@@ -47,11 +46,6 @@ export function shapePath(shape: FlowShape, w: number, h: number): string {
       const o = SUBPROCESS_BAR_OFFSET
       return `M0 0 H${w} V${h} H0 Z M${o} 0 V${h} M${w - o} 0 V${h}`
     }
-    case "note":
-      // Solo il contorno (`body`): il taglio diagonale dell'angolo è già nel perimetro, quindi la
-      // forma «riquadro con angolo ripiegato» non serve il triangolo di `fold` separato — quello
-      // è un dettaglio di resa a due tinte che spetta al componente che disegna, non alla geometria.
-      return notePath(w, h).body
   }
 }
 

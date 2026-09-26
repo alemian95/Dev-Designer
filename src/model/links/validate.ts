@@ -8,7 +8,7 @@ import { typesCompatible } from "./types"
 /** Nome di attributo o di colonna nella forma di confronto: `createdAt`, `created_at` e `CreatedAt` coincidono. */
 const normalize = (name: string): string => name.toLowerCase().replaceAll("_", "")
 
-/** `true` se l'estremo esiste: un'entità, una classe (non una nota) o un nodo di flusso. */
+/** `true` se l'estremo esiste: un'entità, una classe (non una nota) o un nodo di flusso. Una nota non è mai l'estremo di un collegamento. */
 function endExists(doc: DevDocument, key: string): boolean {
   const { family, key: bare } = splitKey(key)
   switch (family) {
@@ -18,6 +18,8 @@ function endExists(doc: DevDocument, key: string): boolean {
       return doc.diagram.class.model.classes[bare] !== undefined
     case "flow":
       return doc.diagram.flow.model.nodes[bare] !== undefined
+    case "note":
+      return false
   }
 }
 

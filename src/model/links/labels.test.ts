@@ -43,6 +43,14 @@ describe("endName", () => {
     expect(endName(documento(), "flow/n3")).toBe("(senza etichetta)")
     expect(endName(documento(), "flow/fantasma")).toBe("(nodo eliminato)")
   })
+
+  it("un pool si nomina col suo nome, e senza nome lo dice", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.flow.model.pools["p1"] = { name: "Processo", lanes: [{ id: "l1", name: "Cliente" }] }
+    doc.diagram.flow.model.pools["p2"] = { name: "", lanes: [{ id: "l2", name: "Cliente" }] }
+    expect(endName(doc, "flow/p1")).toBe("Processo")
+    expect(endName(doc, "flow/p2")).toBe("(senza nome)")
+  })
 })
 
 describe("persistenza del modo", () => {

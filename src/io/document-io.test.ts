@@ -108,9 +108,9 @@ describe("restoreLast", () => {
     const saved = withEntity("salvato", "s1")
     d.db.records.set("s1", record(saved, { fileName: "s1.dd.json", updatedAt: 900, savedToFileAt: 800 }))
     d.db.last = "s1"
-    // Lo strumento attivo (qui la nota di classe) non sopravvive all'apertura di un altro
-    // documento: si riparte da «Seleziona», senza famiglia né variante.
-    sessionStore.getState().setTool("node", "class", "note")
+    // Lo strumento attivo (qui la nota) non sopravvive all'apertura di un altro documento: si
+    // riparte da «Seleziona», senza famiglia né variante.
+    sessionStore.getState().setTool("node", "note")
     await createDocumentIo(d).restoreLast()
     expect(documentStore.getState().doc).toEqual(saved)
     expect(documentStore.getState().past).toHaveLength(0)
@@ -336,12 +336,12 @@ describe("openRecent e newDocument", () => {
     expect(documentSession.getState()).toMatchObject({ docId: "r1", fileName: "r.dd.json", dirty: false })
   })
 
-  it("newDocument crea un documento con le tre famiglie e i collegamenti vuoti", async () => {
+  it("newDocument crea un documento con le quattro famiglie e i collegamenti vuoti", async () => {
     const d = deps()
     const io = createDocumentIo(d)
     await io.newDocument()
     const doc = documentStore.getState().doc
-    expect(Object.keys(doc.diagram).sort()).toEqual(["class", "er", "flow", "links"])
+    expect(Object.keys(doc.diagram).sort()).toEqual(["class", "er", "flow", "links", "note"])
   })
 
   it("newDocument lascia il precedente in biblioteca", async () => {

@@ -9,6 +9,7 @@ import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { flowDiagram } from "@/editor/flow-access"
 import { familyHasContent } from "@/editor/kinds/canvas-ops"
+import { noteDiagram } from "@/editor/note-access"
 import { emitDdl } from "@/io/emit/ddl"
 import type { Dialect } from "@/io/ddl/schema"
 import { emitClassMermaid } from "@/io/emit/class-mermaid"
@@ -21,12 +22,16 @@ import type { ClassModel } from "@/model/class/schema"
 import type { ErModel } from "@/model/er/schema"
 import type { Family } from "@/model/family"
 import type { FlowModel } from "@/model/flow/schema"
+import type { Note } from "@/model/note/schema"
 import { documentFileName } from "./file-name"
 
 type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid"
 
+/** Le famiglie che hanno un formato di testo: le note escono dentro quello delle classi, o in nessuno (spec 3a §8). */
+type ExportFamily = Exclude<Family, "note">
+
 /** La famiglia di ogni formato: un formato si offre solo se la sua famiglia ha contenuto. */
-const FORMAT_FAMILY: Record<Format, Family> = {
+const FORMAT_FAMILY: Record<Format, ExportFamily> = {
   postgres: "er",
   mysql: "er",
   mermaid: "er",
@@ -34,11 +39,12 @@ const FORMAT_FAMILY: Record<Format, Family> = {
   "flow-mermaid": "flow",
 }
 
-/** I modelli delle famiglie, letti dal selettore: tre riferimenti stabili, confrontati da `useShallow`. */
+/** I modelli delle famiglie, letti dal selettore: riferimenti stabili, confrontati da `useShallow`. */
 interface Models {
   er: ErModel | null
   class: ClassModel | null
   flow: FlowModel | null
+  notes: Readonly<Record<string, Note>>
 }
 
 function emit(models: Models, format: Format): EmitResult {
@@ -48,11 +54,11 @@ function emit(models: Models, format: Format): EmitResult {
     case "mysql":
       return models.er ? emitDdl(models.er, format) : empty
     case "mermaid":
-      return models.er ? emitMermaid(models.er) : empty
+      return models.er ? emitMermaid(models.er, models.notes) : empty
     case "class-mermaid":
-      return models.class ? emitClassMermaid(models.class) : empty
+      return models.class ? emitClassMermaid(models.class, models.notes) : empty
     case "flow-mermaid":
-      return models.flow ? emitFlowMermaid(models.flow) : empty
+      return models.flow ? emitFlowMermaid(models.flow, models.notes) : empty
   }
 }
 
@@ -76,9 +82,9 @@ const FORMATS: Record<Format, { label: string; extension: string }> = {
  * scelto. Testo diverso per famiglia — quello ER parla del round trip col dump SQL, quello class
  * elenca gli elementi UML che §16 della spec mette fuori scopo (non se ne inventano altri).
  */
-const MODEL_LIMITS: Record<Family, string> = {
+const MODEL_LIMITS: Record<ExportFamily, string> = {
   er: "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale.",
-  class: "Il modello non rappresenta generici, package, note, classi di associazione, classi annidate e visibilità di pacchetto.",
+  class: "Il modello non rappresenta generici, package, classi di associazione, classi annidate e visibilità di pacchetto.",
   flow: "Le note non hanno equivalente in Mermaid, e le corsie diventano riquadri (subgraph) invece di bande orizzontali vere.",
 }
 
@@ -104,6 +110,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
         er: has("er") ? erDiagram(s.doc).model : null,
         class: has("class") ? classDiagram(s.doc).model : null,
         flow: has("flow") ? flowDiagram(s.doc).model : null,
+        notes: noteDiagram(s.doc).model.notes,
       }
     }),
   )
@@ -163,6 +170,10 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
             </ul>
             <pre data-export-preview className="max-h-96 overflow-auto rounded border bg-muted/40 p-3 font-mono text-xs">{text}</pre>
           </>
+        ) : Object.keys(models.notes).length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Le note libere escono solo nel Mermaid delle classi, che chiede almeno una classe: qui non ce n'è nessuna.
+          </p>
         ) : (
           <p className="text-sm text-muted-foreground">Il documento è vuoto: non c'è niente da esportare.</p>
         )}

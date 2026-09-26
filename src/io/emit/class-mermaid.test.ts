@@ -22,13 +22,12 @@ function modello(relazione: ClassRelation): ClassModel {
   return {
     classes: { Figlio: classe("Figlio"), Padre: classe("Padre") },
     relations: { r: relazione },
-    notes: {},
   }
 }
 
 /** Un modello con una sola classe dal nome anomalo, nessuna relazione. */
 function modelloCon(nome: string): ClassModel {
-  return { classes: { [nome]: classe(nome) }, relations: {}, notes: {} }
+  return { classes: { [nome]: classe(nome) }, relations: {} }
 }
 
 /**
@@ -41,7 +40,6 @@ function emitten(text: string): string {
   const model: ClassModel = {
     classes: { C: { name: "C", stereotype: "class", attributes: parsed.value.attributes, methods: parsed.value.methods } },
     relations: {},
-    notes: {},
   }
   return emitClassMermaid(model).text
 }
@@ -93,7 +91,6 @@ describe("emitClassMermaid: navigabilità", () => {
     const rel = (navigable?: boolean) => ({
       classes: { A: { name: "A", stereotype: "class" as const, attributes: [], methods: [] }, B: { name: "B", stereotype: "class" as const, attributes: [], methods: [] } },
       relations: { r: { kind: "association" as const, ...(navigable === undefined ? {} : { navigable }), source: { class: "A", multiplicity: "", role: "" }, target: { class: "B", multiplicity: "", role: "" } } },
-      notes: {},
     })
     expect(emitClassMermaid(rel(true)).text).toContain("A --> B")
     expect(emitClassMermaid(rel(false)).text).toContain("A -- B")
@@ -125,7 +122,6 @@ describe("emitClassMermaid: i membri", () => {
     const m: ClassModel = {
       classes: { E: classe("E", "enum"), C: classe("C", "class") },
       relations: {},
-      notes: {},
     }
     const { text } = emitClassMermaid(m)
     expect(text).toContain("<<Enumeration>>")
@@ -140,7 +136,6 @@ describe("emitClassMermaid: i membri", () => {
     const m: ClassModel = {
       classes: { E: { name: "E", stereotype: "enum", attributes: [], methods: parsed.value.methods } },
       relations: {},
-      notes: {},
     }
     const { text } = emitClassMermaid(m)
     expect(text).toContain("<<Enumeration>>")
@@ -151,7 +146,7 @@ describe("emitClassMermaid: i membri", () => {
     // `safeName` ha due rami: la sostituzione dei caratteri non ammessi e il prefisso `_` per chi
     // inizia con una cifra. Il secondo non aveva fixture, e un identificatore che inizia con una
     // cifra Mermaid non lo accetta.
-    const m: ClassModel = { classes: { "9Cliente": classe("9Cliente") }, relations: {}, notes: {} }
+    const m: ClassModel = { classes: { "9Cliente": classe("9Cliente") }, relations: {} }
     const { text, warnings } = emitClassMermaid(m)
     expect(text).toContain("_9Cliente")
     expect(text).not.toMatch(/class 9Cliente/)
@@ -169,52 +164,52 @@ describe("emitClassMermaid: nomi che Mermaid non prende nudi", () => {
 })
 
 describe("note", () => {
-  const modello = (notes: Record<string, { text: string }>) => ({ classes: {}, relations: {}, notes })
+  const conNote = (notes: Record<string, { text: string }>) => Object.fromEntries(Object.entries(notes).map(([k, n]) => [k, { ...n, anchor: null }]))
 
   it("una nota diventa una riga note, fuori da qualunque blocco class", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: "da rivedere" } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: "da rivedere" } }))
     expect(text).toContain('note "da rivedere"')
     expect(text).not.toContain("class {")
   })
 
   it("gli a capo veri diventano <br>, non un backslash-n visibile (misurato su mermaid@11)", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: "prima\nseconda" } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: "prima\nseconda" } }))
     expect(text).toContain('note "prima<br>seconda"')
     // Una riga sola nell'output: l'a capo vero romperebbe la sintassi.
     expect(text.split("\n").filter((l) => l.includes("note ")).length).toBe(1)
   })
 
   it("le virgolette doppie diventano l'entità #quot;, misurata dentro una note: rende la virgoletta vera", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: 'il campo "id"' } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: 'il campo "id"' } }))
     expect(text).toContain(`note "il campo #quot;id#quot;"`)
   })
 
   it("`<`, `>` e `&` grezzi si escapano con le entità di Mermaid, o l'HTML viene interpretato e il testo si perde", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: "se a<b allora <b>grassetto</b>" } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: "se a<b allora <b>grassetto</b>" } }))
     expect(text).toContain('note "se a#lt;b allora #lt;b#gt;grassetto#lt;/b#gt;"')
   })
 
   it("l'utente scrive una propria entità (&lt;): l'& si escapa per primo, così non viene decodificata due volte", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: "Tizio & Caio, &lt;" } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: "Tizio & Caio, &lt;" } }))
     // Se l'& non fosse il primo a essere escapato, questo testo uscirebbe identico a un `<` vero
     // e verrebbe interpretato come tale da Mermaid — invece deve restare `&lt;` letterale.
     expect(text).toContain('note "Tizio #amp; Caio, #amp;lt;"')
   })
 
   it("una nota con newline e `<` letterale: l'ordine conta, il <br> emesso deve sopravvivere alla propria escape di `<`", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: "riga1 <b>\nriga2" } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: "riga1 <b>\nriga2" } }))
     // Se la sostituzione dell'a capo girasse prima dell'escape di `<`, il `<br>` risulterebbe
     // a sua volta escapato in `#lt;br#gt;` invece di restare un vero a capo per Mermaid.
     expect(text).toContain('note "riga1 #lt;b#gt;<br>riga2"')
   })
 
   it("una nota con newline, virgoletta, `<` e `&` tutti insieme: l'escape sopravvive esatto", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: 'riga1 & "cit" <b>\nriga2' } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: 'riga1 & "cit" <b>\nriga2' } }))
     expect(text).toContain('note "riga1 #amp; #quot;cit#quot; #lt;b#gt;<br>riga2"')
   })
 
   it("una nota vuota non produce nessuna riga", () => {
-    const { text } = emitClassMermaid(modello({ "n-1": { text: "" } }))
+    const { text } = emitClassMermaid({ classes: {}, relations: {} }, conNote({ "n-1": { text: "" } }))
     expect(text).not.toContain("note ")
   })
 })
@@ -223,7 +218,6 @@ describe("tipi che Mermaid non porta com'è", () => {
   const conTipo = (type: string) => ({
     classes: { A: { name: "A", stereotype: "class" as const, attributes: [{ name: "campo", type, visibility: "public" as const, isStatic: false }], methods: [] } },
     relations: {},
-    notes: {},
   })
 
   it("i generici passano alle tilde, che è la sintassi che Mermaid interpreta", () => {
@@ -335,7 +329,6 @@ describe("tipi che Mermaid non porta com'è", () => {
         },
       },
       relations: {},
-      notes: {},
     }
     const { text, warnings } = emitClassMermaid(modello)
     expect(text).toContain("+salva(List~Ordine~ x) Map~string, int~")
@@ -362,7 +355,6 @@ describe("tipi che Mermaid non porta com'è", () => {
         },
       },
       relations: {},
-      notes: {},
     }
     const { warnings } = emitClassMermaid(modello)
     const avviso = warnings.find((w) => w.includes("graffe"))!
@@ -372,34 +364,28 @@ describe("tipi che Mermaid non porta com'è", () => {
 })
 
 describe("note ancorate", () => {
-  const end = (c: string) => ({ class: c, multiplicity: "", role: "" })
   const cliente = classe("Cliente")
+  const model = { classes: { Cliente: cliente }, relations: {} }
 
-  it("la nota ancorata esce come `note for`, la libera resta `note`", () => {
-    const out = emitClassMermaid({
-      classes: { Cliente: cliente },
-      relations: { r0: { kind: "note-link", source: end("n1"), target: end("Cliente") } },
-      notes: { n1: { text: "da rivedere" }, n2: { text: "legenda" } },
+  it("la nota ancorata a una classe esce come `note for`, la libera resta `note`", () => {
+    const out = emitClassMermaid(model, {
+      n1: { text: "da rivedere", anchor: "class/Cliente" },
+      n2: { text: "legenda", anchor: null },
     })
     expect(out.text).toContain('note for Cliente "da rivedere"')
     expect(out.text).toContain('note "legenda"')
   })
 
-  it("l'ancoraggio non esce anche come riga di relazione", () => {
-    const out = emitClassMermaid({
-      classes: { Cliente: cliente },
-      relations: { r0: { kind: "note-link", source: end("n1"), target: end("Cliente") } },
-      notes: { n1: { text: "x" } },
+  it("una nota ancorata a un'entità o a un nodo di flusso non esce nel class diagram", () => {
+    const out = emitClassMermaid(model, {
+      n1: { text: "ER", anchor: "er/ordini" },
+      n2: { text: "flusso", anchor: "flow/n1" },
     })
-    expect(out.text).not.toContain("n1")
+    expect(out.text).not.toContain("note")
   })
 
-  it("un ancoraggio verso una classe che non c'è esce come nota libera, non come `note for` rotta", () => {
-    const out = emitClassMermaid({
-      classes: { Cliente: cliente },
-      relations: { r0: { kind: "note-link", source: end("n1"), target: end("Fantasma") } },
-      notes: { n1: { text: "x" } },
-    })
+  it("un'àncora verso una classe che non c'è esce come nota libera, non come `note for` rotta", () => {
+    const out = emitClassMermaid(model, { n1: { text: "x", anchor: "class/Fantasma" } })
     expect(out.text).toContain('note "x"')
     expect(out.text).not.toContain("Fantasma")
   })

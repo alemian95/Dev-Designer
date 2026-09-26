@@ -3,7 +3,7 @@ import { memberLines } from "@/model/class/members"
 import type { ClassNode, ClassRelation } from "@/model/class/schema"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Rect } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
-import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, notePath, noteSize, STEREO_H, umlMarkerPath } from "./geometry"
+import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
 
 // Annotazione esplicita `ClassNode` sulle fixture, non `as const`: il brief le
 // scriveva `as const`, ma un `ClassNode` ha array mutabili e `as const` li
@@ -257,56 +257,5 @@ describe("endLabel", () => {
 
   it("vuota quando il capo non ha né molteplicità né ruolo: è la condizione che usa chi la chiama", () => {
     expect(endLabel(capo("", ""))).toBe("")
-  })
-})
-
-describe("noteSize", () => {
-  it("larghezza dalla riga più lunga, altezza dal numero di righe", () => {
-    const corta = noteSize({ text: "ok" })
-    const lunga = noteSize({ text: "una riga molto più lunga della precedente" })
-    expect(lunga.w).toBeGreaterThan(corta.w)
-    expect(noteSize({ text: "a\nb\nc" }).h).toBeGreaterThan(noteSize({ text: "a" }).h)
-  })
-
-  it("una nota vuota ha comunque una dimensione cliccabile", () => {
-    const { w, h } = noteSize({ text: "" })
-    expect(w).toBeGreaterThanOrEqual(MIN_W / 2)
-    expect(h).toBeGreaterThan(0)
-  })
-
-  it("la larghezza è arrotondata alla griglia, come le classi", () => {
-    expect(noteSize({ text: "abcdefghijklmnopqrstuvwxyz" }).w % GRID).toBe(0)
-  })
-})
-
-describe("notePath", () => {
-  it("il corpo salta l'angolo in alto a destra e la piega lo chiude", () => {
-    const { body, fold } = notePath(200, 80)
-    // Path esatti e non solo "non lancia": la piega è la geometria più delicata del diff,
-    // e il renderer (task successivo) deve riprodurla identica — un vertice spostato o
-    // mancante deve far fallire il test, non passare inosservato.
-    expect(body).toBe("M0 0 L188 0 L200 12 L200 80 L0 80 Z")
-    expect(fold).toBe("M188 0 L200 12 L188 12 Z")
-  })
-})
-
-describe("ancoraggio di una nota", () => {
-  it("la linea è tratteggiata, come vuole UML", () => {
-    expect(isDashed("note-link")).toBe(true)
-  })
-
-  it("nessuna punta a nessuno dei due capi: non eredita la freccia della dipendenza", () => {
-    const at = { x: 10, y: 10 }
-    for (const dir of [
-      { x: 1, y: 0 } as const,
-      { x: -1, y: 0 } as const,
-      { x: 0, y: 1 } as const,
-      { x: 0, y: -1 } as const,
-    ]) {
-      expect(umlMarkerPath(at, dir, "note-link")).toBe("")
-      // La dipendenza, per contrasto, la punta ce l'ha: se questo diventasse "" il test sopra
-      // passerebbe per la ragione sbagliata.
-      expect(umlMarkerPath(at, dir, "dependency")).not.toBe("")
-    }
   })
 })

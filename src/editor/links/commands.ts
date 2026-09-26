@@ -5,8 +5,8 @@ import { linkRule, type AccessMode, type Link, type LinkKind } from "@/model/lin
 import { classDiagram } from "../class-access"
 import type { Recipe } from "../document-store"
 import { linkKey, qualify, splitKey } from "../families"
-import { flowDiagram } from "../flow-access"
 import { familyOps } from "../kinds/ops"
+import { retargetAnchors } from "../note/anchor"
 
 /** L'esito del gesto Collega fra due famiglie diverse (spec 4a §4). Le chiavi sono `link/<uuid>`. */
 export type ConnectResult =
@@ -15,35 +15,18 @@ export type ConnectResult =
   | { type: "rejected"; notice: string }
 
 /** Come si nomina un nodo di ogni famiglia nell'avviso di rifiuto. */
-const FAMILY_NOUN: Record<Family, string> = { er: "un'entità", class: "una classe", flow: "un nodo di flusso" }
+const FAMILY_NOUN: Record<Family, string> = { er: "un'entità", class: "una classe", flow: "un nodo di flusso", note: "una nota" }
 
 /**
  * Il motivo per cui gli estremi non ammettono il tipo, o `null` se lo ammettono. `source` e `target`
- * sono già nel verso del tipo. La regola «solo class e abstract» vive nel modello (`unmappableNotice`,
- * review finale F1 del 4a): qui la si usa per l'avviso, e `validateLinks` la stessa fonte per l'errore
- * `link-unmappable`. Le note, di flusso e di classe, non partecipano ai collegamenti del flusso
- * (spec 4b §4).
+ * sono già nel verso del tipo. Solo «mappa su» ha una regola: una classe si mappa solo se è `class` o
+ * `abstract`, e la regola vive nel modello (`unmappableNotice`), la stessa fonte dell'errore
+ * `link-unmappable` di `validateLinks`.
  */
-function refusal(doc: DevDocument, kind: LinkKind, source: string, target: string): string | null {
-  switch (kind) {
-    case "maps-to": {
-      const key = splitKey(source).key
-      const cls = classDiagram(doc).model.classes[key]
-      // Nella famiglia `class` un nodo che non è una classe è una nota.
-      if (!cls) return "Una nota non si mappa su una tabella."
-      return unmappableNotice(cls.stereotype)
-    }
-    case "accesses":
-      return isFlowNote(doc, source) ? "Una nota non legge né scrive una tabella." : null
-    case "calls":
-      if (isFlowNote(doc, source)) return "Una nota non chiama una classe."
-      return classDiagram(doc).model.notes[splitKey(target).key] ? "Una nota non si chiama." : null
-  }
-}
-
-/** `true` se `key` è un nodo di flusso con la forma della nota. */
-function isFlowNote(doc: DevDocument, key: string): boolean {
-  return flowDiagram(doc).model.nodes[splitKey(key).key]?.shape === "note"
+function refusal(doc: DevDocument, kind: LinkKind, source: string): string | null {
+  if (kind !== "maps-to") return null
+  const cls = classDiagram(doc).model.classes[splitKey(source).key]
+  return cls ? unmappableNotice(cls.stereotype) : null
 }
 
 /** Il collegamento che nasce dal gesto: un accesso nasce in lettura, e il modo si cambia dal pannello. */
@@ -63,7 +46,7 @@ export function connectAcross(doc: DevDocument, from: string, to: string): Conne
   const rule = linkRule(a, b)
   if (!rule) return { type: "rejected", notice: `Non esiste un collegamento fra ${FAMILY_NOUN[a]} e ${FAMILY_NOUN[b]}.` }
   const [source, target] = rule.reversed ? [to, from] : [from, to]
-  const refused = refusal(doc, rule.kind, source, target)
+  const refused = refusal(doc, rule.kind, source)
   if (refused) return { type: "rejected", notice: refused }
   const existing = Object.entries(doc.diagram.links).find(
     ([, l]) => l.kind === rule.kind && l.source === source && l.target === target,
@@ -90,19 +73,23 @@ export function retargetLinks(oldKey: string, newKey: string): Recipe {
 }
 
 /**
- * La rinomina `rename` e i collegamenti che la seguono, in una recipe sola: un passo di annulla, e
- * nessuno stato intermedio. Chiavi **senza** prefisso, quelle dei comandi di famiglia.
+ * La rinomina `rename`, e i collegamenti e le àncore delle note che la seguono, in una recipe sola:
+ * un passo di annulla, e nessuno stato intermedio. Chiavi **senza** prefisso, quelle dei comandi di
+ * famiglia.
  *
- * I collegamenti si spostano solo se la rinomina ha davvero tolto il nodo `oldKey`. `renameEntity`
- * e `renameClass` rispondono a una collisione con una recipe che non scrive niente: senza la guardia,
- * una collisione sposterebbe i collegamenti sul nodo che esiste già.
+ * Collegamenti e àncore si spostano solo se la rinomina ha davvero tolto il nodo `oldKey`.
+ * `renameEntity` e `renameClass` rispondono a una collisione con una recipe che non scrive niente:
+ * senza la guardia, una collisione li sposterebbe sul nodo che esiste già.
  */
 export function followRename(rename: Recipe, family: Family, oldKey: string, newKey: string): Recipe {
   const has = (doc: DevDocument, key: string) => familyOps(doc, family).nodeKeys().includes(key)
   return (draft) => {
     const had = has(draft, oldKey)
     rename(draft)
-    if (had && !has(draft, oldKey)) retargetLinks(qualify(family, oldKey), qualify(family, newKey))(draft)
+    if (had && !has(draft, oldKey)) {
+      retargetLinks(qualify(family, oldKey), qualify(family, newKey))(draft)
+      retargetAnchors(qualify(family, oldKey), qualify(family, newKey))(draft)
+    }
   }
 }
 

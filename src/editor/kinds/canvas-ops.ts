@@ -9,6 +9,7 @@ import { linkId, linkKey, qualify, splitKey } from "../families"
 import type { Point, Rect } from "../geometry"
 import { connectAcross, deleteLinks, linksTouching, type ConnectResult } from "../links/commands"
 import { linkGeometry } from "../links/geometry"
+import { anchorNote, anchorsTouching, detachAnchoredTo } from "../note/anchor"
 import { familyOps, type EdgeEnds, type EditTarget } from "./ops"
 
 export type { ConnectResult }
@@ -36,8 +37,9 @@ export interface CanvasOps {
   edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
   addNode(at: Point, family: Family, variant?: string): { key: string; recipe: Recipe; edit: EditTarget | null }
   /**
-   * Dentro una famiglia: l'arco della famiglia, oppure `null` se i due nodi non si possono collegare
-   * (due note). Fra famiglie diverse: un collegamento tipizzato creato, uno già presente da
+   * Una nota e un altro elemento, in qualunque verso: l'àncora della nota (`anchorNote`), anche verso
+   * un pool. Dentro una famiglia: l'arco della famiglia, oppure `null` se i due nodi non si possono
+   * collegare. Fra famiglie diverse: un collegamento tipizzato creato, uno già presente da
    * selezionare, oppure un rifiuto con il suo avviso (`connectAcross`).
    */
   addEdge(source: string, target: string): ConnectResult | null
@@ -110,6 +112,7 @@ export function canvasOps(doc: DevDocument): CanvasOps {
           .map((e) => ({ key: qualify(f, e.key), source: qualify(f, e.source), target: qualify(f, e.target) })),
       ),
       ...linksTouching(doc.diagram.links, keys).map(([id, l]) => ({ key: linkKey(id), source: l.source, target: l.target })),
+      ...anchorsTouching(doc, keys),
     ],
 
     edgeGeometry: (qualified, a, b) => {
@@ -125,6 +128,9 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     },
 
     addEdge: (source, target) => {
+      // Una nota si ancora a qualunque elemento, pool compresi (spec 3a §5): si riconosce prima
+      // della guardia dei frame, che per ogni altro collegamento resta chiusa (spec 2b §2).
+      if (splitKey(source).family === "note" || splitKey(target).family === "note") return anchorNote(doc, source, target)
       // Un frame non è un estremo (spec 2b §2): niente arco, niente collegamento, niente avviso.
       if (isFrame(source) || isFrame(target)) return null
       const a = splitKey(source)
@@ -143,8 +149,9 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       ),
 
     deleteItems: (nodeKeys, edgeKeys) => {
-      // I collegamenti selezionati, e quelli che toccano un nodo eliminato: nella stessa recipe delle
-      // famiglie, così un solo annulla riporta indietro tutto (spec 4a §4, «Coerenza»).
+      // I collegamenti selezionati, e quelli che toccano un nodo eliminato; le note ancorate a un
+      // nodo eliminato si staccano: tutto nella stessa recipe delle famiglie, così un solo annulla
+      // riporta indietro tutto (spec 4a §4, spec 3a §5).
       const selectedLinks = edgeKeys.flatMap((k) => linkId(k) ?? [])
       const cascade = linksTouching(doc.diagram.links, new Set(nodeKeys)).map(([id]) => id)
       const linkIds = [...new Set([...selectedLinks, ...cascade])]
@@ -154,6 +161,7 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       return combine([
         ...[...touched].map((f) => ops(f).deleteItems(nodes.get(f) ?? [], edges.get(f) ?? [])),
         linkIds.length > 0 ? deleteLinks(linkIds) : null,
+        detachAnchoredTo(doc, new Set(nodeKeys)),
       ])
     },
 

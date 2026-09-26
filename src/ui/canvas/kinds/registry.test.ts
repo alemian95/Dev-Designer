@@ -29,15 +29,15 @@ describe("viewFor", () => {
       { label: "Classe", key: "c", Icon: Box, tool: "node", family: "class" },
       { label: "Interfaccia", key: "i", Icon: SquareDashed, tool: "node", family: "class", variant: "interface" },
       { label: "Enum", key: "u", Icon: ListOrdered, tool: "node", family: "class", variant: "enum" },
-      { label: "Nota di classe", key: "n", Icon: StickyNote, tool: "node", family: "class", variant: "note" },
     ])
   })
 })
 
 describe("terzo strumento", () => {
-  it("la vista delle classi dichiara la variante nota, quella ER no", () => {
-    expect(viewFor("class").tools.some((t) => t.variant === "note")).toBe(true)
+  it("la nota ha una famiglia sua: né le classi né l'ER hanno più una variante nota", () => {
+    expect(viewFor("class").tools.some((t) => t.variant === "note")).toBe(false)
     expect(viewFor("er").tools.some((t) => t.variant === "note")).toBe(false)
+    expect(viewFor("note").tools).toEqual([{ label: "Nota", key: "n", Icon: StickyNote, tool: "node", family: "note" }])
   })
 
   it("le scorciatoie degli strumenti sono distinte", () => {
@@ -49,9 +49,9 @@ describe("terzo strumento", () => {
 })
 
 describe("flowchart", () => {
-  it("il flowchart dichiara sei forme più il pool, tutti con chiave distinta, tutti nella famiglia flow", () => {
+  it("il flowchart dichiara cinque forme più il pool, tutti con chiave distinta, tutti nella famiglia flow", () => {
     const view = viewFor("flow")
-    expect(view.tools).toHaveLength(7)
+    expect(view.tools).toHaveLength(6)
     const keys = view.tools.map((t) => t.key)
     expect(new Set(keys).size).toBe(keys.length)
     expect(view.tools.every((t) => t.family === "flow")).toBe(true)
@@ -59,23 +59,18 @@ describe("flowchart", () => {
 
   /**
    * `every((t) => t.variant)` controllava solo che la stringa non fosse vuota, non che fosse una
-   * delle sei forme vere: un refuso in `flow.tsx` (es. `"decison"`) avrebbe compilato — `variant`
+   * delle forme vere: un refuso in `flow.tsx` (es. `"decison"`) avrebbe compilato — `variant`
    * è una stringa opaca per la giuntura, la interpreta solo `flowOps.addNode` (spec §3) — passato
    * lint e questo test, e prodotto un nodo con `shapePath` fuori dallo switch esaustivo, cioè
    * `undefined`: invisibile, e respinto da `FlowShapeSchema` al primo salvataggio. L'insieme delle
    * varianti deve coincidere esattamente con le forme dello schema, non solo essere non vuoto.
    */
-  it("le sei varianti di forma sono esattamente quelle di FlowShapeSchema, il pool a parte", () => {
+  it("le varianti di forma sono esattamente quelle di FlowShapeSchema, il pool a parte", () => {
     const view = viewFor("flow")
     // Il pool (spec 2b §5) è una variante dello strumento nodo ma non una forma: non appartiene a
     // `FlowShapeSchema`, quindi va escluso da questo confronto.
     const shapeVariants = view.tools.filter((t) => t.tool === "node" && t.variant !== "pool").map((t) => t.variant)
     expect(new Set(shapeVariants)).toEqual(new Set(FlowShapeSchema.options))
-  })
-
-  it("la nota del flusso ha un'etichetta sua, distinta da quella delle classi", () => {
-    const note = viewFor("flow").tools.find((t) => t.variant === "note")
-    expect(note?.label).toBe("Nota di flusso")
   })
 
   /**
@@ -94,7 +89,7 @@ describe("flowchart", () => {
     expect(byKey.get("3")).toBe("decision")
     expect(byKey.get("4")).toBe("io")
     expect(byKey.get("5")).toBe("subprocess")
-    expect(byKey.get("6")).toBe("note")
+    expect(byKey.has("6")).toBe(false)
   })
 })
 
@@ -118,9 +113,9 @@ describe("canvasTools", () => {
 })
 
 describe("toolId", () => {
-  it("distingue due note di famiglie diverse", () => {
-    expect(toolId({ tool: "node", family: "class", variant: "note" })).toBe("node:class:note")
-    expect(toolId({ tool: "node", family: "flow", variant: "note" })).toBe("node:flow:note")
+  it("compone strumento, famiglia e variante", () => {
+    expect(toolId({ tool: "node", family: "class", variant: "interface" })).toBe("node:class:interface")
+    expect(toolId({ tool: "node", family: "flow", variant: "decision" })).toBe("node:flow:decision")
     expect(toolId({ tool: "select", family: null })).toBe("select")
     expect(toolId(LINK_TOOL)).toBe("edge")
   })

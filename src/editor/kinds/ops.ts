@@ -8,6 +8,7 @@ import type { Point, Rect } from "../geometry"
 import { classOps } from "./class"
 import { erOps } from "./er"
 import { flowOps } from "./flow"
+import { noteOps } from "./note"
 
 // `EdgeEnds` sta in `edge-routing.ts`, dove `edgeOffsets` lo consuma; qui si ri-esporta perché è
 // il tipo di ritorno di `edgesTouching` e i chiamanti lo importano dal contratto.
@@ -47,10 +48,7 @@ export interface DiagramOps {
    * `null` quando non c'è niente da scrivere: un pool appena creato si rinomina dal pannello.
    */
   addNode(at: Point, variant?: string): { key: string; recipe: Recipe; edit: EditTarget | null }
-  /** `null` quando i due estremi non possono essere collegati: due note (un ancoraggio ha senso
-   *  solo verso una classe), o una classe che non esiste. Una nota **e** una classe producono
-   *  invece un ancoraggio (`note-link`, spec note ancorate §4). L'ER non ha note e continua a
-   *  tornare sempre un valore. */
+  /** `null` quando i due estremi non possono essere collegati. */
   addEdge(source: string, target: string): { key: string; recipe: Recipe } | null
   /**
    * Sostituisce la dispatch predefinita `moveNodes(family, keys, dx, dy)` al rilascio del drag, quando c'è.
@@ -68,6 +66,15 @@ export interface DiagramOps {
    * (spec 2b §6). `null` se non c'è niente da disporre. Assente: l'ingombro dei nodi.
    */
   layoutBounds?(positions: LayoutPositions): Rect | null
+  /**
+   * Il rettangolo che l'elemento `key` (un nodo o un frame di questa famiglia, senza prefisso) avrà
+   * dopo `layoutRecipe(positions, …)`, nel sistema di `positions`: usato da `layoutAll` per prevedere
+   * dove cadrà una nota ancorata a quell'elemento, e includerla nell'ingombro del blocco (spec 3a
+   * §10, F1 della review finale — vedi DT-29). `null` se `key` non è nel layout. Assente: il
+   * rettangolo si legge dal nodo di `layoutGraph()` con la stessa posizione, come `nodesBounds` —
+   * basta per una famiglia senza frame.
+   */
+  layoutRectOf?(positions: LayoutPositions, key: string): Rect | null
   /**
    * Sostituisce la dispatch predefinita `applyLayout(family, positions + offset)` quando c'è. Serve al
    * flowchart, che col layout riscrive anche pool e corsie: due dispatch darebbero due passi di undo.
@@ -94,5 +101,7 @@ export function familyOps(doc: DevDocument, family: Family): DiagramOps {
       return classOps(doc)
     case "flow":
       return flowOps(doc)
+    case "note":
+      return noteOps(doc)
   }
 }

@@ -29,15 +29,6 @@ describe("validateFlow", () => {
     expect(validateFlow(sano).filter((i) => i.code === "flow-dead-end")).toEqual([])
   })
 
-  it("una nota non partecipa al flusso: né irraggiungibile né senza uscite", () => {
-    const m = model({
-      nodes: { s: sano.nodes.s!, p: sano.nodes.p!, t: sano.nodes.t!, nota: n("note") },
-      edges: sano.edges,
-    })
-    const issues = validateFlow(m)
-    expect(issues.filter((i) => i.node === "nota")).toEqual([])
-  })
-
   it("un arco con il target inesistente è flow-dangling-edge", () => {
     const m = model({ nodes: { s: n("terminal") }, edges: { e1: e("s", "fantasma") } })
     const issues = validateFlow(m)

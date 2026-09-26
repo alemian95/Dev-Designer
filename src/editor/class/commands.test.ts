@@ -1,26 +1,9 @@
-import { produce } from "immer"
 import { beforeEach, describe, expect, it } from "vitest"
-import { createDocument, type DevDocument } from "@/model/document"
+import { createDocument } from "@/model/document"
 import type { ClassAttribute } from "@/model/class/schema"
 import { classDiagram } from "../class-access"
-import { documentStore, type Recipe } from "../document-store"
-import {
-  addNote,
-  addNoteLink,
-  addRelation,
-  classLayoutGraph,
-  deleteClassItems,
-  duplicateClasses,
-  renameClass,
-  setMembers,
-  setNoteText,
-} from "./commands"
-
-/** Applica una recipe a un documento senza passare dallo store: comodo per i test che non
- *  hanno bisogno di undo/redo, solo del documento risultante. */
-function applica(doc: DevDocument, recipe: Recipe): DevDocument {
-  return produce(doc, recipe)
-}
+import { documentStore } from "../document-store"
+import { addRelation, deleteClassItems, duplicateClasses, renameClass, setMembers } from "./commands"
 
 const state = () => documentStore.getState()
 
@@ -129,175 +112,12 @@ describe("comandi delle classi", () => {
   })
 
   it("cancellare una classe porta via le relazioni che la toccavano", () => {
-    expect(deleteClassItems([], [], [])).toBeNull()
-    state().dispatch(deleteClassItems(["Persona"], [], [])!)
+    expect(deleteClassItems([], [])).toBeNull()
+    state().dispatch(deleteClassItems(["Persona"], [])!)
     const d = cd()
     expect(d.model.classes["Persona"]).toBeUndefined()
     expect(d.view.nodes["Persona"]).toBeUndefined()
     // r1 aveva Persona come target: sparisce con lei, non resta appesa.
     expect(Object.keys(d.model.relations)).toEqual([])
-  })
-})
-
-describe("comandi delle note", () => {
-  const vuoto = () => createDocument("Prova", "doc-1")
-
-  it("addNote crea la nota e la sua view, con una chiave che non è il testo", () => {
-    const doc = vuoto()
-    const { key, recipe } = addNote({ x: 37, y: 52 })
-    const dopo = applica(doc, recipe)
-    expect(dopo.diagram.class.model.notes[key]).toEqual({ text: "" })
-    // Snappata alla griglia come le classi.
-    expect(dopo.diagram.class.view.nodes[key]).toEqual({ x: 40, y: 50, collapsed: false })
-  })
-
-  it("setNoteText scrive il testo e non tocca altro", () => {
-    const { key, recipe } = addNote({ x: 0, y: 0 })
-    const doc = applica(vuoto(), recipe)
-    const dopo = applica(doc, setNoteText(key, "prima\nseconda"))
-    expect(dopo.diagram.class.model.notes[key]!.text).toBe("prima\nseconda")
-  })
-
-  it("setNoteText su una chiave che non esiste non scrive niente", () => {
-    const doc = vuoto()
-    expect(applica(doc, setNoteText("assente", "x")).diagram.class.model.notes).toEqual({})
-  })
-
-  it("deleteClassItems cancella la nota e la sua view", () => {
-    const { key, recipe } = addNote({ x: 0, y: 0 })
-    const doc = applica(vuoto(), recipe)
-    const dopo = applica(doc, deleteClassItems([], [], [key])!)
-    expect(dopo.diagram.class.model.notes).toEqual({})
-    expect(dopo.diagram.class.view.nodes[key]).toBeUndefined()
-  })
-
-  it("deleteClassItems su una classe non tocca una nota indipendente", () => {
-    // Copre il caso che il test precedente non tocca: la nota non ha archi, ma va comunque
-    // provato che cancellare una classe non la trascina via di rimbalzo.
-    const base = vuoto()
-    base.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
-    base.diagram.class.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
-    const { key, recipe } = addNote({ x: 0, y: 0 })
-    const doc = applica(base, recipe)
-    const dopo = applica(doc, deleteClassItems(["Cliente"], [], [])!)
-    expect(dopo.diagram.class.model.classes["Cliente"]).toBeUndefined()
-    expect(dopo.diagram.class.model.notes[key]).toEqual({ text: "" })
-    expect(dopo.diagram.class.view.nodes[key]).toEqual({ x: 0, y: 0, collapsed: false })
-  })
-
-  it("deleteClassItems torna null solo se non c'è niente da cancellare, note comprese", () => {
-    expect(deleteClassItems([], [], [])).toBeNull()
-    expect(deleteClassItems([], [], ["n1"])).not.toBeNull()
-  })
-
-  it("duplicateClasses copia anche le note, con una chiave nuova e lo scarto", () => {
-    const { key, recipe } = addNote({ x: 100, y: 100 })
-    const doc = applica(applica(vuoto(), recipe), setNoteText(key, "promemoria"))
-    const { keys, recipe: dup } = duplicateClasses(doc.diagram.class.model, [key])
-    const dopo = applica(doc, dup)
-    expect(keys).toHaveLength(1)
-    expect(keys[0]).not.toBe(key)
-    expect(dopo.diagram.class.model.notes[keys[0]!]).toEqual({ text: "promemoria" })
-    expect(dopo.diagram.class.view.nodes[keys[0]!]!.x).toBe(120)
-  })
-})
-
-describe("addNoteLink", () => {
-  /** Un documento con una classe "Cliente" e una nota "n1", entrambe con una view. */
-  function conNotaEClasse(): DevDocument {
-    const doc = createDocument("d", "id")
-    return produce(doc, (d) => {
-      const cd = classDiagram(d)
-      cd.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
-      cd.model.notes["n1"] = { text: "da rivedere" }
-      cd.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
-      cd.view.nodes["n1"] = { x: 100, y: 0, collapsed: false }
-    })
-  }
-
-  it("crea l'ancoraggio con la nota in sorgente e la classe in target", () => {
-    const doc = conNotaEClasse()
-    const res = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
-    const dopo = classDiagram(applica(doc, res.recipe))
-    expect(dopo.model.relations[res.key]).toEqual({
-      kind: "note-link",
-      source: { class: "n1", multiplicity: "", role: "" },
-      target: { class: "Cliente", multiplicity: "", role: "" },
-    })
-  })
-
-  it("normalizza la direzione: trascinato dalla classe alla nota, la nota resta la sorgente", () => {
-    const doc = conNotaEClasse()
-    const res = addNoteLink(classDiagram(doc).model, "Cliente", "n1")!
-    const rel = classDiagram(applica(doc, res.recipe)).model.relations[res.key]!
-    expect(rel.source.class).toBe("n1")
-    expect(rel.target.class).toBe("Cliente")
-  })
-
-  it("un secondo ancoraggio sostituisce il primo: una nota ne ha al più uno", () => {
-    let doc = conNotaEClasse()
-    doc = produce(doc, (d) => {
-      classDiagram(d).model.classes["Ordine"] = { name: "Ordine", stereotype: "class", attributes: [], methods: [] }
-      classDiagram(d).view.nodes["Ordine"] = { x: 200, y: 0, collapsed: false }
-    })
-    const primo = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
-    doc = applica(doc, primo.recipe)
-    const secondo = addNoteLink(classDiagram(doc).model, "n1", "Ordine")!
-    const dopo = classDiagram(applica(doc, secondo.recipe))
-    expect(Object.keys(dopo.model.relations)).toEqual([secondo.key])
-    expect(dopo.model.relations[secondo.key]!.target.class).toBe("Ordine")
-  })
-
-  it("nota verso nota non produce niente", () => {
-    const doc = produce(conNotaEClasse(), (d) => {
-      classDiagram(d).model.notes["n2"] = { text: "altra" }
-      classDiagram(d).view.nodes["n2"] = { x: 300, y: 0, collapsed: false }
-    })
-    expect(addNoteLink(classDiagram(doc).model, "n1", "n2")).toBeNull()
-  })
-
-  it("cancellata la nota, il suo ancoraggio non resta nel modello", () => {
-    let doc = conNotaEClasse()
-    const link = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
-    doc = applica(doc, link.recipe)
-    const dopo = classDiagram(applica(doc, deleteClassItems([], [], ["n1"])!))
-    expect(dopo.model.notes).toEqual({})
-    expect(dopo.model.relations).toEqual({})
-  })
-
-  it("cancellata la classe, l'ancoraggio se ne va col ciclo che c'era già", () => {
-    let doc = conNotaEClasse()
-    const link = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
-    doc = applica(doc, link.recipe)
-    const dopo = classDiagram(applica(doc, deleteClassItems(["Cliente"], [], [])!))
-    expect(dopo.model.relations).toEqual({})
-    expect(Object.keys(dopo.model.notes)).toEqual(["n1"])
-  })
-
-  it("tutte le note sono nodi del grafo di layout, ancorate o no", () => {
-    const doc = produce(conNotaEClasse(), (d) => {
-      classDiagram(d).model.notes["n2"] = { text: "legenda" }
-      classDiagram(d).view.nodes["n2"] = { x: 400, y: 0, collapsed: false }
-    })
-    const grafo = classLayoutGraph(classDiagram(doc))
-    expect(grafo.nodes.map((n) => n.id).sort()).toEqual(["Cliente", "n1", "n2"])
-    expect(grafo.nodes.every((n) => n.w > 0 && n.h > 0)).toBe(true)
-  })
-
-  it("l'ancoraggio è un arco del grafo, invertito come gli altri: la classe è la sorgente", () => {
-    let doc = conNotaEClasse()
-    const link = addNoteLink(classDiagram(doc).model, "n1", "Cliente")!
-    doc = applica(doc, link.recipe)
-    const grafo = classLayoutGraph(classDiagram(doc))
-    expect(grafo.edges).toEqual([{ id: link.key, source: "Cliente", target: "n1" }])
-  })
-
-  it("una nota senza view resta fuori dal grafo, come una classe senza view", () => {
-    // Rete di regressione sul ramo `if (diagram.view.nodes[key])`: era già vero prima di questa
-    // task (le note non entravano affatto nel grafo), quindi qui non c'è mai stato un rosso da vedere.
-    const doc = produce(conNotaEClasse(), (d) => {
-      classDiagram(d).model.notes["orfana"] = { text: "senza view" }
-    })
-    expect(classLayoutGraph(classDiagram(doc)).nodes.map((n) => n.id)).not.toContain("orfana")
   })
 })

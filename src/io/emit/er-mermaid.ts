@@ -1,4 +1,6 @@
 import type { Cardinality, ErModel } from "@/model/er/schema"
+import { splitKey } from "@/model/family"
+import type { Note } from "@/model/note/schema"
 import type { EmitResult } from "./result"
 
 /**
@@ -62,7 +64,7 @@ function entityName(key: string, found: Found): string {
  * La nullabilità non viene emessa: Mermaid ER ha solo PK/FK/UK, e il `?` sul tipo che la
  * documentazione cita non compare in `ATTRIBUTE_WORD`. `NOT NULL` vive nel DDL.
  */
-export function emitMermaid(model: ErModel): EmitResult {
+export function emitMermaid(model: ErModel, notes: Readonly<Record<string, Note>> = {}): EmitResult {
   const found: Found = { skipped: [], illegalNames: new Map(), backticks: [], quotedLabels: [] }
   const out = ["erDiagram"]
 
@@ -116,6 +118,14 @@ export function emitMermaid(model: ErModel): EmitResult {
     warnings.push(
       `${found.quotedLabels.length} etichette di relazione avevano virgolette, rimosse perché Mermaid non le sa sfuggire nell'etichetta:` +
         ` ${found.quotedLabels.join(", ")}`,
+    )
+  }
+  const anchored = Object.values(notes).filter((n) => n.anchor !== null && splitKey(n.anchor).family === "er").length
+  if (anchored > 0) {
+    warnings.push(
+      anchored === 1
+        ? "1 nota ancorata a un'entità non è uscita: i diagrammi ER di Mermaid non hanno note."
+        : `${anchored} note ancorate a entità non sono uscite: i diagrammi ER di Mermaid non hanno note.`,
     )
   }
   return { text: `${out.join("\n")}\n`, warnings }

@@ -1,17 +1,16 @@
 import { useStore } from "zustand"
 import { Label } from "@/components/ui/label"
-import { setNoteText, setStereotype, updateRelation } from "@/editor/class/commands"
+import { setStereotype, updateRelation } from "@/editor/class/commands"
 import { classDiagram } from "@/editor/class-access"
 import { setCollapsed } from "@/editor/commands/view"
 import { documentStore, type Recipe } from "@/editor/document-store"
-import { familySelectedKeys, qualify } from "@/editor/families"
+import { familySelectedKeys } from "@/editor/families"
 import { sessionStore } from "@/editor/session-store"
 import {
   CLASS_RELATION_KINDS, RelationKindSchema, StereotypeSchema, type RelationKind, type Stereotype,
 } from "@/model/class/schema"
 import { renameClassWithNotice } from "@/ui/class-rename"
 import { CommitInput } from "@/ui/panels/CommitInput"
-import { CommitTextarea } from "@/ui/panels/CommitTextarea"
 
 const dispatch = (recipe: Recipe | null) => {
   if (recipe) documentStore.getState().dispatch(recipe)
@@ -41,7 +40,6 @@ const RELATION_LABEL: Record<RelationKind, string> = {
   composition: "Composizione",
   aggregation: "Aggregazione",
   dependency: "Dipendenza",
-  "note-link": "Ancoraggio nota",
 }
 
 function StereotypeSelect({ id, value, onChange }: { id: string; value: Stereotype; onChange: (v: Stereotype) => void }) {
@@ -86,57 +84,9 @@ function ClassNodeProperties({ classKey: key }: { classKey: string }) {
   )
 }
 
-/**
- * Corpo del pannello per una nota selezionata: una `textarea` col testo, commessa sul blur con lo
- * stesso comando `setNoteText` che usa `NoteEditor` — l'alternativa al doppio click sul canvas,
- * come il campo «Membri» lo è per le classi.
- *
- * **Alternativa, non secondo editor.** Il doppio click su una nota già selezionata — e la creazione
- * di una nota nuova — monta anche l'overlay `NoteEditor` sullo stesso testo: due campi modificabili
- * per lo stesso dato, cioè la situazione che il commento del campo «Membri» qui sopra scarta per le
- * classi. I valori non divergono davvero (`key={note.text}` rimonta questo campo appena l'overlay
- * commette sul blur, verificato nel browser), ma quale dei due comandi il testo non è leggibile
- * dalla schermata. Finché l'overlay è aperto su *questa* nota il campo è in sola lettura e lo
- * dichiara: l'editor sul canvas è quello che l'utente sta guardando.
- */
-function NoteProperties({ noteKey: key }: { noteKey: string }) {
-  const note = useStore(documentStore, (s) => classDiagram(s.doc).model.notes[key])
-  const editingHere = useStore(sessionStore, (s) => s.editing?.key === qualify("class", key) && s.editing.target === "body")
-  if (!note) return null
-  return (
-    <div className="flex flex-col gap-3 p-3">
-      <div className="grid gap-1">
-        <Label htmlFor="note-text">Testo</Label>
-        <CommitTextarea
-          id="note-text"
-          key={note.text}
-          value={note.text}
-          readOnly={editingHere}
-          onCommit={(text) => dispatch(setNoteText(key, text))}
-          className="min-h-24 resize-none rounded-md border bg-background p-2 text-sm read-only:opacity-50"
-        />
-        {editingHere && <p className="text-xs text-muted-foreground">Modifica in corso sul canvas.</p>}
-      </div>
-    </div>
-  )
-}
-
 function RelationProperties({ relationKey: key }: { relationKey: string }) {
   const rel = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[key])
   if (!rel) return null
-  // Un ancoraggio si crea col gesto e si toglie cancellandolo: non ha specie da convertire (il
-  // selettore non lo offre, `CLASS_RELATION_KINDS`), né nome, molteplicità o ruoli che l'export
-  // sappia rappresentare. Il pannello dice che cos'è e a chi punta.
-  if (rel.kind === "note-link") {
-    return (
-      <div className="flex flex-col gap-3 p-3">
-        <p className="text-xs text-muted-foreground">{RELATION_LABEL["note-link"]}</p>
-        <p className="text-sm">
-          La nota commenta <span className="font-medium">{rel.target.class}</span>.
-        </p>
-      </div>
-    )
-  }
   return (
     <div className="flex flex-col gap-3 p-3">
       <p className="text-xs text-muted-foreground">{rel.source.class} → {rel.target.class}</p>
@@ -178,20 +128,11 @@ function RelationProperties({ relationKey: key }: { relationKey: string }) {
  * delle due. Nessuna riga di form per membro, deliberatamente: sarebbe la ricostruzione
  * dell'alternativa scartata nel brainstorming (§15 della spec), e due editor per lo stesso dato
  * divergerebbero.
- *
- * Classi e note condividono lo spazio di chiavi di selezione (`selId("node", ...)`, §4 della
- * spec): una singola chiave selezionata va quindi ancora distinta, e lo si fa come altrove
- * (`kinds/class.tsx`, `use-canvas-interaction.ts`) guardando in quale dei due record del modello
- * la chiave compare.
  */
 export function ClassProperties() {
   const selection = useStore(sessionStore, (s) => s.selection)
   const nodes = familySelectedKeys(selection, "node", "class")
-  const key = nodes.length === 1 ? nodes[0]! : undefined
-  const isNote = useStore(documentStore, (s) => key !== undefined && key in classDiagram(s.doc).model.notes)
-  if (key !== undefined) {
-    return isNote ? <NoteProperties key={key} noteKey={key} /> : <ClassNodeProperties key={key} classKey={key} />
-  }
+  if (nodes.length === 1) return <ClassNodeProperties key={nodes[0]} classKey={nodes[0]!} />
   const relations = familySelectedKeys(selection, "edge", "class")
   return <RelationProperties key={relations[0]} relationKey={relations[0]!} />
 }

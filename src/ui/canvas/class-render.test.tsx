@@ -1,22 +1,10 @@
-// @vitest-environment jsdom
-//
-// jsdom e non l'ambiente di default (node): il test su `ClassEdge` in coda al file monta il
-// componente connesso allo store con `react-dom/client`, che ha bisogno di un DOM per esistere.
-// `renderToStaticMarkup` (usato da tutti gli altri test di questo file) funziona comunque sotto
-// jsdom — resta un renderer a stringa, non tocca il DOM — quindi il cambio d'ambiente non li
-// riguarda.
-import { act } from "react"
-import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import { createDocument } from "@/model/document"
 import { classSize } from "@/editor/class/geometry"
-import { documentStore } from "@/editor/document-store"
 import { HEADER_H } from "@/editor/geometry"
 import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import { ClassNodeView } from "./ClassNode"
-import { ClassEdge, ClassEdgeView } from "./ClassEdge"
-import { ClassNoteView } from "./ClassNote"
+import { ClassEdgeView } from "./ClassEdge"
 
 const cliente: ClassNode = {
   name: "Cliente", stereotype: "class",
@@ -191,67 +179,5 @@ describe("ClassEdgeView", () => {
     const con = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association", { name: "possiede" })} {...rects} selected={false} offset={0} />)
     expect(con).toContain("data-edge-label")
     expect(con).toContain(">possiede<")
-  })
-})
-
-describe("ClassNoteView", () => {
-  const nota = { text: "prima\nseconda" }
-
-  it("disegna corpo e piega, e una riga di testo per riga di nota", () => {
-    const html = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={nota} view={{ x: 10, y: 20, collapsed: false }} selected={false} />)
-    expect(html).toContain('data-node-id="class/n-1"')
-    expect(html).toContain('transform="translate(10 20)"')
-    expect(html).toContain("data-note-fold")
-    expect(html).toContain(">prima<")
-    expect(html).toContain(">seconda<")
-  })
-
-  it("una nota vuota non produce righe di testo ma esiste come nodo", () => {
-    const html = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={{ text: "" }} view={{ x: 0, y: 0, collapsed: false }} selected={false} />)
-    expect(html).toContain('data-node-id="class/n-1"')
-    expect(html).not.toContain("<text")
-  })
-
-  it("la selezione cambia il contorno, come per le classi", () => {
-    const sel = renderToStaticMarkup(<ClassNoteView nodeKey="n-1" note={nota} view={{ x: 0, y: 0, collapsed: false }} selected={true} />)
-    expect(sel).toContain("var(--primary)")
-  })
-})
-
-describe("ClassEdge — connesso allo store", () => {
-  /**
-   * `ClassEdgeView` sopra riceve `source`/`target` già come prop: non passa mai dall'hook che
-   * risolve il rettangolo di un estremo dallo store, quindi non avrebbe mai potuto prendere questo
-   * difetto. `useClassRect` (ora `useNodeRect`, `ClassEdge.tsx`) leggeva il rettangolo solo da
-   * `model.classes`; per un ancoraggio nota→classe il `source` della relazione è la chiave di una
-   * nota, quindi tornava sempre `null` e `ClassEdge` usciva `null` — l'arco non si montava mai sul
-   * canvas dal vivo, anche con un modello e un export corretti (`buildSvg` risolve gli stessi
-   * estremi con `familyOps(doc, "class").rectOf`, che le note le risolve già). Verificato che questo test è
-   * rosso sulla versione precedente di `ClassEdge.tsx` (l'hook che leggeva solo `model.classes`)
-   * prima di scrivere la correzione.
-   */
-  it("un ancoraggio nota→classe monta comunque un arco, non solo un arco fra classi", () => {
-    const doc = createDocument("t")
-    doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
-    doc.diagram.class.model.notes["n-1"] = { text: "promemoria" }
-    doc.diagram.class.model.relations["ancora"] = {
-      kind: "note-link",
-      source: { class: "n-1", multiplicity: "", role: "" },
-      target: { class: "Cliente", multiplicity: "", role: "" },
-    }
-    doc.diagram.class.view.nodes["Cliente"] = { x: 0, y: 0, collapsed: false }
-    doc.diagram.class.view.nodes["n-1"] = { x: 200, y: 0, collapsed: false }
-    documentStore.getState().load(doc)
-
-    const container = document.createElement("div")
-    const root = createRoot(container)
-    try {
-      act(() => {
-        root.render(<ClassEdge edgeKey="ancora" offset={0} />)
-      })
-      expect(container.innerHTML).toContain('data-edge-id="class/ancora"')
-    } finally {
-      root.unmount()
-    }
   })
 })

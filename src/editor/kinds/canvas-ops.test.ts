@@ -282,3 +282,105 @@ describe("canvasOps (collegamenti)", () => {
     expect(issues.some((i) => i.code === "link-attribute-missing" && i.edge === link)).toBe(true)
   })
 })
+
+describe("canvasOps e le note (spec 3a §5)", () => {
+  const add = (at: { x: number; y: number }, family: "er" | "note" | "flow", variant?: string) => {
+    const { key, recipe } = canvasOps(state().doc).addNode(at, family, variant)
+    state().dispatch(recipe)
+    return key
+  }
+  const anchorOf = (note: string) => state().doc.diagram.note.model.notes[splitKey(note).key]!.anchor
+  const connect = (from: string, to: string) => {
+    const r = canvasOps(state().doc).addEdge(from, to)
+    if (r?.type === "created") state().dispatch(r.recipe)
+    return r
+  }
+
+  it("Collega da una nota a un'entità scrive l'àncora, e la chiave è quella della nota", () => {
+    const entity = add({ x: 0, y: 0 }, "er")
+    const note = add({ x: 0, y: 300 }, "note")
+    const r = connect(note, entity)
+    expect(r?.type).toBe("created")
+    expect(r?.type === "created" && r.key).toBe(note)
+    expect(anchorOf(note)).toBe(entity)
+  })
+
+  it("nel verso opposto ancora lo stesso, e verso l'àncora che ha già non crea niente", () => {
+    // Review Focus 4.
+    const entity = add({ x: 0, y: 0 }, "er")
+    const note = add({ x: 0, y: 300 }, "note")
+    connect(entity, note)
+    expect(anchorOf(note)).toBe(entity)
+    expect(canvasOps(state().doc).addEdge(note, entity)).toEqual({ type: "existing", key: note })
+  })
+
+  it("un nuovo Collega sostituisce l'àncora", () => {
+    const first = add({ x: 0, y: 0 }, "er")
+    const second = add({ x: 400, y: 0 }, "er")
+    const note = add({ x: 0, y: 300 }, "note")
+    connect(note, first)
+    connect(note, second)
+    expect(anchorOf(note)).toBe(second)
+  })
+
+  it("una nota si ancora a un pool, ma un pool resta escluso da ogni altro collegamento", () => {
+    state().load(withPool(createDocument("t", "t")))
+    const note = add({ x: 0, y: 400 }, "note")
+    const nodo = add({ x: 900, y: 0 }, "flow", "process")
+    expect(connect("flow/p1", note)?.type).toBe("created")
+    expect(anchorOf(note)).toBe("flow/p1")
+    expect(canvasOps(state().doc).addEdge("flow/p1", nodo)).toBeNull()
+  })
+
+  it("due note non si collegano", () => {
+    const a = add({ x: 0, y: 0 }, "note")
+    const b = add({ x: 300, y: 0 }, "note")
+    expect(canvasOps(state().doc).addEdge(a, b)).toBeNull()
+  })
+
+  it("la linea tocca sia la nota sia l'elemento, e ha una geometria senza marker", () => {
+    const entity = add({ x: 0, y: 0 }, "er")
+    const note = add({ x: 0, y: 300 }, "note")
+    connect(note, entity)
+    const ops = canvasOps(state().doc)
+    const line = { key: note, source: note, target: entity }
+    expect(ops.edgesTouching(new Set([entity]))).toContainEqual(line)
+    expect(ops.edgesTouching(new Set([note]))).toContainEqual(line)
+    expect(ops.edgeGeometry(note, ops.rectOf(note)!, ops.rectOf(entity)!)?.targetMarker).toBe("")
+  })
+
+  it("Canc sulla linea stacca la nota, che resta", () => {
+    const entity = add({ x: 0, y: 0 }, "er")
+    const note = add({ x: 0, y: 300 }, "note")
+    connect(note, entity)
+    state().dispatch(canvasOps(state().doc).deleteItems([], [note])!)
+    expect(anchorOf(note)).toBeNull()
+    expect(canvasOps(state().doc).nodeKeys()).toContain(note)
+  })
+
+  it("eliminare l'elemento stacca la nota, e un solo annulla riporta entrambi", () => {
+    // Review Focus 3.
+    const entity = add({ x: 0, y: 0 }, "er")
+    const note = add({ x: 0, y: 300 }, "note")
+    connect(note, entity)
+    state().dispatch(canvasOps(state().doc).deleteItems([entity], [])!)
+    expect(anchorOf(note)).toBeNull()
+    state().undo()
+    expect(anchorOf(note)).toBe(entity)
+    expect(canvasOps(state().doc).nodeKeys()).toContain(entity)
+  })
+
+  it("eliminare un pool ancorato stacca la nota", () => {
+    // Review Focus 2.
+    state().load(withPool(createDocument("t", "t")))
+    const note = add({ x: 0, y: 400 }, "note")
+    connect(note, "flow/p1")
+    state().dispatch(canvasOps(state().doc).deleteItems(["flow/p1"], [])!)
+    expect(anchorOf(note)).toBeNull()
+  })
+
+  it("le note contano come contenuto", () => {
+    add({ x: 0, y: 0 }, "note")
+    expect(familyHasContent(state().doc, "note")).toBe(true)
+  })
+})

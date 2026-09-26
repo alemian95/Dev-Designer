@@ -1,9 +1,10 @@
 import { splitKey, type Family } from "@/model/family"
 import { parseSelId, type SelectionKind, type SessionState } from "./session-store"
 
-// `qualify` e `splitKey` stanno nel modello (lo schema dei collegamenti legge il prefisso): qui si
-// ri-esportano, così canvas, pannelli e comandi continuano a importarli da un posto solo.
-export { qualify, splitKey } from "@/model/family"
+// `qualify`, `splitKey` e `inFamily` stanno nel modello (lo schema dei collegamenti legge il
+// prefisso): qui si ri-esportano, così canvas, pannelli e comandi continuano a importarli da un
+// posto solo.
+export { inFamily, qualify, splitKey } from "@/model/family"
 
 const LINK_PREFIX = "link/"
 

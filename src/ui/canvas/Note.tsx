@@ -1,18 +1,18 @@
 import { memo } from "react"
 import { useStore } from "zustand"
-import { classDiagram } from "@/editor/class-access"
-import { noteSize, notePath } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
 import { PAD_X, ROW_H } from "@/editor/geometry"
+import { notePath, noteSize } from "@/editor/note/geometry"
+import { noteDiagram } from "@/editor/note-access"
 import { selId, sessionStore } from "@/editor/session-store"
-import type { ClassNote } from "@/model/class/schema"
 import type { NodeView } from "@/model/shared"
 import { registerNode } from "./dom-registry"
 
 interface Props {
-  nodeKey: string
-  note: ClassNote
+  /** La chiave con prefisso: la nota si registra e si colpisce con quella. */
+  id: string
+  note: { text: string }
   view: NodeView
   selected: boolean
 }
@@ -24,8 +24,7 @@ interface Props {
  *
  * Nessuno scomparto, nessun header: una nota è testo e basta, e `collapsed` non le si applica.
  */
-export const ClassNoteView = memo(function ClassNoteView({ nodeKey, note, view, selected }: Props) {
-  const id = qualify("class", nodeKey)
+export const NoteView = memo(function NoteView({ id, note, view, selected }: Props) {
   const { w, h } = noteSize(note)
   const { body, fold } = notePath(w, h)
   const lines = note.text === "" ? [] : note.text.split("\n")
@@ -55,10 +54,11 @@ export const ClassNoteView = memo(function ClassNoteView({ nodeKey, note, view, 
 })
 
 /** Componente connesso: un selettore per nota, così un cambiamento altrove non la tocca. */
-export function ClassNoteNode({ nodeKey }: { nodeKey: string }) {
-  const note = useStore(documentStore, (s) => classDiagram(s.doc).model.notes[nodeKey])
-  const view = useStore(documentStore, (s) => classDiagram(s.doc).view.nodes[nodeKey])
-  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", qualify("class", nodeKey))))
+export function NoteNode({ nodeKey }: { nodeKey: string }) {
+  const id = qualify("note", nodeKey)
+  const note = useStore(documentStore, (s) => noteDiagram(s.doc).model.notes[nodeKey])
+  const view = useStore(documentStore, (s) => noteDiagram(s.doc).view.nodes[nodeKey])
+  const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", id)))
   if (!note || !view) return null
-  return <ClassNoteView nodeKey={nodeKey} note={note} view={view} selected={selected} />
+  return <NoteView id={id} note={note} view={view} selected={selected} />
 }

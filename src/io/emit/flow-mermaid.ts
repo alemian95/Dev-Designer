@@ -1,4 +1,6 @@
 import type { FlowModel, FlowShape } from "@/model/flow/schema"
+import { splitKey } from "@/model/family"
+import type { Note } from "@/model/note/schema"
 import type { EmitResult } from "./result"
 
 /**
@@ -31,22 +33,13 @@ function escapeLabel(text: string): string {
     .replaceAll("\n", "<br/>")
 }
 
-/**
- * Il template Mermaid per ciascuna forma. `note` è nella mappa solo per restare `Record<FlowShape,
- * …>` — totale, senza `Exclude` che poi `noUncheckedIndexedAccess` non riesce a far tornare al
- * chiamante come narrowing — ma non viene mai invocata: `emitFlowMermaid` filtra le note prima di
- * arrivare qui (si omettono con avviso, spec §10), quindi il `throw` è morto per costruzione.
- * L'etichetta arriva già scappata da `escapeLabel`.
- */
+/** Il template Mermaid per ciascuna forma. L'etichetta arriva già scappata da `escapeLabel`. */
 const SHAPE_TEMPLATE: Record<FlowShape, (id: string, label: string) => string> = {
   terminal: (id, label) => `${id}(["${label}"])`,
   process: (id, label) => `${id}["${label}"]`,
   decision: (id, label) => `${id}{"${label}"}`,
   io: (id, label) => `${id}[/"${label}"/]`,
   subprocess: (id, label) => `${id}[["${label}"]]`,
-  note: () => {
-    throw new Error("una nota non emette mai un nodo: emitFlowMermaid la esclude prima di arrivare qui")
-  },
 }
 
 /** Confronto per code unit UTF-16: lo stesso su ogni macchina, a differenza di `localeCompare`. */
@@ -64,27 +57,17 @@ const byCodeUnit = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0
  * spostato. Gli id sono `n1..nN` per i nodi, `p1..pN` per i pool e `l1..lN` per le corsie, contate
  * tutte in quell'ordine, anche quelle vuote.
  *
- * Le note sono escluse dalla numerazione: non emettono mai un nodo, quindi non consumano un id. Un
- * pool o una corsia senza nodi emettibili non escono: sarebbero un riquadro vuoto.
+ * Un pool o una corsia senza nodi emettibili non escono: sarebbero un riquadro vuoto.
  */
-export function emitFlowMermaid(model: FlowModel): EmitResult {
+export function emitFlowMermaid(model: FlowModel, notes: Readonly<Record<string, Note>> = {}): EmitResult {
   const out = ["flowchart LR"]
   const nodeIdByKey = new Map<string, string>()
   let nextNodeId = 1
-  let noteCount = 0
   let hasSubgraph = false
-  let noteEdgeCount = 0
 
-  /** Le chiavi emettibili di una corsia (o dei liberi, con `null`), in ordine; le note si contano e basta. */
+  /** Le chiavi emettibili di una corsia (o dei liberi, con `null`), in ordine. */
   const emittable = (lane: string | null): string[] =>
-    Object.keys(model.nodes)
-      .filter((key) => model.nodes[key]!.lane === lane)
-      .sort()
-      .filter((key) => {
-        if (model.nodes[key]!.shape !== "note") return true
-        noteCount += 1
-        return false
-      })
+    Object.keys(model.nodes).filter((key) => model.nodes[key]!.lane === lane).sort()
 
   const emitNode = (key: string, indent: string) => {
     const node = model.nodes[key]!
@@ -119,18 +102,8 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
     const edge = model.edges[key]!
     const sourceId = nodeIdByKey.get(edge.source)
     const targetId = nodeIdByKey.get(edge.target)
-    if (sourceId === undefined || targetId === undefined) {
-      // Una nota è comunque un nodo di `model.nodes` — `validateFlow` non la tratta come un
-      // estremo assente, quindi `flow-dangling-edge` non scatta e il pannello problemi tace.
-      // L'unico posto che sa che l'arco è sparito è qui: si conta, per l'avviso aggregato sotto.
-      // Un estremo davvero inesistente (chiave che non è in `model.nodes` per niente) è invece
-      // un invariante rotto che `validateFlow` segnala già come `flow-dangling-edge` — qui non
-      // aggiunge un secondo conteggio, si scarta e basta.
-      const sourceIsNote = model.nodes[edge.source]?.shape === "note"
-      const targetIsNote = model.nodes[edge.target]?.shape === "note"
-      if (sourceIsNote || targetIsNote) noteEdgeCount += 1
-      continue
-    }
+    // Un estremo inesistente lo segnala già `validateFlow` (`flow-dangling-edge`): qui si scarta e basta.
+    if (sourceId === undefined || targetId === undefined) continue
     const label = edge.label === "" ? "" : `|"${escapeLabel(edge.label)}"|`
     out.push(`  ${sourceId} -->${label} ${targetId}`)
   }
@@ -141,20 +114,12 @@ export function emitFlowMermaid(model: FlowModel): EmitResult {
       "I pool e le corsie sono usciti come riquadri annidati (subgraph): Mermaid non disegna corsie come bande orizzontali vere.",
     )
   }
-  if (noteCount > 0) {
-    // Singolare e plurale corretti (minori della correzione finale): a 1 "1 note non sono uscite"
-    // legge come un refuso, non come un conteggio.
+  const anchored = Object.values(notes).filter((n) => n.anchor !== null && splitKey(n.anchor).family === "flow").length
+  if (anchored > 0) {
     warnings.push(
-      noteCount === 1
-        ? `1 nota non è uscita: in Mermaid entrerebbe nel flusso come un nodo qualunque e ne sposterebbe il layout.`
-        : `${noteCount} note non sono uscite: in Mermaid entrerebbero nel flusso come nodi qualunque e ne sposterebbero il layout.`,
-    )
-  }
-  if (noteEdgeCount > 0) {
-    warnings.push(
-      noteEdgeCount === 1
-        ? `1 arco non è uscito perché tocca una nota: una nota non è un nodo del flusso in Mermaid.`
-        : `${noteEdgeCount} archi non sono usciti perché toccano una nota: una nota non è un nodo del flusso in Mermaid.`,
+      anchored === 1
+        ? "1 nota ancorata al flusso non è uscita: i flowchart di Mermaid non hanno note."
+        : `${anchored} note ancorate al flusso non sono uscite: i flowchart di Mermaid non hanno note.`,
     )
   }
 

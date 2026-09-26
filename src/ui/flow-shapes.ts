@@ -1,4 +1,4 @@
-import { Circle, Diamond, Layers, Parentheses, Square, StickyNote, type LucideIcon } from "lucide-react"
+import { Circle, Diamond, Layers, Parentheses, Square, type LucideIcon } from "lucide-react"
 import { FlowShapeSchema, type FlowShape } from "@/model/flow/schema"
 
 /**
@@ -17,7 +17,6 @@ export const FLOW_SHAPE_LABEL: Record<FlowShape, string> = {
   decision: "Decisione",
   io: "Input/Output",
   subprocess: "Sottoprocesso",
-  note: "Nota",
 }
 
 export const FLOW_SHAPE_ICON: Record<FlowShape, LucideIcon> = {
@@ -26,9 +25,8 @@ export const FLOW_SHAPE_ICON: Record<FlowShape, LucideIcon> = {
   decision: Diamond,
   io: Parentheses,
   subprocess: Layers,
-  note: StickyNote,
 }
 
-/** Le sei forme nell'ordine di presentazione: quello di `FlowShapeSchema`, non l'ordine
+/** Le cinque forme nell'ordine di presentazione: quello di `FlowShapeSchema`, non l'ordine
  *  d'inserimento di un `Record`, che per chiavi stringa non è garantito. */
 export const FLOW_SHAPES = FlowShapeSchema.options

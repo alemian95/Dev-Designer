@@ -42,8 +42,6 @@ function hitTest(el: Element | null): Hit {
  */
 function classEditTarget(key: string, headerHit: boolean): "name" | "body" {
   const diagram = classDiagram(documentStore.getState().doc)
-  // Una nota non ha nome: qualunque punto del suo rettangolo apre il corpo.
-  if (diagram.model.notes[key]) return "body"
   const cls = diagram.model.classes[key]
   const view = diagram.view.nodes[key]
   const emptyExpanded = !!cls && !view?.collapsed && cls.attributes.length === 0 && cls.methods.length === 0

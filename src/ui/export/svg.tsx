@@ -37,7 +37,7 @@ function nodeModelsOf(doc: DevDocument, family: Family): Record<string, unknown>
     case "er":
       return erDiagram(doc).model.entities
     case "class":
-      return { ...classDiagram(doc).model.classes, ...classDiagram(doc).model.notes }
+      return classDiagram(doc).model.classes
     case "flow":
       return flowDiagram(doc).model.nodes
     case "note":

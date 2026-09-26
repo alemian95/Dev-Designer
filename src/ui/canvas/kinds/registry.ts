@@ -54,10 +54,8 @@ export interface ToolDef {
   variant?: string
 }
 
-/**
- * Identità di uno strumento nel ToggleGroup. La famiglia serve: «Nota di classe» e «Nota di flusso»
- * sono entrambe `node` con variante `note`, e senza la famiglia avrebbero lo stesso id.
- */
+/** Identità di uno strumento nel ToggleGroup: strumento, famiglia e variante, perché due famiglie
+ *  possono dichiarare la stessa variante. */
 export function toolId(def: Pick<ToolDef, "tool" | "family" | "variant">): string {
   return [def.tool, def.family, def.variant].filter(Boolean).join(":")
 }

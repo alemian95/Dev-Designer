@@ -45,10 +45,6 @@ export function validateFlow(model: FlowModel): Issue[] {
   }
 
   for (const [key, node] of Object.entries(nodes)) {
-    // La nota non partecipa al flusso (spec §9): non ha arità, non è un vicolo cieco, non è
-    // irraggiungibile — è un riquadro di testo, non un passo del processo.
-    if (node.shape === "note") continue
-
     const outgoing = outgoingEdges.get(key) ?? []
 
     if (node.shape === "decision" && outgoing.length < 2) {
@@ -103,7 +99,6 @@ export function validateFlow(model: FlowModel): Issue[] {
     }
 
     for (const [key, node] of Object.entries(nodes)) {
-      if (node.shape === "note") continue
       if (!reached.has(key)) {
         issues.push({ code: "flow-unreachable", severity: "warning", node: key, message: `"${node.label}" non è raggiungibile da nessun ingresso` })
       }

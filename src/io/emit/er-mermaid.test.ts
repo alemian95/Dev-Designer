@@ -233,3 +233,16 @@ describe("emitMermaid", () => {
     )
   })
 })
+
+describe("emitMermaid: le note ancorate alle entità", () => {
+  const model = { entities: {}, relationships: {} }
+
+  it("l'avviso le conta, al singolare e al plurale, e ignora le altre", () => {
+    expect(emitMermaid(model, { a: { text: "", anchor: "er/ordini" } }).warnings).toContain(
+      "1 nota ancorata a un'entità non è uscita: i diagrammi ER di Mermaid non hanno note.",
+    )
+    expect(
+      emitMermaid(model, { a: { text: "", anchor: "er/ordini" }, b: { text: "", anchor: "er/clienti" }, c: { text: "", anchor: null } }).warnings,
+    ).toContain("2 note ancorate a entità non sono uscite: i diagrammi ER di Mermaid non hanno note.")
+  })
+})

@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createDocument, DocumentSchema } from "../document"
 import { SCHEMA_VERSION } from "../shared"
-import {
-  CLASS_RELATION_KINDS, ClassDiagramSchema, ClassModelSchema, ClassRelationSchema,
-  isClassRelation, RelationKindSchema,
-} from "./schema"
+import { ClassDiagramSchema, ClassRelationSchema } from "./schema"
 
 /** Un diagramma di classi minimo con due classi e una relazione fra loro.
  *  `patch` sovrascrive campi della relazione, per provare i casi rifiutati. */
@@ -23,7 +20,6 @@ function diagrammaConRelazione(patch: Record<string, unknown>) {
           ...patch,
         },
       },
-      notes: {},
     },
     view: { nodes: {} },
   }
@@ -42,7 +38,7 @@ describe("schema del class diagram", () => {
 
   it("uno stereotipo fuori dai quattro è rifiutato", () => {
     const r = ClassDiagramSchema.safeParse({
-      model: { classes: { X: { name: "X", stereotype: "trait", attributes: [], methods: [] } }, relations: {}, notes: {} },
+      model: { classes: { X: { name: "X", stereotype: "trait", attributes: [], methods: [] } }, relations: {} },
       view: { nodes: {} },
     })
     expect(r.success).toBe(false)
@@ -70,52 +66,17 @@ describe("schema del class diagram", () => {
     doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
     doc.diagram.er.model.entities["clienti"] = { name: "clienti", attributes: [] }
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
-    // La versione è quella corrente: la 5 → 6 raccoglie le corsie dei flowchart nei pool.
+    // La versione è quella corrente: la 6 → 7 porta le note nella loro famiglia.
     expect(SCHEMA_VERSION).toBe(7)
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })
 
-describe("note e navigabilità", () => {
-  it("un modello senza notes non passa più", () => {
-    const senza = { classes: {}, relations: {} }
-    expect(ClassModelSchema.safeParse(senza).success).toBe(false)
-  })
-
-  it("una nota è testo libero, anche vuoto e multiriga", () => {
-    const modello = { classes: {}, relations: {}, notes: { n1: { text: "" }, n2: { text: "prima\nseconda" } } }
-    expect(ClassModelSchema.parse(modello).notes.n2!.text).toBe("prima\nseconda")
-  })
-
+describe("navigabilità", () => {
   it("navigable è opzionale: una relazione senza il campo resta valida", () => {
     const rel = { kind: "association", source: { class: "A", multiplicity: "", role: "" }, target: { class: "B", multiplicity: "", role: "" } }
     const parsed = ClassRelationSchema.parse(rel)
     expect(parsed.navigable).toBeUndefined()
     expect(ClassRelationSchema.parse({ ...rel, navigable: true }).navigable).toBe(true)
-  })
-
-  it("createDocument nasce con le note di classe vuote e alla versione corrente", () => {
-    const doc = createDocument("Prova", "id-fisso")
-    expect(doc.diagram.class.model.notes).toEqual({})
-    expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
-  })
-})
-
-describe("note-link", () => {
-  const end = (c: string) => ({ class: c, multiplicity: "", role: "" })
-
-  it("è una specie di relazione valida", () => {
-    expect(RelationKindSchema.parse("note-link")).toBe("note-link")
-  })
-
-  it("non è una relazione fra classi: isClassRelation la esclude", () => {
-    expect(isClassRelation({ kind: "note-link", source: end("n1"), target: end("Cliente") })).toBe(false)
-    expect(isClassRelation({ kind: "association", source: end("A"), target: end("B") })).toBe(true)
-  })
-
-  it("non compare fra le specie che il selettore offre: si crea col gesto, non si sceglie", () => {
-    expect(CLASS_RELATION_KINDS).toEqual([
-      "association", "generalization", "realization", "composition", "aggregation", "dependency",
-    ])
   })
 })

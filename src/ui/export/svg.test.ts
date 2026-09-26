@@ -213,7 +213,6 @@ function classDiagram(): ClassDiagram {
           target: { class: "Persona", multiplicity: "", role: "" },
         },
       },
-      notes: {},
     },
     view: {
       nodes: {
@@ -339,7 +338,7 @@ describe("buildSvg (class diagram)", () => {
   })
 
   it("restituisce null su un diagramma senza classi: non c'è niente da esportare", () => {
-    const empty = { model: { classes: {}, relations: {}, notes: {} }, view: { nodes: {} } } as ClassDiagram
+    const empty = { model: { classes: {}, relations: {} }, view: { nodes: {} } } as ClassDiagram
     expect(buildSvg(docOf("class", empty), { vars })).toBeNull()
   })
 
@@ -364,14 +363,6 @@ describe("buildSvg (class diagram)", () => {
     expect(hOf(collassato)).toBeLessThan(hOf(aperto))
   })
 
-  it("esporta anche le note, che sono nodi come le classi", () => {
-    const d = classDiagram()
-    d.model.notes = { "n-1": { text: "da rivedere" } }
-    d.view.nodes["n-1"] = { x: 700, y: 700, collapsed: false }
-    const svg = buildSvg(docOf("class", d), { vars })!
-    expect(svg).toContain('data-node-id="class/n-1"')
-    expect(svg).toContain(">da rivedere<")
-  })
 })
 
 /**
@@ -439,7 +430,7 @@ describe("collegamenti nell'export", () => {
       diagram: {
         ...doc.diagram,
         class: {
-          model: { classes: { Ordine: { name: "Ordine", stereotype: "class", attributes: [], methods: [] } }, relations: {}, notes: {} },
+          model: { classes: { Ordine: { name: "Ordine", stereotype: "class", attributes: [], methods: [] } }, relations: {} },
           view: { nodes: { Ordine: { x: 900, y: 200, collapsed: false } } },
         },
         links: { l1: { kind: "maps-to", source: "class/Ordine", target } },

@@ -9,6 +9,7 @@ import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { flowDiagram } from "@/editor/flow-access"
 import { familyHasContent } from "@/editor/kinds/canvas-ops"
+import { noteDiagram } from "@/editor/note-access"
 import { emitDdl } from "@/io/emit/ddl"
 import type { Dialect } from "@/io/ddl/schema"
 import { emitClassMermaid } from "@/io/emit/class-mermaid"
@@ -21,6 +22,7 @@ import type { ClassModel } from "@/model/class/schema"
 import type { ErModel } from "@/model/er/schema"
 import type { Family } from "@/model/family"
 import type { FlowModel } from "@/model/flow/schema"
+import type { Note } from "@/model/note/schema"
 import { documentFileName } from "./file-name"
 
 type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid"
@@ -37,11 +39,12 @@ const FORMAT_FAMILY: Record<Format, ExportFamily> = {
   "flow-mermaid": "flow",
 }
 
-/** I modelli delle famiglie, letti dal selettore: tre riferimenti stabili, confrontati da `useShallow`. */
+/** I modelli delle famiglie, letti dal selettore: riferimenti stabili, confrontati da `useShallow`. */
 interface Models {
   er: ErModel | null
   class: ClassModel | null
   flow: FlowModel | null
+  notes: Readonly<Record<string, Note>>
 }
 
 function emit(models: Models, format: Format): EmitResult {
@@ -51,11 +54,11 @@ function emit(models: Models, format: Format): EmitResult {
     case "mysql":
       return models.er ? emitDdl(models.er, format) : empty
     case "mermaid":
-      return models.er ? emitMermaid(models.er) : empty
+      return models.er ? emitMermaid(models.er, models.notes) : empty
     case "class-mermaid":
-      return models.class ? emitClassMermaid(models.class) : empty
+      return models.class ? emitClassMermaid(models.class, models.notes) : empty
     case "flow-mermaid":
-      return models.flow ? emitFlowMermaid(models.flow) : empty
+      return models.flow ? emitFlowMermaid(models.flow, models.notes) : empty
   }
 }
 
@@ -107,6 +110,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
         er: has("er") ? erDiagram(s.doc).model : null,
         class: has("class") ? classDiagram(s.doc).model : null,
         flow: has("flow") ? flowDiagram(s.doc).model : null,
+        notes: noteDiagram(s.doc).model.notes,
       }
     }),
   )

@@ -4,18 +4,9 @@ import type { DevDocument } from "@/model/document"
 import type { Issue } from "@/model/issue"
 import type { LayoutGraph } from "@/model/layout"
 import { classDiagram } from "../class-access"
-import {
-  addClass,
-  addNote,
-  addNoteLink,
-  addRelation,
-  classLayoutGraph,
-  deleteClassItems,
-  duplicateClasses,
-} from "../class/commands"
+import { addClass, addRelation, classLayoutGraph, deleteClassItems, duplicateClasses } from "../class/commands"
 import { classEdgeGeometry, classEdgeOffsets, classRect } from "../class/geometry"
 import type { EdgeGeometry } from "../edge-routing"
-import { noteRect } from "../note/geometry"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
@@ -35,11 +26,7 @@ export function classOps(doc: DevDocument): DiagramOps {
       if (!view) return null
       const at_ = at ? { ...view, ...at } : view
       const cls = diagram().model.classes[key]
-      if (cls) return classRect(cls, at_)
-      // `view.nodes` è lo spazio di chiavi condiviso fra classi e note (§4 della spec): una chiave
-      // che non è una classe può essere una nota, e solo qui si sa quale delle due.
-      const note = diagram().model.notes[key]
-      return note ? noteRect(note, at_) : null
+      return cls ? classRect(cls, at_) : null
     },
 
     edgesTouching: (keys): EdgeEnds[] =>
@@ -53,36 +40,14 @@ export function classOps(doc: DevDocument): DiagramOps {
       return rel ? classEdgeGeometry(a, b, rel, classEdgeOffsets(model.relations).get(key) ?? 0) : null
     },
 
-    // Ogni variante diversa da «note» è uno stereotipo (`DiagramView.tools`); nessuna variante è «class».
-    addNode: (at, variant) =>
-      variant === "note"
-        ? { ...addNote(at), edit: "body" }
-        : { ...addClass(diagram().model.classes, at, StereotypeSchema.catch("class").parse(variant)), edit: "name" },
+    addNode: (at, variant) => ({ ...addClass(diagram().model.classes, at, StereotypeSchema.catch("class").parse(variant)), edit: "name" }),
 
-    // Una nota non può essere estremo di una relazione fra classi, ma può esserlo di un
-    // **ancoraggio**: è il gesto con cui si dichiara la classe che commenta. `addNoteLink`
-    // normalizza la direzione e torna `null` per nota → nota, che resta senza effetto come prima.
-    addEdge: (source, target) => {
-      const model = diagram().model
-      if (source in model.notes || target in model.notes) return addNoteLink(model, source, target)
-      return addRelation(model.relations, source, target)
-    },
+    addEdge: (source, target) => addRelation(diagram().model.relations, source, target),
 
-    // Ciascuna delle due specie si riconosce dalla propria mappa, non per esclusione dall'altra:
-    // `rectOf` qui sopra usa già il pattern giusto, e una chiave che non fosse né classe né nota
-    // finirebbe altrimenti fra le classi. Oggi non può succedere — le chiavi vengono da `nodeKeys()`,
-    // che enumera `view.nodes` — ma dedurre per esclusione è vero solo finché le specie restano due.
-    deleteItems: (nodeKeys, edgeKeys) => {
-      const { classes, notes } = diagram().model
-      const noteKeys = nodeKeys.filter((k) => k in notes)
-      const classKeys = nodeKeys.filter((k) => k in classes)
-      return deleteClassItems(classKeys, edgeKeys, noteKeys)
-    },
+    deleteItems: (nodeKeys, edgeKeys) => deleteClassItems(nodeKeys, edgeKeys),
 
     duplicateNodes: (keys) => duplicateClasses(diagram().model, keys),
 
-    // Il grafo da disporre — classi, note e i loro archi — è tutto in `classLayoutGraph`, che ha
-    // già il docblock per il perché.
     layoutGraph: (): LayoutGraph => classLayoutGraph(diagram()),
 
     validate: (): Issue[] => validateClass(diagram().model),

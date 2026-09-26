@@ -59,7 +59,6 @@ export function verificaContrattoOps(family: Family, docConDueNodiEUnArco: () =>
       const doc = docConDueNodiEUnArco()
       const ops = familyOps(doc, family)
       const [a, b] = ops.nodeKeys()
-      // Non-null: né `a` né `b` sono note in questo documento, quindi `addEdge` non torna mai null qui.
       const { recipe } = ops.addEdge(a!, b!)!
       recipe(doc)
       expect(familyOps(doc, family).edgesTouching(new Set([a!]))).toHaveLength(2)
@@ -141,88 +140,6 @@ function docClass(): DevDocument {
 }
 
 verificaContrattoOps("class", docClass)
-
-describe("classOps e le note", () => {
-  /** Documento con una classe e una nota, entrambe con una view. Nomi inventati. */
-  function docConNota() {
-    const doc = createDocument("Prova", "doc-1")
-    doc.diagram.class.model.classes.Cliente = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
-    doc.diagram.class.view.nodes.Cliente = { x: 0, y: 0, collapsed: false }
-    doc.diagram.class.model.notes["n-1"] = { text: "promemoria" }
-    doc.diagram.class.view.nodes["n-1"] = { x: 300, y: 0, collapsed: false }
-    return doc
-  }
-
-  it("nodeKeys elenca classi e note insieme: leggono entrambe da view.nodes", () => {
-    expect(familyOps(docConNota(), "class").nodeKeys().sort()).toEqual(["Cliente", "n-1"])
-  })
-
-  it("rectOf risolve una chiave di nota, non solo una di classe", () => {
-    const ops = familyOps(docConNota(), "class")
-    expect(ops.rectOf("n-1")).not.toBeNull()
-    expect(ops.rectOf("n-1")!.x).toBe(300)
-    expect(ops.rectOf("assente")).toBeNull()
-  })
-
-  it("rectOf su una nota rispetta `at`, che serve all'anteprima del drag", () => {
-    expect(familyOps(docConNota(), "class").rectOf("n-1", { x: 10, y: 20 })!.x).toBe(10)
-  })
-
-  it("edgesTouching non trova niente per una nota: non ha archi", () => {
-    expect(familyOps(docConNota(), "class").edgesTouching(new Set(["n-1"]))).toEqual([])
-  })
-
-  it("addNode con la variante \"note\" produce una chiave nuova e un recipe che la crea", () => {
-    const doc = docConNota()
-    const { key, recipe, edit } = familyOps(doc, "class").addNode({ x: 40, y: 40 }, "note")
-    recipe(doc)
-    const ops = familyOps(doc, "class")
-    expect(ops.nodeKeys()).toContain(key)
-    expect(doc.diagram.class.model.notes[key]).toBeDefined()
-    expect(edit).toBe("body")
-  })
-
-  it("layoutGraph include la nota libera insieme alla classe", () => {
-    const g = familyOps(docConNota(), "class").layoutGraph()
-    expect(g.nodes.map((n) => n.id).sort()).toEqual(["Cliente", "n-1"])
-  })
-
-  it("addEdge ancora la nota alla classe in entrambi i sensi di trascinamento; nota→nota resta null", () => {
-    // Nota + classe non è più un no-op (spec note ancorate §4): produce un `note-link`.
-    // Resta senza effetto solo nota→nota, l'unico caso che continua a non avere senso.
-    const doc = docConNota()
-    const ops = familyOps(doc, "class")
-    expect(ops.addEdge("n-1", "n-1")).toBeNull()
-
-    const dallaNota = ops.addEdge("n-1", "Cliente")!
-    dallaNota.recipe(doc)
-    expect(doc.diagram.class.model.relations[dallaNota.key]).toMatchObject({ kind: "note-link" })
-
-    const doc2 = docConNota()
-    const dallaClasse = familyOps(doc2, "class").addEdge("Cliente", "n-1")!
-    dallaClasse.recipe(doc2)
-    expect(doc2.diagram.class.model.relations[dallaClasse.key]).toMatchObject({ kind: "note-link" })
-
-    // Il caso classe→classe resta l'unico che produce un'associazione.
-    const doc3 = docConNota()
-    doc3.diagram.class.model.classes.Altra = { name: "Altra", stereotype: "class", attributes: [], methods: [] }
-    doc3.diagram.class.view.nodes.Altra = { x: 500, y: 0, collapsed: false }
-    const result = familyOps(doc3, "class").addEdge("Cliente", "Altra")
-    expect(result).not.toBeNull()
-  })
-
-  it("deleteItems separa le chiavi di nota da quelle di classe: cancella entrambe", () => {
-    const doc = docConNota()
-    const recipe = familyOps(doc, "class").deleteItems(["Cliente", "n-1"], [])
-    expect(recipe).not.toBeNull()
-    recipe!(doc)
-    expect(familyOps(doc, "class").nodeKeys()).toEqual([])
-    // `nodeKeys` da sola non basterebbe: una divisione sbagliata (come la riga provvisoria
-    // del Task 3) svuota comunque `view.nodes`, ma lascia la nota orfana in `model.notes`.
-    expect(doc.diagram.class.model.notes["n-1"]).toBeUndefined()
-    expect(doc.diagram.class.model.classes.Cliente).toBeUndefined()
-  })
-})
 
 describe("classOps e gli stereotipi", () => {
   it.each([

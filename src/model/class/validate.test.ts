@@ -12,7 +12,6 @@ function modello(classi: ClassNode[], relazioni: ClassRelation[] = []): ClassMod
   return {
     classes: Object.fromEntries(classi.map((c) => [c.name, c])),
     relations: Object.fromEntries(relazioni.map((r, i) => [`r${i}`, r])),
-    notes: {},
   }
 }
 
@@ -116,38 +115,5 @@ describe("validateClass", () => {
     // `toEqual([])` e non un filtro sul codice: qui non deve scattare nessuna regola.
     expect(validateClass(modello([classe("A", { stereotype: "abstract", methods: [f] })]))).toEqual([])
     expect(validateClass(modello([classe("B", { stereotype: "interface", methods: [f] })]))).toEqual([])
-  })
-})
-
-describe("ancoraggi delle note", () => {
-  const link = (nota: string, classe: string): ClassRelation =>
-    ({ kind: "note-link", source: end(nota), target: end(classe) })
-
-  const conNota = (relazioni: ClassRelation[], notes: Record<string, { text: string }> = { n1: { text: "x" } }): ClassModel => ({
-    classes: { Cliente: classe("Cliente") },
-    relations: Object.fromEntries(relazioni.map((r, i) => [`r${i}`, r])),
-    notes,
-  })
-
-  it("un ancoraggio sano non produce nessun issue", () => {
-    expect(validateClass(conNota([link("n1", "Cliente")]))).toEqual([])
-  })
-
-  it("ancoraggio verso una classe che non esiste: dangling-relation", () => {
-    const issues = validateClass(conNota([link("n1", "Fantasma")]))
-    expect(issues).toHaveLength(1)
-    expect(issues[0]!.code).toBe("dangling-relation")
-    expect(issues[0]!.message).toContain("Fantasma")
-  })
-
-  it("ancoraggio da una nota che non esiste più: dangling-relation", () => {
-    const issues = validateClass(conNota([link("sparita", "Cliente")]))
-    expect(issues).toHaveLength(1)
-    expect(issues[0]!.code).toBe("dangling-relation")
-    // Messaggio intero, non `toContain`: "sparita" comparirebbe anche nel messaggio del vecchio
-    // ciclo (che cercava `source.class` fra le classi, non fra le note), lasciando verde il test
-    // pure con una regressione che ripristinasse quella ricerca. Solo il testo completo distingue
-    // "ancoraggio ... nota" (giusto) da "relazione ... classe" (il guasto che questa task chiude).
-    expect(issues[0]!.message).toBe('ancoraggio "r0": nota "sparita" inesistente')
   })
 })

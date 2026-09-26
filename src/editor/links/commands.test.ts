@@ -8,7 +8,7 @@ import { connectAcross, deleteLinks, followRename, linksTouching, retargetLinks,
 const state = () => documentStore.getState()
 const links = () => state().doc.diagram.links
 
-/** Un'entità `ordini`, una seconda entità `clienti`, una classe, un'interfaccia, un enum, una nota di classe, un processo `p1`, e una nota di flusso `f1`. */
+/** Un'entità `ordini`, una seconda entità `clienti`, una classe, un'interfaccia, un enum, e un processo `p1`. */
 function documento(): DevDocument {
   const doc = createDocument("t", "t")
   // Un oggetto nuovo per nodo: una view condivisa fra due chiavi diventerebbe un alias nel documento.
@@ -21,12 +21,8 @@ function documento(): DevDocument {
     doc.diagram.class.model.classes[name] = { name, stereotype, attributes: [], methods: [] }
     doc.diagram.class.view.nodes[name] = at()
   }
-  doc.diagram.class.model.notes["n1"] = { text: "" }
-  doc.diagram.class.view.nodes["n1"] = at()
   doc.diagram.flow.model.nodes["p1"] = { label: "Calcola totale", shape: "process", lane: null }
   doc.diagram.flow.view.nodes["p1"] = at()
-  doc.diagram.flow.model.nodes["f1"] = { label: "promemoria", shape: "note", lane: null }
-  doc.diagram.flow.view.nodes["f1"] = at()
   return doc
 }
 
@@ -68,10 +64,9 @@ describe("connectAcross", () => {
     }
   })
 
-  it("un'interfaccia, un enum e una nota non si mappano su una tabella", () => {
+  it("un'interfaccia e un enum non si mappano su una tabella", () => {
     expect(connectAcross(state().doc, "class/Pagabile", "er/ordini")).toEqual({ type: "rejected", notice: "Un'interfaccia non si mappa su una tabella." })
     expect(connectAcross(state().doc, "er/ordini", "class/Stato")).toEqual({ type: "rejected", notice: "Un enum non si mappa su una tabella." })
-    expect(connectAcross(state().doc, "class/n1", "er/ordini")).toEqual({ type: "rejected", notice: "Una nota non si mappa su una tabella." })
   })
 
   it("un secondo gesto fra gli stessi nodi seleziona quello che c'è", () => {
@@ -88,13 +83,6 @@ describe("connectAcross", () => {
       state().dispatch(r.recipe)
     }
     expect(Object.keys(links())).toHaveLength(2)
-  })
-
-  it("le note non leggono, non scrivono, non chiamano e non si chiamano", () => {
-    expect(connectAcross(state().doc, "flow/f1", "er/ordini")).toEqual({ type: "rejected", notice: "Una nota non legge né scrive una tabella." })
-    expect(connectAcross(state().doc, "er/ordini", "flow/f1")).toEqual({ type: "rejected", notice: "Una nota non legge né scrive una tabella." })
-    expect(connectAcross(state().doc, "flow/f1", "class/Ordine")).toEqual({ type: "rejected", notice: "Una nota non chiama una classe." })
-    expect(connectAcross(state().doc, "class/n1", "flow/p1")).toEqual({ type: "rejected", notice: "Una nota non si chiama." })
   })
 
   it("dopo il cambio di modo un secondo gesto seleziona l'accesso che c'è", () => {

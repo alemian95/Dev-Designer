@@ -18,12 +18,10 @@ interface Props {
 }
 
 /**
- * Vista pura e memoizzata del nodo: sulla forma esatta di `ClassNoteView` (`ClassNote.tsx`), che
- * il flowchart riusa invece di riscrivere — un flowchart è fatto delle stesse etichette brevi su
- * più righe di una nota (spec §7). Un solo `<path>` per il corpo, non due come la nota di classe:
- * `shapePath` (Task 6) torna già un contorno completo per ogni forma, angolo ripiegato della nota
- * compreso — il secondo path a due tinte di `ClassNoteView` è un dettaglio decorativo che qui non
- * serve.
+ * Vista pura e memoizzata del nodo: un flowchart è fatto delle stesse etichette brevi su più
+ * righe della nota unica (`NoteView`, `Note.tsx`, spec §7), ma un solo `<path>` per il corpo, non
+ * due: `shapePath` (Task 6) torna già un contorno completo per ogni forma, mentre il secondo path
+ * a due tinte di `NoteView` è un dettaglio decorativo dell'angolo ripiegato che qui non serve.
  *
  * **Il testo si centra**, non si allinea a sinistra come nella nota: un rombo o un parallelogramma
  * non hanno un rettangolo interno comodo per il testo, e il centro è l'unico punto che resta

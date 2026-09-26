@@ -44,7 +44,7 @@ export function notePath(w: number, h: number): { body: string; fold: string } {
 /**
  * La linea di ancoraggio (spec 3a §5): lo stesso instradamento ortogonale dei collegamenti, con
  * scarto 0 perché una nota ha una linea sola, e **nessun marker** a nessuno dei due capi — un
- * ancoraggio non ha verso, come il `note-link` di prima. Tratteggiata la rende chi disegna.
+ * ancoraggio non ha verso. Tratteggiata la rende chi disegna.
  */
 export function anchorGeometry(source: Rect, target: Rect): EdgeGeometry {
   const route = routeEdge(source, target, false)

@@ -1,8 +1,9 @@
-import { isClassRelation } from "@/model/class/schema"
 import type {
-  ClassAttribute, ClassEnd, ClassMethod, ClassModel, ClassNode, ClassRelation, ClassRelationKind, Stereotype,
+  ClassAttribute, ClassEnd, ClassMethod, ClassModel, ClassNode, ClassRelation, RelationKind, Stereotype,
   Visibility,
 } from "@/model/class/schema"
+import { splitKey } from "@/model/family"
+import type { Note } from "@/model/note/schema"
 import type { EmitResult } from "./result"
 
 /** Simbolo di visibilità davanti al membro. Stessa tabella di `members.ts`, non esportata da lì:
@@ -27,7 +28,7 @@ const STEREOTYPE_ANNOTATION: Partial<Record<Stereotype, string>> = {
  * sempre il `target` (il padre) — realizzazione e dipendenza vogliono il `source` a sinistra — ed è
  * la parte che si sbaglia più facilmente: i test hanno molteplicità asimmetriche apposta per prenderlo.
  */
-const RELATION_TOKEN: Record<ClassRelationKind, string> = {
+const RELATION_TOKEN: Record<RelationKind, string> = {
   generalization: "<|--",
   realization: "..|>",
   composition: "*--",
@@ -37,7 +38,7 @@ const RELATION_TOKEN: Record<ClassRelationKind, string> = {
 }
 
 /** I `kind` che mettono il `target` (il padre/tutto) a sinistra; gli altri tre mettono il `source`. */
-const TARGET_LEFT = new Set<ClassRelationKind>(["generalization", "composition", "aggregation"])
+const TARGET_LEFT = new Set<RelationKind>(["generalization", "composition", "aggregation"])
 
 /** Nome sicuro per un identificatore Mermaid nudo (classe o riferimento a classe in una relazione). */
 const SAFE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
@@ -168,7 +169,7 @@ function quotedMultiplicity(m: string): string {
  * La riga di una relazione. Il lato sinistro/destro dipende dal `kind` (`TARGET_LEFT`), non è
  * sempre `target`/`source`: è la tabella normativa di §9. L'etichetta va in coda dopo i due punti.
  */
-function relationLine(rel: ClassRelation & { kind: ClassRelationKind }, renamed: Map<string, string>): string {
+function relationLine(rel: ClassRelation, renamed: Map<string, string>): string {
   const left: ClassEnd = TARGET_LEFT.has(rel.kind) ? rel.target : rel.source
   const right: ClassEnd = TARGET_LEFT.has(rel.kind) ? rel.source : rel.target
   // `-->` solo quando il modello registra la navigabilità. Finché non la registrava, `--` era la
@@ -227,14 +228,14 @@ function classBlock(node: ClassNode, name: string, unbalanced: string[], braced:
 }
 
 /**
- * Serializza il modello come `classDiagram`.
+ * Serializza il modello come `classDiagram`. Le note arrivano a parte, dalla loro famiglia.
  *
  * La navigabilità si emette come freccia solo quando il modello la registra: `rel.navigable` è
  * `true` per un'associazione che il diagramma dichiara esplicitamente navigabile, ed esce `-->`;
  * altrimenti (campo assente o `false`) esce `--` (link solido, senza direzione) — vedi §9 della
  * spec per il perché.
  */
-export function emitClassMermaid(model: ClassModel): EmitResult {
+export function emitClassMermaid(model: ClassModel, notes: Readonly<Record<string, Note>> = {}): EmitResult {
   const renamed = new Map<string, string>()
   const unbalanced: string[] = []
   const braced: string[] = []
@@ -243,7 +244,6 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
 
   for (const key of Object.keys(model.relations).sort()) {
     const rel = model.relations[key]!
-    if (!isClassRelation(rel)) continue
     out.push(relationLine(rel, renamed))
   }
 
@@ -252,21 +252,17 @@ export function emitClassMermaid(model: ClassModel): EmitResult {
     out.push(...classBlock(node, safeName(key, renamed), unbalanced, braced, nested))
   }
 
-  // L'ancoraggio sta fra le relazioni, non sulla nota: qui si ribalta in una mappa nota → classe,
-  // una passata sola, perché il ciclo qui sotto è ordinato per chiave di nota e non di relazione.
-  const anchorOf = new Map<string, string>()
-  for (const rel of Object.values(model.relations)) {
-    if (!isClassRelation(rel)) anchorOf.set(rel.source.class, rel.target.class)
-  }
-
-  for (const key of Object.keys(model.notes).sort()) {
-    const text = model.notes[key]!.text
+  // Le note escono qui se sono libere o ancorate a una classe; quelle ancorate a un'altra famiglia
+  // le conta l'export di quella famiglia (spec 3a §8).
+  for (const key of Object.keys(notes).sort()) {
+    const { text, anchor } = notes[key]!
     // Una nota vuota non ha niente da dire: `note ""` è rumore nel file emesso.
     if (text === "") continue
-    const anchor = anchorOf.get(key)
-    // Un ancoraggio verso una classe che non esiste esce come nota libera: `note for Fantasma`
-    // sarebbe un file che Mermaid rifiuta, e il pannello problemi segnala già il guasto (§8).
-    const head = anchor !== undefined && anchor in model.classes ? `note for ${safeName(anchor, renamed)}` : "note"
+    if (anchor !== null && splitKey(anchor).family !== "class") continue
+    const cls = anchor === null ? undefined : splitKey(anchor).key
+    // Un'àncora verso una classe che non esiste esce come nota libera: `note for Fantasma` sarebbe
+    // un file che Mermaid rifiuta, e il pannello Problemi segnala già il guasto.
+    const head = cls !== undefined && cls in model.classes ? `note for ${safeName(cls, renamed)}` : "note"
     out.push(`  ${head} "${noteText(text)}"`)
   }
 

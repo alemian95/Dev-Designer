@@ -48,10 +48,7 @@ export interface DiagramOps {
    * `null` quando non c'è niente da scrivere: un pool appena creato si rinomina dal pannello.
    */
   addNode(at: Point, variant?: string): { key: string; recipe: Recipe; edit: EditTarget | null }
-  /** `null` quando i due estremi non possono essere collegati: due note (un ancoraggio ha senso
-   *  solo verso una classe), o una classe che non esiste. Una nota **e** una classe producono
-   *  invece un ancoraggio (`note-link`, spec note ancorate §4). L'ER non ha note e continua a
-   *  tornare sempre un valore. */
+  /** `null` quando i due estremi non possono essere collegati. */
   addEdge(source: string, target: string): { key: string; recipe: Recipe } | null
   /**
    * Sostituisce la dispatch predefinita `moveNodes(family, keys, dx, dy)` al rilascio del drag, quando c'è.

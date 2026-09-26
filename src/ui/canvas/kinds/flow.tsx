@@ -61,13 +61,12 @@ export const flowView: DiagramView = {
   NodeView,
   EdgeView,
   Properties: FlowProperties,
-  // Sette varianti: una per forma, e in fondo il pool. Per le forme l'ordine e il tasto (`1`..`6`,
-  // spec §11) seguono `FLOW_SHAPES`, cioè l'ordine di `FlowShapeSchema`. Etichetta e icona vengono da `flow-shapes.ts`, non
+  // Sei varianti: una per forma, e in fondo il pool. Per le forme l'ordine e il tasto (`1`..`5`)
+  // seguono `FLOW_SHAPES`, cioè l'ordine di `FlowShapeSchema`. Etichetta e icona vengono da `flow-shapes.ts`, non
   // ridichiarate qui — è la stessa fonte che usa il select del pannello proprietà.
   tools: [
     ...FLOW_SHAPES.map((shape, i) => ({
-      // La nota ha un'etichetta sua solo qui: il select delle forme nel pannello resta «Nota».
-      label: shape === "note" ? "Nota di flusso" : FLOW_SHAPE_LABEL[shape],
+      label: FLOW_SHAPE_LABEL[shape],
       key: String(i + 1),
       Icon: FLOW_SHAPE_ICON[shape],
       tool: "node" as const,

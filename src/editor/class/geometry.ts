@@ -92,17 +92,12 @@ export function umlMarkerPath(at: Point, dir: Dir, kind: RelationKind, navigable
     return `${pathFromPoints([at, p(DIAMOND_LEN / 2, -DIAMOND_HALF_W), p(DIAMOND_LEN, 0), p(DIAMOND_LEN / 2, DIAMOND_HALF_W)])} Z`
   }
 
-  // Il legame di una nota non ha punta a nessuno dei due estremi. Esplicito e non per caduta: la
-  // riga qui sotto è la freccia aperta della dipendenza, e senza questa guardia l'ancoraggio la
-  // erediterebbe.
-  if (kind === "note-link") return ""
-
   return openArrowPath(at, dir)
 }
 
-/** `true` se la linea dell'arco va tratteggiata: realizzazione, dipendenza e ancoraggio di nota. */
+/** `true` se la linea dell'arco va tratteggiata: realizzazione e dipendenza. */
 export function isDashed(kind: RelationKind): boolean {
-  return kind === "realization" || kind === "dependency" || kind === "note-link"
+  return kind === "realization" || kind === "dependency"
 }
 
 /** `true` se la punta va riempita: solo la composizione. */

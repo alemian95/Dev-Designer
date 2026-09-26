@@ -119,11 +119,102 @@ const lanesIntoPool: Migration = (raw) => {
   }
 }
 
-/** 6 → 7: il documento guadagna la parte delle note, vuota (spec 3a §3). */
-const addNotes: Migration = (raw) => {
+/** Il primo id libero fra le note già travasate: una nota di flusso che collide con una di classe prende un suffisso. */
+function freeNoteId(key: string, taken: Obj): string {
+  if (!(key in taken)) return key
+  let n = 2
+  while (`${key}_${n}` in taken) n++
+  return `${key}_${n}`
+}
+
+/**
+ * 6 → 7: le note diventano una famiglia (spec 3a §4).
+ *
+ * 1. **Le note di classe** tengono id, testo e posizione. L'àncora è la classe del loro `note-link`
+ *    (il primo in ordine di chiave, se un file scritto a mano ne ha più d'uno). I `note-link`
+ *    spariscono dalle relazioni.
+ * 2. **Le note di flusso** (nodi con forma `note`) diventano note con l'etichetta come testo e la
+ *    stessa posizione. L'àncora è l'altro capo del primo arco che le tocca, in ordine di id, purché
+ *    non sia un'altra nota. Tutti gli archi che toccano una nota spariscono; l'appartenenza alla
+ *    corsia si perde con il nodo. Gli archi in più non lasciano traccia: una migrazione non ha modo
+ *    di avvisare (spec 3a §10).
+ * 3. **Un id in conflitto** con una nota di classe fa prendere alla nota di flusso il primo suffisso
+ *    libero: succede solo con file scritti a mano, gli id generati sono uuid.
+ */
+const notesIntoFamily: Migration = (raw) => {
   const diagram = raw.diagram
   if (!isObj(diagram)) return raw
-  return { ...raw, diagram: { ...diagram, note: { model: { notes: {} }, view: { nodes: {} } } } }
+  const notes: Obj = {}
+  const views: Obj = {}
+  let classPart = diagram.class
+  let flowPart = diagram.flow
+
+  if (isObj(classPart) && isObj(classPart.model) && isObj(classPart.view)) {
+    const { notes: classNotes, ...model } = classPart.model
+    const relations = isObj(model.relations) ? model.relations : {}
+    const classViews = isObj(classPart.view.nodes) ? classPart.view.nodes : {}
+    const anchorOf = new Map<string, string>()
+    const keptRelations: Obj = {}
+    for (const key of Object.keys(relations).sort()) {
+      const rel = relations[key]
+      if (!isObj(rel) || rel.kind !== "note-link") {
+        keptRelations[key] = rel
+        continue
+      }
+      const note = isObj(rel.source) ? rel.source.class : undefined
+      const cls = isObj(rel.target) ? rel.target.class : undefined
+      if (typeof note === "string" && typeof cls === "string" && !anchorOf.has(note)) anchorOf.set(note, cls)
+    }
+    const keptViews: Obj = { ...classViews }
+    for (const [key, note] of Object.entries(isObj(classNotes) ? classNotes : {})) {
+      const cls = anchorOf.get(key)
+      notes[key] = { text: isObj(note) && typeof note.text === "string" ? note.text : "", anchor: cls === undefined ? null : `class/${cls}` }
+      if (classViews[key] !== undefined) views[key] = classViews[key]
+      delete keptViews[key]
+    }
+    classPart = { ...classPart, model: { ...model, relations: keptRelations }, view: { ...classPart.view, nodes: keptViews } }
+  }
+
+  if (isObj(flowPart) && isObj(flowPart.model) && isObj(flowPart.view)) {
+    const nodes = isObj(flowPart.model.nodes) ? flowPart.model.nodes : {}
+    const edges = isObj(flowPart.model.edges) ? flowPart.model.edges : {}
+    const flowViews = isObj(flowPart.view.nodes) ? flowPart.view.nodes : {}
+    const isNote = (key: unknown): key is string => typeof key === "string" && isObj(nodes[key]) && (nodes[key] as Obj).shape === "note"
+    const anchorOf = new Map<string, string>()
+    const keptEdges: Obj = {}
+    for (const key of Object.keys(edges).sort()) {
+      const edge = edges[key]
+      const source = isObj(edge) ? edge.source : undefined
+      const target = isObj(edge) ? edge.target : undefined
+      if (!isNote(source) && !isNote(target)) {
+        keptEdges[key] = edge
+        continue
+      }
+      if (isNote(source) && !isNote(target) && typeof target === "string" && !anchorOf.has(source)) anchorOf.set(source, target)
+      if (isNote(target) && !isNote(source) && typeof source === "string" && !anchorOf.has(target)) anchorOf.set(target, source)
+    }
+    const keptNodes: Obj = {}
+    const keptViews: Obj = {}
+    for (const key of Object.keys(nodes).sort()) {
+      if (!isNote(key)) {
+        keptNodes[key] = nodes[key]
+        if (flowViews[key] !== undefined) keptViews[key] = flowViews[key]
+        continue
+      }
+      const node = nodes[key] as Obj
+      const id = freeNoteId(key, notes)
+      const other = anchorOf.get(key)
+      notes[id] = { text: typeof node.label === "string" ? node.label : "", anchor: other === undefined ? null : `flow/${other}` }
+      if (flowViews[key] !== undefined) views[id] = flowViews[key]
+    }
+    flowPart = {
+      ...flowPart,
+      model: { ...flowPart.model, nodes: keptNodes, edges: keptEdges },
+      view: { ...flowPart.view, nodes: keptViews },
+    }
+  }
+
+  return { ...raw, diagram: { ...diagram, class: classPart, flow: flowPart, note: { model: { notes }, view: { nodes: views } } } }
 }
 
 /**
@@ -136,7 +227,7 @@ const migrations: ReadonlyMap<number, Migration> = new Map([
   [3, addLinks],
   [4, sameShape],
   [5, lanesIntoPool],
-  [6, addNotes],
+  [6, notesIntoFamily],
 ])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }

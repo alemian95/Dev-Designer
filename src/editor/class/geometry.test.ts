@@ -259,24 +259,3 @@ describe("endLabel", () => {
     expect(endLabel(capo("", ""))).toBe("")
   })
 })
-
-describe("ancoraggio di una nota", () => {
-  it("la linea è tratteggiata, come vuole UML", () => {
-    expect(isDashed("note-link")).toBe(true)
-  })
-
-  it("nessuna punta a nessuno dei due capi: non eredita la freccia della dipendenza", () => {
-    const at = { x: 10, y: 10 }
-    for (const dir of [
-      { x: 1, y: 0 } as const,
-      { x: -1, y: 0 } as const,
-      { x: 0, y: 1 } as const,
-      { x: 0, y: -1 } as const,
-    ]) {
-      expect(umlMarkerPath(at, dir, "note-link")).toBe("")
-      // La dipendenza, per contrasto, la punta ce l'ha: se questo diventasse "" il test sopra
-      // passerebbe per la ragione sbagliata.
-      expect(umlMarkerPath(at, dir, "dependency")).not.toBe("")
-    }
-  })
-})

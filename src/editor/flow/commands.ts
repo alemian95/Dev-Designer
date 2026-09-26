@@ -73,8 +73,7 @@ export function moveFlowNodes(keys: readonly string[], dx: number, dy: number): 
 
 /**
  * `null` solo quando un estremo non esiste. Due archi fra la stessa coppia sono ammessi di
- * proposito: sono i due rami di una decisione ("sì"/"no"), non un doppione da respingere come fa
- * `addNoteLink` (class/commands.ts) per due note identiche.
+ * proposito: sono i due rami di una decisione ("sì"/"no"), non un doppione da respingere.
  */
 export function addFlowEdge(model: FlowModel, source: string, target: string): { key: string; recipe: Recipe } | null {
   if (!(source in model.nodes) || !(target in model.nodes)) return null

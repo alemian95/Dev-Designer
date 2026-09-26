@@ -4,7 +4,7 @@
  * aggiorna, il collegamento che resta attaccato a una rinomina e sopravvive a un ricaricamento, Canc
  * che lo elimina, e l'avviso quando il gesto viene rifiutato. Poi i collegamenti del flusso (spec 4b
  * §9): un processo che legge l'entità, il modo cambiato dal pannello, un «chiama» verso la classe, e
- * il rifiuto di una nota del flusso.
+ * l'ancoraggio di una nota, che non è un collegamento.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/collegamenti.mjs`. `HEADLESS=0` per vedere.
  */
@@ -183,19 +183,18 @@ export async function run(browser, base) {
       if ((await page.locator(LINK).count()) !== 2) throw new Error("attesi due collegamenti")
     })
 
-    await step("una nota del flusso verso l'entità: avviso, e nessun collegamento nuovo", async () => {
-      await page.keyboard.press("6")
-      // `700`, non `900`: a `900` il nodo (con l'etichetta) sconfina oltre il bordo destro del
-      // canvas, nel pannello proprietà — il clic e il trascinamento successivo cadono lì e non
-      // sul canvas.
+    await step("una nota verso l'entità: un ancoraggio, e nessun collegamento nuovo", async () => {
+      await page.keyboard.press("n")
       await page.mouse.click(canvas.x + 700, canvas.y + 60)
-      await nodeText.waitFor()
-      await nodeText.fill("promemoria")
-      await nodeText.blur()
-      await nodeText.waitFor({ state: "detached" })
+      const noteText = page.locator('[aria-label="Testo della nota"]')
+      await noteText.waitFor()
+      await noteText.fill("promemoria")
+      await noteText.blur()
+      await noteText.waitFor({ state: "detached" })
       await page.keyboard.press("r")
-      await drag(page, await centerOfFlow(page, "promemoria"), await centerOfId(page, "er/righe"))
-      await expectText(page, "[data-notice-bar]", "Una nota non legge né scrive una tabella.")
+      const nota = await page.locator('[data-node-id^="note/"]').boundingBox()
+      await drag(page, { x: nota.x + nota.width / 2, y: nota.y + nota.height / 2 }, await centerOfId(page, "er/righe"))
+      await page.waitForSelector('[data-edge-id^="note/"]')
       if ((await page.locator(LINK).count()) !== 2) throw new Error("è nato un collegamento da una nota")
       await page.keyboard.press("Escape")
     })

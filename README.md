@@ -22,11 +22,9 @@ inline con doppio click, undo/redo su ogni azione.
   scritti come **testo** in un editor dedicato — non una riga di form per membro — con le regole di
   visibilità e modificatori dell'UML, lo statico sottolineato come prescrive la notazione. Le sei
   relazioni (associazione anche navigabile, generalizzazione, realizzazione, composizione,
-  aggregazione, dipendenza), ciascuna con la punta e il tratto giusti, più le note. Una nota può
-  dichiarare la classe che commenta — un tratteggio senza punta, con lo strumento relazione — e il
-  legame esce nell'export Mermaid come `note for`; «Disponi» tiene la nota accanto alla sua classe.
-- **Flowchart**: sei forme di nodo (terminale, processo, decisione, input/output, sottoprocesso,
-  nota) e archi etichettabili col doppio click. «Disponi» dispone il flusso con ELK in direzione
+  aggregazione, dipendenza), ciascuna con la punta e il tratto giusti.
+- **Flowchart**: cinque forme di nodo (terminale, processo, decisione, input/output, sottoprocesso)
+  e archi etichettabili col doppio click. «Disponi» dispone il flusso con ELK in direzione
   `RIGHT` (ADR 0007) e poi corregge solo l'asse trasversale per far stare ogni nodo nella banda
   della sua corsia; trascinare un nodo in un'altra corsia scrive posizione e corsia in un solo
   passo di undo. Sei regole di validazione (archi penzolanti, decisioni con meno di due uscite,
@@ -37,6 +35,11 @@ inline con doppio click, undo/redo su ogni azione.
   dall'intestazione con i suoi nodi, si allarga dal bordo destro, e ogni corsia cresce dal bordo
   inferiore. Un nodo trascinato in una corsia ci entra, trascinato fuori torna libero. Più pool
   possono stare sullo stesso canvas.
+- **Note**: una nota è testo libero, libera o ancorata a un solo elemento — un'entità, una classe,
+  un nodo di flusso o un pool — con Collega. La linea tratteggiata segue l'elemento; Canc sulla
+  linea o «Stacca» nel pannello staccano la nota, ed eliminare l'elemento la stacca da sola. «Disponi»
+  la tiene accanto al suo elemento. Nell'export Mermaid delle classi escono le note libere e quelle
+  ancorate a una classe (`note for`); le altre sintassi non hanno note, e l'export lo dice.
 - **Collegamenti fra famiglie**, con lo strumento Collega, trascinando in qualunque verso:
   - una classe **mappa su** un'entità, e l'app verifica che ogni attributo della classe abbia la sua
     colonna (`createdAt` e `created_at` sono lo stesso campo) e un tipo compatibile, e che una
@@ -44,8 +47,8 @@ inline con doppio click, undo/redo su ogni azione.
   - un nodo di flusso **accede** a un'entità — legge, scrive, o legge e scrive, scelto nel pannello —
     e **chiama** una classe.
 
-  I collegamenti seguono le rinomine e spariscono con i loro nodi. Una nota non si collega: il gesto
-  lo dice invece di non fare niente.
+  I collegamenti seguono le rinomine e spariscono con i loro nodi. Collega fra una nota e un
+  elemento non crea un collegamento: ancora la nota.
 
 La **validazione è live**: i problemi del documento compaiono in un pannello mentre si disegna, non a
 un comando esplicito.
@@ -85,8 +88,9 @@ si perde niente.
 |---|---|
 | `V` | selezione |
 | `E` | entità (ER) |
-| `C` · `I` · `U` · `N` | classe · interfaccia · enum · nota di classe |
-| `1`..`6` | forme del flusso (terminale, processo, decisione, input/output, sottoprocesso, nota) |
+| `C` · `I` · `U` | classe · interfaccia · enum |
+| `1`..`5` | forme del flusso (terminale, processo, decisione, input/output, sottoprocesso) |
+| `N` | nota |
 | `R` | Collega: il tipo di arco dipende dagli estremi |
 | `F` · `L` | inquadra tutto · disponi |
 | `⌘Z` · `⇧⌘Z` / `⌘Y` · `⌘D` · `⌫` | annulla · ripeti · duplica · elimina |
@@ -131,8 +135,8 @@ Limiti puntuali, ciascuno con la sua ragione scritta:
   - **Le corsie escono come riquadri in Mermaid**, non come bande orizzontali vere: Mermaid non ha
     un costrutto per bande, solo per contenitori annidati (`subgraph`). Avviso nel dialogo di
     export.
-  - **Le note non escono in Mermaid**: entrerebbero nel flusso come un nodo qualunque e ne
-    sposterebbero il layout, cioè mentirebbero. Avviso nel dialogo di export.
+  - **Le note ancorate al flusso non escono in Mermaid**: la sintassi dei flowchart non ha note.
+    Avviso nel dialogo di export.
   - **Il rombo è grande** a parità di testo: deve contenere il rettangolo del testo lungo la
     diagonale, quindi occupa circa il doppio di un processo con lo stesso contenuto — le decisioni
     vanno scritte corte.
@@ -216,10 +220,10 @@ vicenda) — ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l
   l'editor resti aperto col testo intatto, collega le due classi con una generalizzazione e verifica
   che «Disponi» metta il padre sopra il figlio, poi esporta in Mermaid e verifica l'ordine dei lati
   nell'arco.
-- **Nota**: crea una nota, ne commette il testo su due righe col blur, la trascina e la rimette con
-  ⌘Z, la ancora a una classe con lo strumento relazione — verificando che il pannello dica
-  «Ancoraggio nota» e non offra il menu «Tipo» — poi «Disponi» e verifica che non resti sotto nessun
-  nodo, e infine verifica che esca come riga `note for` nell'export Mermaid.
+- **Nota**: crea una nota, la ancora a un'entità, a un nodo di flusso e a un pool, verifica che la
+  linea segua l'entità trascinata, la stacca con Canc e dal pannello, verifica che eliminare il pool
+  la stacchi, che «Disponi» la tenga accanto alla sua entità, e che un file della versione 6 ritrovi
+  le sue note ancorate.
 - **Flowchart**: crea un pool con `P`, aggiunge una seconda corsia dal pannello del pool, tre nodi di
   forme diverse dentro le corsie (un terminale e un processo nella prima, una decisione nella
   seconda), collega due nodi e scrive l'etichetta sull'arco col doppio click. «Disponi» verifica che
@@ -241,7 +245,8 @@ vicenda) — ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l
   `Ordine.note`. Poi rinomina l'entità e verifica che il collegamento resti attaccato, ricarica,
   elimina il collegamento con Canc, e prova a collegare un'interfaccia all'entità e verifica
   l'avviso. Infine collega un processo all'entità («legge», poi «scrive» dal pannello) e alla
-  classe («chiama»), e verifica l'avviso per una nota del flusso.
+  classe («chiama»), e verifica che una nota trascinata su un'entità si ancori senza creare un
+  collegamento.
 - **Pool**: crea un processo libero e un pool, trascina il processo dentro e fuori dal pool,
   sposta il pool dall'intestazione e verifica che il nodo lo segua, elimina il pool e verifica che
   il nodo resti, e carica un file della versione precedente per verificare che le sue corsie siano

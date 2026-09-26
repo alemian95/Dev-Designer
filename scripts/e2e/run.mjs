@@ -3,20 +3,19 @@
  * build già fatta) e una sola istanza di browser, poi esegue in sequenza — mai in parallelo, perché
  * l'e2e della persistenza esercita il lock fra schede e IndexedDB sulla stessa origine, e due
  * scenari concorrenti se li disturberebbero a vicenda — gli scenari della persistenza, dell'import,
- * dell'export immagini, dell'export testo, dell'auto layout, del class diagram, della sua nota, del
- * flowchart, del canvas misto, dei collegamenti fra famiglie, e dei pool. Ognuno apre il proprio
+ * dell'export immagini, dell'export testo, dell'auto layout, del class diagram, del flowchart, del
+ * canvas misto, dei collegamenti fra famiglie, dei pool e della nota. Ognuno apre il proprio
  * contesto di browser, cosa che isola l'IndexedDB fra loro senza pagare due volte il costo fisso di
  * build, server e avvio del browser (avvio condiviso con `helpers.mjs#startEnv`, la stessa funzione
  * usata dalla guardia di esecuzione diretta di ciascuno scenario). Per lanciare un solo scenario in
  * isolamento, dopo `pnpm build`: `node scripts/e2e/import.mjs`, `node scripts/e2e/persistenza.mjs`,
  * `node scripts/e2e/export.mjs`, `node scripts/e2e/export-testo.mjs`, `node scripts/e2e/layout.mjs`,
- * `node scripts/e2e/class.mjs`, `node scripts/e2e/class-note.mjs`, `node scripts/e2e/flow.mjs`,
- * `node scripts/e2e/misto.mjs`, `node scripts/e2e/collegamenti.mjs` o `node scripts/e2e/pool.mjs`.
+ * `node scripts/e2e/class.mjs`, `node scripts/e2e/flow.mjs`, `node scripts/e2e/misto.mjs`,
+ * `node scripts/e2e/collegamenti.mjs`, `node scripts/e2e/pool.mjs` o `node scripts/e2e/note.mjs`.
  *
  * Uso: `pnpm e2e`. `HEADLESS=0` per vedere il browser.
  */
 import { run as runClass } from "./class.mjs"
-import { run as runClassNote } from "./class-note.mjs"
 import { run as runCollegamenti } from "./collegamenti.mjs"
 import { run as runExport } from "./export.mjs"
 import { run as runExportTesto } from "./export-testo.mjs"
@@ -25,6 +24,7 @@ import { startEnv } from "./helpers.mjs"
 import { run as runImport } from "./import.mjs"
 import { run as runLayout } from "./layout.mjs"
 import { run as runMisto } from "./misto.mjs"
+import { run as runNote } from "./note.mjs"
 import { run as runPersistenza } from "./persistenza.mjs"
 import { run as runPool } from "./pool.mjs"
 
@@ -39,12 +39,12 @@ try {
   const exportTestoOk = await runExportTesto(browser, base)
   const layoutOk = await runLayout(browser, base)
   const classOk = await runClass(browser, base)
-  const classNoteOk = await runClassNote(browser, base)
   const flowOk = await runFlow(browser, base)
   const mistoOk = await runMisto(browser, base)
   const collegamentiOk = await runCollegamenti(browser, base)
   const poolOk = await runPool(browser, base)
-  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && classNoteOk && flowOk && mistoOk && collegamentiOk && poolOk
+  const noteOk = await runNote(browser, base)
+  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && flowOk && mistoOk && collegamentiOk && poolOk && noteOk
 } catch (e) {
   console.error("\nFALLITO:", e)
 } finally {

@@ -65,8 +65,11 @@ Nuovo `src/model/note/schema.ts`:
 ```ts
 NoteSchema        = { text: string, anchor: string | null }
 NoteModelSchema   = { notes: Record<string, Note> }
-NoteDiagramSchema = { model: NoteModel, view: { nodes: Record<string, { x, y }> } }
+NoteDiagramSchema = { model: NoteModel, view: { nodes: Record<string, NodeView> } }
 ```
+
+`view.nodes` usa `NodeViewSchema` come le altre famiglie: `collapsed` non si applica e resta `false`
+(scostamento 1 del piano).
 
 - `anchor` è una **chiave con prefisso** (`er/ordini`, `class/Ordine`, `flow/n3`, `flow/pool-1`),
   come gli estremi di un collegamento: è il secondo punto in cui il prefisso entra nel modello, per
@@ -147,14 +150,15 @@ linea li segue, con lo stesso meccanismo che usano le linee dei collegamenti fra
   ed elemento (§10).
 - Una nota **non segue** l'elemento quando lo si trascina: si sposta solo se è selezionata anche
   lei. La segue invece con Disponi (§6).
+- Una rinomina di entità o classe sposta anche le àncore che la nominano (scostamento 6 del piano).
 
 ## 6. Disponi
 
 - **Le note ancorate** mantengono lo scarto dall'angolo in alto a sinistra del loro elemento: se
   Disponi sposta l'entità, la nota la segue con lo stesso scarto di prima. Il passo delle note
-  legge le posizioni nuove già scritte sul draft dalle altre famiglie e quelle vecchie dal documento
-  di partenza: funziona perché `note` è l'ultima di `FAMILIES`. Il codice lo dice in un commento, e
-  un test fallisce se l'ordine cambia.
+  (`followAnchors`) è l'ultimo di Disponi: legge le posizioni vecchie dal documento di partenza e
+  quelle nuove dal draft, dopo tutte le famiglie, quindi non dipende dall'ordine di `FAMILIES`
+  (scostamento 2 del piano).
 - **Le note libere** formano l'ultimo blocco del canvas misto, dopo il flusso, messe in fila dal
   motore di layout. Una famiglia fatta solo di note libere conta come contenuto.
 - Una nota con l'àncora pendente si tratta come libera.

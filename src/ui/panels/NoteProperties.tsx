@@ -1,39 +1,14 @@
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { familySelectedKeys, qualify } from "@/editor/families"
 import { detachNotes, setNoteText } from "@/editor/note/commands"
 import { noteDiagram } from "@/editor/note-access"
 import { sessionStore } from "@/editor/session-store"
 import { endName } from "@/model/links/labels"
-import { CommitTextarea } from "./CommitTextarea"
+import { BodyTextField } from "./BodyTextField"
 
 const dispatch = (recipe: Recipe) => documentStore.getState().dispatch(recipe)
-
-/**
- * Il campo «Testo» di una nota: una `textarea` commessa sul blur, l'alternativa al doppio clic sul
- * canvas. **Alternativa, non secondo editor:** finché l'editor sul canvas è aperto su *questa* nota
- * il campo è in sola lettura e lo dice, perché due campi modificabili per lo stesso dato
- * divergerebbero. `id` è la chiave con prefisso della nota, quella che l'editing in corso porta.
- */
-export function NoteTextField({ id, text, onCommit }: { id: string; text: string; onCommit: (text: string) => void }) {
-  const editingHere = useStore(sessionStore, (s) => s.editing?.key === id && s.editing.target === "body")
-  return (
-    <div className="grid gap-1">
-      <Label htmlFor="note-text">Testo</Label>
-      <CommitTextarea
-        id="note-text"
-        key={text}
-        value={text}
-        readOnly={editingHere}
-        onCommit={onCommit}
-        className="min-h-24 resize-none rounded-md border bg-background p-2 text-sm read-only:opacity-50"
-      />
-      {editingHere && <p className="text-xs text-muted-foreground">Modifica in corso sul canvas.</p>}
-    </div>
-  )
-}
 
 function NoteBody({ noteKey: key }: { noteKey: string }) {
   const note = useStore(documentStore, (s) => noteDiagram(s.doc).model.notes[key])
@@ -44,7 +19,7 @@ function NoteBody({ noteKey: key }: { noteKey: string }) {
   if (!note) return null
   return (
     <div className="flex flex-col gap-3 p-3">
-      <NoteTextField id={qualify("note", key)} text={note.text} onCommit={(text) => dispatch(setNoteText(key, text))} />
+      <BodyTextField id={qualify("note", key)} text={note.text} onCommit={(text) => dispatch(setNoteText(key, text))} />
       {note.anchor === null ? (
         <p className="text-sm text-muted-foreground">Libera</p>
       ) : (

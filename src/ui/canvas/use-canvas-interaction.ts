@@ -26,7 +26,7 @@ function hitTest(el: Element | null): Hit {
   const handle = el?.closest("[data-resize]")
   if (handle) return { kind: "resize", key: handle.getAttribute("data-resize")!, lane: handle.getAttribute("data-resize-lane") }
   const node = el?.closest("[data-node-id]")
-  if (node) return { kind: "node", key: node.getAttribute("data-node-id")! }
+  if (node) return { kind: "node", key: node.getAttribute("data-node-id")!, backdrop: !!node.closest("[data-backdrop]") }
   const edge = el?.closest("[data-edge-id]")
   if (edge) return { kind: "edge", key: edge.getAttribute("data-edge-id")! }
   return { kind: "canvas" }
@@ -161,9 +161,9 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
         session().setEditing({ key: hit.key, target: classEditTarget(key, headerHit) })
         return
       }
-      // Un nodo di flowchart e una nota non hanno un nome distinto dal corpo: qualunque punto del
-      // nodo apre l'editor di testo, a differenza dell'header che l'ER usa per il nome dell'entità.
-      if (family === "flow" || family === "note") {
+      // Un nodo di flowchart, una nota e una forma non hanno un nome distinto dal corpo: qualunque
+      // punto del nodo apre l'editor di testo, a differenza dell'header che l'ER usa per il nome.
+      if (family === "flow" || family === "note" || family === "shape") {
         session().setEditing({ key: hit.key, target: "body" })
         return
       }

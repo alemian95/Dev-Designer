@@ -3,9 +3,11 @@ import { createDocument } from "@/model/document"
 import { addEntity, addRelationship, removeAttribute } from "../commands/er"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
-import { splitKey } from "../families"
+import { qualify, splitKey } from "../families"
 import { flowDiagram } from "../flow-access"
 import { withPool } from "../flow/pool-fixture"
+import { noteDiagram } from "../note-access"
+import { shapeDiagram } from "../shape-access"
 import { canvasOps, familyHasContent } from "./canvas-ops"
 
 const state = () => documentStore.getState()
@@ -382,5 +384,109 @@ describe("canvasOps e le note (spec 3a §5)", () => {
   it("le note contano come contenuto", () => {
     add({ x: 0, y: 0 }, "note")
     expect(familyHasContent(state().doc, "note")).toBe(true)
+  })
+})
+
+describe("canvasOps e le forme (spec 3b)", () => {
+  const add = (family: "shape" | "er" | "note", at: { x: number; y: number }, variant?: string) => {
+    const { key, recipe } = canvasOps(state().doc).addNode(at, family, variant)
+    state().dispatch(recipe)
+    return key
+  }
+
+  it("lo strumento crea la forma della sua variante e apre il testo", () => {
+    const created = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "shape", "ellipse")
+    expect(created.edit).toBe("body")
+    state().dispatch(created.recipe)
+    expect(shapeDiagram(state().doc).model.shapes[splitKey(created.key).key]).toEqual({ kind: "ellipse", label: "" })
+  })
+
+  it("Collega fra una forma e un'entità è rifiutato con l'avviso", () => {
+    const s = add("shape", { x: 0, y: 0 }, "rect")
+    const e = add("er", { x: 300, y: 0 })
+    expect(canvasOps(state().doc).addEdge(s, e)).toEqual({ type: "rejected", notice: "Non esiste un collegamento fra una forma e un'entità." })
+  })
+
+  it("Collega fra due forme crea una freccia; da una forma a sé stessa niente", () => {
+    const a = add("shape", { x: 0, y: 0 }, "rect")
+    const b = add("shape", { x: 300, y: 0 }, "ellipse")
+    const r = canvasOps(state().doc).addEdge(a, b)
+    if (r?.type !== "created") throw new Error("attesa una freccia")
+    state().dispatch(r.recipe)
+    expect(shapeDiagram(state().doc).model.arrows[splitKey(r.key).key]).toEqual({ source: splitKey(a).key, target: splitKey(b).key, head: "end", dashed: false })
+    expect(canvasOps(state().doc).addEdge(a, a)).toBeNull()
+  })
+
+  it("una nota si ancora a una forma; eliminare la forma stacca la nota, e un annulla riporta forma, frecce e àncora", () => {
+    const s = add("shape", { x: 0, y: 0 }, "rect")
+    const altra = add("shape", { x: 300, y: 0 }, "rect")
+    const arrow = canvasOps(state().doc).addEdge(s, altra)
+    if (arrow?.type !== "created") throw new Error("attesa una freccia")
+    state().dispatch(arrow.recipe)
+    const arrowKey = splitKey(arrow.key).key
+    const n = add("note", { x: 0, y: 200 })
+    const anchored = canvasOps(state().doc).addEdge(n, s)
+    if (anchored?.type !== "created") throw new Error("atteso un ancoraggio")
+    state().dispatch(anchored.recipe)
+    const nota = () => noteDiagram(state().doc).model.notes[splitKey(n).key]!
+    expect(nota().anchor).toBe(s)
+
+    state().dispatch(canvasOps(state().doc).deleteItems([s], [])!)
+    expect(nota().anchor).toBeNull()
+    expect(shapeDiagram(state().doc).model.arrows).toEqual({})
+
+    state().undo()
+    expect(nota().anchor).toBe(s)
+    expect(Object.keys(shapeDiagram(state().doc).model.arrows)).toEqual([arrowKey])
+  })
+
+  it("resize allarga la forma in un passo di annulla, e riportata al testo torna automatica", () => {
+    const s = add("shape", { x: 0, y: 0 }, "rect")
+    const view = () => shapeDiagram(state().doc).view.nodes[splitKey(s).key]!
+    const grande = canvasOps(state().doc).resize(s, null, 100, 60)!
+    expect(grande.rect).toEqual({ x: 0, y: 0, w: 160, h: 100 })
+    state().dispatch(grande.recipe)
+    expect(view()).toMatchObject({ w: 160, h: 100 })
+    const indietro = canvasOps(state().doc).resize(s, null, -100, -60)!
+    state().dispatch(indietro.recipe)
+    expect(view()).toMatchObject({ w: null, h: null })
+    state().undo()
+    expect(view()).toMatchObject({ w: 160, h: 100 })
+  })
+
+  it("un resize via commit produce esattamente una voce di annulla", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.shape.model.shapes["s"] = { kind: "rect", label: "" }
+    doc.diagram.shape.view.nodes["s"] = { x: 0, y: 0, collapsed: false, w: null, h: null }
+    state().load(doc)
+    const key = qualify("shape", "s")
+    const view = () => shapeDiagram(state().doc).view.nodes["s"]!
+    const r = canvasOps(state().doc).resize(key, null, 100, 60)!
+    state().dispatch(r.recipe)
+    expect(state().past.length).toBe(1)
+    expect(view()).toMatchObject({ w: 160, h: 100 })
+    state().undo()
+    expect(view()).toMatchObject({ w: null, h: null })
+    // Un secondo annulla non c'è più niente prima: non tocca più questo ridimensionamento.
+    state().undo()
+    expect(view()).toMatchObject({ w: null, h: null })
+  })
+
+  it("valida la famiglia shape anche con sole frecce: la freccia pendente emerge pur senza forme", () => {
+    const a = add("shape", { x: 0, y: 0 }, "rect")
+    const b = add("shape", { x: 300, y: 0 }, "rect")
+    const edge = canvasOps(state().doc).addEdge(a, b)
+    if (edge?.type !== "created") throw new Error("attesa una freccia")
+    state().dispatch(edge.recipe)
+    // Le forme spariscono senza passare da `deleteShapeItems`, che farebbe cascata sulla freccia: si
+    // simula così un file con frecce orfane e zero forme, il caso del brief.
+    state().dispatch((draft) => {
+      const shapes = shapeDiagram(draft).model.shapes
+      delete shapes[splitKey(a).key]
+      delete shapes[splitKey(b).key]
+    })
+    expect(familyHasContent(state().doc, "shape")).toBe(false)
+    const issues = canvasOps(state().doc).validate()
+    expect(issues.some((i) => i.code === "shape-dangling-arrow")).toBe(true)
   })
 })

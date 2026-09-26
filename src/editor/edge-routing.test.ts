@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Relationship } from "@/model/er/schema"
-import { BUNDLE_GAP, crowsFootPath, edgeGeometry, edgeOffsets, LEFT, pathFromPoints, RIGHT, routeEdge } from "./edge-routing"
+import { BUNDLE_GAP, crowsFootPath, edgeGeometry, edgeOffsets, filledArrowPath, LEFT, pathFromPoints, RIGHT, routeEdge } from "./edge-routing"
 
 const rel: Relationship = {
   source: { entity: "a", attributes: [], cardinality: "many" },
@@ -185,6 +185,12 @@ describe("routeEdge con lo scarto del fascio", () => {
     expect(uno[4]).not.toEqual(due[4])
     // l'anello esterno sta davvero più in fuori
     expect(due[1]!.x).toBeGreaterThan(uno[1]!.x)
+  })
+})
+
+describe("filledArrowPath", () => {
+  it("la cima sta nel punto dato e la base si apre lungo la direzione", () => {
+    expect(filledArrowPath({ x: 100, y: 50 }, { x: 1, y: 0 })).toBe("M100 50 L110 45 L110 55 Z")
   })
 })
 

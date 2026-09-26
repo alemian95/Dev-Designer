@@ -2,11 +2,9 @@ import { LANE_MIN_H, POOL_MIN_W, nextName, type FlowDiagram, type FlowModel, typ
 import type { LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
-import { GRID, snap, type Point } from "../geometry"
+import { DUPLICATE_OFFSET, GRID, snap, type Point } from "../geometry"
 import { flowNodeSize, laneAt, laneOwner, laneRect, poolLaneRects, poolMembers } from "./geometry"
 import { keepInSpan, LANE_PAD, placeInLanes } from "./layout"
-
-const DUPLICATE_OFFSET = 20
 
 /**
  * Nuovo nodo vuoto, nella corsia data o libero con `null`. La chiave è un uuid e non un nome unico

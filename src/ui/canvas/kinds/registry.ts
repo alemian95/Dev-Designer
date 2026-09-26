@@ -8,6 +8,7 @@ import { classView } from "./class"
 import { erView } from "./er"
 import { flowView } from "./flow"
 import { noteView } from "./note"
+import { shapeView } from "./shape"
 
 /**
  * Props di `DiagramView.NodeView`: `node` arriva come `unknown` perché il registro è lo stesso
@@ -67,7 +68,7 @@ export function toolId(def: Pick<ToolDef, "tool" | "family" | "variant">): strin
 export const LINK_TOOL: ToolDef = { label: "Collega", key: "r", Icon: Spline, tool: "edge", family: null }
 
 /** Nome del gruppo della sidebar: è anche il nome accessibile del `role="group"`. */
-export const FAMILY_LABEL: Record<Family, string> = { er: "ER", class: "Classi", flow: "Flusso", note: "Note" }
+export const FAMILY_LABEL: Record<Family, string> = { shape: "Forme", er: "ER", class: "Classi", flow: "Flusso", note: "Note" }
 
 /** Gli strumenti del canvas nell'ordine della sidebar: famiglia per famiglia, poi Collega. «Seleziona» non è qui: non crea niente. */
 export function canvasTools(families: readonly Family[]): ToolDef[] {
@@ -86,11 +87,21 @@ export interface DiagramView {
    */
   Properties: ComponentType
   tools: ToolDef[]
+  /**
+   * I nodi della famiglia si disegnano **sotto tutto**: sotto i pool, sotto gli archi di ogni
+   * famiglia, sotto i nodi delle altre (spec 3b §3). Serve alle forme, perché una zona non copra ciò
+   * che racchiude. Assente: i nodi stanno sopra tutti gli archi, nell'ordine di `FAMILIES`.
+   */
+  backdrop?: boolean
+  /** `true` per un nodo che il canvas mostra ma l'export salta (un testo vuoto, spec 3b §8). Assente: tutti escono. */
+  hiddenInExport?: (node: unknown) => boolean
 }
 
 /** Chiuso sulla famiglia: neutro rispetto a cosa contiene ogni vista, non guarda dentro nessuna di esse. */
 export function viewFor(family: Family): DiagramView {
   switch (family) {
+    case "shape":
+      return shapeView
     case "er":
       return erView
     case "class":

@@ -1,4 +1,4 @@
-import { Box, ListOrdered, Square, SquareDashed, StickyNote } from "lucide-react"
+import { Box, Circle, ListOrdered, RectangleHorizontal, Square, SquareDashed, StickyNote, Type } from "lucide-react"
 import { describe, expect, it } from "vitest"
 import { FAMILIES } from "@/model/family"
 import { FlowShapeSchema } from "@/model/flow/schema"
@@ -109,6 +109,32 @@ describe("canvasTools", () => {
     expect(unique(tools.map(toolId))).toBe(true)
     // «v» è Seleziona, che non sta in `canvasTools`: nessuno strumento può rubarla.
     expect(tools.some((t) => t.key === "v")).toBe(false)
+  })
+})
+
+describe("forme", () => {
+  it("le forme dichiarano Rettangolo, Ellisse e Testo, e si disegnano sotto tutto", () => {
+    const view = viewFor("shape")
+    expect(view.tools).toEqual([
+      { label: "Rettangolo", key: "q", Icon: RectangleHorizontal, tool: "node", family: "shape", variant: "rect" },
+      { label: "Ellisse", key: "o", Icon: Circle, tool: "node", family: "shape", variant: "ellipse" },
+      { label: "Testo", key: "t", Icon: Type, tool: "node", family: "shape", variant: "text" },
+    ])
+    expect(view.backdrop).toBe(true)
+    expect(viewFor("er").backdrop).toBeUndefined()
+  })
+
+  it("nessun tasto è preso da due strumenti, e nessuno è una scorciatoia globale", () => {
+    const keys = canvasTools(FAMILIES).map((t) => t.key)
+    expect(new Set(keys).size).toBe(keys.length)
+    for (const reserved of ["v", "f", "l"]) expect(keys).not.toContain(reserved)
+  })
+
+  it("un testo vuoto non esce nell'export, un testo scritto sì", () => {
+    const hidden = viewFor("shape").hiddenInExport!
+    expect(hidden({ kind: "text", label: "" })).toBe(true)
+    expect(hidden({ kind: "text", label: "titolo" })).toBe(false)
+    expect(hidden({ kind: "rect", label: "" })).toBe(false)
   })
 })
 

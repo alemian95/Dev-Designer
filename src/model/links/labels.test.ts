@@ -44,6 +44,15 @@ describe("endName", () => {
     expect(endName(documento(), "flow/fantasma")).toBe("(nodo eliminato)")
   })
 
+  it("una forma si nomina col suo testo su una riga, o «(senza testo)», o «(forma eliminata)»", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.shape.model.shapes["a"] = { kind: "rect", label: "API\nGateway" }
+    doc.diagram.shape.model.shapes["b"] = { kind: "text", label: "" }
+    expect(endName(doc, "shape/a")).toBe("API Gateway")
+    expect(endName(doc, "shape/b")).toBe("(senza testo)")
+    expect(endName(doc, "shape/x")).toBe("(forma eliminata)")
+  })
+
   it("un pool si nomina col suo nome, e senza nome lo dice", () => {
     const doc = createDocument("t", "t")
     doc.diagram.flow.model.pools["p1"] = { name: "Processo", lanes: [{ id: "l1", name: "Cliente" }] }

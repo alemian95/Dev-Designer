@@ -8,6 +8,7 @@ import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { flowDiagram } from "@/editor/flow-access"
+import { splitKey } from "@/editor/families"
 import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { noteDiagram } from "@/editor/note-access"
 import { emitDdl } from "@/io/emit/ddl"
@@ -27,8 +28,11 @@ import { documentFileName } from "./file-name"
 
 type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid"
 
-/** Le famiglie che hanno un formato di testo: le note escono dentro quello delle classi, o in nessuno (spec 3a §8). */
-type ExportFamily = Exclude<Family, "note">
+/**
+ * Le famiglie che hanno un formato di testo: le note escono dentro quello delle classi, o in nessuno
+ * (spec 3a §8); le forme in nessuno (spec 3b §8).
+ */
+type ExportFamily = Exclude<Family, "note" | "shape">
 
 /** La famiglia di ogni formato: un formato si offre solo se la sua famiglia ha contenuto. */
 const FORMAT_FAMILY: Record<Format, ExportFamily> = {
@@ -116,6 +120,13 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
   )
   // DDL e Mermaid non hanno una notazione fra tipi di diagramma diversi (spec 4a §8): lo si dice.
   const hasLinks = useStore(documentStore, (s) => Object.keys(s.doc.diagram.links).length > 0)
+  // Le forme non hanno formato di testo (spec 3b §8): lo si dice, con i formati e senza.
+  const hasShapes = useStore(documentStore, (s) => familyHasContent(s.doc, "shape"))
+  // Una nota ancorata a una forma non ha formato di testo neanche lei: `class-mermaid.ts` la salta
+  // come le altre note ancorate fuori dalla famiglia classe (righe apposite lì). Non è libera — dirlo
+  // come se lo fosse («chiede almeno una classe») è falso: una classe non la farebbe mai comparire.
+  const shapeAnchoredNotes = Object.values(models.notes).some((n) => n.anchor !== null && splitKey(n.anchor).family === "shape")
+  const freeNoteCount = Object.values(models.notes).filter((n) => n.anchor === null).length
   // Gli hook stanno sopra, l'uscita anticipata sotto: `DocumentMenu` si ri-renderizza a ogni
   // battuta sul nome del documento e a ogni cambio del pallino delle modifiche, e senza questa
   // riga gli emettitori girerebbero ogni volta a dialog chiuso.
@@ -162,6 +173,13 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
             <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
               <li>{MODEL_LIMITS[FORMAT_FAMILY[effectiveFormat]]}</li>
               {hasLinks && <li data-export-links-note>I collegamenti fra famiglie non hanno una notazione in questo formato.</li>}
+              {hasShapes && (
+                <li data-export-shapes-note>
+                  {shapeAnchoredNotes
+                    ? "Le forme, e le note ancorate a una forma, escono solo come immagine (SVG o PNG)."
+                    : "Le forme escono solo come immagine (SVG o PNG)."}
+                </li>
+              )}
               {/* La chiave è l'indice: gli avvisi sono una lista derivata e stabile, e due avvisi
                   con lo stesso testo darebbero chiavi duplicate. */}
               {warnings.map((w, i) => (
@@ -170,10 +188,19 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
             </ul>
             <pre data-export-preview className="max-h-96 overflow-auto rounded border bg-muted/40 p-3 font-mono text-xs">{text}</pre>
           </>
-        ) : Object.keys(models.notes).length > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Le note libere escono solo nel Mermaid delle classi, che chiede almeno una classe: qui non ce n'è nessuna.
-          </p>
+        ) : hasShapes || freeNoteCount > 0 ? (
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+            {hasShapes && (
+              <p>
+                {shapeAnchoredNotes
+                  ? "Le forme, e le note ancorate a una forma, escono solo come immagine: usa l'export SVG o PNG."
+                  : "Le forme escono solo come immagine: usa l'export SVG o PNG."}
+              </p>
+            )}
+            {freeNoteCount > 0 && (
+              <p>Le note libere escono solo nel Mermaid delle classi, che chiede almeno una classe: qui non ce n'è nessuna.</p>
+            )}
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">Il documento è vuoto: non c'è niente da esportare.</p>
         )}

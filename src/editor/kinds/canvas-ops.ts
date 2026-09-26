@@ -47,7 +47,7 @@ export interface CanvasOps {
   commitDrag(keys: readonly string[], dx: number, dy: number): Recipe | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
-  /** Il ridimensionamento di un frame, sulla chiave con prefisso (vedi `DiagramOps.resize`). */
+  /** Il ridimensionamento di un frame o di una forma, sulla chiave con prefisso (vedi `DiagramOps.resize`). */
   resize(key: string, lane: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
   /** Solo le famiglie con contenuto: una famiglia vuota non ha problemi da segnalare. Poi i collegamenti. */
   validate(): Issue[]
@@ -179,7 +179,11 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     },
 
     validate: () => [
-      ...FAMILIES.filter((f) => familyHasContent(doc, f)).flatMap((f) =>
+      // `shape` salta il cancello di `familyHasContent`: le sue frecce possono restare orfane dopo
+      // che le forme sono sparite (un file corrotto a mano, o un futuro comando che non fa ancora la
+      // cascata), e `shape-dangling-arrow` deve emergere anche a zero forme. Il costo è nullo — senza
+      // forme né frecce `validateShapes` non ha niente da dire.
+      ...FAMILIES.filter((f) => f === "shape" || familyHasContent(doc, f)).flatMap((f) =>
         ops(f)
           .validate()
           .map((issue) => ({

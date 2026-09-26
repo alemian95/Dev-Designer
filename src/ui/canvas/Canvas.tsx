@@ -9,6 +9,7 @@ import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
 import { Overlay } from "./Overlay"
 import { PoolsLayer } from "./PoolsLayer"
+import { ShapeEditor } from "./ShapeEditor"
 import { useCanvasInteraction } from "./use-canvas-interaction"
 import { ViewportGroup } from "./ViewportGroup"
 
@@ -30,18 +31,27 @@ export function Canvas({ children }: { children?: ReactNode }) {
         </defs>
         <ViewportGroup>
           <rect data-canvas x={-GRID_EXTENT} y={-GRID_EXTENT} width={2 * GRID_EXTENT} height={2 * GRID_EXTENT} fill="url(#dd-grid)" />
+          {/* Le famiglie `backdrop` sotto tutto, anche sotto pool e archi: una zona non copre ciò che
+              racchiude (spec 3b §3). `data-backdrop` marca il gruppo per `hitTest`
+              (`use-canvas-interaction.ts`): lo strumento di creazione deve poter aprire una forma
+              nuova dentro una zona invece di selezionarla (spec 3b §1, §5). */}
+          <g data-backdrop>
+            {FAMILIES.filter((f) => viewFor(f).backdrop).map((f) => {
+              const { NodesLayer } = viewFor(f)
+              return <NodesLayer key={`nodes-${f}`} />
+            })}
+          </g>
           {/* I pool non sono un `DiagramView.NodesLayer`: sono un layer che solo il flowchart popola,
               sotto archi e nodi (spec 2b §3). */}
           <PoolsLayer />
           {/* Tutti gli archi sotto tutti i nodi: un arco ER non deve coprire una classe (spec §5). */}
-          {/* Tutte le famiglie, nell'ordine canonico: ogni layer disegna la propria parte, vuota o no. */}
           {FAMILIES.map((f) => {
             const { EdgesLayer } = viewFor(f)
             return <EdgesLayer key={`edges-${f}`} />
           })}
           {/* I collegamenti fra famiglie: sopra gli archi interni, sotto ogni nodo (spec 4a §6). */}
           <LinksLayer />
-          {FAMILIES.map((f) => {
+          {FAMILIES.filter((f) => !viewFor(f).backdrop).map((f) => {
             const { NodesLayer } = viewFor(f)
             return <NodesLayer key={`nodes-${f}`} />
           })}
@@ -53,6 +63,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
       <MembersEditor />
       <NoteEditor />
       <FlowNodeEditor />
+      <ShapeEditor />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
 import { noteDiagram } from "@/editor/note-access"
+import { shapeDiagram } from "@/editor/shape-access"
 import type { DevDocument } from "@/model/document"
 import { FAMILIES, type Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
@@ -34,6 +35,8 @@ export interface BuildSvgOptions {
 /** I nodi grezzi di una famiglia: vedi la nota sopra `buildSvg`. */
 function nodeModelsOf(doc: DevDocument, family: Family): Record<string, unknown> {
   switch (family) {
+    case "shape":
+      return shapeDiagram(doc).model.shapes
     case "er":
       return erDiagram(doc).model.entities
     case "class":
@@ -48,6 +51,8 @@ function nodeModelsOf(doc: DevDocument, family: Family): Record<string, unknown>
 /** Gli archi grezzi di una famiglia, stessa ragione di `nodeModelsOf`. */
 function edgeModelsOf(doc: DevDocument, family: Family): Record<string, unknown> {
   switch (family) {
+    case "shape":
+      return shapeDiagram(doc).model.arrows
     case "er":
       return erDiagram(doc).model.relationships
     case "class":
@@ -63,6 +68,8 @@ function edgeModelsOf(doc: DevDocument, family: Family): Record<string, unknown>
 /** Le view dei nodi di una famiglia: la forma è la stessa per tutte (`NodeViewSchema`). */
 function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewModel> {
   switch (family) {
+    case "shape":
+      return shapeDiagram(doc).view.nodes
     case "er":
       return erDiagram(doc).view.nodes
     case "class":
@@ -76,8 +83,8 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
 
 /**
  * Serializza il documento come SVG autoconsistente. Scorre le famiglie del documento nello stesso
- * ordine del canvas: le corsie sotto tutto, poi tutti gli archi, poi i collegamenti fra famiglie,
- * poi tutti i nodi.
+ * ordine del canvas: le forme sotto tutto, poi le corsie, poi tutti gli archi, poi i collegamenti fra
+ * famiglie, poi i nodi delle altre famiglie.
  *
  * Una sezione per famiglia: `nodeKeys`/`rectOf`/`edgesTouching`/`edgeGeometry` di `DiagramOps`
  * (`@/editor/kinds/ops.ts`) danno chiavi, geometria e bounds senza sapere se il modello si chiama
@@ -106,7 +113,11 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
   // pure di ogni famiglia li vogliono così (e il prefisso nei `data-*-id` lo mettono loro).
   const sections = FAMILIES.map((family) => {
     const ops = familyOps(doc, family)
-    const keys = ops.nodeKeys()
+    const view = viewFor(family)
+    const nodeModels = nodeModelsOf(doc, family)
+    // Un nodo che il canvas mostra ma l'export salta (un testo vuoto, spec 3b §8) non entra né nel
+    // disegno né nei limiti del file.
+    const keys = ops.nodeKeys().filter((key) => !view.hiddenInExport?.(nodeModels[key]))
     const rects = new Map<string, Rect>()
     for (const key of keys) {
       const rect = ops.rectOf(key)
@@ -120,8 +131,8 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
       rects,
       edges,
       offsets: edgeOffsets(edges),
-      view: viewFor(family),
-      nodeModels: nodeModelsOf(doc, family),
+      view,
+      nodeModels,
       edgeModels: edgeModelsOf(doc, family),
       viewNodes: viewNodesOf(doc, family),
     }
@@ -142,6 +153,18 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
   // Gli estremi dei collegamenti sono chiavi con prefisso, di famiglie diverse: li risolve `CanvasOps`.
   const allOps = canvasOps(doc)
 
+  // Le famiglie `backdrop` sotto tutto, anche sotto pool e archi, come nel canvas (spec 3b §3).
+  const nodesOf = (list: typeof sections) =>
+    list.flatMap((s) =>
+      s.keys.map((key) => {
+        const rect = s.rects.get(key)
+        const view = s.viewNodes[key]
+        const node = s.nodeModels[key]
+        if (!rect || !view || !node) return null
+        return <s.view.NodeView key={qualify(s.family, key)} nodeKey={key} node={node} view={view} selected={false} />
+      }),
+    )
+
   // I pool sotto tutto, come nel canvas (`Canvas.tsx`: `PoolsLayer` monta prima dei layer di
   // famiglia). Poi tutti gli archi sotto tutti i nodi. Il fondo sotto tutto: nell'app lo dipinge il
   // div attorno all'svg, quindi qui va aggiunto, altrimenti il PNG esce trasparente e il testo del
@@ -149,6 +172,7 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
   const body = renderToStaticMarkup(
     <>
       <rect data-background x={x} y={y} width={w} height={h} fill="var(--background)" />
+      <g data-layer="backdrop">{nodesOf(sections.filter((s) => s.view.backdrop))}</g>
       {poolRects.length > 0 && <PoolsLayerView part={flow} />}
       <g data-layer="edges">
         {sections.flatMap((s) =>
@@ -193,17 +217,7 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
           return <LinkEdgeView key={id} id={id} link={link} source={source} target={target} selected={false} />
         })}
       </g>
-      <g data-layer="nodes">
-        {sections.flatMap((s) =>
-          s.keys.map((key) => {
-            const rect = s.rects.get(key)
-            const view = s.viewNodes[key]
-            const node = s.nodeModels[key]
-            if (!rect || !view || !node) return null
-            return <s.view.NodeView key={qualify(s.family, key)} nodeKey={key} node={node} view={view} selected={false} />
-          }),
-        )}
-      </g>
+      <g data-layer="nodes">{nodesOf(sections.filter((s) => !s.view.backdrop))}</g>
     </>,
   )
 

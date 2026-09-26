@@ -174,6 +174,22 @@ export function pathFromPoints(points: readonly Point[]): string {
   return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x} ${p.y}`).join(" ")
 }
 
+/** Lunghezza e semilarghezza della freccia piena: la punta degli archi di flowchart e delle frecce delle forme. */
+const FILLED_ARROW_LEN = 10
+const FILLED_ARROW_HALF_W = 5
+
+/**
+ * Una punta piena con la cima in `at`, che si apre lungo `dir` — il versore che esce dal nodo lungo
+ * l'arco, lo stesso di `routeEdge` per `sourceDir` e `targetDir`: la cima tocca il bordo del nodo, la
+ * base sta sull'arco. Serve a entrambi i capi.
+ */
+export function filledArrowPath(at: Point, dir: Dir): string {
+  const px = -dir.y
+  const py = dir.x
+  const p = (d: number, s: number): Point => ({ x: at.x + dir.x * d + px * s, y: at.y + dir.y * d + py * s })
+  return `${pathFromPoints([at, p(FILLED_ARROW_LEN, -FILLED_ARROW_HALF_W), p(FILLED_ARROW_LEN, FILLED_ARROW_HALF_W)])} Z`
+}
+
 /**
  * Marker crow's foot. `point` sta sul bordo dell'entità, `dir` è il versore che esce dall'entità lungo l'edge.
  * Distanze lungo l'edge: barra a 12, punta del piede a 16, seconda barra a 20, cerchio a 24.

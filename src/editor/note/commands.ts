@@ -2,11 +2,9 @@ import type { DevDocument } from "@/model/document"
 import type { LayoutGraph, LayoutNode } from "@/model/layout"
 import type { NoteModel } from "@/model/note/schema"
 import type { Recipe } from "../document-store"
-import { snap, type Point } from "../geometry"
+import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
 import { isAnchored, noteDiagram } from "../note-access"
 import { noteSize } from "./geometry"
-
-const DUPLICATE_OFFSET = 20
 
 /**
  * Nuova nota vuota e libera. La chiave è un uuid e non deriva dal testo: il testo cambia a ogni

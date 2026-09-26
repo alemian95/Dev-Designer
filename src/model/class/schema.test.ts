@@ -66,8 +66,8 @@ describe("schema del class diagram", () => {
     doc.diagram.class.model.classes["Cliente"] = { name: "Cliente", stereotype: "class", attributes: [], methods: [] }
     doc.diagram.er.model.entities["clienti"] = { name: "clienti", attributes: [] }
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
-    // La versione è quella corrente: la 6 → 7 porta le note nella loro famiglia.
-    expect(SCHEMA_VERSION).toBe(7)
+    // La versione è quella corrente: la 7 → 8 aggiunge la parte delle forme.
+    expect(SCHEMA_VERSION).toBe(8)
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })

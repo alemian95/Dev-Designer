@@ -6,6 +6,8 @@ import { erDiagram } from "../er-access"
 import { splitKey } from "../families"
 import { flowDiagram } from "../flow-access"
 import { withPool } from "../flow/pool-fixture"
+import { noteDiagram } from "../note-access"
+import { shapeDiagram } from "../shape-access"
 import { canvasOps, familyHasContent } from "./canvas-ops"
 
 const state = () => documentStore.getState()
@@ -382,5 +384,49 @@ describe("canvasOps e le note (spec 3a §5)", () => {
   it("le note contano come contenuto", () => {
     add({ x: 0, y: 0 }, "note")
     expect(familyHasContent(state().doc, "note")).toBe(true)
+  })
+})
+
+describe("canvasOps e le forme (spec 3b)", () => {
+  const add = (family: "shape" | "er" | "note", at: { x: number; y: number }, variant?: string) => {
+    const { key, recipe } = canvasOps(state().doc).addNode(at, family, variant)
+    state().dispatch(recipe)
+    return key
+  }
+
+  it("lo strumento crea la forma della sua variante e apre il testo", () => {
+    const created = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "shape", "ellipse")
+    expect(created.edit).toBe("body")
+    state().dispatch(created.recipe)
+    expect(shapeDiagram(state().doc).model.shapes[splitKey(created.key).key]).toEqual({ kind: "ellipse", label: "" })
+  })
+
+  it("Collega fra una forma e un'entità è rifiutato con l'avviso", () => {
+    const s = add("shape", { x: 0, y: 0 }, "rect")
+    const e = add("er", { x: 300, y: 0 })
+    expect(canvasOps(state().doc).addEdge(s, e)).toEqual({ type: "rejected", notice: "Non esiste un collegamento fra una forma e un'entità." })
+  })
+
+  it("una nota si ancora a una forma; eliminare la forma stacca la nota, e un annulla riporta forma, frecce e àncora", () => {
+    const s = add("shape", { x: 0, y: 0 }, "rect")
+    const altra = add("shape", { x: 300, y: 0 }, "rect")
+    // La freccia si scrive a mano: il gesto arriva col Task 2.
+    state().dispatch((draft) => {
+      shapeDiagram(draft).model.arrows["f"] = { source: splitKey(s).key, target: splitKey(altra).key, head: "end", dashed: false }
+    })
+    const n = add("note", { x: 0, y: 200 })
+    const anchored = canvasOps(state().doc).addEdge(n, s)
+    if (anchored?.type !== "created") throw new Error("atteso un ancoraggio")
+    state().dispatch(anchored.recipe)
+    const nota = () => noteDiagram(state().doc).model.notes[splitKey(n).key]!
+    expect(nota().anchor).toBe(s)
+
+    state().dispatch(canvasOps(state().doc).deleteItems([s], [])!)
+    expect(nota().anchor).toBeNull()
+    expect(shapeDiagram(state().doc).model.arrows).toEqual({})
+
+    state().undo()
+    expect(nota().anchor).toBe(s)
+    expect(Object.keys(shapeDiagram(state().doc).model.arrows)).toEqual(["f"])
   })
 })

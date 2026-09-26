@@ -341,7 +341,7 @@ describe("openRecent e newDocument", () => {
     const io = createDocumentIo(d)
     await io.newDocument()
     const doc = documentStore.getState().doc
-    expect(Object.keys(doc.diagram).sort()).toEqual(["class", "er", "flow", "links", "note"])
+    expect(Object.keys(doc.diagram).sort()).toEqual(["class", "er", "flow", "links", "note", "shape"])
   })
 
   it("newDocument lascia il precedente in biblioteca", async () => {

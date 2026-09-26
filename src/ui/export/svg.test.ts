@@ -476,3 +476,23 @@ describe("buildSvg e le note", () => {
     expect(svg).not.toContain('data-edge-id="note/n1"')
   })
 })
+
+describe("buildSvg e le forme (spec 3b)", () => {
+  it("le forme escono sotto tutto, prima di archi e nodi delle altre famiglie; un testo vuoto non esce e non allarga il file", () => {
+    const doc = docOf("er", diagram())
+    doc.diagram.shape.model.shapes = { z: { kind: "rect", label: "zona" }, t: { kind: "text", label: "" } }
+    doc.diagram.shape.view.nodes = {
+      z: { x: 0, y: 0, collapsed: false, w: 800, h: 800 },
+      t: { x: 5000, y: 5000, collapsed: false, w: null, h: null },
+    }
+    const svg = buildSvg(doc, { vars: {} })!
+    const zona = svg.indexOf('data-node-id="shape/z"')
+    expect(zona).toBeGreaterThan(-1)
+    expect(zona).toBeLessThan(svg.indexOf('data-layer="edges"'))
+    expect(zona).toBeLessThan(svg.indexOf('data-node-id="er/utenti"'))
+    expect(svg).not.toContain('data-node-id="shape/t"')
+    // Il testo vuoto a (5000, 5000) non conta nei limiti: il file finisce ben prima.
+    const width = Number(/width="([\d.]+)"/.exec(svg)![1])
+    expect(width).toBeLessThan(5000)
+  })
+})

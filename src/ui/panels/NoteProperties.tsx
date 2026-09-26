@@ -12,18 +12,19 @@ import { CommitTextarea } from "./CommitTextarea"
 const dispatch = (recipe: Recipe) => documentStore.getState().dispatch(recipe)
 
 /**
- * Il campo «Testo» di una nota: una `textarea` commessa sul blur, l'alternativa al doppio clic sul
- * canvas. **Alternativa, non secondo editor:** finché l'editor sul canvas è aperto su *questa* nota
- * il campo è in sola lettura e lo dice, perché due campi modificabili per lo stesso dato
- * divergerebbero. `id` è la chiave con prefisso della nota, quella che l'editing in corso porta.
+ * Il campo «Testo» di una nota o di una forma: una `textarea` commessa sul blur, l'alternativa al
+ * doppio clic sul canvas. **Alternativa, non secondo editor:** finché l'editor sul canvas è aperto su
+ * *questo* elemento il campo è in sola lettura e lo dice, perché due campi modificabili per lo stesso
+ * dato divergerebbero. `id` è la chiave con prefisso dell'elemento, quella che l'editing in corso
+ * porta; `fieldId` è l'id HTML del campo, diverso per nota e forma.
  */
-export function NoteTextField({ id, text, onCommit }: { id: string; text: string; onCommit: (text: string) => void }) {
+export function NoteTextField({ id, text, onCommit, fieldId = "note-text" }: { id: string; text: string; onCommit: (text: string) => void; fieldId?: string }) {
   const editingHere = useStore(sessionStore, (s) => s.editing?.key === id && s.editing.target === "body")
   return (
     <div className="grid gap-1">
-      <Label htmlFor="note-text">Testo</Label>
+      <Label htmlFor={fieldId}>Testo</Label>
       <CommitTextarea
-        id="note-text"
+        id={fieldId}
         key={text}
         value={text}
         readOnly={editingHere}

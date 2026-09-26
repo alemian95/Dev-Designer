@@ -23,6 +23,13 @@ describe("anchorExists", () => {
     doc.diagram.note.model.notes["n2"] = { text: "", anchor: null }
     for (const anchor of ["er/clienti", "class/Cliente", "flow/n9", "note/n2"]) expect(anchorExists(doc, anchor)).toBe(false)
   })
+
+  it("un'àncora a una forma esiste finché la forma c'è", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.shape.model.shapes["s1"] = { kind: "rect", label: "" }
+    expect(anchorExists(doc, "shape/s1")).toBe(true)
+    expect(anchorExists(doc, "shape/sparita")).toBe(false)
+  })
 })
 
 describe("validateNotes", () => {

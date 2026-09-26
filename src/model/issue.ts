@@ -13,6 +13,8 @@ export type IssueCode =
   | "link-dangling" | "class-maps-multiple" | "link-attribute-missing" | "link-type-mismatch" | "link-unmappable"
   // note
   | "note-dangling-anchor"
+  // forme
+  | "shape-dangling-arrow"
 
 export type IssueSeverity = "error" | "warning"
 

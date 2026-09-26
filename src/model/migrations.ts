@@ -218,6 +218,17 @@ const notesIntoFamily: Migration = (raw) => {
 }
 
 /**
+ * 7 → 8: il documento guadagna la parte delle forme, vuota (spec 3b §4). Il letterale, e non
+ * `emptyShapeDiagram()`, per la stessa ragione di `unifyDiagram`: la migrazione descrive il formato
+ * della versione 8, e non deve cambiare se in futuro cambia il default di un documento nuovo.
+ */
+const addShapes: Migration = (raw) => {
+  const diagram = raw.diagram
+  if (!isObj(diagram)) return raw
+  return { ...raw, diagram: { ...diagram, shape: { model: { shapes: {}, arrows: {} }, view: { nodes: {} } } } }
+}
+
+/**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
  */
@@ -228,6 +239,7 @@ const migrations: ReadonlyMap<number, Migration> = new Map([
   [4, sameShape],
   [5, lanesIntoPool],
   [6, notesIntoFamily],
+  [7, addShapes],
 ])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }

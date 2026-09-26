@@ -161,9 +161,9 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
         session().setEditing({ key: hit.key, target: classEditTarget(key, headerHit) })
         return
       }
-      // Un nodo di flowchart e una nota non hanno un nome distinto dal corpo: qualunque punto del
-      // nodo apre l'editor di testo, a differenza dell'header che l'ER usa per il nome dell'entità.
-      if (family === "flow" || family === "note") {
+      // Un nodo di flowchart, una nota e una forma non hanno un nome distinto dal corpo: qualunque
+      // punto del nodo apre l'editor di testo, a differenza dell'header che l'ER usa per il nome.
+      if (family === "flow" || family === "note" || family === "shape") {
         session().setEditing({ key: hit.key, target: "body" })
         return
       }

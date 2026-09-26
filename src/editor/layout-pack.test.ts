@@ -125,3 +125,53 @@ describe("layoutAll", () => {
     await expect(layoutAll(doc, failsOnSecond)).rejects.toThrow("worker giù")
   })
 })
+
+describe("layoutAll e le note (spec 3a §6)", () => {
+  function conNota() {
+    documentStore.getState().load(createDocument("t", "t"))
+    const add = (family: "er" | "note", at: { x: number; y: number }) => {
+      const { key, recipe } = canvasOps(documentStore.getState().doc).addNode(at, family)
+      documentStore.getState().dispatch(recipe)
+      return key
+    }
+    const a = add("er", { x: 500, y: 500 })
+    const b = add("er", { x: 900, y: 500 })
+    const nota = add("note", { x: 520, y: 700 })
+    const connect = canvasOps(documentStore.getState().doc).addEdge(nota, a)
+    if (connect?.type === "created") documentStore.getState().dispatch(connect.recipe)
+    const libera = add("note", { x: 2000, y: 2000 })
+    return { a, b, nota, libera }
+  }
+
+  it("la nota ancorata segue la sua entità con lo stesso scarto", async () => {
+    const { a, nota } = conNota()
+    const before = canvasOps(documentStore.getState().doc)
+    const offset = { x: before.rectOf(nota)!.x - before.rectOf(a)!.x, y: before.rectOf(nota)!.y - before.rectOf(a)!.y }
+    const recipe = await layoutAll(documentStore.getState().doc, fila)
+    documentStore.getState().dispatch(recipe!)
+    const after = canvasOps(documentStore.getState().doc)
+    expect(after.rectOf(nota)!.x - after.rectOf(a)!.x).toBe(offset.x)
+    expect(after.rectOf(nota)!.y - after.rectOf(a)!.y).toBe(offset.y)
+    // L'entità si è spostata davvero: altrimenti il test passerebbe anche senza il passo delle note.
+    expect(after.rectOf(a)!.x).not.toBe(before.rectOf(a)!.x)
+  })
+
+  it("la nota libera fa l'ultimo blocco, dopo l'ER, e tutto è un solo passo di annulla", async () => {
+    const { b, libera } = conNota()
+    const past = documentStore.getState().past.length
+    const recipe = await layoutAll(documentStore.getState().doc, fila)
+    documentStore.getState().dispatch(recipe!)
+    const ops = canvasOps(documentStore.getState().doc)
+    expect(ops.rectOf(libera)!.x).toBe(ops.rectOf(b)!.x + ops.rectOf(b)!.w + LAYOUT_FAMILY_GAP)
+    expect(documentStore.getState().past.length).toBe(past + 1)
+  })
+
+  it("con sole note ancorate e nessuna libera, le note seguono lo stesso", async () => {
+    const { a, nota, libera } = conNota()
+    documentStore.getState().dispatch(canvasOps(documentStore.getState().doc).deleteItems([libera], [])!)
+    const recipe = await layoutAll(documentStore.getState().doc, fila)
+    documentStore.getState().dispatch(recipe!)
+    const ops = canvasOps(documentStore.getState().doc)
+    expect(ops.rectOf(nota)!.x - ops.rectOf(a)!.x).toBe(20)
+  })
+})

@@ -6,6 +6,7 @@ import type { Recipe } from "./document-store"
 import { rectsBounds, type Point, type Rect } from "./geometry"
 import { familyHasContent } from "./kinds/canvas-ops"
 import { familyOps } from "./kinds/ops"
+import { followAnchors } from "./note/layout"
 
 /** Distanza dall'origine del risultato: un diagramma appiccicato al bordo (0, 0) si legge male. */
 export const LAYOUT_MARGIN = 40
@@ -57,7 +58,8 @@ const translate = (positions: LayoutPositions, by: Point): LayoutPositions =>
  * solo traslato. Il blocco di una famiglia si misura con `layoutBounds` quando la famiglia disegna
  * più dei suoi nodi (i pool del flowchart, spec 2b §6), altrimenti dai nodi. Le chiamate partono in
  * parallelo e **tutto o niente**: se una fallisce, la promise rifiuta e non si applica niente. Il
- * motore è iniettato: `editor` non può importare `io`.
+ * motore è iniettato: `editor` non può importare `io`. Per ultime, le note ancorate seguono il loro
+ * elemento (`followAnchors`).
  */
 export async function layoutAll(doc: DevDocument, layout: (g: LayoutGraph) => Promise<LayoutPositions>): Promise<Recipe | null> {
   const families = FAMILIES.filter((f) => familyHasContent(doc, f))
@@ -76,6 +78,9 @@ export async function layoutAll(doc: DevDocument, layout: (g: LayoutGraph) => Pr
     if (!offset) return []
     return [ops.layoutRecipe ? ops.layoutRecipe(positions, offset) : applyLayout(family, translate(positions, offset))]
   })
+  // Le note ancorate seguono i loro elementi, dopo che tutte le famiglie hanno scritto (spec 3a §6).
+  const follow = followAnchors(doc)
+  if (follow) recipes.push(follow)
   if (recipes.length === 0) return null
   return (draft) => {
     for (const recipe of recipes) recipe(draft)

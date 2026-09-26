@@ -15,7 +15,12 @@ interface Props {
   shape: Shape
   view: ShapeView
   selected: boolean
+  /** Mostra la maniglia di ridimensionamento: solo per la forma selezionata da sola. */
+  handle?: boolean
 }
+
+/** Lato della maniglia di ridimensionamento, in unità mondo: lo stesso dei pool. */
+const HANDLE = 8
 
 /**
  * Vista pura e memoizzata di una forma (spec 3b §5). Rettangolo ed ellisse hanno bordo e fondo del
@@ -24,7 +29,7 @@ interface Props {
  * flusso: il centro è l'unico punto che sta dentro tutte e tre le forme. Un testo vuoto mostra il
  * segnaposto in grigio.
  */
-export const ShapeNodeView = memo(function ShapeNodeView({ id, shape, view, selected }: Props) {
+export const ShapeNodeView = memo(function ShapeNodeView({ id, shape, view, selected, handle = false }: Props) {
   const { w, h } = shapeSize(shape, view)
   const text = shapeText(shape)
   const lines = text === "" ? [] : text.split("\n")
@@ -65,6 +70,18 @@ export const ShapeNodeView = memo(function ShapeNodeView({ id, shape, view, sele
           </text>
         </g>
       )}
+      {/* `data-resize` con la chiave della forma: `hitTest` la guarda prima del nodo, come per i pool (spec 3b §5). */}
+      {handle && (
+        <rect
+          data-resize={id}
+          x={w - HANDLE / 2}
+          y={h - HANDLE / 2}
+          width={HANDLE}
+          height={HANDLE}
+          fill="var(--primary)"
+          style={{ cursor: "nwse-resize" }}
+        />
+      )}
     </g>
   )
 })
@@ -75,6 +92,7 @@ export function ShapeNode({ nodeKey }: { nodeKey: string }) {
   const shape = useStore(documentStore, (s) => shapeDiagram(s.doc).model.shapes[nodeKey])
   const view = useStore(documentStore, (s) => shapeDiagram(s.doc).view.nodes[nodeKey])
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", id)))
+  const alone = useStore(sessionStore, (s) => s.selection.size === 1 && s.selection.has(selId("node", id)))
   if (!shape || !view) return null
-  return <ShapeNodeView id={id} shape={shape} view={view} selected={selected} />
+  return <ShapeNodeView id={id} shape={shape} view={view} selected={selected} handle={alone} />
 }

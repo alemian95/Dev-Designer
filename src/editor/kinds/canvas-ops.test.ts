@@ -439,4 +439,18 @@ describe("canvasOps e le forme (spec 3b)", () => {
     expect(nota().anchor).toBe(s)
     expect(Object.keys(shapeDiagram(state().doc).model.arrows)).toEqual([arrowKey])
   })
+
+  it("resize allarga la forma in un passo di annulla, e riportata al testo torna automatica", () => {
+    const s = add("shape", { x: 0, y: 0 }, "rect")
+    const view = () => shapeDiagram(state().doc).view.nodes[splitKey(s).key]!
+    const grande = canvasOps(state().doc).resize(s, null, 100, 60)!
+    expect(grande.rect).toEqual({ x: 0, y: 0, w: 160, h: 100 })
+    state().dispatch(grande.recipe)
+    expect(view()).toMatchObject({ w: 160, h: 100 })
+    const indietro = canvasOps(state().doc).resize(s, null, -100, -60)!
+    state().dispatch(indietro.recipe)
+    expect(view()).toMatchObject({ w: null, h: null })
+    state().undo()
+    expect(view()).toMatchObject({ w: 160, h: 100 })
+  })
 })

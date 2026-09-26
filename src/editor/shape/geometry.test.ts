@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { ShapeDiagram } from "@/model/shape/schema"
-import { arrowGeometry, arrowOffsets, shapeDrawOrder, shapeSize, shapeTextSize } from "./geometry"
+import { arrowGeometry, arrowOffsets, resizedShape, shapeDrawOrder, shapeSize, shapeTextSize } from "./geometry"
 
 const at = (w: number | null = null, h: number | null = null) => ({ x: 0, y: 0, collapsed: false, w, h })
 
@@ -57,5 +57,18 @@ describe("geometria delle frecce", () => {
       f2: { source: "a", target: "b", head: "end", dashed: false },
     })
     expect(offsets.get("f1")).not.toBe(offsets.get("f2"))
+  })
+})
+
+describe("ridimensionamento", () => {
+  const vuoto = { kind: "rect" as const, label: "" }
+
+  it("allarga della distanza trascinata, allineata alla griglia", () => {
+    // 60 × 40 + (103, 47) → 163 → 160, 87 → 90.
+    expect(resizedShape(vuoto, { w: null, h: null }, 103, 47)).toEqual({ size: { w: 160, h: 90 }, w: 160, h: 90 })
+  })
+
+  it("non scende sotto il testo, e fino al testo torna alla misura automatica", () => {
+    expect(resizedShape(vuoto, { w: 200, h: 100 }, -500, -500)).toEqual({ size: { w: 60, h: 40 }, w: null, h: null })
   })
 })

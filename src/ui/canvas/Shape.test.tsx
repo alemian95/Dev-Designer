@@ -20,6 +20,12 @@ describe("ShapeNodeView", () => {
     expect(out).toContain("var(--muted-foreground)")
     expect(out).not.toContain("<ellipse")
   })
+
+  it("la maniglia c'è solo quando la si chiede, con la chiave della forma", () => {
+    const con = renderToStaticMarkup(<ShapeNodeView id="shape/a" shape={{ kind: "rect", label: "" }} view={view} selected={true} handle />)
+    expect(con).toContain('data-resize="shape/a"')
+    expect(html("rect", "")).not.toContain("data-resize")
+  })
 })
 
 describe("ArrowEdgeView", () => {

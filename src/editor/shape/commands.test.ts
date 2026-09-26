@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { createDocument } from "@/model/document"
 import { documentStore } from "../document-store"
 import { shapeDiagram } from "../shape-access"
-import { addArrow, addShape, deleteShapeItems, duplicateShapes, invertArrow, setArrowDashed, setArrowHead, setShapeLabel, shapeLayoutGraph } from "./commands"
+import { addArrow, addShape, deleteShapeItems, duplicateShapes, invertArrow, resizeShape, setArrowDashed, setArrowHead, setShapeLabel, shapeLayoutGraph } from "./commands"
 
 const state = () => documentStore.getState()
 const part = () => shapeDiagram(state().doc)
@@ -90,5 +90,14 @@ describe("comandi delle frecce", () => {
     expect(state().dispatch(setArrowDashed("ab", true))).toBe(true)
     state().dispatch(invertArrow("ab"))
     expect(part().model.arrows["ab"]).toEqual({ source: "b", target: "a", head: "both", dashed: true })
+  })
+})
+
+describe("resizeShape", () => {
+  it("scrive la misura scelta, e la stessa misura non aggiunge una voce di annulla", () => {
+    tre()
+    expect(state().dispatch(resizeShape("b", 200, 120))).toBe(true)
+    expect(part().view.nodes["b"]).toMatchObject({ w: 200, h: 120 })
+    expect(state().dispatch(resizeShape("b", 200, 120))).toBe(false)
   })
 })

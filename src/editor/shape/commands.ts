@@ -128,3 +128,13 @@ export function invertArrow(key: string): Recipe {
     if (arrow) [arrow.source, arrow.target] = [arrow.target, arrow.source]
   }
 }
+
+/** Scrive la misura scelta a mano di una forma: un solo passo di annulla, e niente se non cambia. */
+export function resizeShape(key: string, w: number | null, h: number | null): Recipe {
+  return (draft) => {
+    const view = shapeDiagram(draft).view.nodes[key]
+    if (!view) return
+    if (view.w !== w) view.w = w
+    if (view.h !== h) view.h = h
+  }
+}

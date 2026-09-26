@@ -2,11 +2,11 @@
  * Le famiglie di elementi che un documento contiene. L'ordine è quello canonico, e tutto ciò che
  * le scorre lo rispetta: layer del canvas, blocchi del layout, formati di export, validazione.
  */
-export const FAMILIES = ["er", "class", "flow"] as const
+export const FAMILIES = ["er", "class", "flow", "note"] as const
 export type Family = (typeof FAMILIES)[number]
 
 /**
- * Chiave con prefisso di famiglia: `er/utenti`, `class/Ordine`, `flow/n3`. È la sola forma di
+ * Chiave con prefisso di famiglia: `er/utenti`, `class/Ordine`, `flow/n3`, `note/…`. È la sola forma di
  * chiave che canvas, selezione, editing e `dom-registry` conoscono, ed è quella con cui un
  * collegamento fra famiglie conserva i suoi estremi. I moduli di famiglia (comandi, `DiagramOps`,
  * validatori, emettitori, pannelli) lavorano senza prefisso: lo aggiunge `CanvasOps` all'andata e

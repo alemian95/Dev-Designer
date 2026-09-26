@@ -119,6 +119,13 @@ const lanesIntoPool: Migration = (raw) => {
   }
 }
 
+/** 6 → 7: il documento guadagna la parte delle note, vuota (spec 3a §3). */
+const addNotes: Migration = (raw) => {
+  const diagram = raw.diagram
+  if (!isObj(diagram)) return raw
+  return { ...raw, diagram: { ...diagram, note: { model: { notes: {} }, view: { nodes: {} } } } }
+}
+
 /**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
@@ -129,6 +136,7 @@ const migrations: ReadonlyMap<number, Migration> = new Map([
   [3, addLinks],
   [4, sameShape],
   [5, lanesIntoPool],
+  [6, addNotes],
 ])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }

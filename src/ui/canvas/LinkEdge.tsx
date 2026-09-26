@@ -46,8 +46,9 @@ export const LinkEdgeView = memo(function LinkEdgeView({ id, link, source, targe
   )
 })
 
-/** Il rettangolo di un estremo, di qualunque famiglia: `useShallow` per la stessa ragione di `ClassEdge`. */
-function useNodeRect(key: string | undefined): Rect | null {
+/** Il rettangolo di un nodo o di un frame di qualunque famiglia, dalla chiave con prefisso: lo usano
+ *  i collegamenti e le linee di ancoraggio. `useShallow` per la stessa ragione di `ClassEdge`. */
+export function useNodeRect(key: string | undefined): Rect | null {
   return useStore(documentStore, useShallow((s) => (key ? canvasOps(s.doc).rectOf(key) : null)))
 }
 

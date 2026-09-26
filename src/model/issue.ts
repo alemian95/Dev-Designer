@@ -11,6 +11,8 @@ export type IssueCode =
   | "flow-unreachable" | "flow-branch-unlabeled" | "flow-no-terminal"
   // collegamenti fra famiglie
   | "link-dangling" | "class-maps-multiple" | "link-attribute-missing" | "link-type-mismatch" | "link-unmappable"
+  // note
+  | "note-dangling-anchor"
 
 export type IssueSeverity = "error" | "warning"
 

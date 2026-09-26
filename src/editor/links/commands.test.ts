@@ -138,6 +138,18 @@ describe("retargetLinks e followRename", () => {
     expect(state().dispatch(followRename(renameEntity("ordini", "clienti")!, "er", "ordini", "clienti"))).toBe(false)
     expect(links()["l1"]!.target).toBe("er/ordini")
   })
+
+  it("una rinomina sposta anche le note ancorate, e una collisione no", () => {
+    // Review Focus 1.
+    const doc = documento()
+    doc.diagram.note.model.notes["a1"] = { text: "", anchor: "class/Ordine" }
+    doc.diagram.note.view.nodes["a1"] = { x: 0, y: 0, collapsed: false }
+    state().load(doc)
+    state().dispatch(followRename(renameClass("Ordine", "Pagabile")!, "class", "Ordine", "Pagabile"))
+    expect(state().doc.diagram.note.model.notes["a1"]!.anchor).toBe("class/Ordine")
+    state().dispatch(followRename(renameClass("Ordine", "Ordini")!, "class", "Ordine", "Ordini"))
+    expect(state().doc.diagram.note.model.notes["a1"]!.anchor).toBe("class/Ordini")
+  })
 })
 
 describe("deleteLinks e linksTouching", () => {

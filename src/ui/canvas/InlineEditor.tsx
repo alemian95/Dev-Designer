@@ -126,13 +126,14 @@ function FlowEdgeLabelEditor({ editing, viewport, close }: { editing: Editing; v
 }
 
 /**
- * L'editor del nome per la famiglia della chiave in editing — `null` per il flowchart, che un nome non
- * ce l'ha (un nodo ha solo l'etichetta del corpo, `target: "body"`). Uno `switch` esaustivo sul
- * tipo, non il ternario `er ? Entity : Class` di prima: quel ternario è nato quando i tipi erano
- * due, e un terzo (`"flow"`) ci sarebbe caduto dentro il ramo sbagliato in silenzio — lo stesso
- * difetto già corretto altrove nella stessa correzione finale (`ui/export/svg.tsx`, Task 11).
- * L'annotazione di ritorno è ciò che rende lo switch esaustivo: senza, un quarto tipo futuro non
- * gestito qui tornerebbe `undefined` senza che il compilatore se ne accorga.
+ * L'editor del nome per la famiglia della chiave in editing — `null` per il flowchart e per le
+ * note, che un nome non ce l'hanno (un nodo ha solo l'etichetta del corpo, `target: "body"`). Uno
+ * `switch` esaustivo sul tipo, non il ternario `er ? Entity : Class` di prima: quel ternario è
+ * nato quando i tipi erano due, e un terzo (`"flow"`) ci sarebbe caduto dentro il ramo sbagliato in
+ * silenzio — lo stesso difetto già corretto altrove nella stessa correzione finale
+ * (`ui/export/svg.tsx`, Task 11). L'annotazione di ritorno è ciò che rende lo switch esaustivo:
+ * senza, un quinto tipo futuro non gestito qui tornerebbe `undefined` senza che il compilatore se
+ * ne accorga.
  */
 function nameEditorFor(family: Family, editing: Editing, viewport: Viewport, close: () => void): ReactElement | null {
   switch (family) {
@@ -141,6 +142,8 @@ function nameEditorFor(family: Family, editing: Editing, viewport: Viewport, clo
     case "class":
       return <ClassNameEditor editing={editing} viewport={viewport} close={close} />
     case "flow":
+      return null
+    case "note":
       return null
   }
 }

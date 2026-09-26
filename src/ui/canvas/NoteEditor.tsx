@@ -1,9 +1,9 @@
 import { useStore } from "zustand"
-import { setNoteText } from "@/editor/class/commands"
-import { classDiagram } from "@/editor/class-access"
-import { noteSize } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import { editingIn } from "@/editor/families"
+import { setNoteText } from "@/editor/note/commands"
+import { noteSize } from "@/editor/note/geometry"
+import { noteDiagram } from "@/editor/note-access"
 import { sessionStore } from "@/editor/session-store"
 import { TextEditorOverlay } from "./TextEditorOverlay"
 
@@ -13,10 +13,10 @@ import { TextEditorOverlay } from "./TextEditorOverlay"
  */
 export function NoteEditor() {
   const editing = useStore(sessionStore, (s) => s.editing)
-  const own = editingIn(editing, "class")
+  const own = editingIn(editing, "note")
   const viewport = useStore(sessionStore, (s) => s.viewport)
-  const note = useStore(documentStore, (s) => (own?.target === "body" ? classDiagram(s.doc).model.notes[own.key] : undefined))
-  const view = useStore(documentStore, (s) => (own?.target === "body" ? classDiagram(s.doc).view.nodes[own.key] : undefined))
+  const note = useStore(documentStore, (s) => (own?.target === "body" ? noteDiagram(s.doc).model.notes[own.key] : undefined))
+  const view = useStore(documentStore, (s) => (own?.target === "body" ? noteDiagram(s.doc).view.nodes[own.key] : undefined))
   if (!own || own.target !== "body" || !note || !view) return null
 
   const close = () => sessionStore.getState().setEditing(null)

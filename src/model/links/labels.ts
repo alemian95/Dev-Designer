@@ -18,12 +18,15 @@ export function linkLabel(link: Link): string {
 }
 
 /**
- * Il nome leggibile di un estremo, per i messaggi e per il pannello. Entità e classi hanno per chiave
- * il nome; un nodo di flusso ha per chiave un uuid, quindi si mostra la sua etichetta, su una riga.
+ * Il nome leggibile di un estremo o di un'àncora, per i messaggi e per i pannelli. Entità e classi
+ * hanno per chiave il nome; un nodo di flusso ha per chiave un uuid, quindi si mostra la sua
+ * etichetta, su una riga; un pool, anche lui con un uuid, si mostra col suo nome.
  */
 export function endName(doc: DevDocument, key: string): string {
   const { family, key: bare } = splitKey(key)
   if (family !== "flow") return bare
+  const pool = doc.diagram.flow.model.pools[bare]
+  if (pool) return pool.name === "" ? "(senza nome)" : pool.name
   const node = doc.diagram.flow.model.nodes[bare]
   if (!node) return "(nodo eliminato)"
   const label = node.label.replace(/\s+/g, " ").trim()

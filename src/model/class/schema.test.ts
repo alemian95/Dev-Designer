@@ -71,7 +71,7 @@ describe("schema del class diagram", () => {
     doc.diagram.er.model.entities["clienti"] = { name: "clienti", attributes: [] }
     expect(DocumentSchema.safeParse(doc).success).toBe(true)
     // La versione è quella corrente: la 5 → 6 raccoglie le corsie dei flowchart nei pool.
-    expect(SCHEMA_VERSION).toBe(6)
+    expect(SCHEMA_VERSION).toBe(7)
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION)
   })
 })

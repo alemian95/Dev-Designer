@@ -13,8 +13,9 @@ import {
   deleteClassItems,
   duplicateClasses,
 } from "../class/commands"
-import { classEdgeGeometry, classEdgeOffsets, classRect, noteRect } from "../class/geometry"
+import { classEdgeGeometry, classEdgeOffsets, classRect } from "../class/geometry"
 import type { EdgeGeometry } from "../edge-routing"
+import { noteRect } from "../note/geometry"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**

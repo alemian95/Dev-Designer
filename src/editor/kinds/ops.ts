@@ -8,6 +8,7 @@ import type { Point, Rect } from "../geometry"
 import { classOps } from "./class"
 import { erOps } from "./er"
 import { flowOps } from "./flow"
+import { noteOps } from "./note"
 
 // `EdgeEnds` sta in `edge-routing.ts`, dove `edgeOffsets` lo consuma; qui si ri-esporta perché è
 // il tipo di ritorno di `edgesTouching` e i chiamanti lo importano dal contratto.
@@ -94,5 +95,7 @@ export function familyOps(doc: DevDocument, family: Family): DiagramOps {
       return classOps(doc)
     case "flow":
       return flowOps(doc)
+    case "note":
+      return noteOps(doc)
   }
 }

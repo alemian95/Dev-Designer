@@ -25,8 +25,11 @@ import { documentFileName } from "./file-name"
 
 type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid"
 
+/** Le famiglie che hanno un formato di testo: le note escono dentro quello delle classi, o in nessuno (spec 3a §8). */
+type ExportFamily = Exclude<Family, "note">
+
 /** La famiglia di ogni formato: un formato si offre solo se la sua famiglia ha contenuto. */
-const FORMAT_FAMILY: Record<Format, Family> = {
+const FORMAT_FAMILY: Record<Format, ExportFamily> = {
   postgres: "er",
   mysql: "er",
   mermaid: "er",
@@ -76,7 +79,7 @@ const FORMATS: Record<Format, { label: string; extension: string }> = {
  * scelto. Testo diverso per famiglia — quello ER parla del round trip col dump SQL, quello class
  * elenca gli elementi UML che §16 della spec mette fuori scopo (non se ne inventano altri).
  */
-const MODEL_LIMITS: Record<Family, string> = {
+const MODEL_LIMITS: Record<ExportFamily, string> = {
   er: "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale.",
   class: "Il modello non rappresenta generici, package, note, classi di associazione, classi annidate e visibilità di pacchetto.",
   flow: "Le note non hanno equivalente in Mermaid, e le corsie diventano riquadri (subgraph) invece di bande orizzontali vere.",

@@ -462,3 +462,26 @@ describe("collegamenti nell'export", () => {
     expect(buildSvg(conCollegamento("er/fantasma"), { vars })!).not.toContain('data-edge-id="link/l1"')
   })
 })
+
+describe("buildSvg e le note", () => {
+  it("esporta la nota e la sua linea verso l'entità", () => {
+    const doc = createDocument("export", "export")
+    doc.diagram.er.model.entities["ordini"] = { name: "ordini", attributes: [] }
+    doc.diagram.er.view.nodes["ordini"] = { x: 0, y: 0, collapsed: false }
+    doc.diagram.note.model.notes["n1"] = { text: "da rivedere", anchor: "er/ordini" }
+    doc.diagram.note.view.nodes["n1"] = { x: 400, y: 0, collapsed: false }
+    const svg = buildSvg(doc, { vars })!
+    expect(svg).toContain('data-node-id="note/n1"')
+    expect(svg).toContain(">da rivedere<")
+    expect(svg).toContain('data-edge-id="note/n1"')
+  })
+
+  it("un'àncora pendente non disegna la linea, ma la nota sì", () => {
+    const doc = createDocument("export", "export")
+    doc.diagram.note.model.notes["n1"] = { text: "sola", anchor: "er/fantasma" }
+    doc.diagram.note.view.nodes["n1"] = { x: 0, y: 0, collapsed: false }
+    const svg = buildSvg(doc, { vars })!
+    expect(svg).toContain('data-node-id="note/n1"')
+    expect(svg).not.toContain('data-edge-id="note/n1"')
+  })
+})

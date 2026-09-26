@@ -1,14 +1,16 @@
-import { Box, ListOrdered, SquareDashed, StickyNote } from "lucide-react"
+import { Box, ListOrdered, SquareDashed } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { classDiagram } from "@/editor/class-access"
 import { classEdgeOffsets } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
+import { qualify } from "@/editor/families"
 import type { ClassNote as ClassNoteModel, ClassNode as ClassNodeModel, ClassRelation } from "@/model/class/schema"
 import { ClassProperties } from "@/ui/panels/ClassProperties"
 import { ClassEdge, ClassEdgeView } from "../ClassEdge"
 import { ClassNode, ClassNodeView } from "../ClassNode"
-import { ClassNoteNode, ClassNoteView } from "../ClassNote"
+import { ClassNoteNode } from "../ClassNote"
+import { NoteView } from "../Note"
 import type { DiagramView, EdgeViewProps, NodeViewProps } from "./registry"
 
 /**
@@ -55,7 +57,7 @@ function EdgesLayer() {
  */
 function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   if (typeof node === "object" && node !== null && "text" in node) {
-    return <ClassNoteView nodeKey={nodeKey} note={node as ClassNoteModel} view={view} selected={selected} />
+    return <NoteView id={qualify("class", nodeKey)} note={node as ClassNoteModel} view={view} selected={selected} />
   }
   return <ClassNodeView nodeKey={nodeKey} node={node as ClassNodeModel} view={view} selected={selected} />
 }
@@ -77,6 +79,5 @@ export const classView: DiagramView = {
     { label: "Interfaccia", key: "i", Icon: SquareDashed, tool: "node", family: "class", variant: "interface" },
     // «u» e non «e»: «e» è Entità, e sulla sidebar unica le scorciatoie devono essere uniche.
     { label: "Enum", key: "u", Icon: ListOrdered, tool: "node", family: "class", variant: "enum" },
-    { label: "Nota di classe", key: "n", Icon: StickyNote, tool: "node", family: "class", variant: "note" },
   ],
 }

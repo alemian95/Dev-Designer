@@ -1,8 +1,8 @@
 import { LANE_MIN_H, POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode, type FlowShape, type LaneView, type Pool, type PoolView } from "@/model/flow/schema"
 import { flowNodeSize } from "@/model/flow/size"
 import type { NodeView } from "@/model/shared"
-import { notePath } from "../class/geometry"
 import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
+import { notePath } from "../note/geometry"
 import type { Point, Rect } from "../geometry"
 
 // La misura dei nodi vive nel modello (spec 2b §3): qui si riesporta.

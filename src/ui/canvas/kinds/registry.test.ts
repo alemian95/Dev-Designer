@@ -29,15 +29,15 @@ describe("viewFor", () => {
       { label: "Classe", key: "c", Icon: Box, tool: "node", family: "class" },
       { label: "Interfaccia", key: "i", Icon: SquareDashed, tool: "node", family: "class", variant: "interface" },
       { label: "Enum", key: "u", Icon: ListOrdered, tool: "node", family: "class", variant: "enum" },
-      { label: "Nota di classe", key: "n", Icon: StickyNote, tool: "node", family: "class", variant: "note" },
     ])
   })
 })
 
 describe("terzo strumento", () => {
-  it("la vista delle classi dichiara la variante nota, quella ER no", () => {
-    expect(viewFor("class").tools.some((t) => t.variant === "note")).toBe(true)
+  it("la nota ha una famiglia sua: né le classi né l'ER hanno più una variante nota", () => {
+    expect(viewFor("class").tools.some((t) => t.variant === "note")).toBe(false)
     expect(viewFor("er").tools.some((t) => t.variant === "note")).toBe(false)
+    expect(viewFor("note").tools).toEqual([{ label: "Nota", key: "n", Icon: StickyNote, tool: "node", family: "note" }])
   })
 
   it("le scorciatoie degli strumenti sono distinte", () => {

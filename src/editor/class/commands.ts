@@ -5,7 +5,8 @@ import type { Recipe } from "../document-store"
 import { classDiagram } from "../class-access"
 import { snap, type Point } from "../geometry"
 import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
-import { classSize, noteSize } from "./geometry"
+import { noteSize } from "../note/geometry"
+import { classSize } from "./geometry"
 
 const DUPLICATE_OFFSET = 20
 

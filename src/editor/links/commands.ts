@@ -7,6 +7,7 @@ import type { Recipe } from "../document-store"
 import { linkKey, qualify, splitKey } from "../families"
 import { flowDiagram } from "../flow-access"
 import { familyOps } from "../kinds/ops"
+import { retargetAnchors } from "../note/anchor"
 
 /** L'esito del gesto Collega fra due famiglie diverse (spec 4a §4). Le chiavi sono `link/<uuid>`. */
 export type ConnectResult =
@@ -15,7 +16,7 @@ export type ConnectResult =
   | { type: "rejected"; notice: string }
 
 /** Come si nomina un nodo di ogni famiglia nell'avviso di rifiuto. */
-const FAMILY_NOUN: Record<Family, string> = { er: "un'entità", class: "una classe", flow: "un nodo di flusso" }
+const FAMILY_NOUN: Record<Family, string> = { er: "un'entità", class: "una classe", flow: "un nodo di flusso", note: "una nota" }
 
 /**
  * Il motivo per cui gli estremi non ammettono il tipo, o `null` se lo ammettono. `source` e `target`
@@ -90,19 +91,23 @@ export function retargetLinks(oldKey: string, newKey: string): Recipe {
 }
 
 /**
- * La rinomina `rename` e i collegamenti che la seguono, in una recipe sola: un passo di annulla, e
- * nessuno stato intermedio. Chiavi **senza** prefisso, quelle dei comandi di famiglia.
+ * La rinomina `rename`, e i collegamenti e le àncore delle note che la seguono, in una recipe sola:
+ * un passo di annulla, e nessuno stato intermedio. Chiavi **senza** prefisso, quelle dei comandi di
+ * famiglia.
  *
- * I collegamenti si spostano solo se la rinomina ha davvero tolto il nodo `oldKey`. `renameEntity`
- * e `renameClass` rispondono a una collisione con una recipe che non scrive niente: senza la guardia,
- * una collisione sposterebbe i collegamenti sul nodo che esiste già.
+ * Collegamenti e àncore si spostano solo se la rinomina ha davvero tolto il nodo `oldKey`.
+ * `renameEntity` e `renameClass` rispondono a una collisione con una recipe che non scrive niente:
+ * senza la guardia, una collisione li sposterebbe sul nodo che esiste già.
  */
 export function followRename(rename: Recipe, family: Family, oldKey: string, newKey: string): Recipe {
   const has = (doc: DevDocument, key: string) => familyOps(doc, family).nodeKeys().includes(key)
   return (draft) => {
     const had = has(draft, oldKey)
     rename(draft)
-    if (had && !has(draft, oldKey)) retargetLinks(qualify(family, oldKey), qualify(family, newKey))(draft)
+    if (had && !has(draft, oldKey)) {
+      retargetLinks(qualify(family, oldKey), qualify(family, newKey))(draft)
+      retargetAnchors(qualify(family, oldKey), qualify(family, newKey))(draft)
+    }
   }
 }
 

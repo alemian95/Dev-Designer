@@ -8,10 +8,12 @@ import { poolIds, poolRect } from "@/editor/flow/geometry"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
+import { noteDiagram } from "@/editor/note-access"
 import type { DevDocument } from "@/model/document"
 import { FAMILIES, type Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
 import { LinkEdgeView } from "@/ui/canvas/LinkEdge"
+import { AnchorEdgeView } from "@/ui/canvas/NoteAnchor"
 import { PoolsLayerView } from "@/ui/canvas/PoolsLayer"
 import { viewFor } from "@/ui/canvas/kinds/registry"
 
@@ -38,6 +40,8 @@ function nodeModelsOf(doc: DevDocument, family: Family): Record<string, unknown>
       return { ...classDiagram(doc).model.classes, ...classDiagram(doc).model.notes }
     case "flow":
       return flowDiagram(doc).model.nodes
+    case "note":
+      return noteDiagram(doc).model.notes
   }
 }
 
@@ -50,6 +54,9 @@ function edgeModelsOf(doc: DevDocument, family: Family): Record<string, unknown>
       return classDiagram(doc).model.relations
     case "flow":
       return flowDiagram(doc).model.edges
+    // Le linee di ancoraggio hanno l'altro capo in un'altra famiglia: le disegna il loro layer, qui sotto.
+    case "note":
+      return {}
   }
 }
 
@@ -62,6 +69,8 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
       return classDiagram(doc).view.nodes
     case "flow":
       return flowDiagram(doc).view.nodes
+    case "note":
+      return noteDiagram(doc).view.nodes
   }
 }
 
@@ -85,6 +94,9 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
  * I pool sono l'unica parte del flowchart che non passa da `DiagramOps`/`DiagramView`: sono un
  * layer che solo il flowchart ha, disegnato con la stessa `PoolsLayerView` del canvas, così il
  * pool è identico nell'app e nell'export.
+ *
+ * Le linee di ancoraggio delle note, come i collegamenti, hanno i capi in famiglie diverse: le
+ * risolve `CanvasOps`.
  *
  * `null` se non c'è né un nodo con una view né un pool: non c'è niente da esportare. Un pool senza
  * nodi esporta, come conta per «Adatta alla vista» e per Disponi (spec 2b §6).
@@ -161,6 +173,16 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
             )
           }),
         )}
+      </g>
+      <g data-layer="anchors">
+        {Object.entries(noteDiagram(doc).model.notes).map(([key, note]) => {
+          if (note.anchor === null) return null
+          const source = allOps.rectOf(qualify("note", key))
+          const target = allOps.rectOf(note.anchor)
+          // Un'àncora pendente non si disegna, come sul canvas.
+          if (!source || !target) return null
+          return <AnchorEdgeView key={key} noteKey={key} source={source} target={target} selected={false} />
+        })}
       </g>
       <g data-layer="links">
         {Object.entries(doc.diagram.links).map(([id, link]) => {

@@ -1,4 +1,5 @@
-import type { Shape, ShapeDiagram, ShapeView } from "@/model/shape/schema"
+import type { Arrow, Shape, ShapeDiagram, ShapeView } from "@/model/shape/schema"
+import { edgeOffsets, filledArrowPath, memoOnIdentity, pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, PAD_X, ROW_H, type Rect, type Size } from "../geometry"
 
 /** Quello che un testo vuoto mostra sul canvas (spec 3b §5): senza, sarebbe invisibile e impossibile da afferrare. */
@@ -68,3 +69,28 @@ export function shapeDrawOrder(d: ShapeDiagram): string[] {
     .filter((key) => key in d.model.shapes)
     .sort((a, b) => area(b) - area(a))
 }
+
+/**
+ * Tutta la geometria di una freccia (spec 3b §5): il percorso ortogonale di tutti gli archi
+ * (`routeEdge`, mai un cappio: lo schema rifiuta una freccia verso sé stessa), una punta piena a ogni
+ * capo che `head` chiede, e l'etichetta — che una freccia non ha — sul segmento centrale, perché
+ * `EdgeGeometry` la vuole. Serve al disegno statico e all'anteprima del drag.
+ */
+export function arrowGeometry(source: Rect, target: Rect, arrow: Pick<Arrow, "head">, offset = 0): EdgeGeometry {
+  const route = routeEdge(source, target, false, offset)
+  const pts = route.points
+  const mid = Math.floor((pts.length - 1) / 2)
+  const a = pts[mid]!
+  const b = pts[mid + 1]!
+  return {
+    d: pathFromPoints(pts),
+    sourceMarker: arrow.head === "both" ? filledArrowPath(pts[0]!, route.sourceDir) : "",
+    targetMarker: arrow.head === "none" ? "" : filledArrowPath(pts[pts.length - 1]!, route.targetDir),
+    label: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+  }
+}
+
+/** Gli scarti di fascio delle frecce: più frecce fra le stesse due forme si affiancano (spec 3b §3). Gemella di `flowEdgeOffsets`. */
+export const arrowOffsets = memoOnIdentity((arrows: Readonly<Record<string, Arrow>>) =>
+  edgeOffsets(Object.entries(arrows).map(([key, a]) => ({ key, source: a.source, target: a.target }))),
+)

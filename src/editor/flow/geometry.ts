@@ -1,7 +1,7 @@
 import { LANE_MIN_H, POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode, type FlowShape, type LaneView, type Pool, type PoolView } from "@/model/flow/schema"
 import { flowNodeSize } from "@/model/flow/size"
 import type { NodeView } from "@/model/shared"
-import { edgeOffsets, memoOnIdentity, pathFromPoints, routeEdge, type Dir, type EdgeGeometry } from "../edge-routing"
+import { edgeOffsets, filledArrowPath, memoOnIdentity, pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
 
 // La misura dei nodi vive nel modello (spec 2b §3): qui si riesporta.
@@ -148,19 +148,6 @@ export function poolMembers(d: FlowDiagram, poolId: string): string[] {
   return Object.entries(d.model.nodes)
     .filter(([, n]) => n.lane !== null && lanes.has(n.lane))
     .map(([key]) => key)
-}
-
-/** Lunghezza e semilarghezza della freccia piena: l'unico marker dell'arco di flowchart, sempre
- *  sul target. A differenza del crow's foot dell'ER e della punta UML delle classi, un flowchart
- *  non distingue specie di arco — una sola forma basta. */
-const FLOW_ARROW_LEN = 10
-const FLOW_ARROW_HALF_W = 5
-
-function filledArrowPath(at: Point, dir: Dir): string {
-  const px = -dir.y
-  const py = dir.x
-  const p = (d: number, s: number): Point => ({ x: at.x + dir.x * d + px * s, y: at.y + dir.y * d + py * s })
-  return `${pathFromPoints([at, p(FLOW_ARROW_LEN, -FLOW_ARROW_HALF_W), p(FLOW_ARROW_LEN, FLOW_ARROW_HALF_W)])} Z`
 }
 
 /**

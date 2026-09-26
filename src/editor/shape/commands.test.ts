@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { createDocument } from "@/model/document"
 import { documentStore } from "../document-store"
 import { shapeDiagram } from "../shape-access"
-import { addShape, deleteShapeItems, duplicateShapes, setShapeLabel, shapeLayoutGraph } from "./commands"
+import { addArrow, addShape, deleteShapeItems, duplicateShapes, invertArrow, setArrowDashed, setArrowHead, setShapeLabel, shapeLayoutGraph } from "./commands"
 
 const state = () => documentStore.getState()
 const part = () => shapeDiagram(state().doc)
@@ -69,5 +69,26 @@ describe("comandi delle forme", () => {
     expect(graph.nodes.find((n) => n.id === "a")).toEqual({ id: "a", w: 300, h: 40 })
     expect(graph.edges).toEqual([{ id: "ab", source: "a", target: "b" }, { id: "ca", source: "c", target: "a" }])
     expect(graph.direction).toBe("DOWN")
+  })
+})
+
+describe("comandi delle frecce", () => {
+  it("addArrow crea una freccia con la punta alla fine; verso sé stessa o verso una forma che non c'è, niente", () => {
+    tre()
+    const created = addArrow(part().model, "b", "c")!
+    state().dispatch(created.recipe)
+    expect(part().model.arrows[created.key]).toEqual({ source: "b", target: "c", head: "end", dashed: false })
+    expect(addArrow(part().model, "a", "a")).toBeNull()
+    expect(addArrow(part().model, "a", "sparita")).toBeNull()
+  })
+
+  it("punte e tratteggio si scrivono solo se cambiano; invertire scambia i capi", () => {
+    tre()
+    expect(state().dispatch(setArrowHead("ab", "end"))).toBe(false)
+    expect(state().dispatch(setArrowHead("ab", "both"))).toBe(true)
+    expect(state().dispatch(setArrowDashed("ab", false))).toBe(false)
+    expect(state().dispatch(setArrowDashed("ab", true))).toBe(true)
+    state().dispatch(invertArrow("ab"))
+    expect(part().model.arrows["ab"]).toEqual({ source: "b", target: "a", head: "both", dashed: true })
   })
 })

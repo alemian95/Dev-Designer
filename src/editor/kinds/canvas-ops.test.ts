@@ -407,13 +407,23 @@ describe("canvasOps e le forme (spec 3b)", () => {
     expect(canvasOps(state().doc).addEdge(s, e)).toEqual({ type: "rejected", notice: "Non esiste un collegamento fra una forma e un'entità." })
   })
 
+  it("Collega fra due forme crea una freccia; da una forma a sé stessa niente", () => {
+    const a = add("shape", { x: 0, y: 0 }, "rect")
+    const b = add("shape", { x: 300, y: 0 }, "ellipse")
+    const r = canvasOps(state().doc).addEdge(a, b)
+    if (r?.type !== "created") throw new Error("attesa una freccia")
+    state().dispatch(r.recipe)
+    expect(shapeDiagram(state().doc).model.arrows[splitKey(r.key).key]).toEqual({ source: splitKey(a).key, target: splitKey(b).key, head: "end", dashed: false })
+    expect(canvasOps(state().doc).addEdge(a, a)).toBeNull()
+  })
+
   it("una nota si ancora a una forma; eliminare la forma stacca la nota, e un annulla riporta forma, frecce e àncora", () => {
     const s = add("shape", { x: 0, y: 0 }, "rect")
     const altra = add("shape", { x: 300, y: 0 }, "rect")
-    // La freccia si scrive a mano: il gesto arriva col Task 2.
-    state().dispatch((draft) => {
-      shapeDiagram(draft).model.arrows["f"] = { source: splitKey(s).key, target: splitKey(altra).key, head: "end", dashed: false }
-    })
+    const arrow = canvasOps(state().doc).addEdge(s, altra)
+    if (arrow?.type !== "created") throw new Error("attesa una freccia")
+    state().dispatch(arrow.recipe)
+    const arrowKey = splitKey(arrow.key).key
     const n = add("note", { x: 0, y: 200 })
     const anchored = canvasOps(state().doc).addEdge(n, s)
     if (anchored?.type !== "created") throw new Error("atteso un ancoraggio")
@@ -427,6 +437,6 @@ describe("canvasOps e le forme (spec 3b)", () => {
 
     state().undo()
     expect(nota().anchor).toBe(s)
-    expect(Object.keys(shapeDiagram(state().doc).model.arrows)).toEqual(["f"])
+    expect(Object.keys(shapeDiagram(state().doc).model.arrows)).toEqual([arrowKey])
   })
 })

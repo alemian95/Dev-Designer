@@ -495,4 +495,23 @@ describe("buildSvg e le forme (spec 3b)", () => {
     const width = Number(/width="([\d.]+)"/.exec(svg)![1])
     expect(width).toBeLessThan(5000)
   })
+
+  it("le frecce escono con punte e tratteggio; una freccia pendente non esce e non rompe l'export", () => {
+    const doc = createDocument("export", "export")
+    doc.diagram.shape.model.shapes = { a: { kind: "rect", label: "A" }, b: { kind: "ellipse", label: "B" } }
+    doc.diagram.shape.model.arrows = {
+      f: { source: "a", target: "b", head: "both", dashed: true },
+      rotta: { source: "a", target: "sparita", head: "end", dashed: false },
+    }
+    doc.diagram.shape.view.nodes = {
+      a: { x: 0, y: 0, collapsed: false, w: null, h: null },
+      b: { x: 300, y: 0, collapsed: false, w: null, h: null },
+    }
+    const svg = buildSvg(doc, { vars: {} })!
+    expect(svg).toContain('data-edge-id="shape/f"')
+    expect(svg).toContain('stroke-dasharray="6 4"')
+    expect(svg).not.toContain('data-edge-id="shape/rotta"')
+    // Le frecce stanno nel layer degli archi, sopra le forme che collegano.
+    expect(svg.indexOf('data-edge-id="shape/f"')).toBeGreaterThan(svg.indexOf('data-node-id="shape/a"'))
+  })
 })

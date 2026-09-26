@@ -1,5 +1,5 @@
 import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
-import type { Arrow, ShapeDiagram, ShapeKind, ShapeModel } from "@/model/shape/schema"
+import type { Arrow, ArrowHead, ShapeDiagram, ShapeKind, ShapeModel } from "@/model/shape/schema"
 import type { Recipe } from "../document-store"
 import { snap, type Point } from "../geometry"
 import { shapeDiagram } from "../shape-access"
@@ -89,4 +89,42 @@ export function shapeLayoutGraph(d: ShapeDiagram): LayoutGraph {
     present.has(arrow.source) && present.has(arrow.target) ? [{ id, source: arrow.source, target: arrow.target }] : [],
   )
   return { nodes, edges, direction: "DOWN" }
+}
+
+/**
+ * Una freccia nuova dal gesto Collega (spec 3b §5): con la punta alla fine e la linea continua.
+ * `null` fra una forma e sé stessa, o se un estremo non è una forma. Due frecce fra le stesse forme
+ * sono ammesse: si affiancano.
+ */
+export function addArrow(model: ShapeModel, source: string, target: string): { key: string; recipe: Recipe } | null {
+  if (source === target || !(source in model.shapes) || !(target in model.shapes)) return null
+  const key = crypto.randomUUID()
+  return {
+    key,
+    recipe: (draft) => {
+      shapeDiagram(draft).model.arrows[key] = { source, target, head: "end", dashed: false }
+    },
+  }
+}
+
+export function setArrowHead(key: string, head: ArrowHead): Recipe {
+  return (draft) => {
+    const arrow = shapeDiagram(draft).model.arrows[key]
+    if (arrow && arrow.head !== head) arrow.head = head
+  }
+}
+
+export function setArrowDashed(key: string, dashed: boolean): Recipe {
+  return (draft) => {
+    const arrow = shapeDiagram(draft).model.arrows[key]
+    if (arrow && arrow.dashed !== dashed) arrow.dashed = dashed
+  }
+}
+
+/** Scambia i capi: la punta «alla fine» passa all'altra forma senza cancellare e rifare la freccia (spec 3b §7). */
+export function invertArrow(key: string): Recipe {
+  return (draft) => {
+    const arrow = shapeDiagram(draft).model.arrows[key]
+    if (arrow) [arrow.source, arrow.target] = [arrow.target, arrow.source]
+  }
 }

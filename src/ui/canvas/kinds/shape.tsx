@@ -3,12 +3,13 @@ import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
-import { shapeDrawOrder } from "@/editor/shape/geometry"
+import { arrowOffsets, shapeDrawOrder } from "@/editor/shape/geometry"
 import { shapeDiagram } from "@/editor/shape-access"
-import type { Shape, ShapeView } from "@/model/shape/schema"
+import type { Arrow, Shape, ShapeView } from "@/model/shape/schema"
 import { ShapeProperties } from "@/ui/panels/ShapeProperties"
+import { ArrowEdge, ArrowEdgeView } from "../ShapeArrow"
 import { ShapeNode, ShapeNodeView } from "../Shape"
-import type { DiagramView, NodeViewProps } from "./registry"
+import type { DiagramView, EdgeViewProps, NodeViewProps } from "./registry"
 
 /** Le forme nell'ordine di disegno, dalla più grande (spec 3b §5): lo stesso di `shapeOps.nodeKeys`. */
 function NodesLayer() {
@@ -20,9 +21,15 @@ function NodesLayer() {
   )
 }
 
-/** Le frecce arrivano col Task 2 del piano: fino ad allora il layer è vuoto. */
+/** Gli scarti di fascio si leggono qui, non in `ArrowEdge`: dipendono da tutte le frecce. */
 function EdgesLayer() {
-  return <g data-layer="edges" />
+  const arrows = useStore(documentStore, (s) => shapeDiagram(s.doc).model.arrows)
+  const offsets = arrowOffsets(arrows)
+  return (
+    <g data-layer="edges">
+      {Object.keys(arrows).map((key) => <ArrowEdge key={key} arrowKey={key} offset={offsets.get(key) ?? 0} />)}
+    </g>
+  )
 }
 
 /** Adattatore verso la vista pura, dietro la forma generica di `DiagramView`: `node` e `view` arrivano generici da `buildSvg`. */
@@ -30,9 +37,8 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   return <ShapeNodeView id={qualify("shape", nodeKey)} shape={node as Shape} view={view as ShapeView} selected={selected} />
 }
 
-/** Le frecce arrivano col Task 2 del piano. */
-function EdgeView() {
-  return null
+function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeViewProps) {
+  return <ArrowEdgeView arrowKey={edgeKey} arrow={relation as Arrow} source={source} target={target} selected={selected} offset={offset} />
 }
 
 /**

@@ -40,6 +40,14 @@ inline con doppio click, undo/redo su ogni azione.
   linea o «Stacca» nel pannello staccano la nota, ed eliminare l'elemento la stacca da sola. «Disponi»
   la tiene accanto al suo elemento. Nell'export Mermaid delle classi escono le note libere e quelle
   ancorate a una classe (`note for`); le altre sintassi non hanno note, e l'export lo dice.
+- **Forme**: una lavagna libera accanto alle famiglie tipizzate — rettangolo (`Q`), ellisse (`O`) e
+  testo (`T`), con frecce fra loro disegnate con Collega. Le forme non hanno semantica né
+  validazione di dominio: servono a schemi di architettura, zone e titoli. Stanno sotto tutto, anche
+  sotto archi e pool, così una zona non copre ciò che racchiude; nascono della misura del loro testo
+  e si allargano dalla maniglia nell'angolo. Una freccia ha la punta alla fine, a entrambi i capi o
+  in nessuno, continua o tratteggiata, e si inverte dal pannello. Escono in SVG e PNG, non in
+  Mermaid; «Disponi» le dispone in un blocco loro, e una zona disegnata attorno ad altri elementi non
+  li racchiude più dopo.
 - **Collegamenti fra famiglie**, con lo strumento Collega, trascinando in qualunque verso:
   - una classe **mappa su** un'entità, e l'app verifica che ogni attributo della classe abbia la sua
     colonna (`createdAt` e `created_at` sono lo stesso campo) e un tipo compatibile, e che una
@@ -48,7 +56,8 @@ inline con doppio click, undo/redo su ogni azione.
     e **chiama** una classe.
 
   I collegamenti seguono le rinomine e spariscono con i loro nodi. Collega fra una nota e un
-  elemento non crea un collegamento: ancora la nota.
+  elemento non crea un collegamento: ancora la nota. Collega fra una forma e un elemento di
+  un'altra famiglia non crea niente, e lo dice.
 
 La **validazione è live**: i problemi del documento compaiono in un pannello mentre si disegna, non a
 un comando esplicito.
@@ -87,6 +96,7 @@ si perde niente.
 | Tasti | Strumento |
 |---|---|
 | `V` | selezione |
+| `Q` · `O` · `T` | rettangolo · ellisse · testo (forme) |
 | `E` | entità (ER) |
 | `C` · `I` · `U` | classe · interfaccia · enum |
 | `1`..`5` | forme del flusso (terminale, processo, decisione, input/output, sottoprocesso) |
@@ -189,11 +199,11 @@ significano niente. Il deploy su Vercel parte dal push: perché aspetti la CI va
 ### Test end-to-end
 
 ```bash
-pnpm e2e       # undici scenari provati in un browser vero
+pnpm e2e       # dodici scenari provati in un browser vero
 ```
 
 Compila una volta sola, poi avvia un solo `vite preview` e un solo Chrome di sistema headless
-condivisi dagli undici scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il
+condivisi dai dodici scenari, eseguiti in sequenza (mai in parallelo: la persistenza tocca il
 lock fra schede e IndexedDB sulla stessa origine, e scenari concorrenti si disturberebbero a
 vicenda) — ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l'uno dall'altro:
 
@@ -224,6 +234,10 @@ vicenda) — ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l
   linea segua l'entità trascinata, la stacca con Canc e dal pannello, verifica che eliminare il pool
   la stacchi, che «Disponi» la tenga accanto alla sua entità, e che un file della versione 6 ritrovi
   le sue note ancorate.
+- **Forme**: crea un rettangolo e un'ellisse, li collega con una freccia, ne cambia punte e
+  tratteggio e la inverte dal pannello, allarga il rettangolo dalla maniglia e annulla, ci ancora
+  una nota, verifica che «Disponi» tenga freccia e nota, e che Collega fra una forma e un'entità sia
+  rifiutato.
 - **Flowchart**: crea un pool con `P`, aggiunge una seconda corsia dal pannello del pool, tre nodi di
   forme diverse dentro le corsie (un terminale e un processo nella prima, una decisione nella
   seconda), collega due nodi e scrive l'etichetta sull'arco col doppio click. «Disponi» verifica che
@@ -254,7 +268,7 @@ vicenda) — ciascuno nel proprio contesto di browser, per isolare l'IndexedDB l
 
 Per lanciarne uno solo, dopo `pnpm build`: `node scripts/e2e/<nome>.mjs`.
 
-`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno degli undici scenari non regge.
+`HEADLESS=0` per vedere il browser. Exit code 1 se un passo di uno dei dodici scenari non regge.
 
 ### Misura prestazioni
 

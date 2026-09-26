@@ -1371,6 +1371,24 @@ giro di correzione: vedi anche la voce riaperta in DT-29.
   terzo emettitore con lo stesso bisogno (YAGNI: due copie non sono ancora una duplicazione da
   correggere).
 
+### Le forme generiche (3b)
+
+Rilievi noti dallo sviluppo dello step 3b (`.superpowers/sdd/2026-09-26-forme-generiche/`), rinviati
+deliberatamente: scelte di scope già decise nel brainstorming, o interazioni condivise con le zone che
+il piano non chiedeva di risolvere qui.
+
+- **Disponi e le zone.** Un rettangolo disegnato attorno a elementi di altre famiglie finisce nel
+  blocco delle forme, e gli elementi che racchiudeva nei blocchi delle loro famiglie: dopo Disponi la
+  zona non li racchiude più. Tenere le zone fuori da Disponi non risolve niente, perché i nodi si
+  sposterebbero comunque. Da riprendere se le zone attorno alle famiglie diventano l'uso principale
+  (spec 3b §10).
+- **Una zona non porta con sé ciò che contiene** quando la si trascina: il contenitore vero resta il
+  pool.
+- **La selezione a riquadro non parte da dentro una zona**: il clic sul fondo prende la zona, come sul
+  fondo di un pool.
+- **Niente colori, niente etichetta sulle frecce, niente Mermaid per le forme, `kind` fisso**: scelte
+  del brainstorming (spec 3b §12), non dimenticanze.
+
 ---
 
 ## Perduto

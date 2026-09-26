@@ -55,8 +55,8 @@ const isNotFound = (e: unknown): boolean => e instanceof DOMException && e.name 
 
 /**
  * Il documento ha almeno un nodo, in qualunque famiglia: la definizione è quella di
- * `familyHasContent`, la stessa di export e canvas. Una nota di classe da sola conta come
- * contenuto, come ogni altro nodo.
+ * `familyHasContent`, la stessa di export e canvas. Una nota da sola conta come contenuto, come
+ * ogni altro nodo.
  */
 function hasContent(doc: DevDocument): boolean {
   return FAMILIES.some((f) => familyHasContent(doc, f))

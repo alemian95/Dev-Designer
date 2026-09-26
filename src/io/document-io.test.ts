@@ -108,9 +108,9 @@ describe("restoreLast", () => {
     const saved = withEntity("salvato", "s1")
     d.db.records.set("s1", record(saved, { fileName: "s1.dd.json", updatedAt: 900, savedToFileAt: 800 }))
     d.db.last = "s1"
-    // Lo strumento attivo (qui la nota di classe) non sopravvive all'apertura di un altro
-    // documento: si riparte da «Seleziona», senza famiglia né variante.
-    sessionStore.getState().setTool("node", "class", "note")
+    // Lo strumento attivo (qui la nota) non sopravvive all'apertura di un altro documento: si
+    // riparte da «Seleziona», senza famiglia né variante.
+    sessionStore.getState().setTool("node", "note")
     await createDocumentIo(d).restoreLast()
     expect(documentStore.getState().doc).toEqual(saved)
     expect(documentStore.getState().past).toHaveLength(0)

@@ -51,7 +51,7 @@ function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeV
 
 /**
  * `DiagramView` per il flowchart: cablaggio verso i componenti di questo task, più gli strumenti
- * — sette varianti dello strumento nodo, una per forma più il pool. Collega è comune a tutte le
+ * — sei varianti dello strumento nodo, una per forma più il pool. Collega è comune a tutte le
  * famiglie (`LINK_TOOL`, `registry.ts`) e non compare qui. Le corsie si gestiscono dal pannello del
  * pool selezionato (`PoolLanes`, dentro `FlowProperties`).
  */

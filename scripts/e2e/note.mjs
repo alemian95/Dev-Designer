@@ -155,6 +155,7 @@ export async function run(browser, base) {
       await nodeText.waitFor()
       await nodeText.fill("Ordina")
       await nodeText.blur()
+      await nodeText.waitFor({ state: "detached" })
       await page.keyboard.press("r")
       await drag(page, center(await rectOf(page, NOTE)), center(await rectOf(page, '[data-node-id^="flow/"]:not([data-pool])')))
       await page.waitForSelector(LINE)

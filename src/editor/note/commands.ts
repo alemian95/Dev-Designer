@@ -1,10 +1,9 @@
 import type { DevDocument } from "@/model/document"
 import type { LayoutGraph, LayoutNode } from "@/model/layout"
 import type { NoteModel } from "@/model/note/schema"
-import { anchorExists } from "@/model/note/validate"
 import type { Recipe } from "../document-store"
 import { snap, type Point } from "../geometry"
-import { noteDiagram } from "../note-access"
+import { isAnchored, noteDiagram } from "../note-access"
 import { noteSize } from "./geometry"
 
 const DUPLICATE_OFFSET = 20
@@ -88,7 +87,7 @@ export function duplicateNotes(model: NoteModel, keys: readonly string[]): { key
 export function noteLayoutGraph(doc: DevDocument): LayoutGraph {
   const d = noteDiagram(doc)
   const nodes: LayoutNode[] = Object.entries(d.model.notes).flatMap(([key, note]) =>
-    d.view.nodes[key] && (note.anchor === null || !anchorExists(doc, note.anchor)) ? [{ id: key, ...noteSize(note) }] : [],
+    d.view.nodes[key] && !isAnchored(doc, note) ? [{ id: key, ...noteSize(note) }] : [],
   )
   return { nodes, edges: [], direction: "DOWN" }
 }

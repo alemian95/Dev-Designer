@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest"
 import { createDocument } from "@/model/document"
 import type { LayoutGraph } from "@/model/layout"
 import { documentStore } from "./document-store"
+import { qualify, splitKey } from "./families"
 import { flowDiagram } from "./flow-access"
 import { expectLaneInvariant } from "./flow/lane-invariant"
-import { rectsIntersect } from "./geometry"
+import { withPool } from "./flow/pool-fixture"
+import { GRID, rectsIntersect } from "./geometry"
 import { canvasOps } from "./kinds/canvas-ops"
 import { LAYOUT_FAMILY_GAP, LAYOUT_MARGIN, layoutAll, nodesBounds, packBlocks } from "./layout-pack"
+import { setNoteText } from "./note/commands"
 
 const node = (id: string, w = 100, h = 50) => ({ id, w, h })
 const rect = (x: number, y: number, w: number, h = 50) => ({ x, y, w, h })
@@ -173,5 +176,78 @@ describe("layoutAll e le note (spec 3a §6)", () => {
     documentStore.getState().dispatch(recipe!)
     const ops = canvasOps(documentStore.getState().doc)
     expect(ops.rectOf(nota)!.x - ops.rectOf(a)!.x).toBe(20)
+  })
+})
+
+describe("layoutAll e le note: l'ingombro della nota ancorata non sconfina (F1)", () => {
+  it("una nota ancorata a destra dell'entità più a destra del blocco ER non cade nel blocco della famiglia successiva", async () => {
+    documentStore.getState().load(createDocument("t", "t"))
+    const add = (family: "er" | "class" | "note", at: { x: number; y: number }) => {
+      const { key, recipe } = canvasOps(documentStore.getState().doc).addNode(at, family)
+      documentStore.getState().dispatch(recipe)
+      return key
+    }
+    add("er", { x: 0, y: 0 })
+    const b = add("er", { x: 300, y: 0 })
+    // Una classe, la famiglia che «Disponi» impacchetta subito dopo l'ER.
+    add("class", { x: 0, y: 0 })
+    const bRect = canvasOps(documentStore.getState().doc).rectOf(b)!
+    const nota = add("note", { x: bRect.x + bRect.w + 10, y: bRect.y })
+    // Un testo abbastanza lungo da sporgere oltre il bordo del blocco ER: senza F1 la nota
+    // cadrebbe nel blocco della classe, il prossimo in fila (spec 3a §10, DT-29).
+    documentStore.getState().dispatch(setNoteText(splitKey(nota).key, "una nota abbastanza lunga da sporgere parecchio"))
+    const link = canvasOps(documentStore.getState().doc).addEdge(nota, b)
+    if (link?.type === "created") documentStore.getState().dispatch(link.recipe)
+
+    const recipe = await layoutAll(documentStore.getState().doc, fila)
+    documentStore.getState().dispatch(recipe!)
+
+    const ops = canvasOps(documentStore.getState().doc)
+    const notaRect = ops.rectOf(nota)!
+    const classRects = ops
+      .nodeKeys()
+      .filter((k) => splitKey(k).family === "class")
+      .map((k) => ops.rectOf(k)!)
+    expect(classRects.some((r) => rectsIntersect(r, notaRect))).toBe(false)
+  })
+})
+
+describe("layoutAll e le note: lo scarto resta esatto anche fuori griglia (F7)", () => {
+  it("una nota ancorata a un pool tiene lo scarto esatto anche se il pool esce dalla griglia dopo Disponi", async () => {
+    documentStore.getState().load(withPool(createDocument("t", "t")))
+    const add = (family: "er" | "flow" | "note", at: { x: number; y: number }, variant?: string) => {
+      const { key, recipe } = canvasOps(documentStore.getState().doc).addNode(at, family, variant)
+      documentStore.getState().dispatch(recipe)
+      return key
+    }
+    // Due entità con un passo dispari (137, non multiplo della griglia): il blocco ER che precede il
+    // flusso in Disponi finisce con una larghezza fuori griglia, e la trascina sul pool che segue
+    // (`packBlocks`) — esattamente il caso che la review sospettava per `applyFlowLayout` (DT, «Correzione
+    // finale del flowchart»).
+    add("er", { x: 0, y: 0 })
+    add("er", { x: 400, y: 0 })
+    // Un solo nodo nella corsia: il pool resta comunque il punto più a sinistra del suo blocco.
+    add("flow", { x: 100, y: 40 }, "process")
+    const nota = add("note", { x: -400, y: 0 })
+    const link = canvasOps(documentStore.getState().doc).addEdge(nota, qualify("flow", "p1"))
+    if (link?.type === "created") documentStore.getState().dispatch(link.recipe)
+
+    const before = canvasOps(documentStore.getState().doc)
+    const scarto = {
+      x: before.rectOf(nota)!.x - before.rectOf(qualify("flow", "p1"))!.x,
+      y: before.rectOf(nota)!.y - before.rectOf(qualify("flow", "p1"))!.y,
+    }
+    // Un passo dispari anche qui: solo il grafo ER lo vede (più di un nodo), il flusso con un nodo
+    // solo non chiama mai il motore.
+    const fuoriGriglia = async (g: LayoutGraph) => Object.fromEntries(g.nodes.map((n, i) => [n.id, { x: i * 137, y: 0 }]))
+    const recipe = await layoutAll(documentStore.getState().doc, fuoriGriglia)
+    documentStore.getState().dispatch(recipe!)
+
+    const after = canvasOps(documentStore.getState().doc)
+    const pool = after.rectOf(qualify("flow", "p1"))!
+    // Il pool è davvero fuori griglia: altrimenti il test passerebbe anche con lo `snap` di troppo.
+    expect(pool.x % GRID).not.toBe(0)
+    expect(after.rectOf(nota)!.x - pool.x).toBe(scarto.x)
+    expect(after.rectOf(nota)!.y - pool.y).toBe(scarto.y)
   })
 })

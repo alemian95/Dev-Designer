@@ -206,6 +206,10 @@ e le note libere non escono (§10).
 - Una nota non segue il suo elemento durante un trascinamento, solo con Disponi.
 - Le note ancorate fuori dalle classi non escono in nessun Mermaid.
 - Con sole note libere, l'export Mermaid delle classi non è disponibile.
+- Disponi può sovrapporre una nota ancorata a un altro elemento della **stessa** famiglia del suo
+  àncora: il grafo ELK di quella famiglia non vede le note (DT-29). Non si sovrappone al blocco di
+  un'**altra** famiglia: `layoutAll` (`layout-pack.ts`) include il rettangolo previsto di ogni nota
+  ancorata nell'ingombro del blocco della sua famiglia, prima di impacchettarli con `packBlocks`.
 
 ## 11. Test
 

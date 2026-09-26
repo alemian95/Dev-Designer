@@ -67,6 +67,15 @@ export interface DiagramOps {
    */
   layoutBounds?(positions: LayoutPositions): Rect | null
   /**
+   * Il rettangolo che l'elemento `key` (un nodo o un frame di questa famiglia, senza prefisso) avrà
+   * dopo `layoutRecipe(positions, …)`, nel sistema di `positions`: usato da `layoutAll` per prevedere
+   * dove cadrà una nota ancorata a quell'elemento, e includerla nell'ingombro del blocco (spec 3a
+   * §10, F1 della review finale — vedi DT-29). `null` se `key` non è nel layout. Assente: il
+   * rettangolo si legge dal nodo di `layoutGraph()` con la stessa posizione, come `nodesBounds` —
+   * basta per una famiglia senza frame.
+   */
+  layoutRectOf?(positions: LayoutPositions, key: string): Rect | null
+  /**
    * Sostituisce la dispatch predefinita `applyLayout(family, positions + offset)` quando c'è. Serve al
    * flowchart, che col layout riscrive anche pool e corsie: due dispatch darebbero due passi di undo.
    * `offset` è la traslazione che l'impacchettamento dà al blocco (`packBlocks`): vale per tutto ciò

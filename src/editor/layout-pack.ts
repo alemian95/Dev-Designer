@@ -1,12 +1,14 @@
 import type { DevDocument } from "@/model/document"
-import { FAMILIES, type Family } from "@/model/family"
+import { FAMILIES, splitKey, type Family } from "@/model/family"
 import type { LayoutGraph, LayoutNode, LayoutPositions } from "@/model/layout"
 import { applyLayout } from "./commands/view"
 import type { Recipe } from "./document-store"
 import { rectsBounds, type Point, type Rect } from "./geometry"
 import { familyHasContent } from "./kinds/canvas-ops"
-import { familyOps } from "./kinds/ops"
-import { followAnchors } from "./note/layout"
+import { familyOps, type DiagramOps } from "./kinds/ops"
+import { noteSize } from "./note/geometry"
+import { anchorPlan, followAnchors } from "./note/layout"
+import { noteDiagram } from "./note-access"
 
 /** Distanza dall'origine del risultato: un diagramma appiccicato al bordo (0, 0) si legge male. */
 export const LAYOUT_MARGIN = 40
@@ -53,22 +55,46 @@ const translate = (positions: LayoutPositions, by: Point): LayoutPositions =>
   Object.fromEntries(Object.entries(positions).map(([id, p]) => [id, { x: p.x + by.x, y: p.y + by.y }]))
 
 /**
+ * Il rettangolo che l'elemento `key` (senza prefisso) di questa famiglia avrà dopo il layout, nel
+ * sistema locale di `positions`: da `ops.layoutRectOf` se la famiglia lo definisce (i pool del
+ * flusso), altrimenti dal nodo di `layoutGraph()` con la stessa posizione — la stessa regola di
+ * `nodesBounds`, ristretta a un solo id.
+ */
+function elementRect(ops: DiagramOps, graph: LayoutGraph, positions: LayoutPositions, key: string): Rect | null {
+  return ops.layoutRectOf ? ops.layoutRectOf(positions, key) : nodesBounds(graph.nodes.filter((n) => n.id === key), positions)
+}
+
+/**
  * Il layout di tutte le famiglie con contenuto, in una recipe sola (spec §7). Ogni famiglia va al
  * motore con la sua direzione (ADR 0007); una famiglia di un nodo solo non ci va, e il nodo viene
  * solo traslato. Il blocco di una famiglia si misura con `layoutBounds` quando la famiglia disegna
- * più dei suoi nodi (i pool del flowchart, spec 2b §6), altrimenti dai nodi. Le chiamate partono in
- * parallelo e **tutto o niente**: se una fallisce, la promise rifiuta e non si applica niente. Il
- * motore è iniettato: `editor` non può importare `io`. Per ultime, le note ancorate seguono il loro
- * elemento (`followAnchors`).
+ * più dei suoi nodi (i pool del flowchart, spec 2b §6), altrimenti dai nodi — **più** il rettangolo
+ * che ogni nota ancorata a un suo elemento avrà dopo Disponi (`anchorPlan`, `note/layout.ts`): senza
+ * quel margine `packBlocks` potrebbe accostare il blocco successivo sopra una nota che sporge dal suo
+ * elemento (spec 3a §10, F1 della review finale — vedi DT-29). La sovrapposizione **dentro** la
+ * stessa famiglia resta possibile: ELK non vede le note. Le chiamate partono in parallelo e **tutto o
+ * niente**: se una fallisce, la promise rifiuta e non si applica niente. Il motore è iniettato:
+ * `editor` non può importare `io`. Per ultime, le note ancorate seguono il loro elemento
+ * (`followAnchors`).
  */
 export async function layoutAll(doc: DevDocument, layout: (g: LayoutGraph) => Promise<LayoutPositions>): Promise<Recipe | null> {
   const families = FAMILIES.filter((f) => familyHasContent(doc, f))
+  const plan = anchorPlan(doc)
+  const notes = noteDiagram(doc).model.notes
   const blocks = await Promise.all(
     families.map(async (family) => {
       const ops = familyOps(doc, family)
       const graph = ops.layoutGraph()
       const positions = graph.nodes.length > 1 ? await layout(graph) : Object.fromEntries(graph.nodes.map((n) => [n.id, { x: 0, y: 0 }]))
-      const bounds = ops.layoutBounds ? ops.layoutBounds(positions) : nodesBounds(graph.nodes, positions)
+      const base = ops.layoutBounds ? ops.layoutBounds(positions) : nodesBounds(graph.nodes, positions)
+      const anchored = plan.flatMap(({ key, anchor, dx, dy }) => {
+        const split = splitKey(anchor)
+        if (split.family !== family) return []
+        const rect = elementRect(ops, graph, positions, split.key)
+        const note = notes[key]
+        return rect && note ? [{ x: rect.x + dx, y: rect.y + dy, ...noteSize(note) }] : []
+      })
+      const bounds = rectsBounds([...(base ? [base] : []), ...anchored])
       return { family, ops, positions, bounds }
     }),
   )

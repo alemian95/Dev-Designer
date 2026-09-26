@@ -173,3 +173,23 @@ export function placedBounds(diagram: FlowDiagram, positions: LayoutPositions): 
     ...Object.keys(placed.pools).flatMap((id) => poolRect(part, id) ?? []),
   ])
 }
+
+/**
+ * Il rettangolo di un nodo o di un pool dopo `placeInLanes`, nel sistema di `positions`: la stessa
+ * disposizione di `placedBounds`, che la chiama per l'intero blocco — qui per un solo elemento, quello
+ * a cui una nota è ancorata (spec 3a §10, F1 della review finale). `null` se `key` non è un nodo né
+ * un pool disposto.
+ */
+export function placedRectOf(diagram: FlowDiagram, positions: LayoutPositions, key: string): Rect | null {
+  const placed = placeInLanes(diagram, positions)
+  const node = diagram.model.nodes[key]
+  if (node) {
+    const p = placed.positions[key]
+    return p ? { ...p, ...flowNodeSize(node) } : null
+  }
+  if (key in diagram.model.pools) {
+    const part = { model: diagram.model, view: placed }
+    return poolRect(part, key)
+  }
+  return null
+}

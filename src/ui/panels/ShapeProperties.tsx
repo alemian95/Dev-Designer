@@ -7,7 +7,7 @@ import { sessionStore } from "@/editor/session-store"
 import { invertArrow, setArrowDashed, setArrowHead, setShapeLabel } from "@/editor/shape/commands"
 import { shapeDiagram } from "@/editor/shape-access"
 import { ArrowHeadSchema, type ArrowHead } from "@/model/shape/schema"
-import { NoteTextField } from "./NoteProperties"
+import { BodyTextField } from "./BodyTextField"
 
 const dispatch = (recipe: Recipe) => documentStore.getState().dispatch(recipe)
 
@@ -19,7 +19,7 @@ function ShapeBody({ shapeKey: key }: { shapeKey: string }) {
   if (!shape) return null
   return (
     <div className="flex flex-col gap-3 p-3">
-      <NoteTextField fieldId="shape-text" id={qualify("shape", key)} text={shape.label} onCommit={(label) => dispatch(setShapeLabel(key, label))} />
+      <BodyTextField fieldId="shape-text" id={qualify("shape", key)} text={shape.label} onCommit={(label) => dispatch(setShapeLabel(key, label))} />
     </div>
   )
 }

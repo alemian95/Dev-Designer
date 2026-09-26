@@ -1,7 +1,7 @@
 import { entityKey, type Attribute, type Entity, type ErModel, type Relationship } from "@/model/er/schema"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
-import { snap, type Point } from "../geometry"
+import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
 
 export const DEFAULT_ATTRIBUTE: Attribute = {
   name: "id",
@@ -19,7 +19,6 @@ const NEW_ATTRIBUTE: Attribute = {
   nullable: false,
   unique: false,
 }
-const DUPLICATE_OFFSET = 20
 
 /** `base` se libera, altrimenti `base_2`, `base_3`, … */
 export function uniqueKey(existing: Record<string, unknown>, base: string): string {

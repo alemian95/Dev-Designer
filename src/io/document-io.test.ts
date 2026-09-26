@@ -336,7 +336,7 @@ describe("openRecent e newDocument", () => {
     expect(documentSession.getState()).toMatchObject({ docId: "r1", fileName: "r.dd.json", dirty: false })
   })
 
-  it("newDocument crea un documento con le quattro famiglie e i collegamenti vuoti", async () => {
+  it("newDocument crea un documento con le cinque famiglie e i collegamenti vuoti", async () => {
     const d = deps()
     const io = createDocumentIo(d)
     await io.newDocument()

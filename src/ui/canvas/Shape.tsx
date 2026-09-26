@@ -8,6 +8,7 @@ import { shapeSize, shapeText } from "@/editor/shape/geometry"
 import { shapeDiagram } from "@/editor/shape-access"
 import type { Shape, ShapeView } from "@/model/shape/schema"
 import { registerNode } from "./dom-registry"
+import { HANDLE } from "./resize-handle"
 
 interface Props {
   /** La chiave con prefisso: la forma si registra e si colpisce con quella. */
@@ -18,9 +19,6 @@ interface Props {
   /** Mostra la maniglia di ridimensionamento: solo per la forma selezionata da sola. */
   handle?: boolean
 }
-
-/** Lato della maniglia di ridimensionamento, in unità mondo: lo stesso dei pool. */
-const HANDLE = 8
 
 /**
  * Vista pura e memoizzata di una forma (spec 3b §5). Rettangolo ed ellisse hanno bordo e fondo del

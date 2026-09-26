@@ -3,7 +3,7 @@ import { createDocument } from "@/model/document"
 import { addEntity, addRelationship, removeAttribute } from "../commands/er"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
-import { splitKey } from "../families"
+import { qualify, splitKey } from "../families"
 import { flowDiagram } from "../flow-access"
 import { withPool } from "../flow/pool-fixture"
 import { noteDiagram } from "../note-access"
@@ -452,5 +452,41 @@ describe("canvasOps e le forme (spec 3b)", () => {
     expect(view()).toMatchObject({ w: null, h: null })
     state().undo()
     expect(view()).toMatchObject({ w: 160, h: 100 })
+  })
+
+  it("un resize via commit produce esattamente una voce di annulla", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.shape.model.shapes["s"] = { kind: "rect", label: "" }
+    doc.diagram.shape.view.nodes["s"] = { x: 0, y: 0, collapsed: false, w: null, h: null }
+    state().load(doc)
+    const key = qualify("shape", "s")
+    const view = () => shapeDiagram(state().doc).view.nodes["s"]!
+    const r = canvasOps(state().doc).resize(key, null, 100, 60)!
+    state().dispatch(r.recipe)
+    expect(state().past.length).toBe(1)
+    expect(view()).toMatchObject({ w: 160, h: 100 })
+    state().undo()
+    expect(view()).toMatchObject({ w: null, h: null })
+    // Un secondo annulla non c'è più niente prima: non tocca più questo ridimensionamento.
+    state().undo()
+    expect(view()).toMatchObject({ w: null, h: null })
+  })
+
+  it("valida la famiglia shape anche con sole frecce: la freccia pendente emerge pur senza forme", () => {
+    const a = add("shape", { x: 0, y: 0 }, "rect")
+    const b = add("shape", { x: 300, y: 0 }, "rect")
+    const edge = canvasOps(state().doc).addEdge(a, b)
+    if (edge?.type !== "created") throw new Error("attesa una freccia")
+    state().dispatch(edge.recipe)
+    // Le forme spariscono senza passare da `deleteShapeItems`, che farebbe cascata sulla freccia: si
+    // simula così un file con frecce orfane e zero forme, il caso del brief.
+    state().dispatch((draft) => {
+      const shapes = shapeDiagram(draft).model.shapes
+      delete shapes[splitKey(a).key]
+      delete shapes[splitKey(b).key]
+    })
+    expect(familyHasContent(state().doc, "shape")).toBe(false)
+    const issues = canvasOps(state().doc).validate()
+    expect(issues.some((i) => i.code === "shape-dangling-arrow")).toBe(true)
   })
 })

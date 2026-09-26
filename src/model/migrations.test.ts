@@ -101,14 +101,14 @@ describe("migrazione 3 → 4", () => {
     expect(r.document.diagram.links).toEqual({})
   })
 
-  it("un documento v2 arriva alla 7 passando dalla 3", () => {
+  it("un documento v2 arriva alla 8 passando dalla 3", () => {
     const r = parseDocument(v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } }))
     expect(r.ok && r.document.diagram.links).toEqual({})
   })
 })
 
 describe("migrazione 4 → 5", () => {
-  it("un documento v4 con un «mappa su» passa intatto, alla versione 7", () => {
+  it("un documento v4 con un «mappa su» passa intatto, alla versione 8", () => {
     const doc = JSON.parse(toJson(createDocument("Prova", "v4doc"))) as { schemaVersion: number; diagram: { links: Record<string, unknown> } }
     doc.diagram.links["l1"] = { kind: "maps-to", source: "class/Ordine", target: "er/ordini" }
     const r = parseDocument(JSON.stringify({ ...doc, schemaVersion: 4 }))

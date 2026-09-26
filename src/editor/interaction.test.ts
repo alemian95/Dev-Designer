@@ -115,6 +115,37 @@ describe("reduce", () => {
     expect(r.mode).toEqual(IDLE)
   })
 
+  it("tool node: click su un hit backdrop crea dentro la zona, invece di selezionarla", () => {
+    const r = run(
+      [down({ hit: { kind: "node", key: "s1", backdrop: true }, world: { x: 12, y: 8 } })],
+      ctx({ tool: "node", family: "shape", variant: "rect" }),
+    )
+    expect(r.effects).toEqual([{ type: "create-node", at: { x: 12, y: 8 }, family: "shape", variant: "rect" }])
+    expect(r.mode).toEqual(IDLE)
+  })
+
+  it("tool node: click su un nodo NON backdrop si comporta come prima, seleziona e avvia il drag", () => {
+    const r = run(
+      [down({ hit: { kind: "node", key: "a" }, world: { x: 5, y: 5 } })],
+      ctx({ tool: "node", family: "er" }),
+    )
+    expect(r.effects).toEqual([{ type: "select", ids: [selId("node", "a")] }])
+    expect(r.mode).toEqual({ type: "drag", keys: ["a"], start: { x: 5, y: 5 }, moved: false })
+  })
+
+  it("Seleziona su un hit backdrop seleziona e trascina come un nodo qualunque", () => {
+    const r = run([
+      down({ hit: { kind: "node", key: "s1", backdrop: true }, world: { x: 0, y: 0 } }),
+      move({ world: { x: 10, y: 5 } }),
+      up({ world: { x: 10, y: 5 } }),
+    ])
+    expect(r.effects).toEqual([
+      { type: "select", ids: [selId("node", "s1")] },
+      { type: "preview-drag", keys: ["s1"], dx: 10, dy: 5 },
+      { type: "commit-drag", keys: ["s1"], dx: 10, dy: 5 },
+    ])
+  })
+
   it("tool edge: da nodo a nodo committa la connessione", () => {
     const r = run([
       down({ hit: { kind: "node", key: "a" }, world: { x: 0, y: 0 } }),

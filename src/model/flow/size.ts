@@ -1,4 +1,4 @@
-import { CHAR_W, GRID, PAD_X, ROW_H } from "../metrics"
+import { CHAR_W, GRID, MIN_NODE_H, MIN_NODE_W, PAD_X, ROW_H } from "../metrics"
 import type { FlowNode } from "./schema"
 
 /**
@@ -8,11 +8,6 @@ import type { FlowNode } from "./schema"
  * scelta di stile — è la ragione per cui nei flowchart le decisioni si scrivono corte.
  */
 export const DECISION_FACTOR = 2
-
-/** Dimensione minima di un nodo appena creato, con etichetta vuota: deve restare afferrabile, non
- *  sparire in un punto. */
-const MIN_NODE_W = 60
-const MIN_NODE_H = 40
 
 /**
  * Dimensione di un nodo dalla sua etichetta, sulla falsariga di `noteSize` (`class/geometry.ts`):

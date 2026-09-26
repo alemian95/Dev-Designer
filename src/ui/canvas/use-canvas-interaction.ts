@@ -26,7 +26,7 @@ function hitTest(el: Element | null): Hit {
   const handle = el?.closest("[data-resize]")
   if (handle) return { kind: "resize", key: handle.getAttribute("data-resize")!, lane: handle.getAttribute("data-resize-lane") }
   const node = el?.closest("[data-node-id]")
-  if (node) return { kind: "node", key: node.getAttribute("data-node-id")! }
+  if (node) return { kind: "node", key: node.getAttribute("data-node-id")!, backdrop: !!node.closest("[data-backdrop]") }
   const edge = el?.closest("[data-edge-id]")
   if (edge) return { kind: "edge", key: edge.getAttribute("data-edge-id")! }
   return { kind: "canvas" }

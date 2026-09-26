@@ -2,7 +2,18 @@ import type { Family } from "@/model/family"
 import type { Point, Rect } from "./geometry"
 import { selId, selectedKeys, type Tool } from "./session-store"
 
-export type Hit = { kind: "node"; key: string } | { kind: "edge"; key: string } | { kind: "resize"; key: string; lane: string | null } | { kind: "canvas" }
+/**
+ * `backdrop` è vero quando il nodo colpito appartiene a una famiglia `backdrop` (le forme, spec 3b
+ * §5): un rettangolo o un'ellisse dipinti, o il rettangolo trasparente del testo, riempiono l'area e
+ * intercettano il puntatore come un nodo qualunque, ma restano una *zona* — lo strumento di
+ * creazione deve poter aprire una forma nuova dentro, non selezionare quella sotto (spec §1, §3, §5).
+ * Assente/`false`: un nodo qualsiasi delle altre famiglie.
+ */
+export type Hit =
+  | { kind: "node"; key: string; backdrop?: boolean }
+  | { kind: "edge"; key: string }
+  | { kind: "resize"; key: string; lane: string | null }
+  | { kind: "canvas" }
 
 /** Stato della macchina: uno solo alla volta sul root SVG (spec §4.3). */
 export type Mode =
@@ -78,7 +89,11 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
   if (info.button !== 0) return { mode: IDLE, effects: [] }
 
   if (ctx.tool === "node") {
-    if (info.hit.kind === "canvas" && ctx.family) {
+    // Crea anche dentro una zona (spec 3b §1, §3, §5): un hit backdrop non è un nodo da selezionare
+    // per questo strumento, è lo sfondo che la forma dipinge. Con Seleziona (sotto) resta un nodo a
+    // tutti gli effetti: selezione e drag invariati.
+    const canCreateHere = info.hit.kind === "canvas" || (info.hit.kind === "node" && info.hit.backdrop)
+    if (canCreateHere && ctx.family) {
       return { mode: IDLE, effects: [{ type: "create-node", at: info.world, family: ctx.family, variant: ctx.variant }] }
     }
   }

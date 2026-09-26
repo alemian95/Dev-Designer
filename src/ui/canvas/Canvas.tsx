@@ -32,11 +32,15 @@ export function Canvas({ children }: { children?: ReactNode }) {
         <ViewportGroup>
           <rect data-canvas x={-GRID_EXTENT} y={-GRID_EXTENT} width={2 * GRID_EXTENT} height={2 * GRID_EXTENT} fill="url(#dd-grid)" />
           {/* Le famiglie `backdrop` sotto tutto, anche sotto pool e archi: una zona non copre ciò che
-              racchiude (spec 3b §3). */}
-          {FAMILIES.filter((f) => viewFor(f).backdrop).map((f) => {
-            const { NodesLayer } = viewFor(f)
-            return <NodesLayer key={`nodes-${f}`} />
-          })}
+              racchiude (spec 3b §3). `data-backdrop` marca il gruppo per `hitTest`
+              (`use-canvas-interaction.ts`): lo strumento di creazione deve poter aprire una forma
+              nuova dentro una zona invece di selezionarla (spec 3b §1, §5). */}
+          <g data-backdrop>
+            {FAMILIES.filter((f) => viewFor(f).backdrop).map((f) => {
+              const { NodesLayer } = viewFor(f)
+              return <NodesLayer key={`nodes-${f}`} />
+            })}
+          </g>
           {/* I pool non sono un `DiagramView.NodesLayer`: sono un layer che solo il flowchart popola,
               sotto archi e nodi (spec 2b §3). */}
           <PoolsLayer />

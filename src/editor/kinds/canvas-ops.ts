@@ -179,7 +179,11 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     },
 
     validate: () => [
-      ...FAMILIES.filter((f) => familyHasContent(doc, f)).flatMap((f) =>
+      // `shape` salta il cancello di `familyHasContent`: le sue frecce possono restare orfane dopo
+      // che le forme sono sparite (un file corrotto a mano, o un futuro comando che non fa ancora la
+      // cascata), e `shape-dangling-arrow` deve emergere anche a zero forme. Il costo è nullo — senza
+      // forme né frecce `validateShapes` non ha niente da dire.
+      ...FAMILIES.filter((f) => f === "shape" || familyHasContent(doc, f)).flatMap((f) =>
         ops(f)
           .validate()
           .map((issue) => ({

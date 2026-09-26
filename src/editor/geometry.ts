@@ -2,10 +2,13 @@ import { GRID } from "@/model/metrics"
 
 // Le metriche del testo vivono nel modello (spec 2b §3): qui si riesportano, così nessun chiamante
 // cambia import.
-export { CHAR_W, FONT_SIZE, GRID, PAD_X, ROW_H } from "@/model/metrics"
+export { CHAR_W, FONT_SIZE, GRID, MIN_NODE_H, MIN_NODE_W, PAD_X, ROW_H } from "@/model/metrics"
 
 export const HEADER_H = 28
 export const MIN_W = 160
+
+/** Scostamento di un duplicato dall'originale, in x e y: uguale in ogni famiglia (SSOT, una sola definizione). */
+export const DUPLICATE_OFFSET = 20
 
 export interface Point { x: number; y: number }
 export interface Size { w: number; h: number }

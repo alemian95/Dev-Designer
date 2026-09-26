@@ -8,9 +8,7 @@ import { PAD_X } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import { POOL_HEADER_W } from "@/model/flow/schema"
 import { registerNode } from "./dom-registry"
-
-/** Spessore delle maniglie di ridimensionamento, in unità di mondo: abbastanza da prenderle, non da coprire i nodi. */
-const HANDLE = 8
+import { HANDLE } from "./resize-handle"
 
 /**
  * Vista pura dei pool (spec 2b §3): per ognuno le bande delle corsie, la striscia a sinistra con il

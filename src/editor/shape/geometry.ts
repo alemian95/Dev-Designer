@@ -1,13 +1,9 @@
 import type { Arrow, Shape, ShapeDiagram, ShapeView } from "@/model/shape/schema"
 import { edgeOffsets, filledArrowPath, memoOnIdentity, pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
-import { CHAR_W, GRID, PAD_X, ROW_H, snap, type Rect, type Size } from "../geometry"
+import { CHAR_W, GRID, MIN_NODE_H, MIN_NODE_W, PAD_X, ROW_H, snap, type Rect, type Size } from "../geometry"
 
 /** Quello che un testo vuoto mostra sul canvas (spec 3b §5): senza, sarebbe invisibile e impossibile da afferrare. */
 export const TEXT_PLACEHOLDER = "Testo"
-
-/** Minimo di rettangolo ed ellisse con l'etichetta vuota: gli stessi di un nodo di flusso, afferrabili. */
-const MIN_SHAPE_W = 60
-const MIN_SHAPE_H = 40
 
 /**
  * Un'ellisse che contiene il rettangolo `w × h` del testo ha gli assi √2 volte i suoi lati: con quel
@@ -37,9 +33,9 @@ export function shapeTextSize(shape: Pick<Shape, "kind" | "label">): Size {
     case "text":
       return { w: toGrid(w), h: toGrid(h) }
     case "rect":
-      return { w: Math.max(MIN_SHAPE_W, toGrid(w)), h: Math.max(MIN_SHAPE_H, toGrid(h)) }
+      return { w: Math.max(MIN_NODE_W, toGrid(w)), h: Math.max(MIN_NODE_H, toGrid(h)) }
     case "ellipse":
-      return { w: Math.max(MIN_SHAPE_W, toGrid(w * ELLIPSE_FACTOR)), h: Math.max(MIN_SHAPE_H, toGrid(h * ELLIPSE_FACTOR)) }
+      return { w: Math.max(MIN_NODE_W, toGrid(w * ELLIPSE_FACTOR)), h: Math.max(MIN_NODE_H, toGrid(h * ELLIPSE_FACTOR)) }
   }
 }
 

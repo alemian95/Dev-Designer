@@ -3,11 +3,9 @@ import type { Members } from "@/model/class/members"
 import type { ClassDiagram, ClassModel, ClassNode, ClassRelation, Stereotype } from "@/model/class/schema"
 import type { Recipe } from "../document-store"
 import { classDiagram } from "../class-access"
-import { snap, type Point } from "../geometry"
+import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
 import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
 import { classSize } from "./geometry"
-
-const DUPLICATE_OFFSET = 20
 
 /** La chiave provvisoria prende il nome dallo stereotipo («interface», «enum»): l'editor del nome si apre subito. */
 export function addClass(

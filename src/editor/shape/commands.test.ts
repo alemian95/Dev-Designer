@@ -91,6 +91,40 @@ describe("comandi delle frecce", () => {
     state().dispatch(invertArrow("ab"))
     expect(part().model.arrows["ab"]).toEqual({ source: "b", target: "a", head: "both", dashed: true })
   })
+
+  it("invertArrow produce esattamente una voce di annulla", () => {
+    tre()
+    state().dispatch(invertArrow("ab"))
+    expect(state().past.length).toBe(1)
+    expect(part().model.arrows["ab"]).toMatchObject({ source: "b", target: "a" })
+    state().undo()
+    expect(part().model.arrows["ab"]).toMatchObject({ source: "a", target: "b" })
+    // Un secondo annulla: non c'è più niente prima, non tocca più questa inversione.
+    state().undo()
+    expect(part().model.arrows["ab"]).toMatchObject({ source: "a", target: "b" })
+  })
+
+  it("setArrowHead produce esattamente una voce di annulla", () => {
+    tre()
+    state().dispatch(setArrowHead("ab", "both"))
+    expect(state().past.length).toBe(1)
+    expect(part().model.arrows["ab"]!.head).toBe("both")
+    state().undo()
+    expect(part().model.arrows["ab"]!.head).toBe("end")
+    state().undo()
+    expect(part().model.arrows["ab"]!.head).toBe("end")
+  })
+
+  it("setArrowDashed produce esattamente una voce di annulla", () => {
+    tre()
+    state().dispatch(setArrowDashed("ab", true))
+    expect(state().past.length).toBe(1)
+    expect(part().model.arrows["ab"]!.dashed).toBe(true)
+    state().undo()
+    expect(part().model.arrows["ab"]!.dashed).toBe(false)
+    state().undo()
+    expect(part().model.arrows["ab"]!.dashed).toBe(false)
+  })
 })
 
 describe("resizeShape", () => {

@@ -1,11 +1,9 @@
 import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
 import type { Arrow, ArrowHead, ShapeDiagram, ShapeKind, ShapeModel } from "@/model/shape/schema"
 import type { Recipe } from "../document-store"
-import { snap, type Point } from "../geometry"
+import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
 import { shapeDiagram } from "../shape-access"
 import { shapeSize } from "./geometry"
-
-const DUPLICATE_OFFSET = 20
 
 /** Una forma nuova, con l'etichetta vuota e la misura del testo (`w`/`h` a `null`). La chiave è un uuid. */
 export function addShape(at: Point, kind: ShapeKind): { key: string; recipe: Recipe } {

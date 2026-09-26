@@ -181,6 +181,18 @@ export async function run(browser, base) {
       }
     })
 
+    await step("con lo strumento Testo, un clic dentro il rettangolo crea una forma nuova invece di selezionarlo", async () => {
+      await page.keyboard.press("Escape")
+      const before = await page.locator(SHAPE).count()
+      const box = await boxOf(rettangolo)
+      await page.keyboard.press("t")
+      await page.mouse.click(box.x + box.w / 2, box.y + box.h / 2)
+      await write("Zona interna")
+      await page.waitForFunction(([sel, n]) => document.querySelectorAll(sel).length > n, [SHAPE, before])
+      const after = await page.locator(SHAPE).count()
+      if (after !== before + 1) throw new Error(`atteso ${before + 1} forme dopo il clic, trovate ${after}`)
+    })
+
     await step("Collega fra una forma e un'entità è rifiutato con l'avviso", async () => {
       await page.keyboard.press("e")
       // `canvas.x + 750`, non `+ 900` come nel brief: a `+ 900` il rettangolo dell'entità (largo

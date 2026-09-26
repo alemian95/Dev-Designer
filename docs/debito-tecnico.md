@@ -1388,6 +1388,10 @@ il piano non chiedeva di risolvere qui.
   fondo di un pool.
 - **Niente colori, niente etichetta sulle frecce, niente Mermaid per le forme, `kind` fisso**: scelte
   del brainstorming (spec 3b §12), non dimenticanze.
+- **La maniglia di ridimensionamento vive nel layer backdrop**, sotto tutto come le forme stesse: un
+  pool, l'area di hit di un arco o un nodo di un'altra famiglia sopra l'angolo in basso a destra di
+  una zona la coprono, e la zona non si ridimensiona. Il rimedio è disegnare la maniglia della forma
+  selezionata in un layer sopra i nodi, non nel backdrop (fix wave finale, brief §3).
 
 ---
 

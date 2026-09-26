@@ -53,11 +53,15 @@ La roadmap del canvas unificato, aggiornata:
 
 ### La famiglia `shape`
 
-`FAMILIES` diventa `["shape", "er", "class", "flow", "note"]`. L'ordine di `FAMILIES` è l'ordine dei
-layer (spec del canvas unificato §5): le forme stanno **sotto** tutte le altre famiglie, perché un
-rettangolo usato come zona non deve coprire le entità o i nodi che racchiude; le note restano sopra
-tutto. Lo stesso ordine decide il gruppo della sidebar (`ToolSidebar`, `canvasTools(FAMILIES)`):
-«Forme» è il primo gruppo.
+`FAMILIES` diventa `["shape", "er", "class", "flow", "note"]`. Le forme stanno **sotto tutto**:
+sotto i nodi delle altre famiglie, ma anche sotto i pool e sotto **tutti gli archi**, perché un
+rettangolo usato come zona non deve coprire né le entità o i nodi che racchiude né le relazioni e gli
+archi fra loro. Il canvas disegna quindi, dal basso: le forme, i pool, gli archi di tutte le famiglie
+(le frecce delle forme comprese), i collegamenti, i nodi delle altre famiglie nell'ordine di
+`FAMILIES`, le note. La vista della famiglia lo dichiara (`DiagramView.backdrop`), e l'export SVG
+segue lo stesso ordine. Le frecce stanno quindi sopra le forme che collegano: finiscono sul bordo, e
+una freccia che attraversa una zona resta visibile. Lo stesso ordine di `FAMILIES` decide il gruppo
+della sidebar (`ToolSidebar`, `canvasTools(FAMILIES)`): «Forme» è il primo gruppo.
 
 Il documento guadagna `diagram.shape`:
 
@@ -257,4 +261,4 @@ disegna, come un collegamento pendente.
 | Stile | Punte e tratteggio sulle frecce | Nessuno stile; anche un colore per le forme |
 | Export testuale | Nessuno, solo immagine | Un «Mermaid lavagna» come flowchart di Mermaid |
 | Architettura | Quinta famiglia `shape` | Forme nuove dentro il flowchart; uno strato fuori dalle famiglie |
-| Layer | Forme sotto tutte le famiglie, le più grandi per prime | Forme sopra i nodi: una zona coprirebbe ciò che racchiude |
+| Layer | Forme sotto tutto, anche sotto pool e archi, le più grandi per prime | Forme sopra i nodi, o solo sotto i nodi: una zona coprirebbe ciò che racchiude, o gli archi fra i nodi |

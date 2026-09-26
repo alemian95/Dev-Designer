@@ -1392,6 +1392,26 @@ il piano non chiedeva di risolvere qui.
   pool, l'area di hit di un arco o un nodo di un'altra famiglia sopra l'angolo in basso a destra di
   una zona la coprono, e la zona non si ridimensiona. Il rimedio è disegnare la maniglia della forma
   selezionata in un layer sopra i nodi, non nel backdrop (fix wave finale, brief §3).
+- **Il testo vuoto è nascosto nell'export, ma non del tutto.** `buildSvg` salta un testo vuoto
+  (`hiddenInExport`), però la linea di una nota ancorata a quel testo si disegna lo stesso
+  (`svg.tsx` usa `canvasOps.rectOf`, che il filtro non lo conosce). E un documento con soli testi vuoti
+  ha `familyHasContent(shape)` vero ma `buildSvg` nullo: la copia PNG rifiuta, l'export SVG non fa
+  niente, il dialog rimanda all'SVG. Il rimedio è una sola definizione di «ha contenuto esportabile» che
+  rispetti `hiddenInExport`. Rinviato perché servono testi lasciati vuoti apposta. Costo-se-sbagliato:
+  una linea che punta al vuoto, o un export che non parte senza spiegare perché.
+- **Copertura mancante, non difetti noti.** Nessun test fissa l'ordine dei layer nel Canvas (forme
+  sotto pool e archi), il ritorno della forma stessa dopo l'undo di un'eliminazione (si verifica solo il
+  ritorno delle frecce), `resizedShape` su ellisse e testo (coperti solo attraverso `shapeSize`), o la
+  maniglia nascosta con più forme selezionate. `registry.test.ts` ripete il controllo di unicità dei
+  tasti già presente altrove, perché il piano lo chiedeva. `hiddenInExport` fa il cast `node as Shape`
+  senza guardia, come gli altri adapter di `NodeView`.
+- **Le scorciatoie e i controlli del pannello** (difetto precedente allo step, emerso nella sua review
+  finale). `inTextInput` (`src/ui/use-keyboard-shortcuts.ts:13`) esclude ogni `INPUT` compresi i
+  checkbox, quindi con il focus su «Tratteggiata» (o sui checkbox di ER e classi) non funziona nessuna
+  scorciatoia, ⌘Z e Canc comprese. Non esclude invece i `SELECT`, quindi su «Punte» le lettere fanno
+  partire gli strumenti invece della ricerca nativa per iniziale. Il rimedio è escludere solo gli input
+  testuali e aggiungere i select. Costo-se-sbagliato: un ⌘Z che sembra non funzionare finché non si
+  clicca fuori.
 
 ---
 

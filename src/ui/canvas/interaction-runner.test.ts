@@ -5,6 +5,7 @@ import type { Entity } from "@/model/er/schema"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { qualify } from "@/editor/families"
+import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { addFlowNode } from "@/editor/flow/commands"
 import { flowDiagram } from "@/editor/flow-access"
 import { withPool } from "@/editor/flow/pool-fixture"
@@ -377,6 +378,18 @@ describe("Collega fra famiglie", () => {
     collega(qualify("class", "Pagabile"), qualify("er", "ordini"), runner)
     expect(documentSession.getState().notice).toBe("Un'interfaccia non si mappa su una tabella.")
     collega(qualify("class", "Ordine"), qualify("er", "ordini"), runner)
+    expect(documentSession.getState().notice).toBeNull()
+  })
+
+  it("un ancoraggio riuscito toglie l'avviso di un rifiuto precedente (F3, review finale del 3a)", () => {
+    // Come sopra, ma il collegamento riuscito è un ancoraggio nota → entità: la sua chiave è
+    // `note/…`, non `link/…`, e prima della correzione `clearOwnRefusal` non scattava.
+    const runner = createInteractionRunner()
+    collega(qualify("class", "Pagabile"), qualify("er", "ordini"), runner)
+    expect(documentSession.getState().notice).toBe("Un'interfaccia non si mappa su una tabella.")
+    const { key: nota, recipe } = canvasOps(documentStore.getState().doc).addNode({ x: 700, y: 700 }, "note")
+    documentStore.getState().dispatch(recipe)
+    collega(nota, qualify("er", "ordini"), runner)
     expect(documentSession.getState().notice).toBeNull()
   })
 

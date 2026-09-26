@@ -1,5 +1,5 @@
 import { documentStore } from "@/editor/document-store"
-import { linkId } from "@/editor/families"
+import { inFamily, linkId } from "@/editor/families"
 import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
 import { IDLE, reduce, type Effect, type InteractionEvent, type Mode } from "@/editor/interaction"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
@@ -220,11 +220,12 @@ export function createInteractionRunner(): InteractionRunner {
           break
         }
         if (result.type === "created") documentStore.getState().dispatch(result.recipe)
-        // Un collegamento riuscito fra famiglie toglie il rifiuto precedente dello stesso strumento,
-        // non un avviso arrivato da altrove nel frattempo (es. autosave non disponibile): la chiave
-        // del risultato è `link/…` solo per un collegamento fra famiglie, mai per un arco dentro una
-        // famiglia (spec 4a §4, T6 della review finale).
-        if (linkId(result.key) !== null) clearOwnRefusal()
+        // Un collegamento o un ancoraggio riuscito toglie il rifiuto precedente dello stesso
+        // strumento, non un avviso arrivato da altrove nel frattempo (es. autosave non disponibile):
+        // la chiave del risultato è `link/…` per un collegamento fra famiglie (spec 4a §4, T6 della
+        // review finale) o `note/…` per un ancoraggio (spec 3a §5, F3 della review finale del 3a),
+        // mai per un arco dentro un'altra famiglia.
+        if (linkId(result.key) !== null || inFamily(result.key, "note")) clearOwnRefusal()
         session().setSelection([selId("edge", result.key)])
         session().setTool("select")
         break

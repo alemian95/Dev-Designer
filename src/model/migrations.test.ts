@@ -269,12 +269,17 @@ describe("migrazione 6 → 7", () => {
   })
 
   it("una nota di flusso in una corsia si ancora al nodo nel pool, e il pool resta valido", () => {
-    // Review Focus 5.
+    // Review Focus 5. Un secondo nodo `b` e un arco vero `e2: a → b` (F7 della review finale dello
+    // step 3a): l'arco della nota (`e1`) sparisce con la migrazione, l'altro resta.
     const r = parseDocument(v6({
       flow: flow(
-        { a: { label: "Ordina", shape: "process", lane: "l1" }, f: { label: "attenzione", shape: "note", lane: "l1" } },
-        { e1: { source: "f", target: "a", label: "" } },
-        { a: at(100, 20), f: at(300, 20) },
+        {
+          a: { label: "Ordina", shape: "process", lane: "l1" },
+          b: { label: "Spedisci", shape: "process", lane: "l1" },
+          f: { label: "attenzione", shape: "note", lane: "l1" },
+        },
+        { e1: { source: "f", target: "a", label: "" }, e2: { source: "a", target: "b", label: "" } },
+        { a: at(100, 20), b: at(500, 20), f: at(300, 20) },
         { p1: { name: "Processo", lanes: [{ id: "l1", name: "Cliente" }] } },
         { p1: { x: -32, y: 0, w: 672 } },
         { l1: { h: 160 } },
@@ -284,7 +289,11 @@ describe("migrazione 6 → 7", () => {
     if (!r.ok) return
     expect(r.document.diagram.note.model.notes).toEqual({ f: { text: "attenzione", anchor: "flow/a" } })
     expect(r.document.diagram.flow.model.pools["p1"]).toEqual({ name: "Processo", lanes: [{ id: "l1", name: "Cliente" }] })
-    expect(r.document.diagram.flow.model.nodes).toEqual({ a: { label: "Ordina", shape: "process", lane: "l1" } })
+    expect(r.document.diagram.flow.model.nodes).toEqual({
+      a: { label: "Ordina", shape: "process", lane: "l1" },
+      b: { label: "Spedisci", shape: "process", lane: "l1" },
+    })
+    expect(r.document.diagram.flow.model.edges).toEqual({ e2: { source: "a", target: "b", label: "" } })
   })
 
   it("una nota di flusso con lo stesso id di una nota di classe prende un suffisso", () => {

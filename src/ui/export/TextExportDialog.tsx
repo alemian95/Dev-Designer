@@ -84,7 +84,7 @@ const FORMATS: Record<Format, { label: string; extension: string }> = {
  */
 const MODEL_LIMITS: Record<ExportFamily, string> = {
   er: "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale.",
-  class: "Il modello non rappresenta generici, package, note, classi di associazione, classi annidate e visibilità di pacchetto.",
+  class: "Il modello non rappresenta generici, package, classi di associazione, classi annidate e visibilità di pacchetto.",
   flow: "Le note non hanno equivalente in Mermaid, e le corsie diventano riquadri (subgraph) invece di bande orizzontali vere.",
 }
 
@@ -170,6 +170,10 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
             </ul>
             <pre data-export-preview className="max-h-96 overflow-auto rounded border bg-muted/40 p-3 font-mono text-xs">{text}</pre>
           </>
+        ) : Object.keys(models.notes).length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Le note libere escono solo nel Mermaid delle classi, che chiede almeno una classe: qui non ce n'è nessuna.
+          </p>
         ) : (
           <p className="text-sm text-muted-foreground">Il documento è vuoto: non c'è niente da esportare.</p>
         )}

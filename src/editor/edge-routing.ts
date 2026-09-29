@@ -1,3 +1,4 @@
+import type { EdgeAnchors } from "@/model/shared"
 import type { Cardinality, Relationship } from "@/model/er/schema"
 import type { Point, Rect } from "./geometry"
 
@@ -13,11 +14,13 @@ const SELF_LOOP_OFFSET = 30
 /** Distanza fra archi paralleli, e passo di crescita fra cappi concentrici. */
 export const BUNDLE_GAP = 14
 
-/** I due estremi di un arco, per chiave: quanto basta a sapere chi collega chi. */
+/** I due estremi di un arco, per chiave, e dove si agganciano: quanto basta a sapere chi collega chi. */
 export interface EdgeEnds {
   key: string
   source: string
   target: string
+  /** Assente: due capi automatici (`anchorsOf`). */
+  anchors?: EdgeAnchors
 }
 
 const center = (r: Rect): Point => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 })

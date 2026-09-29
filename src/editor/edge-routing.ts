@@ -254,14 +254,18 @@ const ahead = (p: Point, from: Point, d: Dir): number => (p.x - from.x) * d.x + 
 
 const step = (p: Point, d: Dir, by: number): Point => ({ x: p.x + d.x * by, y: p.y + d.y * by })
 
-/** Toglie i punti doppi e quelli in mezzo a due segmenti allineati: il percorso resta lo stesso, con meno pieghe. */
+/**
+ * Toglie i punti doppi e quelli in mezzo a due segmenti allineati e concordi: il percorso resta lo
+ * stesso, con meno pieghe. Un'inversione a 180° non si toglie mai: cambierebbe il verso dei tratti.
+ */
 function simplify(points: readonly Point[]): Point[] {
   const out: Point[] = []
   for (const p of points) {
     const last = out[out.length - 1]
     if (last && last.x === p.x && last.y === p.y) continue
     const prev = out[out.length - 2]
-    if (prev && last && ((prev.x === last.x && last.x === p.x) || (prev.y === last.y && last.y === p.y))) out.pop()
+    if (prev && last && ((prev.x === last.x && last.x === p.x) || (prev.y === last.y && last.y === p.y))
+      && (last.x - prev.x) * (p.x - last.x) + (last.y - prev.y) * (p.y - last.y) > 0) out.pop()
     out.push(p)
   }
   return out
@@ -296,6 +300,12 @@ export function routePorts({ source, target, stub }: EdgePorts): EdgeRoute {
         const mid = (a.y + b.y) / 2
         points = [a, { x: a.x, y: mid }, { x: b.x, y: mid }, b]
       }
+    } else if (same && (h0 ? a.y === b.y : a.x === b.x)) {
+      // Sulla stessa retta la U si ridurrebbe a un andirivieni: si scosta di `stub` di lato.
+      const s0 = step(a, d0, stub)
+      const s3 = step(b, d3, stub)
+      const side: Dir = h0 ? DOWN : RIGHT
+      points = [a, s0, step(s0, side, stub), step(s3, side, stub), s3, b]
     } else if (same) {
       if (h0) {
         const x = d0.x > 0 ? Math.max(a.x, b.x) + stub : Math.min(a.x, b.x) - stub
@@ -308,10 +318,10 @@ export function routePorts({ source, target, stub }: EdgePorts): EdgeRoute {
       const s0 = step(a, d0, stub)
       const s3 = step(b, d3, stub)
       if (h0) {
-        const mid = (a.y + b.y) / 2
+        const mid = a.y === b.y ? a.y + stub : (a.y + b.y) / 2
         points = [a, s0, { x: s0.x, y: mid }, { x: s3.x, y: mid }, s3, b]
       } else {
-        const mid = (a.x + b.x) / 2
+        const mid = a.x === b.x ? a.x + stub : (a.x + b.x) / 2
         points = [a, s0, { x: mid, y: s0.y }, { x: mid, y: s3.y }, s3, b]
       }
     }
@@ -320,8 +330,11 @@ export function routePorts({ source, target, stub }: EdgePorts): EdgeRoute {
     if (ahead(corner, a, d0) > 0 && ahead(corner, b, d3) > 0) {
       points = [a, corner, b]
     } else {
-      const s0 = step(a, d0, stub)
-      const s3 = step(b, d3, stub)
+      let s0 = step(a, d0, stub)
+      let s3 = step(b, d3, stub)
+      // Se i due tratti cadono sulla stessa retta il giro tornerebbe su se stesso: si allunga un tratto.
+      if (h0 ? s0.x === s3.x : s0.y === s3.y) s0 = step(s0, d0, stub)
+      if (h0 ? s0.y === s3.y : s0.x === s3.x) s3 = step(s3, d3, stub)
       points = h0 ? [a, s0, { x: s0.x, y: s3.y }, s3, b] : [a, s0, { x: s3.x, y: s0.y }, s3, b]
     }
   }

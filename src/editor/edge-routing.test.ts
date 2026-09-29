@@ -271,6 +271,29 @@ describe("routePorts", () => {
     checkRoute(ports(port(50, 50, DOWN), port(70, 300, UP)))
   })
 
+  it("stessa direzione sulla stessa retta: la U si scosta di lato", () => {
+    checkRoute(ports(port(100, 25, RIGHT), port(300, 25, RIGHT)))
+    checkRoute(ports(port(300, 25, RIGHT), port(100, 25, RIGHT)))
+    checkRoute(ports(port(50, 0, DOWN), port(50, 200, DOWN)))
+  })
+
+  it("opposte e voltate, sulla stessa retta: la S si scosta di lato", () => {
+    checkRoute(ports(port(300, 25, RIGHT), port(100, 25, LEFT)))
+    checkRoute(ports(port(50, 200, DOWN), port(50, 0, UP)))
+  })
+
+  it("lati opposti dello stesso nodo (cappio): il percorso non attraversa in linea retta", () => {
+    checkRoute(ports(port(0, 25, LEFT), port(100, 25, RIGHT)))
+    checkRoute(ports(port(50, 0, UP), port(50, 50, DOWN)))
+  })
+
+  it("perpendicolari con i tratti sulla stessa retta: il giro non torna su se stesso", () => {
+    checkRoute(ports(port(100, 25, RIGHT), port(116, 0, UP)))
+    checkRoute(ports(port(100, 25, RIGHT), port(50, 41, UP)))
+    checkRoute(ports(port(25, 100, DOWN), port(0, 116, LEFT)))
+    checkRoute(ports(port(25, 100, DOWN), port(41, 50, LEFT)))
+  })
+
   it("restituisce le direzioni dei porti per i marker", () => {
     const r = routePorts(ports(port(100, 25, RIGHT), port(300, 125, UP)))
     expect(r.sourceDir).toEqual(RIGHT)

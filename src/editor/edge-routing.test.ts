@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Relationship } from "@/model/er/schema"
-import { BUNDLE_GAP, crowsFootPath, edgeGeometry, edgeOffsets, filledArrowPath, LEFT, pathFromPoints, RIGHT, routeEdge } from "./edge-routing"
+import { BUNDLE_GAP, crowsFootPath, DOWN, edgeGeometry, edgeOffsets, filledArrowPath, LEFT, pathFromPoints, RIGHT, routeEdge, routePorts, UP } from "./edge-routing"
+import { autoPorts, STUB, type EdgePorts, type Port } from "./ports"
 
 const rel: Relationship = {
   source: { entity: "a", attributes: [], cardinality: "many" },
@@ -209,5 +210,70 @@ describe("l'auto-relazione la dichiara il chiamante", () => {
     const stesso = { x: 0, y: 0, w: 100, h: 50 }
     const suSe: Relationship = { ...rel, target: { ...rel.target, entity: "a" } }
     expect(edgeGeometry(stesso, stesso, rel).d).not.toBe(edgeGeometry(stesso, stesso, suSe).d)
+  })
+})
+
+/** Invarianti di ogni percorso: segmenti ortogonali, primo lungo `source.dir`, ultimo lungo `−target.dir`. */
+function checkRoute(ports: EdgePorts) {
+  const { points } = routePorts(ports)
+  expect(points[0]).toEqual(ports.source.point)
+  expect(points[points.length - 1]).toEqual(ports.target.point)
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!
+    const b = points[i]!
+    expect(a.x === b.x || a.y === b.y).toBe(true)
+    expect(a.x === b.x && a.y === b.y).toBe(false)
+  }
+  const dirOf = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: Math.sign(b.x - a.x), y: Math.sign(b.y - a.y) })
+  expect(dirOf(points[0]!, points[1]!)).toEqual(ports.source.dir)
+  const last = dirOf(points[points.length - 2]!, points[points.length - 1]!)
+  expect(last).toEqual({ x: -ports.target.dir.x || 0, y: -ports.target.dir.y || 0 })
+  return points
+}
+
+const port = (x: number, y: number, dir: Port["dir"]): Port => ({ point: { x, y }, dir })
+const ports = (source: Port, target: Port, stub = STUB): EdgePorts => ({ source, target, stub })
+
+describe("routePorts", () => {
+  it("porti che si guardano: la Z di prima", () => {
+    const p = autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 100, w: 100, h: 50 })
+    expect(checkRoute(p)).toEqual([{ x: 100, y: 25 }, { x: 200, y: 25 }, { x: 200, y: 125 }, { x: 300, y: 125 }])
+  })
+
+  it("allineati: un segmento solo", () => {
+    expect(checkRoute(ports(port(100, 25, RIGHT), port(300, 25, LEFT)))).toHaveLength(2)
+  })
+
+  it("perpendicolari e davanti l'uno all'altro: una L", () => {
+    expect(checkRoute(ports(port(100, 25, RIGHT), port(300, 125, UP)))).toEqual([{ x: 100, y: 25 }, { x: 300, y: 25 }, { x: 300, y: 125 }])
+  })
+
+  it("stessa direzione: una U oltre il più esterno dei due", () => {
+    expect(checkRoute(ports(port(100, 25, RIGHT), port(300, 125, RIGHT)))).toEqual([
+      { x: 100, y: 25 }, { x: 316, y: 25 }, { x: 316, y: 125 }, { x: 300, y: 125 },
+    ])
+  })
+
+  it("opposte ma voltate: una S fra i due tratti", () => {
+    checkRoute(ports(port(300, 25, RIGHT), port(100, 125, LEFT)))
+  })
+
+  it("perpendicolari senza L possibile: esce, gira, rientra", () => {
+    checkRoute(ports(port(100, 25, RIGHT), port(50, 0, UP)))
+  })
+
+  it("il cappio: esce a destra, gira sopra e rientra dall'alto, largo quanto il suo tratto", () => {
+    const pts = checkRoute(ports(port(100, 12.5, RIGHT), port(75, 0, UP), 30))
+    expect(pts).toEqual([{ x: 100, y: 12.5 }, { x: 130, y: 12.5 }, { x: 130, y: -30 }, { x: 75, y: -30 }, { x: 75, y: 0 }])
+  })
+
+  it("verticali che si guardano: la Z verticale", () => {
+    checkRoute(ports(port(50, 50, DOWN), port(70, 300, UP)))
+  })
+
+  it("restituisce le direzioni dei porti per i marker", () => {
+    const r = routePorts(ports(port(100, 25, RIGHT), port(300, 125, UP)))
+    expect(r.sourceDir).toEqual(RIGHT)
+    expect(r.targetDir).toEqual(UP)
   })
 })

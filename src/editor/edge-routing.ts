@@ -1,6 +1,7 @@
 import type { EdgeAnchors } from "@/model/shared"
 import type { Cardinality, Relationship } from "@/model/er/schema"
 import type { Point, Rect } from "./geometry"
+import type { EdgePorts } from "./ports"
 
 export interface Dir { x: -1 | 0 | 1; y: -1 | 0 | 1 }
 export interface EdgeRoute { points: Point[]; sourceDir: Dir; targetDir: Dir }
@@ -246,4 +247,83 @@ export function edgeGeometry(source: Rect, target: Rect, rel: Relationship, offs
     targetMarker: crowsFootPath(pts[pts.length - 1]!, route.targetDir, rel.target.cardinality),
     label: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
   }
+}
+
+/** Quanto `p` sta davanti a `from` lungo `d`: positivo davanti, negativo dietro. */
+const ahead = (p: Point, from: Point, d: Dir): number => (p.x - from.x) * d.x + (p.y - from.y) * d.y
+
+const step = (p: Point, d: Dir, by: number): Point => ({ x: p.x + d.x * by, y: p.y + d.y * by })
+
+/** Toglie i punti doppi e quelli in mezzo a due segmenti allineati: il percorso resta lo stesso, con meno pieghe. */
+function simplify(points: readonly Point[]): Point[] {
+  const out: Point[] = []
+  for (const p of points) {
+    const last = out[out.length - 1]
+    if (last && last.x === p.x && last.y === p.y) continue
+    const prev = out[out.length - 2]
+    if (prev && last && ((prev.x === last.x && last.x === p.x) || (prev.y === last.y && last.y === p.y))) out.pop()
+    out.push(p)
+  }
+  return out
+}
+
+/**
+ * Il percorso ortogonale fra due porti (spec agganci §5). Il primo segmento esce lungo
+ * `source.dir`, l'ultimo entra lungo l'opposto di `target.dir`.
+ *
+ * - **Si guardano** (direzioni opposte, il bersaglio davanti): la Z di prima degli agganci, o un
+ *   segmento solo se sono allineati.
+ * - **Perpendicolari**, con l'angolo davanti a entrambi: una L.
+ * - **Altrimenti** ogni porto esce di `stub` e i due tratti si uniscono girando attorno: una U con
+ *   la stessa direzione, una S con direzioni opposte voltate, un giro con quelle perpendicolari.
+ */
+export function routePorts({ source, target, stub }: EdgePorts): EdgeRoute {
+  const a = source.point
+  const b = target.point
+  const d0 = source.dir
+  const d3 = target.dir
+  const h0 = d0.x !== 0
+  const h3 = d3.x !== 0
+  let points: Point[]
+  if (h0 === h3) {
+    const facing = d0.x === -d3.x && d0.y === -d3.y && ahead(b, a, d0) > 0
+    const same = d0.x === d3.x && d0.y === d3.y
+    if (facing) {
+      if (h0) {
+        const mid = (a.x + b.x) / 2
+        points = [a, { x: mid, y: a.y }, { x: mid, y: b.y }, b]
+      } else {
+        const mid = (a.y + b.y) / 2
+        points = [a, { x: a.x, y: mid }, { x: b.x, y: mid }, b]
+      }
+    } else if (same) {
+      if (h0) {
+        const x = d0.x > 0 ? Math.max(a.x, b.x) + stub : Math.min(a.x, b.x) - stub
+        points = [a, { x, y: a.y }, { x, y: b.y }, b]
+      } else {
+        const y = d0.y > 0 ? Math.max(a.y, b.y) + stub : Math.min(a.y, b.y) - stub
+        points = [a, { x: a.x, y }, { x: b.x, y }, b]
+      }
+    } else {
+      const s0 = step(a, d0, stub)
+      const s3 = step(b, d3, stub)
+      if (h0) {
+        const mid = (a.y + b.y) / 2
+        points = [a, s0, { x: s0.x, y: mid }, { x: s3.x, y: mid }, s3, b]
+      } else {
+        const mid = (a.x + b.x) / 2
+        points = [a, s0, { x: mid, y: s0.y }, { x: mid, y: s3.y }, s3, b]
+      }
+    }
+  } else {
+    const corner = h0 ? { x: b.x, y: a.y } : { x: a.x, y: b.y }
+    if (ahead(corner, a, d0) > 0 && ahead(corner, b, d3) > 0) {
+      points = [a, corner, b]
+    } else {
+      const s0 = step(a, d0, stub)
+      const s3 = step(b, d3, stub)
+      points = h0 ? [a, s0, { x: s0.x, y: s3.y }, s3, b] : [a, s0, { x: s3.x, y: s0.y }, s3, b]
+    }
+  }
+  return { points: simplify(points), sourceDir: d0, targetDir: d3 }
 }

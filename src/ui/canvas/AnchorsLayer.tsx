@@ -25,8 +25,9 @@ export function AnchorsLayer() {
   const node = useStore(sessionStore, (s) => s.anchorsFor)
   const scale = useStore(sessionStore, (s) => s.viewport.scale)
   const edge = useStore(sessionStore, (s) => singleEdge(s.selection))
+  const dragging = useStore(sessionStore, (s) => s.dragging)
   const doc = useStore(documentStore, (s) => s.doc)
-  if (node === null && edge === null) return null
+  if (dragging || (node === null && edge === null)) return null
   const ops = canvasOps(doc)
   const dot = DOT_R / scale
   const hit = HIT_R / scale

@@ -203,6 +203,7 @@ export function createInteractionRunner(): InteractionRunner {
         break
       case "preview-drag":
         // I nodi di un pool trascinato si muovono con lui già nell'anteprima (spec 2b §5).
+        if (!dragTargets) session().setDragging(true)
         dragTargets ??= collectDragTargets(canvasOps(documentStore.getState().doc).withFollowers(fx.keys))
         previewDrag(dragTargets, fx.dx, fx.dy)
         break
@@ -309,7 +310,10 @@ export function createInteractionRunner(): InteractionRunner {
     mode = result.mode
     for (const fx of result.effects) run(fx)
     // Lo snapshot del drag vale per un solo drag: si scarta appena si esce dal modo, commit o annullamento che sia.
-    if (mode.type !== "drag") dragTargets = null
+    if (mode.type !== "drag") {
+      dragTargets = null
+      if (session().dragging) session().setDragging(false)
+    }
   }
 
   return {

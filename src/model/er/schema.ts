@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema } from "../shared"
+import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
 
 export const CardinalitySchema = z.enum(["one", "zero-or-one", "many", "zero-or-many"])
 export type Cardinality = z.infer<typeof CardinalitySchema>
@@ -43,6 +43,8 @@ export const RelationshipSchema = z.object({
   /** Lato referenziato (padre). */
   target: RelationshipEndSchema,
   identifying: z.boolean(),
+  /** Dove l'arco tocca i suoi nodi (spec agganci §3). Assente: due capi automatici. */
+  anchors: EdgeAnchorsSchema.optional(),
 })
 export type Relationship = z.infer<typeof RelationshipSchema>
 

@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema } from "../shared"
+import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
 
 /** Le cinque forme della notazione. La nota non è una forma: è la famiglia `note` (spec 3a). */
 export const FlowShapeSchema = z.enum(["terminal", "process", "decision", "io", "subprocess"])
@@ -26,7 +26,13 @@ export const FlowNodeSchema = z.object({
 export type FlowNode = z.infer<typeof FlowNodeSchema>
 
 /** `label` è sempre una stringa, vuota quando non c'è: un solo modo di dire «nessuna etichetta». */
-export const FlowEdgeSchema = z.object({ source: Identifier, target: Identifier, label: z.string() })
+export const FlowEdgeSchema = z.object({
+  source: Identifier,
+  target: Identifier,
+  label: z.string(),
+  /** Dove l'arco tocca i suoi nodi (spec agganci §3). Assente: due capi automatici. */
+  anchors: EdgeAnchorsSchema.optional(),
+})
 export type FlowEdge = z.infer<typeof FlowEdgeSchema>
 
 /** Gli id delle corsie di tutti i pool: la base dei due controlli qui sotto. */

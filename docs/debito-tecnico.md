@@ -1413,6 +1413,14 @@ il piano non chiedeva di risolvere qui.
   testuali e aggiungere i select. Costo-se-sbagliato: un ⌘Z che sembra non funzionare finché non si
   clicca fuori.
 
+### Gli agganci degli archi (2026-09-29)
+
+- **`dragAll` non rimisurato con `assignPorts`**, per scelta dell'utente («niente perf»). Il memo di
+  `edgeOffsets` era nato da una misura (p95 da 25,9 a 125,1 ms senza), e trascinando tutto il fascio
+  per lato ricalcola i porti di tutti gli archi a ogni frame, O(E log E). Il rimedio, se il drag scatta,
+  è restringere l'insieme ai soli archi nell'inquadratura più i loro vicini di lato. Costo-se-sbagliato:
+  un drag di selezioni larghe sotto i 60 FPS (spec agganci §9).
+
 ---
 
 ## Perduto

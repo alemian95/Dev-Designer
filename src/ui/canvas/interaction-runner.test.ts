@@ -158,6 +158,50 @@ describe("l'anteprima del drag scrive solo ciò che si vede", () => {
   })
 })
 
+describe("l'anteprima del drag riscrive i vicini diretti (spec agganci §8)", () => {
+  const CHIAVI_V = ["a", "b", "c", "d", "e"] as const
+  const ARCHI_V = ["ab", "cb", "de"] as const
+
+  afterEach(() => {
+    for (const k of ARCHI_V) registerEdge(qualify("er", k), null)
+    sessionStore.getState().setSelection([])
+  })
+
+  it("un arco che non tocca il nodo mosso ma condivide un nodo con un suo arco si riscrive, uno fra estranei no", () => {
+    // Tutto in vista: il filtro dell'inquadratura non c'entra. `a` si muove; `ab` lo tocca; `cb`
+    // tocca solo `b`, il vicino di `a`, e il fascio sul lato di `b` cambia con `ab`; `de` è estraneo.
+    const doc = createDocument("t", "t")
+    const m = doc.diagram.er.model
+    const arco = (source: string, target: string) => ({
+      source: { entity: source, attributes: [], cardinality: "many" as const },
+      target: { entity: target, attributes: [], cardinality: "one" as const },
+      identifying: false,
+    })
+    for (const [key, x, y] of [["a", 20, 20], ["b", 300, 20], ["c", 300, 300], ["d", 20, 300], ["e", 20, 450]] as const) {
+      m.entities[key] = entita(key)
+      doc.diagram.er.view.nodes[key] = { x, y, collapsed: false }
+    }
+    m.relationships["ab"] = arco("a", "b")
+    m.relationships["cb"] = arco("c", "b")
+    m.relationships["de"] = arco("d", "e")
+    documentStore.getState().load(doc)
+    sessionStore.getState().setSelection([selId("node", qualify("er", "a"))])
+    for (const k of CHIAVI_V) registerNode(qualify("er", k), fintoNodo([], qualify("er", k)))
+    for (const k of ARCHI_V) registerEdge(qualify("er", k), fintoArco(tocchi, qualify("er", k)))
+
+    const partenza = { x: 20 + W / 2, y: 20 + H / 2 }
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("er", "a") } }))
+    runner.step(muovi({ world: { x: partenza.x, y: partenza.y + 40 } }))
+
+    expect(tocchi.get(qualify("er", "ab")) ?? 0).toBeGreaterThan(0)
+    expect(tocchi.get(qualify("er", "cb")) ?? 0).toBeGreaterThan(0)
+    expect(tocchi.get(qualify("er", "de")) ?? 0).toBe(0)
+    runner.step({ type: "cancel" })
+    for (const k of CHIAVI_V) registerNode(qualify("er", k), null)
+  })
+})
+
 describe("un comando al rilascio", () => {
   it("nessun comando durante il drag, esattamente uno al rilascio", () => {
     const prima = documentStore.getState().past.length

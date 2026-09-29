@@ -6,10 +6,11 @@ import { classSize } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { entitySize } from "@/editor/er/geometry"
-import { splitKey } from "@/editor/families"
+import { qualify, splitKey } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { setEdgeLabel } from "@/editor/flow/commands"
 import { CHAR_W, FONT_SIZE, HEADER_H, PAD_X } from "@/editor/geometry"
+import { canvasPorts } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
 import { sessionStore, type SessionState } from "@/editor/session-store"
 import { worldToScreen, type Viewport } from "@/editor/viewport"
@@ -93,9 +94,8 @@ const MIN_LABEL_CHARS = 4
  * che questo file condivide fra entità e classi (docblock qui sopra).
  *
  * La posizione è il punto etichetta che il render calcola già (spec §8: «si colloca sul primo
- * segmento, con lo stesso offset di fascio»): si legge da `familyOps(doc, "flow")`, la stessa via
- * di `FlowEdge.tsx` — non si ricalcolano i rettangoli a mano con `flowNodeRect` (una
- * seconda strada verso lo stesso dato, la ragione della correzione qui).
+ * segmento»): i porti vengono da `canvasPorts`, la stessa fonte di `FlowEdge.tsx` — non si
+ * ricalcolano i rettangoli a mano con `flowNodeRect` (una seconda strada verso lo stesso dato).
  *
  * Il testo si scarta senza rifinirlo: `setEdgeLabel` (`flow/commands.ts`) scarta gli spazi ai
  * margini da sé, così ogni via che scrive l'etichetta rispetta la stessa regola.
@@ -106,11 +106,8 @@ function FlowEdgeLabelEditor({ editing, viewport, close }: { editing: Editing; v
     documentStore,
     useShallow((s) => {
       if (!edge) return null
-      const ops = familyOps(s.doc, "flow")
-      const source = ops.rectOf(edge.source)
-      const target = ops.rectOf(edge.target)
-      if (!source || !target) return null
-      return ops.edgeGeometry(editing.key, source, target)?.label ?? null
+      const ports = canvasPorts(s.doc).get(qualify("flow", editing.key))
+      return ports ? (familyOps(s.doc, "flow").edgeGeometry(editing.key, ports)?.label ?? null) : null
     }),
   )
   if (!edge || !point) return null

@@ -2,11 +2,12 @@ import { validateEr } from "@/model/er/validate"
 import type { DevDocument } from "@/model/document"
 import type { Issue } from "@/model/issue"
 import type { LayoutGraph } from "@/model/layout"
-import { addEntity, addRelationship, deleteItems, duplicateEntities } from "../commands/er"
+import { writeAnchors } from "@/model/shared"
+import { addEntity, addRelationship, deleteItems, duplicateEntities, updateRelationship } from "../commands/er"
 import { layoutGraph } from "../commands/layout"
 import { edgeGeometry } from "../edge-routing"
 import { erDiagram } from "../er-access"
-import { entityRect, erEdgeOffsets } from "../er/geometry"
+import { entityRect } from "../er/geometry"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
@@ -29,13 +30,14 @@ export function erOps(doc: DevDocument): DiagramOps {
     edgesTouching: (keys): EdgeEnds[] =>
       Object.entries(diagram().model.relationships)
         .filter(([, rel]) => keys.has(rel.source.entity) || keys.has(rel.target.entity))
-        .map(([key, rel]) => ({ key, source: rel.source.entity, target: rel.target.entity })),
+        .map(([key, rel]) => ({ key, source: rel.source.entity, target: rel.target.entity, anchors: rel.anchors })),
 
-    edgeGeometry: (key, a, b) => {
-      const model = diagram().model
-      const rel = model.relationships[key]
-      return rel ? edgeGeometry(a, b, rel, erEdgeOffsets(model.relationships).get(key) ?? 0) : null
+    edgeGeometry: (key, ports) => {
+      const rel = diagram().model.relationships[key]
+      return rel ? edgeGeometry(ports, rel) : null
     },
+
+    setEdgeAnchors: (key, anchors) => updateRelationship(key, (r) => writeAnchors(r, anchors)),
 
     addNode: (at) => ({ ...addEntity(diagram().model.entities, at), edit: "name" }),
 

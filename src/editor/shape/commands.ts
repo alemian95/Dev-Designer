@@ -1,4 +1,5 @@
 import type { LayoutEdge, LayoutGraph, LayoutNode } from "@/model/layout"
+import { anchorsOf, writeAnchors, type EdgeAnchors } from "@/model/shared"
 import type { Arrow, ArrowHead, ShapeDiagram, ShapeKind, ShapeModel } from "@/model/shape/schema"
 import type { Recipe } from "../document-store"
 import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
@@ -119,11 +120,22 @@ export function setArrowDashed(key: string, dashed: boolean): Recipe {
   }
 }
 
-/** Scambia i capi: la punta «alla fine» passa all'altra forma senza cancellare e rifare la freccia (spec 3b §7). */
+/** Scambia i capi, e con loro gli agganci: la punta «alla fine» passa all'altra forma senza cancellare e rifare la freccia (spec 3b §7). */
 export function invertArrow(key: string): Recipe {
   return (draft) => {
     const arrow = shapeDiagram(draft).model.arrows[key]
-    if (arrow) [arrow.source, arrow.target] = [arrow.target, arrow.source]
+    if (!arrow) return
+    ;[arrow.source, arrow.target] = [arrow.target, arrow.source]
+    const { source, target } = anchorsOf(arrow)
+    writeAnchors(arrow, { source: target, target: source })
+  }
+}
+
+/** Gli agganci di una freccia (spec agganci §3): la coppia intera, un passo di annulla. */
+export function setArrowAnchors(key: string, anchors: EdgeAnchors): Recipe {
+  return (draft) => {
+    const arrow = shapeDiagram(draft).model.arrows[key]
+    if (arrow) writeAnchors(arrow, anchors)
   }
 }
 

@@ -4,25 +4,22 @@ import { classDiagram } from "@/editor/class-access"
 import { classEdgeGeometry, endLabel, isDashed, isFilled } from "@/editor/class/geometry"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
-import type { Rect } from "@/editor/geometry"
+import type { EdgePorts } from "@/editor/ports"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { ClassRelation } from "@/model/class/schema"
 import { registerEdge } from "./dom-registry"
-import { useNodeRect } from "./use-node-rect"
+import { useEdgePorts } from "./use-edge-ports"
 
 interface Props {
   edgeKey: string
   relation: ClassRelation
-  source: Rect
-  target: Rect
+  ports: EdgePorts
   selected: boolean
-  /** Scarto del fascio: arriva dal layer, che è l'unico a vedere tutte le relazioni. */
-  offset: number
 }
 
-export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, source, target, selected, offset }: Props) {
+export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, ports, selected }: Props) {
   const id = qualify("class", edgeKey)
-  const geo = classEdgeGeometry(source, target, relation, offset)
+  const geo = classEdgeGeometry(ports, relation)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   // Molteplicità e ruolo nella stessa etichetta, una per capo: `endLabel` è la stessa funzione su
   // cui `classEdgeGeometry` decide se popolare i punti, così render e geometria non divergono.
@@ -59,14 +56,10 @@ export const ClassEdgeView = memo(function ClassEdgeView({ edgeKey, relation, so
   )
 })
 
-export function ClassEdge({ edgeKey, offset }: { edgeKey: string; offset: number }) {
+export function ClassEdge({ edgeKey }: { edgeKey: string }) {
   const relation = useStore(documentStore, (s) => classDiagram(s.doc).model.relations[edgeKey])
-  // Le due estremità sono sempre classi (l'ancoraggio di una nota non è più una relazione, spec 3a
-  // §3): la chiave va comunque qualificata, perché `useNodeRect` lavora su chiavi con prefisso di
-  // qualunque famiglia (`use-node-rect.ts`).
-  const source = useNodeRect(relation && qualify("class", relation.source.class))
-  const target = useNodeRect(relation && qualify("class", relation.target.class))
+  const ports = useEdgePorts(qualify("class", edgeKey))
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", qualify("class", edgeKey))))
-  if (!relation || !source || !target) return null
-  return <ClassEdgeView edgeKey={edgeKey} relation={relation} source={source} target={target} selected={selected} offset={offset} />
+  if (!relation || !ports) return null
+  return <ClassEdgeView edgeKey={edgeKey} relation={relation} ports={ports} selected={selected} />
 }

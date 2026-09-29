@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest"
 import { POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode } from "@/model/flow/schema"
 import { flowNodeSize as flowNodeSizeDelModello } from "@/model/flow/size"
 import { CHAR_W as CHAR_W_DEL_MODELLO } from "@/model/metrics"
-import { routeEdge } from "../edge-routing"
+import { routePorts } from "../edge-routing"
 import { CHAR_W } from "../geometry"
 import type { Rect } from "../geometry"
-import { flowEdgeGeometry, flowEdgeOffsets, flowNodeSize, laneAt, laneOwner, laneRects, poolAt, poolLaneRects, poolMembers, poolRect, shapePath } from "./geometry"
+import { autoPorts } from "../ports"
+import { flowEdgeGeometry, flowNodeSize, flowOutline, laneAt, laneOwner, laneRects, poolAt, poolLaneRects, poolMembers, poolRect, shapePath } from "./geometry"
 
 const node = (over: Partial<FlowNode> = {}): FlowNode => ({ label: "Verifica", shape: "process", lane: null, ...over })
 
@@ -183,21 +184,21 @@ describe("flowEdgeGeometry", () => {
   const edge = (over: Partial<FlowEdge> = {}): FlowEdge => ({ source: "a", target: "b", label: "", ...over })
 
   it("l'etichetta cade sul punto medio del primo segmento, non di quello centrale", () => {
-    const route = routeEdge(source, target, false)
+    const route = routePorts(autoPorts(source, target))
     const p0 = route.points[0]!
     const p1 = route.points[1]!
     // Il percorso piega davvero: altrimenti il primo segmento e quello centrale coinciderebbero e
     // il test passerebbe anche con la formula sbagliata.
     expect(route.points.length).toBeGreaterThan(2)
-    const geo = flowEdgeGeometry(source, target, edge())
+    const geo = flowEdgeGeometry(autoPorts(source, target), edge())
     expect(geo.label).toEqual({ x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 })
   })
 
-  it("due archi fra la stessa coppia ereditano offset diversi: le etichette non coincidono", () => {
-    const edges: Readonly<Record<string, FlowEdge>> = { e1: edge(), e2: edge() }
-    const offsets = flowEdgeOffsets(edges)
-    const g1 = flowEdgeGeometry(source, target, edges.e1!, offsets.get("e1") ?? 0)
-    const g2 = flowEdgeGeometry(source, target, edges.e2!, offsets.get("e2") ?? 0)
-    expect(g1.label).not.toEqual(g2.label)
+  it("il contorno per gli agganci segue il disegno della forma", () => {
+    expect(flowOutline("decision")).toBe("diamond")
+    expect(flowOutline("terminal")).toBe("stadium")
+    expect(flowOutline("io")).toEqual({ skew: 16 })
+    expect(flowOutline("process")).toBe("rect")
+    expect(flowOutline("subprocess")).toBe("rect")
   })
 })

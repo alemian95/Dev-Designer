@@ -2,6 +2,7 @@ import { produce } from "immer"
 import { describe, expect, it } from "vitest"
 import { createDocument, type DevDocument } from "@/model/document"
 import type { Family } from "@/model/family"
+import { autoPorts } from "../ports"
 import { familyOps } from "./ops"
 
 /** Contratto che ogni famiglia deve rispettare: le `DiagramOps` della famiglia data, sul documento
@@ -42,8 +43,8 @@ export function verificaContrattoOps(family: Family, docConDueNodiEUnArco: () =>
       const [arco] = ops.edgesTouching(new Set([a!]))
       const rectA = ops.rectOf(arco!.source)!
       const rectB = ops.rectOf(arco!.target)!
-      expect(ops.edgeGeometry("inesistente", rectA, rectB)).toBeNull()
-      const geo = ops.edgeGeometry(arco!.key, rectA, rectB)
+      expect(ops.edgeGeometry("inesistente", autoPorts(rectA, rectB))).toBeNull()
+      const geo = ops.edgeGeometry(arco!.key, autoPorts(rectA, rectB))
       expect(geo).not.toBeNull()
       expect(geo!.d.length).toBeGreaterThan(0)
     })

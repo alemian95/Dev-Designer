@@ -3,7 +3,6 @@ import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { flowDiagram } from "@/editor/flow-access"
-import { flowEdgeOffsets } from "@/editor/flow/geometry"
 import { POOL_VARIANT } from "@/editor/kinds/flow"
 import type { FlowEdge as FlowEdgeModel, FlowNode as FlowNodeModel } from "@/model/flow/schema"
 import { FLOW_SHAPE_ICON, FLOW_SHAPE_LABEL, FLOW_SHAPES } from "@/ui/flow-shapes"
@@ -23,14 +22,12 @@ function NodesLayer() {
   )
 }
 
-/** Gli scarti di fascio si leggono qui, non in `FlowEdge`: dipendono da tutti gli archi, sulla
- *  stessa forma di `EdgesLayer` in `kinds/class.tsx` e in `../layers.tsx`. */
+/** Sulla stessa forma di `EdgesLayer` in `kinds/class.tsx` e in `../layers.tsx`: i porti li legge ogni arco. */
 function EdgesLayer() {
-  const edges = useStore(documentStore, (s) => flowDiagram(s.doc).model.edges)
-  const offsets = flowEdgeOffsets(edges)
+  const keys = useStore(documentStore, useShallow((s) => Object.keys(flowDiagram(s.doc).model.edges)))
   return (
     <g data-layer="edges">
-      {Object.keys(edges).map((key) => <FlowEdge key={key} edgeKey={key} offset={offsets.get(key) ?? 0} />)}
+      {keys.map((key) => <FlowEdge key={key} edgeKey={key} />)}
     </g>
   )
 }
@@ -45,8 +42,8 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   return <FlowNodeView nodeKey={nodeKey} node={node as FlowNodeModel} view={view} selected={selected} />
 }
 
-function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeViewProps) {
-  return <FlowEdgeView edgeKey={edgeKey} edge={relation as FlowEdgeModel} source={source} target={target} selected={selected} offset={offset} />
+function EdgeView({ edgeKey, relation, ports, selected }: EdgeViewProps) {
+  return <FlowEdgeView edgeKey={edgeKey} edge={relation as FlowEdgeModel} ports={ports} selected={selected} />
 }
 
 /**

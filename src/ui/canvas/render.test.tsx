@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { entitySize } from "@/editor/er/geometry"
 import { HEADER_H, MIN_W } from "@/editor/geometry"
+import { autoPorts } from "@/editor/ports"
 import type { Entity, Relationship } from "@/model/er/schema"
 import { EntityNodeView } from "./EntityNode"
 import { LinkEdgeView } from "./LinkEdge"
@@ -42,14 +43,14 @@ describe("RelationshipEdgeView", () => {
     identifying: false,
   }
   it("disegna linea tratteggiata, marker ed etichetta", () => {
-    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={rel} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} offset={0} />)
+    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={rel} ports={autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 })} selected={false} />)
     expect(html).toContain('data-edge-id="er/r"')
     expect(html).toContain('stroke-dasharray="6 4"')
     expect(html).toContain("data-edge-source")
     expect(html).toContain(">scrive<")
   })
   it("identificante: linea continua", () => {
-    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={{ ...rel, identifying: true }} source={{ x: 0, y: 0, w: 100, h: 50 }} target={{ x: 300, y: 0, w: 100, h: 50 }} selected={false} offset={0} />)
+    const html = renderToStaticMarkup(<RelationshipEdgeView edgeKey="r" relationship={{ ...rel, identifying: true }} ports={autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 })} selected={false} />)
     expect(html).not.toContain("stroke-dasharray")
   })
 })
@@ -60,8 +61,7 @@ describe("LinkEdgeView", () => {
       <LinkEdgeView
         id="l1"
         link={{ kind: "maps-to", source: "class/Ordine", target: "er/ordini" }}
-        source={{ x: 0, y: 0, w: 100, h: 40 }}
-        target={{ x: 300, y: 0, w: 100, h: 40 }}
+        ports={autoPorts({ x: 0, y: 0, w: 100, h: 40 }, { x: 300, y: 0, w: 100, h: 40 })}
         selected={false}
       />,
     )
@@ -79,8 +79,7 @@ describe("LinkEdgeView", () => {
       <LinkEdgeView
         id="a1"
         link={{ kind: "accesses", source: "flow/p1", target: "er/ordini", mode: "write" }}
-        source={{ x: 0, y: 0, w: 100, h: 40 }}
-        target={{ x: 300, y: 0, w: 100, h: 40 }}
+        ports={autoPorts({ x: 0, y: 0, w: 100, h: 40 }, { x: 300, y: 0, w: 100, h: 40 })}
         selected={false}
       />,
     )

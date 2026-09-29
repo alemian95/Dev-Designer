@@ -92,6 +92,15 @@ describe("comandi delle frecce", () => {
     expect(part().model.arrows["ab"]).toEqual({ source: "b", target: "a", head: "both", dashed: true })
   })
 
+  it("invertArrow scambia anche gli agganci, che seguono i capi", () => {
+    tre()
+    state().dispatch((draft) => {
+      shapeDiagram(draft).model.arrows["ab"]!.anchors = { source: "e2", target: null }
+    })
+    state().dispatch(invertArrow("ab"))
+    expect(part().model.arrows["ab"]!.anchors).toEqual({ source: null, target: "e2" })
+  })
+
   it("invertArrow produce esattamente una voce di annulla", () => {
     tre()
     state().dispatch(invertArrow("ab"))

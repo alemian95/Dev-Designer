@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { GRID, MIN_W } from "../geometry"
 import { anchorGeometry, noteSize, notePath } from "./geometry"
+import { autoPorts } from "../ports"
 
 describe("noteSize", () => {
   it("larghezza dalla riga più lunga, altezza dal numero di righe", () => {
@@ -34,7 +35,7 @@ describe("notePath", () => {
 
 describe("anchorGeometry", () => {
   it("una linea senza marker a nessuno dei due capi", () => {
-    const geo = anchorGeometry({ x: 0, y: 0, w: 100, h: 40 }, { x: 300, y: 0, w: 100, h: 40 })
+    const geo = anchorGeometry(autoPorts({ x: 0, y: 0, w: 100, h: 40 }, { x: 300, y: 0, w: 100, h: 40 }))
     expect(geo.d).not.toBe("")
     expect(geo.sourceMarker).toBe("")
     expect(geo.targetMarker).toBe("")

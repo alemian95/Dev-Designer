@@ -4,6 +4,7 @@ import type { ClassNode, ClassRelation } from "@/model/class/schema"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Rect } from "../geometry"
 import { DOWN, LEFT, RIGHT, UP } from "../edge-routing"
 import { classEdgeGeometry, classSize, endLabel, isDashed, isFilled, STEREO_H, umlMarkerPath } from "./geometry"
+import { autoPorts } from "../ports"
 
 // Annotazione esplicita `ClassNode` sulle fixture, non `as const`: il brief le
 // scriveva `as const`, ma un `ClassNode` ha array mutabili e `as const` li
@@ -136,7 +137,7 @@ describe("associazione navigabile", () => {
     const source: Rect = { x: 0, y: 0, w: 100, h: 60 }
     const target: Rect = { x: 240, y: 0, w: 100, h: 60 }
     const rel: ClassRelation = { kind: "association", navigable: true, source: { class: "A", multiplicity: "", role: "" }, target: { class: "B", multiplicity: "", role: "" } }
-    expect(classEdgeGeometry(source, target, rel).targetMarker.length).toBeGreaterThan(0)
+    expect(classEdgeGeometry(autoPorts(source, target), rel).targetMarker.length).toBeGreaterThan(0)
   })
 })
 
@@ -150,7 +151,7 @@ describe("classEdgeGeometry", () => {
   }
 
   it("il marker cade sempre sul target: sourceMarker resta vuoto, contratto di umlMarkerPath", () => {
-    const geo = classEdgeGeometry(source, target, { ...relazione, kind: "composition" })
+    const geo = classEdgeGeometry(autoPorts(source, target), { ...relazione, kind: "composition" })
     expect(geo.sourceMarker).toBe("")
     expect(geo.targetMarker.length).toBeGreaterThan(0)
   })
@@ -160,7 +161,7 @@ describe("classEdgeGeometry", () => {
     // oltre la sua punta, altrimenti il testo finisce sopra il marker. Nessun test lo fissava, e
     // abbassarlo sotto 16 non avrebbe rotto niente.
     const conMolteplicita: ClassRelation = { ...relazione, source: { ...relazione.source, multiplicity: "1" } }
-    const geo = classEdgeGeometry(source, target, conMolteplicita)
+    const geo = classEdgeGeometry(autoPorts(source, target), conMolteplicita)
     // Il capo sorgente attacca a (100, 30) e l'arco esce verso destra: lo scarto lungo l'arco è
     // `END_LABEL_OFFSET` più la semilarghezza del testo (font 11 × 0,6 per carattere, un carattere).
     const semiLarghezza = (11 * 0.6) / 2
@@ -170,14 +171,14 @@ describe("classEdgeGeometry", () => {
   })
 
   it("sourceEnd/targetEnd assenti quando entrambe le molteplicità sono vuote", () => {
-    const geo = classEdgeGeometry(source, target, relazione)
+    const geo = classEdgeGeometry(autoPorts(source, target), relazione)
     expect(geo.sourceEnd).toBeUndefined()
     expect(geo.targetEnd).toBeUndefined()
   })
 
   it("sourceEnd/targetEnd presenti quando almeno una molteplicità c'è, anche se asimmetrica", () => {
     const asimmetrica: ClassRelation = { ...relazione, source: { ...relazione.source, multiplicity: "1" } }
-    const geo = classEdgeGeometry(source, target, asimmetrica)
+    const geo = classEdgeGeometry(autoPorts(source, target), asimmetrica)
     expect(geo.sourceEnd).toBeDefined()
     expect(geo.targetEnd).toBeDefined()
   })
@@ -186,7 +187,7 @@ describe("classEdgeGeometry", () => {
     // Il ruolo si rende nella stessa etichetta della molteplicità: un capo che ha solo il ruolo
     // ha comunque qualcosa da mostrare, e prima di questo caso non riceveva nessun punto.
     const soloRuolo: ClassRelation = { ...relazione, target: { ...relazione.target, role: "titolare" } }
-    const geo = classEdgeGeometry(source, target, soloRuolo)
+    const geo = classEdgeGeometry(autoPorts(source, target), soloRuolo)
     expect(geo.sourceEnd).toBeDefined()
     expect(geo.targetEnd).toBeDefined()
   })
@@ -196,7 +197,7 @@ describe("classEdgeGeometry", () => {
     // dal bordo finiva dentro il rombo e usciva mangiata. I due rettangoli sono alla stessa
     // altezza, quindi l'arco è orizzontale e la distanza è tutta sulla x.
     const conMolt: ClassRelation = { ...relazione, kind: "composition", target: { ...relazione.target, multiplicity: "0..*" } }
-    const geo = classEdgeGeometry(source, target, conMolt)
+    const geo = classEdgeGeometry(autoPorts(source, target), conMolt)
     expect(target.x - geo.targetEnd!.x).toBeGreaterThan(16)
   })
 
@@ -206,7 +207,7 @@ describe("classEdgeGeometry", () => {
     // escono tagliati. Lo scarto lungo l'arco deve quindi contare anche la semilarghezza.
     const lunga = "0..* ordini"
     const conRuolo: ClassRelation = { ...relazione, kind: "composition", target: { class: "B", multiplicity: "0..*", role: "ordini" } }
-    const geo = classEdgeGeometry(source, target, conRuolo)
+    const geo = classEdgeGeometry(autoPorts(source, target), conRuolo)
     const semiLarghezza = (lunga.length * 11 * 0.6) / 2
     // Il bordo del testo più vicino al target, non il suo centro: deve stare oltre il rombo (16).
     expect(target.x - (geo.targetEnd!.x + semiLarghezza)).toBeGreaterThan(16)
@@ -222,7 +223,7 @@ describe("classEdgeGeometry", () => {
       source: { class: "A", multiplicity: "0..*", role: "ordini" },
       target: { class: "B", multiplicity: "1", role: "titolare" },
     }
-    const geo = classEdgeGeometry(source, target, conTutto)
+    const geo = classEdgeGeometry(autoPorts(source, target), conTutto)
     // I due rettangoli sono alla stessa altezza: la linea corre a y = 30.
     expect(geo.sourceEnd!.y).toBeGreaterThan(30)
     expect(geo.targetEnd!.y).toBeGreaterThan(30)
@@ -237,7 +238,7 @@ describe("classEdgeGeometry", () => {
     const sotto: Rect = { x: 0, y: 300, w: 100, h: 60 }
     const molteplicita = "1..*"
     const conMolt: ClassRelation = { ...relazione, source: { ...relazione.source, multiplicity: molteplicita } }
-    const geo = classEdgeGeometry(sopra, sotto, conMolt)
+    const geo = classEdgeGeometry(autoPorts(sopra, sotto), conMolt)
     const semiLarghezza = (molteplicita.length * 11 * 0.6) / 2
     expect(Math.abs(geo.sourceEnd!.x - 50)).toBeGreaterThan(semiLarghezza)
   })

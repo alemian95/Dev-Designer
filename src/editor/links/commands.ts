@@ -1,5 +1,6 @@
 import type { DevDocument } from "@/model/document"
 import type { Family } from "@/model/family"
+import { AUTO_ANCHORS, writeAnchors, type EdgeAnchors } from "@/model/shared"
 import { unmappableNotice } from "@/model/links/mappable"
 import { linkRule, type AccessMode, type Link, type LinkKind } from "@/model/links/schema"
 import { classDiagram } from "../class-access"
@@ -39,13 +40,17 @@ function newLink(kind: LinkKind, source: string, target: string): Link {
  * il verso del trascinamento. Un collegamento già presente fra gli stessi due nodi non si duplica: si
  * seleziona. Una classe con «mappa su» verso due entità diverse invece si può creare, e la segnala la
  * validazione (`class-maps-multiple`): un errore visibile è più chiaro di un gesto rifiutato.
+ *
+ * `anchors` sono gli agganci del gesto, nel verso del trascinamento (si scambiano col verso del tipo);
+ * su un collegamento già presente non si applicano.
  */
-export function connectAcross(doc: DevDocument, from: string, to: string): ConnectResult {
+export function connectAcross(doc: DevDocument, from: string, to: string, anchors: EdgeAnchors = AUTO_ANCHORS): ConnectResult {
   const a = splitKey(from).family
   const b = splitKey(to).family
   const rule = linkRule(a, b)
   if (!rule) return { type: "rejected", notice: `Non esiste un collegamento fra ${FAMILY_NOUN[a]} e ${FAMILY_NOUN[b]}.` }
   const [source, target] = rule.reversed ? [to, from] : [from, to]
+  const ends = rule.reversed ? { source: anchors.target, target: anchors.source } : anchors
   const refused = refusal(doc, rule.kind, source)
   if (refused) return { type: "rejected", notice: refused }
   const existing = Object.entries(doc.diagram.links).find(
@@ -57,7 +62,9 @@ export function connectAcross(doc: DevDocument, from: string, to: string): Conne
     type: "created",
     key: linkKey(id),
     recipe: (draft) => {
-      draft.diagram.links[id] = newLink(rule.kind, source, target)
+      const link = newLink(rule.kind, source, target)
+      writeAnchors(link, ends)
+      draft.diagram.links[id] = link
     },
   }
 }
@@ -115,4 +122,12 @@ export function setLinkMode(id: string, mode: AccessMode): Recipe {
 /** I collegamenti con almeno un estremo fra `keys` (chiavi con prefisso), con il loro id. */
 export function linksTouching(links: Readonly<Record<string, Link>>, keys: ReadonlySet<string>): [string, Link][] {
   return Object.entries(links).filter(([, l]) => keys.has(l.source) || keys.has(l.target))
+}
+
+/** Gli agganci di un collegamento: la coppia intera. Su un id che non c'è non scrive niente. */
+export function setLinkAnchors(id: string, anchors: EdgeAnchors): Recipe {
+  return (draft) => {
+    const link = draft.diagram.links[id]
+    if (link) writeAnchors(link, anchors)
+  }
 }

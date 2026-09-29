@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
+import { autoPorts } from "@/editor/ports"
 import { ShapeNodeView } from "./Shape"
 import { ArrowEdgeView } from "./ShapeArrow"
 
@@ -32,7 +33,7 @@ describe("ArrowEdgeView", () => {
   const a = { x: 0, y: 0, w: 100, h: 40 }
   const b = { x: 300, y: 0, w: 100, h: 40 }
   const arrow = (dashed: boolean) =>
-    renderToStaticMarkup(<ArrowEdgeView arrowKey="f" arrow={{ source: "a", target: "b", head: "end", dashed }} source={a} target={b} selected={false} offset={0} />)
+    renderToStaticMarkup(<ArrowEdgeView arrowKey="f" arrow={{ source: "a", target: "b", head: "end", dashed }} ports={autoPorts(a, b)} selected={false} />)
 
   it("la linea è tratteggiata solo se dashed", () => {
     expect(arrow(true)).toContain('stroke-dasharray="6 4"')

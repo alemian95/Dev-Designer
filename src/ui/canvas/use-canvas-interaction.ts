@@ -151,8 +151,10 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     }
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
-      const hit = hitTest(el)
-      if (hit.kind === "canvas" || hit.kind === "anchor" || hit.kind === "edge-end") return
+      const raw = hitTest(el)
+      if (raw.kind === "canvas" || raw.kind === "edge-end") return
+      // Gli agganci sporgono dal bordo: un doppio click lì vale come sul nodo.
+      const hit: Hit = raw.kind === "anchor" ? { kind: "node", key: raw.node } : raw
       // Un collegamento fra famiglie non ha niente da modificare sul canvas (spec 4a §7), e la sua
       // chiave non ha una famiglia: `splitKey` la rifiuterebbe.
       if (linkId(hit.key) !== null) return

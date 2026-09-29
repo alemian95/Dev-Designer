@@ -3,6 +3,9 @@ import type { Anchor, EdgeAnchors } from "@/model/shared"
 import type { Point, Rect } from "./geometry"
 import { selId, selectedKeys, type Tool } from "./session-store"
 
+/** I due capi di un arco. */
+export type EdgeEnd = "source" | "target"
+
 /**
  * `backdrop` è vero quando il nodo colpito appartiene a una famiglia `backdrop` (le forme, spec 3b
  * §5): un rettangolo o un'ellisse dipinti, o il rettangolo trasparente del testo, riempiono l'area e
@@ -10,9 +13,6 @@ import { selId, selectedKeys, type Tool } from "./session-store"
  * creazione deve poter aprire una forma nuova dentro, non selezionare quella sotto (spec §1, §3, §5).
  * Assente/`false`: un nodo qualsiasi delle altre famiglie.
  */
-/** I due capi di un arco. */
-export type EdgeEnd = "source" | "target"
-
 export type Hit =
   | { kind: "node"; key: string; backdrop?: boolean }
   | { kind: "edge"; key: string }
@@ -233,11 +233,14 @@ function onUp(mode: Mode, info: PointerInfo): Step {
       return { mode: IDLE, effects }
     }
     case "connect": {
-      const effects: Effect[] = [
-        { type: "preview-connect", source: mode.source, anchor: mode.sourceAnchor, to: null },
-        { type: "show-anchors", node: null },
-      ]
       const hit = info.hit
+      const clear: Effect = { type: "preview-connect", source: mode.source, anchor: mode.sourceAnchor, to: null }
+      // Un click sull'aggancio di partenza, senza spostarsi, non è un arco: niente cappio per sbaglio (un
+      // cappio voluto va verso un altro aggancio dello stesso nodo). Gli agganci restano dove sono: il
+      // puntatore è ancora sul nodo, e un doppio click lì deve poterlo raggiungere (`click` non parte se
+      // il punto premuto sparisce dal DOM).
+      if (hit.kind === "anchor" && hit.node === mode.source && hit.anchor === mode.sourceAnchor) return { mode: IDLE, effects: [clear] }
+      const effects: Effect[] = [clear, { type: "show-anchors", node: null }]
       if (hit.kind === "node") {
         effects.push({ type: "commit-connect", source: mode.source, target: hit.key, anchors: { source: mode.sourceAnchor, target: null } })
       } else if (hit.kind === "anchor") {

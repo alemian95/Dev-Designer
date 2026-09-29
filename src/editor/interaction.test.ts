@@ -166,6 +166,7 @@ describe("reduce", () => {
   it("tool edge rilasciato sul canvas: solo pulizia dell'anteprima", () => {
     const r = run([down({ hit: { kind: "node", key: "a" } }), up({})], ctx({ tool: "edge" }))
     expect(r.effects).toContainEqual({ type: "preview-connect", source: "a", anchor: null, to: null })
+    expect(r.effects.some((e) => e.type === "commit-connect")).toBe(false)
   })
 
   it("cancel durante il drag riporta i nodi a zero", () => {
@@ -264,6 +265,16 @@ describe("gli agganci (spec agganci §6)", () => {
     expect(onAnchor.effects).toContainEqual({ type: "show-anchors", node: null })
     const onBody = reduce(mode, up({ hit: { kind: "node", key: "flow/b" } }), ctx({ tool: "edge" }))
     expect(onBody.effects).toContainEqual({ type: "commit-connect", source: "flow/a", target: "flow/b", anchors: { source: "e2", target: null } })
+  })
+
+  it("up sull'aggancio di partenza non crea un cappio e lascia gli agganci; verso un altro aggancio dello stesso nodo sì", () => {
+    const mode: Mode = { type: "connect", source: "flow/a", sourceAnchor: "e2" }
+    const same = reduce(mode, up({ hit: anchorHit("flow/a", "e2") }), ctx({ tool: "select" }))
+    expect(same.effects.some((e) => e.type === "commit-connect")).toBe(false)
+    expect(same.effects).toEqual([{ type: "preview-connect", source: "flow/a", anchor: "e2", to: null }])
+    expect(same.mode).toEqual(IDLE)
+    const loop = reduce(mode, up({ hit: anchorHit("flow/a", "n1") }), ctx({ tool: "select" }))
+    expect(loop.effects).toContainEqual({ type: "commit-connect", source: "flow/a", target: "flow/a", anchors: { source: "e2", target: "n1" } })
   })
 
   it("down sulla maniglia di un capo apre il suo spostamento e mostra gli agganci del suo nodo", () => {

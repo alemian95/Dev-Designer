@@ -1433,6 +1433,11 @@ il piano non chiedeva di risolvere qui.
   perché il router non conosce i nodi (spec §7). Costo-se-sbagliato: linea che taglia il nodo.
 - **La giunzione a metà del percorso a S può attraversare il nodo.** Con un cappio `w`→`e` e agganci a
   altezze diverse la linea mediana passa dentro al corpo. Stessa causa e stesso rimedio del punto sopra.
+- **Il re-import di un DDL perde gli agganci delle relazioni da FK.** `src/editor/commands/import.ts`
+  (righe 73-79) cancella le relazioni derivate da una FK delle tabelle in arrivo e le ricrea da capo, quindi
+  i loro `anchors` spariscono. Rinviato perché servirebbe riconoscere la stessa relazione fra import
+  (oggi la chiave è ricalcolata da `uniqueKey`). Costo-se-sbagliato: dopo un re-import gli archi
+  tornano ad agganci automatici e l'utente deve riposizionarli.
 
 ---
 

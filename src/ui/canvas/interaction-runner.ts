@@ -2,7 +2,7 @@ import { documentStore } from "@/editor/document-store"
 import { inFamily, linkId } from "@/editor/families"
 import { rectsIntersect, snap, type Point, type Rect } from "@/editor/geometry"
 import { IDLE, reduce, type Effect, type InteractionEvent, type Mode } from "@/editor/interaction"
-import { canvasOps } from "@/editor/kinds/canvas-ops"
+import { canvasOps, canvasPorts } from "@/editor/kinds/canvas-ops"
 import type { EdgeEnds } from "@/editor/kinds/ops"
 import { selId, sessionStore } from "@/editor/session-store"
 import { panBy, visibleWorldRect } from "@/editor/viewport"
@@ -20,9 +20,12 @@ const PREVIEW_MARGIN = 64
 
 interface DragTargets {
   nodes: { key: string; x: number; y: number }[]
+  /** Gli archi da riscrivere: quelli dei nodi trascinati e dei loro vicini diretti (spec agganci §8). */
   edges: EdgeEnds[]
+  /** Tutti gli archi del canvas: i porti si calcolano su tutti, o i fasci sui nodi al bordo sarebbero incompleti. */
+  all: EdgeEnds[]
   /**
-   * Il rettangolo di ogni nodo coinvolto — trascinato o all'estremo di un arco toccato — com'era
+   * Il rettangolo di ogni nodo agli estremi di un arco del canvas, e di ogni nodo trascinato, com'era
    * alla presa. La **dimensione** di un nodo non dipende da dove sta: durante il drag cambiano solo
    * `x`/`y`, e ricalcolarla vale una misura di testo per ogni attributo, due volte per arco, a ogni
    * frame. Qui si misura una volta sola e poi si sposta.
@@ -32,7 +35,14 @@ interface DragTargets {
 
 function collectDragTargets(keys: readonly string[]): DragTargets {
   const ops = canvasOps(documentStore.getState().doc)
-  const edges = ops.edgesTouching(new Set(keys))
+  const all = ops.allEdges()
+  const moved = new Set(keys)
+  const near = new Set(keys)
+  for (const e of all) {
+    if (moved.has(e.source)) near.add(e.target)
+    if (moved.has(e.target)) near.add(e.source)
+  }
+  const edges = all.filter((e) => near.has(e.source) || near.has(e.target))
   const rects = new Map<string, Rect>()
   const measure = (key: string) => {
     if (rects.has(key)) return
@@ -40,7 +50,7 @@ function collectDragTargets(keys: readonly string[]): DragTargets {
     if (r) rects.set(key, r)
   }
   for (const key of keys) measure(key)
-  for (const edge of edges) {
+  for (const edge of all) {
     measure(edge.source)
     measure(edge.target)
   }
@@ -50,6 +60,7 @@ function collectDragTargets(keys: readonly string[]): DragTargets {
       return r ? [{ key, x: r.x, y: r.y }] : []
     }),
     edges,
+    all,
     rects,
   }
 }
@@ -89,13 +100,16 @@ function previewDrag(targets: DragTargets, dx: number, dy: number): void {
     const r = rectAt(key)
     if (r && rectsIntersect(r, seen)) setNodePosition(key, p.x, p.y)
   }
+  const ports = ops.portsOf(targets.all, rectAt)
   for (const edge of targets.edges) {
     const a = rectAt(edge.source)
     const b = rectAt(edge.target)
     // L'ingombro dell'arco e non i suoi estremi: un arco lungo può attraversare l'inquadratura con
     // entrambi i nodi fuori.
     if (!a || !b || !rectsIntersect(union(a, b), seen)) continue
-    const geo = ops.edgeGeometry(edge.key, a, b)
+    const p = ports.get(edge.key)
+    if (!p) continue
+    const geo = ops.edgeGeometry(edge.key, p)
     if (geo) setEdgeGeometry(edge.key, geo)
   }
 }
@@ -117,13 +131,14 @@ function previewDrag(targets: DragTargets, dx: number, dy: number): void {
  * già tornati alla posizione di partenza.
  */
 function resetDragTargets(targets: DragTargets): void {
-  const ops = canvasOps(documentStore.getState().doc)
+  const { doc } = documentStore.getState()
+  const ops = canvasOps(doc)
+  const ports = canvasPorts(doc)
   for (const node of targets.nodes) setNodePosition(node.key, node.x, node.y)
   for (const edge of targets.edges) {
-    const a = targets.rects.get(edge.source)
-    const b = targets.rects.get(edge.target)
-    if (!a || !b) continue
-    const geo = ops.edgeGeometry(edge.key, a, b)
+    const p = ports.get(edge.key)
+    if (!p) continue
+    const geo = ops.edgeGeometry(edge.key, p)
     if (geo) setEdgeGeometry(edge.key, geo)
   }
 }
@@ -188,6 +203,7 @@ export function createInteractionRunner(): InteractionRunner {
         break
       case "preview-drag":
         // I nodi di un pool trascinato si muovono con lui già nell'anteprima (spec 2b §5).
+        if (!dragTargets) session().setDragging(true)
         dragTargets ??= collectDragTargets(canvasOps(documentStore.getState().doc).withFollowers(fx.keys))
         previewDrag(dragTargets, fx.dx, fx.dy)
         break
@@ -205,14 +221,34 @@ export function createInteractionRunner(): InteractionRunner {
         session().setSelection(fx.additive ? [...session().selection, ...ids] : ids)
         break
       }
-      case "preview-connect":
-        showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
+      case "preview-connect": {
+        const ops = canvasOps(documentStore.getState().doc)
+        const from = fx.to ? (fx.anchor ? ops.anchorPoint(fx.source, fx.anchor) : nodeCenter(fx.source)) : null
+        showConnect(from, fx.to)
         break
+      }
+      case "show-anchors": {
+        const node = fx.node !== null && canvasOps(documentStore.getState().doc).hasAnchors(fx.node) ? fx.node : null
+        if (session().anchorsFor !== node) session().setAnchorsFor(node)
+        break
+      }
+      case "preview-reanchor": {
+        // L'anteprima parte dal porto dell'altro capo, quello che non si muove (spec agganci §6).
+        const ports = canvasPorts(documentStore.getState().doc).get(fx.edge)
+        const other = ports ? (fx.end === "source" ? ports.target : ports.source) : null
+        showConnect(fx.to && other ? other.point : null, fx.to)
+        break
+      }
+      case "commit-anchor": {
+        const recipe = canvasOps(documentStore.getState().doc).setEdgeAnchor(fx.edge, fx.end, fx.anchor)
+        if (recipe) documentStore.getState().dispatch(recipe)
+        break
+      }
       case "commit-connect": {
         // `null`: dentro una famiglia i due nodi non si collegano (nota → nota), e non c'è niente da
         // dire. Un rifiuto fra famiglie invece si spiega nella barra degli avvisi, e lo strumento resta
         // attivo per riprovare (spec 4a §4). Un collegamento già presente si seleziona soltanto.
-        const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target)
+        const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target, fx.anchors)
         if (!result) break
         if (result.type === "rejected") {
           lastRefusal = result.notice
@@ -274,7 +310,10 @@ export function createInteractionRunner(): InteractionRunner {
     mode = result.mode
     for (const fx of result.effects) run(fx)
     // Lo snapshot del drag vale per un solo drag: si scarta appena si esce dal modo, commit o annullamento che sia.
-    if (mode.type !== "drag") dragTargets = null
+    if (mode.type !== "drag") {
+      dragTargets = null
+      if (session().dragging) session().setDragging(false)
+    }
   }
 
   return {

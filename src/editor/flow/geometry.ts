@@ -1,8 +1,9 @@
 import { LANE_MIN_H, POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode, type FlowShape, type LaneView, type Pool, type PoolView } from "@/model/flow/schema"
 import { flowNodeSize } from "@/model/flow/size"
 import type { NodeView } from "@/model/shared"
-import { edgeOffsets, filledArrowPath, memoOnIdentity, pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
+import { filledArrowPath, pathFromPoints, routePorts, type EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
+import type { EdgePorts, Outline } from "../ports"
 
 // La misura dei nodi vive nel modello (spec 2b §3): qui si riesporta.
 export { DECISION_FACTOR, flowNodeSize } from "@/model/flow/size"
@@ -151,20 +152,21 @@ export function poolMembers(d: FlowDiagram, poolId: string): string[] {
 }
 
 /**
- * Tutta la geometria di un arco di flowchart, da due rettangoli e l'arco — stesso ruolo di
+ * Tutta la geometria di un arco di flowchart, dai suoi porti e l'arco — stesso ruolo di
  * `classEdgeGeometry` (`class/geometry.ts`) e di `edgeGeometry` (`edge-routing.ts`) per l'ER: un
- * solo posto che compone `routeEdge` e il marker, perché sia il render statico (`FlowEdgeView`)
+ * solo posto che compone `routePorts` e il marker, perché sia il render statico (`FlowEdgeView`)
  * sia l'anteprima del drag (`flowOps.edgeGeometry`, via `dom-registry.setEdgeGeometry`) devono
  * disegnare lo stesso arco.
  *
  * **L'etichetta sta sul primo segmento, non su quello centrale come per ER e classi.** Con
  * flusso a destra gli archi entranti arrivano tutti dal lato sinistro del bersaglio: il primo
- * segmento parte dall'attacco che `routeEdge` ha già spostato dell'`offset` di fascio, quindi
- * l'etichetta eredita gratis la separazione che il fascio ha calcolato, invece di chiederne una
- * propria (spec §8).
+ * segmento parte dall'attacco che il fascio per lato (`assignPorts`) ha già separato, quindi
+ * l'etichetta eredita gratis la separazione, invece di chiederne una propria (spec §8).
  */
-export function flowEdgeGeometry(source: Rect, target: Rect, edge: FlowEdge, offset = 0): EdgeGeometry {
-  const route = routeEdge(source, target, edge.source === edge.target, offset)
+// `edge` non serve più: il verso e i capi stanno nei porti. Resta nella firma, sulla forma delle geometrie gemelle.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function flowEdgeGeometry(ports: EdgePorts, _edge: FlowEdge): EdgeGeometry {
+  const route = routePorts(ports)
   const pts = route.points
   const p0 = pts[0]!
   const p1 = pts[1]!
@@ -176,8 +178,17 @@ export function flowEdgeGeometry(source: Rect, target: Rect, edge: FlowEdge, off
   }
 }
 
-/** Gemella di `erEdgeOffsets`/`classEdgeOffsets`: stessa ragione, `source`/`target` già piatti e
- *  non annidati in un capo come nell'ER o nelle classi. */
-export const flowEdgeOffsets = memoOnIdentity((edges: Readonly<Record<string, FlowEdge>>) =>
-  edgeOffsets(Object.entries(edges).map(([key, e]) => ({ key, source: e.source, target: e.target }))),
-)
+/** Il contorno di una forma di flusso per gli agganci (spec agganci §4): lo stesso disegno di `shapePath`. */
+export function flowOutline(shape: FlowShape): Outline {
+  switch (shape) {
+    case "decision":
+      return "diamond"
+    case "terminal":
+      return "stadium"
+    case "io":
+      return { skew: IO_SKEW }
+    case "process":
+    case "subprocess":
+      return "rect"
+  }
+}

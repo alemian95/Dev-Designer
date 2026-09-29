@@ -2,17 +2,16 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
-import type { Rect } from "@/editor/geometry"
+import type { EdgePorts } from "@/editor/ports"
 import { anchorGeometry } from "@/editor/note/geometry"
 import { noteDiagram } from "@/editor/note-access"
 import { selId, sessionStore } from "@/editor/session-store"
 import { registerEdge } from "./dom-registry"
-import { useNodeRect } from "./use-node-rect"
+import { useEdgePorts } from "./use-edge-ports"
 
 interface Props {
   noteKey: string
-  source: Rect
-  target: Rect
+  ports: EdgePorts
   selected: boolean
 }
 
@@ -21,9 +20,9 @@ interface Props {
  * sua nota. Gli attributi `data-edge-*` sono quelli degli archi, quindi l'anteprima del drag la
  * aggiorna senza codice nuovo, come i collegamenti.
  */
-export const AnchorEdgeView = memo(function AnchorEdgeView({ noteKey, source, target, selected }: Props) {
+export const AnchorEdgeView = memo(function AnchorEdgeView({ noteKey, ports, selected }: Props) {
   const id = qualify("note", noteKey)
-  const geo = anchorGeometry(source, target)
+  const geo = anchorGeometry(ports)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   return (
     <g
@@ -43,9 +42,8 @@ export const AnchorEdgeView = memo(function AnchorEdgeView({ noteKey, source, ta
 export function AnchorEdge({ noteKey }: { noteKey: string }) {
   const id = qualify("note", noteKey)
   const anchor = useStore(documentStore, (s) => noteDiagram(s.doc).model.notes[noteKey]?.anchor ?? undefined)
-  const source = useNodeRect(id)
-  const target = useNodeRect(anchor)
+  const ports = useEdgePorts(id)
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", id)))
-  if (!source || !target) return null
-  return <AnchorEdgeView noteKey={noteKey} source={source} target={target} selected={selected} />
+  if (!anchor || !ports) return null
+  return <AnchorEdgeView noteKey={noteKey} ports={ports} selected={selected} />
 }

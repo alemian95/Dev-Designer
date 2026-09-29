@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Relationship } from "@/model/er/schema"
-import { BUNDLE_GAP, crowsFootPath, edgeGeometry, edgeOffsets, filledArrowPath, LEFT, pathFromPoints, RIGHT, routeEdge } from "./edge-routing"
+import { crowsFootPath, DOWN, edgeGeometry, filledArrowPath, LEFT, pathFromPoints, RIGHT, routePorts, UP } from "./edge-routing"
+import { autoPorts, STUB, type EdgePorts, type Port } from "./ports"
 
 const rel: Relationship = {
   source: { entity: "a", attributes: [], cardinality: "many" },
@@ -8,55 +9,32 @@ const rel: Relationship = {
   identifying: false,
 }
 
-describe("routeEdge", () => {
+describe("routePorts fra due rettangoli", () => {
   it("entità affiancate: esce da destra, entra da sinistra, due pieghe", () => {
-    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 100, w: 100, h: 50 }, false)
+    const r = routePorts(autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 100, w: 100, h: 50 }))
     expect(r.sourceDir).toEqual({ x: 1, y: 0 })
     expect(r.targetDir).toEqual({ x: -1, y: 0 })
     expect(r.points).toEqual([{ x: 100, y: 25 }, { x: 200, y: 25 }, { x: 200, y: 125 }, { x: 300, y: 125 }])
   })
 
   it("stessa altezza: segmento dritto", () => {
-    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 }, false)
+    const r = routePorts(autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 }))
     expect(r.points).toHaveLength(2)
   })
 
   it("entità impilate: esce dal basso, entra dall'alto", () => {
-    const r = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 20, y: 300, w: 100, h: 50 }, false)
+    const r = routePorts(autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 20, y: 300, w: 100, h: 50 }))
     expect(r.sourceDir).toEqual({ x: 0, y: 1 })
     expect(r.targetDir).toEqual({ x: 0, y: -1 })
     expect(r.points[0]).toEqual({ x: 50, y: 50 })
   })
-
-  it("relazione su se stessa: anello a destra e rientro dall'alto", () => {
-    const a = { x: 0, y: 0, w: 100, h: 50 }
-    const r = routeEdge(a, a, true)
-    expect(r.points).toHaveLength(5)
-    expect(r.targetDir).toEqual({ x: 0, y: -1 })
-  })
-
-  it("il cappio non attacca al centro dei lati, dove attaccano tutti gli altri archi", () => {
-    const a = { x: 0, y: 0, w: 100, h: 50 }
-    const r = routeEdge(a, a, true)
-    const primo = r.points[0]!
-    const ultimo = r.points[r.points.length - 1]!
-    // Ogni altro arco che tocca questo nodo attacca al centro del lato — (100, 25) a destra,
-    // (50, 0) in alto, come mostrano i tre casi qui sopra. Un cappio che partisse da lì
-    // finirebbe esattamente sotto la punta di quell'arco.
-    expect(primo).not.toEqual({ x: 100, y: 25 })
-    expect(ultimo).not.toEqual({ x: 50, y: 0 })
-    // Resta comunque sul lato destro e su quello superiore: sono i lati che `sourceDir` e
-    // `targetDir` dichiarano, e il marker vi si appoggia.
-    expect(primo.x).toBe(100)
-    expect(ultimo.y).toBe(0)
-  })
 })
 
-describe("routeEdge da sinistra a destra", () => {
+describe("routePorts da sinistra a destra", () => {
   it("esce a destra della sorgente ed entra a sinistra del bersaglio", () => {
     const a = { x: 0, y: 0, w: 100, h: 60 }
     const b = { x: 300, y: 0, w: 100, h: 60 }
-    const route = routeEdge(a, b, false)
+    const route = routePorts(autoPorts(a, b))
     expect(route.sourceDir).toEqual(RIGHT)
     expect(route.targetDir).toEqual(LEFT)
   })
@@ -64,7 +42,7 @@ describe("routeEdge da sinistra a destra", () => {
   it("un arco all'indietro esce comunque con un percorso ortogonale valido", () => {
     const a = { x: 300, y: 0, w: 100, h: 60 }
     const b = { x: 0, y: 0, w: 100, h: 60 }
-    const route = routeEdge(a, b, false)
+    const route = routePorts(autoPorts(a, b))
     expect(route.points.length).toBeGreaterThanOrEqual(2)
     for (let i = 1; i < route.points.length; i++) {
       const p = route.points[i - 1]!, q = route.points[i]!
@@ -88,103 +66,11 @@ describe("crowsFootPath", () => {
 
 describe("edgeGeometry", () => {
   it("produce path, marker ed etichetta", () => {
-    const g = edgeGeometry({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 }, rel)
+    const g = edgeGeometry(autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 0, w: 100, h: 50 }), rel)
     expect(g.d).toBe(pathFromPoints([{ x: 100, y: 25 }, { x: 300, y: 25 }]))
     expect(g.label).toEqual({ x: 200, y: 25 })
     expect(g.sourceMarker).toContain("M")
     expect(g.targetMarker).toBe("M288 31 L288 19")
-  })
-})
-
-describe("edgeOffsets", () => {
-  const ends = (...triples: [string, string, string][]) =>
-    triples.map(([key, source, target]) => ({ key, source, target }))
-
-  it("un arco solo nel proprio fascio non si sposta di un pixel", () => {
-    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "b", "c"]))
-    expect(o.get("e1")).toBe(0)
-    expect(o.get("e2")).toBe(0)
-  })
-
-  it("due archi fra la stessa coppia si aprono simmetrici attorno all'asse", () => {
-    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "a", "b"]))
-    expect(o.get("e1")).toBe(-BUNDLE_GAP / 2)
-    expect(o.get("e2")).toBe(BUNDLE_GAP / 2)
-    // simmetrici: l'insieme resta centrato dov'era il singolo arco
-    expect(o.get("e1")! + o.get("e2")!).toBe(0)
-  })
-
-  it("il fascio non è orientato: a→b e b→a sono lo stesso", () => {
-    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "b", "a"]))
-    expect(o.get("e1")).not.toBe(o.get("e2"))
-  })
-
-  it("tre archi: quello di mezzo resta al centro", () => {
-    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "a", "b"], ["e3", "a", "b"]))
-    expect([o.get("e1"), o.get("e2"), o.get("e3")]).toEqual([-BUNDLE_GAP, 0, BUNDLE_GAP])
-  })
-
-  it("i cappi crescono verso l'esterno invece di aprirsi simmetrici", () => {
-    // Un cappio ha un solo nodo: non c'è un lato opposto su cui bilanciarsi, e due scarti opposti
-    // darebbero due anelli della stessa dimensione, cioè di nuovo sovrapposti.
-    const o = edgeOffsets(ends(["l1", "a", "a"], ["l2", "a", "a"]))
-    expect(o.get("l1")).toBe(0)
-    expect(o.get("l2")).toBe(BUNDLE_GAP)
-  })
-
-  it("una coppia con più archi non tocca gli scarti delle altre coppie", () => {
-    const o = edgeOffsets(ends(["e1", "a", "b"], ["e2", "a", "b"], ["solo", "c", "d"]))
-    expect(o.get("solo")).toBe(0)
-  })
-})
-
-describe("routeEdge con lo scarto del fascio", () => {
-  const a = { x: 0, y: 0, w: 100, h: 100 }
-  const b = { x: 300, y: 0, w: 100, h: 100 }
-
-  it("senza scarto attacca al centro del lato, come prima", () => {
-    expect(routeEdge(a, b, false, 0).points).toEqual(routeEdge(a, b, false).points)
-  })
-
-  it("due archi della stessa coppia non condividono più nessun punto", () => {
-    const uno = routeEdge(a, b, false, -BUNDLE_GAP / 2).points
-    const due = routeEdge(a, b, false, BUNDLE_GAP / 2).points
-    expect(uno[0]).not.toEqual(due[0])
-    expect(uno[uno.length - 1]).not.toEqual(due[due.length - 1])
-  })
-
-  it("su archi verticali lo scarto va di lato, non lungo l'arco", () => {
-    const sotto = { x: 0, y: 300, w: 100, h: 100 }
-    const r = routeEdge(a, sotto, false, BUNDLE_GAP)
-    expect(r.sourceDir).toEqual({ x: 0, y: 1 })
-    expect(r.points[0]).toEqual({ x: 50 + BUNDLE_GAP, y: 100 })
-  })
-
-  it("il fascio sopravvive anche su un nodo alto quanto il solo header", () => {
-    // Il caso che il rientro sbagliato schiacciava: un'entità senza attributi è alta HEADER_H, e
-    // con un rientro pari a BUNDLE_GAP la banda utile si chiudeva a zero: archi di nuovo identici.
-    const basso = { x: 0, y: 0, w: 160, h: 28 }
-    const uno = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, false, -BUNDLE_GAP / 2)
-    const due = routeEdge(basso, { x: 400, y: 0, w: 160, h: 28 }, false, BUNDLE_GAP / 2)
-    expect(uno.points[0]).not.toEqual(due.points[0])
-  })
-
-  it("l'attacco resta sul lato anche con uno scarto più grande del nodo", () => {
-    // Meglio due archi che ripartono dallo stesso punto e divergono subito, che due archi che
-    // partono dal vuoto accanto al nodo.
-    const basso = { x: 0, y: 0, w: 100, h: 20 }
-    const r = routeEdge(basso, { x: 300, y: 0, w: 100, h: 20 }, false, 500)
-    expect(r.points[0]!.y).toBeGreaterThanOrEqual(basso.y)
-    expect(r.points[0]!.y).toBeLessThanOrEqual(basso.y + basso.h)
-  })
-
-  it("due cappi sullo stesso nodo non condividono né anello né attacchi", () => {
-    const uno = routeEdge(a, a, true, 0).points
-    const due = routeEdge(a, a, true, BUNDLE_GAP).points
-    expect(uno[0]).not.toEqual(due[0])
-    expect(uno[4]).not.toEqual(due[4])
-    // l'anello esterno sta davvero più in fuori
-    expect(due[1]!.x).toBeGreaterThan(uno[1]!.x)
   })
 })
 
@@ -194,20 +80,90 @@ describe("filledArrowPath", () => {
   })
 })
 
-describe("l'auto-relazione la dichiara il chiamante", () => {
-  it("due nodi diversi con lo stesso rettangolo non diventano un cappio", () => {
-    // Raggiungibile con lo snap: due entità uguali trascinate sulla stessa cella della griglia
-    // hanno rettangoli identici. Prima `routeEdge` li confrontava per valore e disegnava un cappio.
-    const stesso = { x: 40, y: 40, w: 160, h: 80 }
-    const fra = routeEdge(stesso, stesso, false)
-    const cappio = routeEdge(stesso, stesso, true)
-    expect(cappio.points).toHaveLength(5)
-    expect(fra.points).not.toHaveLength(5)
+/** Invarianti di ogni percorso: segmenti ortogonali, primo lungo `source.dir`, ultimo lungo `−target.dir`. */
+function checkRoute(ports: EdgePorts) {
+  const { points } = routePorts(ports)
+  expect(points[0]).toEqual(ports.source.point)
+  expect(points[points.length - 1]).toEqual(ports.target.point)
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!
+    const b = points[i]!
+    expect(a.x === b.x || a.y === b.y).toBe(true)
+    expect(a.x === b.x && a.y === b.y).toBe(false)
+  }
+  const dirOf = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: Math.sign(b.x - a.x), y: Math.sign(b.y - a.y) })
+  expect(dirOf(points[0]!, points[1]!)).toEqual(ports.source.dir)
+  const last = dirOf(points[points.length - 2]!, points[points.length - 1]!)
+  expect(last).toEqual({ x: -ports.target.dir.x || 0, y: -ports.target.dir.y || 0 })
+  return points
+}
+
+const port = (x: number, y: number, dir: Port["dir"]): Port => ({ point: { x, y }, dir })
+const ports = (source: Port, target: Port, stub = STUB): EdgePorts => ({ source, target, stub })
+
+describe("routePorts", () => {
+  it("porti che si guardano: la Z di prima", () => {
+    const p = autoPorts({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 100, w: 100, h: 50 })
+    expect(checkRoute(p)).toEqual([{ x: 100, y: 25 }, { x: 200, y: 25 }, { x: 200, y: 125 }, { x: 300, y: 125 }])
   })
 
-  it("edgeGeometry prende il cappio dal modello, non dai rettangoli", () => {
-    const stesso = { x: 0, y: 0, w: 100, h: 50 }
-    const suSe: Relationship = { ...rel, target: { ...rel.target, entity: "a" } }
-    expect(edgeGeometry(stesso, stesso, rel).d).not.toBe(edgeGeometry(stesso, stesso, suSe).d)
+  it("allineati: un segmento solo", () => {
+    expect(checkRoute(ports(port(100, 25, RIGHT), port(300, 25, LEFT)))).toHaveLength(2)
+  })
+
+  it("perpendicolari e davanti l'uno all'altro: una L", () => {
+    expect(checkRoute(ports(port(100, 25, RIGHT), port(300, 125, UP)))).toEqual([{ x: 100, y: 25 }, { x: 300, y: 25 }, { x: 300, y: 125 }])
+  })
+
+  it("stessa direzione: una U oltre il più esterno dei due", () => {
+    expect(checkRoute(ports(port(100, 25, RIGHT), port(300, 125, RIGHT)))).toEqual([
+      { x: 100, y: 25 }, { x: 316, y: 25 }, { x: 316, y: 125 }, { x: 300, y: 125 },
+    ])
+  })
+
+  it("opposte ma voltate: una S fra i due tratti", () => {
+    checkRoute(ports(port(300, 25, RIGHT), port(100, 125, LEFT)))
+  })
+
+  it("perpendicolari senza L possibile: esce, gira, rientra", () => {
+    checkRoute(ports(port(100, 25, RIGHT), port(50, 0, UP)))
+  })
+
+  it("il cappio: esce a destra, gira sopra e rientra dall'alto, largo quanto il suo tratto", () => {
+    const pts = checkRoute(ports(port(100, 12.5, RIGHT), port(75, 0, UP), 30))
+    expect(pts).toEqual([{ x: 100, y: 12.5 }, { x: 130, y: 12.5 }, { x: 130, y: -30 }, { x: 75, y: -30 }, { x: 75, y: 0 }])
+  })
+
+  it("verticali che si guardano: la Z verticale", () => {
+    checkRoute(ports(port(50, 50, DOWN), port(70, 300, UP)))
+  })
+
+  it("stessa direzione sulla stessa retta: la U si scosta di lato", () => {
+    checkRoute(ports(port(100, 25, RIGHT), port(300, 25, RIGHT)))
+    checkRoute(ports(port(300, 25, RIGHT), port(100, 25, RIGHT)))
+    checkRoute(ports(port(50, 0, DOWN), port(50, 200, DOWN)))
+  })
+
+  it("opposte e voltate, sulla stessa retta: la S si scosta di lato", () => {
+    checkRoute(ports(port(300, 25, RIGHT), port(100, 25, LEFT)))
+    checkRoute(ports(port(50, 200, DOWN), port(50, 0, UP)))
+  })
+
+  it("lati opposti dello stesso nodo (cappio): il percorso non attraversa in linea retta", () => {
+    checkRoute(ports(port(0, 25, LEFT), port(100, 25, RIGHT)))
+    checkRoute(ports(port(50, 0, UP), port(50, 50, DOWN)))
+  })
+
+  it("perpendicolari con i tratti sulla stessa retta: il giro non torna su se stesso", () => {
+    checkRoute(ports(port(100, 25, RIGHT), port(116, 0, UP)))
+    checkRoute(ports(port(100, 25, RIGHT), port(50, 41, UP)))
+    checkRoute(ports(port(25, 100, DOWN), port(0, 116, LEFT)))
+    checkRoute(ports(port(25, 100, DOWN), port(41, 50, LEFT)))
+  })
+
+  it("restituisce le direzioni dei porti per i marker", () => {
+    const r = routePorts(ports(port(100, 25, RIGHT), port(300, 125, UP)))
+    expect(r.sourceDir).toEqual(RIGHT)
+    expect(r.targetDir).toEqual(UP)
   })
 })

@@ -28,7 +28,7 @@ export function noteOps(doc: DevDocument): DiagramOps {
     edgesTouching: () => [],
 
     // La linea ha la chiave della sua nota: una nota ne ha al più una (spec 3a §5).
-    edgeGeometry: (key, a, b) => (diagram().model.notes[key]?.anchor ? anchorGeometry(a, b) : null),
+    edgeGeometry: (key, ports) => (diagram().model.notes[key]?.anchor ? anchorGeometry(ports) : null),
 
     addNode: (at) => ({ ...addNote(at), edit: "body" }),
 

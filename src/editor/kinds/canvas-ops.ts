@@ -1,15 +1,17 @@
 import type { DevDocument } from "@/model/document"
-import { FAMILIES, type Family } from "@/model/family"
+import { FAMILIES, inFamily, type Family } from "@/model/family"
 import type { Issue } from "@/model/issue"
 import { validateLinks } from "@/model/links/validate"
+import { AUTO_ANCHORS, anchorsOf, type Anchor, type EdgeAnchors } from "@/model/shared"
 import { moveNodes } from "../commands/view"
 import type { Recipe } from "../document-store"
-import type { EdgeGeometry } from "../edge-routing"
+import { memoOnIdentity, type EdgeGeometry } from "../edge-routing"
 import { linkId, linkKey, qualify, splitKey } from "../families"
 import type { Point, Rect } from "../geometry"
-import { connectAcross, deleteLinks, linksTouching, type ConnectResult } from "../links/commands"
+import { connectAcross, deleteLinks, linksTouching, setLinkAnchors, type ConnectResult } from "../links/commands"
 import { linkGeometry } from "../links/geometry"
 import { anchorNote, anchorsTouching, detachAnchoredTo } from "../note/anchor"
+import { anchorPort, assignPorts, autoPorts, offeredAnchors, samePorts, type EdgePorts, type Outline } from "../ports"
 import { familyOps, type EdgeEnds, type EditTarget } from "./ops"
 
 export type { ConnectResult }
@@ -34,15 +36,35 @@ export interface CanvasOps {
   refuseNode(at: Point, family: Family, variant?: string): string | null
   rectOf(key: string, at?: Point): Rect | null
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
-  edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
+  /** Tutti gli archi del canvas, con prefisso: famiglie, collegamenti, linee delle note. */
+  allEdges(): EdgeEnds[]
+  /** Il contorno di un nodo per gli agganci. */
+  outlineOf(key: string): Outline
+  /**
+   * I porti degli archi dati con i rettangoli di `rectOf` (spec agganci §4): il fascio per lato su
+   * famiglie e collegamenti insieme, `autoPorts` per le linee delle note, che restano fuori.
+   * `canvasPorts` lo chiama a riposo, l'anteprima del drag con i rettangoli spostati.
+   */
+  portsOf(edges: readonly EdgeEnds[], rectOf: (key: string) => Rect | null): Map<string, EdgePorts>
+  edgeGeometry(key: string, ports: EdgePorts): EdgeGeometry | null
+  /** Vero per un nodo che mostra gli agganci: non un frame, non una nota, non un collegamento (spec §6). */
+  hasAnchors(key: string): boolean
+  /** Il punto di un aggancio del nodo, per l'anteprima di Collega. `null` se il nodo non c'è. */
+  anchorPoint(node: string, anchor: Anchor): Point | null
+  /** Gli agganci che il nodo offre, con il loro punto: quelli che il canvas disegna. */
+  anchorPoints(node: string): { anchor: Anchor; point: Point }[]
   addNode(at: Point, family: Family, variant?: string): { key: string; recipe: Recipe; edit: EditTarget | null }
   /**
    * Una nota e un altro elemento, in qualunque verso: l'àncora della nota (`anchorNote`), anche verso
    * un pool. Dentro una famiglia: l'arco della famiglia, oppure `null` se i due nodi non si possono
    * collegare. Fra famiglie diverse: un collegamento tipizzato creato, uno già presente da
-   * selezionare, oppure un rifiuto con il suo avviso (`connectAcross`).
+   * selezionare, oppure un rifiuto con il suo avviso (`connectAcross`). `anchors` sono gli agganci
+   * del gesto, scritti nella stessa recipe (le note li ignorano, un collegamento già presente non li
+   * cambia).
    */
-  addEdge(source: string, target: string): ConnectResult | null
+  addEdge(source: string, target: string, anchors?: EdgeAnchors): ConnectResult | null
+  /** Sposta l'aggancio di un capo: `null` torna automatico. `null` se l'arco non c'è, è una linea di nota, o l'aggancio è già quello. */
+  setEdgeAnchor(edgeKey: string, end: "source" | "target", anchor: Anchor | null): Recipe | null
   /** Una recipe sola per tutta la selezione, anche mista: un passo di annulla. */
   commitDrag(keys: readonly string[], dx: number, dy: number): Recipe | null
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
@@ -85,10 +107,48 @@ export function canvasOps(doc: DevDocument): CanvasOps {
     return ops(family).frameKeys?.().includes(key) ?? false
   }
 
-  return {
-    nodeKeys: () => FAMILIES.flatMap((f) => ops(f).nodeKeys().map((k) => qualify(f, k))),
+  /** Una linea di nota: la chiave del suo arco è quella della nota (`anchorsTouching`). */
+  const isNoteLine = (qualified: string): boolean => linkId(qualified) === null && inFamily(qualified, "note")
 
-    frameKeys: () => FAMILIES.flatMap((f) => (ops(f).frameKeys?.() ?? []).map((k) => qualify(f, k))),
+  const outlineOf = (qualified: string): Outline => {
+    const { family, key } = splitKey(qualified)
+    return ops(family).outlineOf?.(key) ?? "rect"
+  }
+
+  const rectOf = (qualified: string, at?: Point): Rect | null => {
+    const { family, key } = splitKey(qualified)
+    return ops(family).rectOf(key, at)
+  }
+
+  const edgesTouching = (keys: ReadonlySet<string>): EdgeEnds[] => [
+    ...[...byFamily(keys)].flatMap(([f, ks]) =>
+      ops(f)
+        .edgesTouching(new Set(ks))
+        .map((e) => ({ ...e, key: qualify(f, e.key), source: qualify(f, e.source), target: qualify(f, e.target) })),
+    ),
+    ...linksTouching(doc.diagram.links, keys).map(([id, l]) => ({ key: linkKey(id), source: l.source, target: l.target, anchors: l.anchors })),
+    ...anchorsTouching(doc, keys),
+  ]
+
+  const nodeKeys = () => FAMILIES.flatMap((f) => ops(f).nodeKeys().map((k) => qualify(f, k)))
+  const frameKeys = () => FAMILIES.flatMap((f) => (ops(f).frameKeys?.() ?? []).map((k) => qualify(f, k)))
+  const allEdges = () => edgesTouching(new Set([...nodeKeys(), ...frameKeys()]))
+
+  /** Scrive la coppia di agganci su un arco o un collegamento; `null` per le linee delle note. */
+  const writeEdgeAnchors = (qualified: string, anchors: EdgeAnchors): Recipe | null => {
+    const id = linkId(qualified)
+    if (id !== null) return setLinkAnchors(id, anchors)
+    const { family, key } = splitKey(qualified)
+    return ops(family).setEdgeAnchors?.(key, anchors) ?? null
+  }
+
+  const withAnchors = (key: string, recipe: Recipe, anchors: EdgeAnchors): Recipe =>
+    anchors.source === null && anchors.target === null ? recipe : (combine([recipe, writeEdgeAnchors(key, anchors)]) ?? recipe)
+
+  return {
+    nodeKeys,
+
+    frameKeys,
 
     isFrame,
 
@@ -100,26 +160,44 @@ export function canvasOps(doc: DevDocument): CanvasOps {
 
     refuseNode: (at, family, variant) => ops(family).refuseNode?.(at, variant) ?? null,
 
-    rectOf: (qualified, at) => {
-      const { family, key } = splitKey(qualified)
-      return ops(family).rectOf(key, at)
+    rectOf,
+
+    edgesTouching,
+
+    allEdges,
+
+    outlineOf,
+
+    portsOf: (edges, rectAt) => {
+      const out = assignPorts(edges.filter((e) => !isNoteLine(e.key)), rectAt, outlineOf)
+      for (const e of edges) {
+        if (!isNoteLine(e.key)) continue
+        const a = rectAt(e.source)
+        const b = rectAt(e.target)
+        if (a && b) out.set(e.key, autoPorts(a, b))
+      }
+      return out
     },
 
-    edgesTouching: (keys) => [
-      ...[...byFamily(keys)].flatMap(([f, ks]) =>
-        ops(f)
-          .edgesTouching(new Set(ks))
-          .map((e) => ({ key: qualify(f, e.key), source: qualify(f, e.source), target: qualify(f, e.target) })),
-      ),
-      ...linksTouching(doc.diagram.links, keys).map(([id, l]) => ({ key: linkKey(id), source: l.source, target: l.target })),
-      ...anchorsTouching(doc, keys),
-    ],
-
-    edgeGeometry: (qualified, a, b) => {
+    edgeGeometry: (qualified, ports) => {
       const id = linkId(qualified)
-      if (id !== null) return doc.diagram.links[id] ? linkGeometry(a, b) : null
+      if (id !== null) return doc.diagram.links[id] ? linkGeometry(ports) : null
       const { family, key } = splitKey(qualified)
-      return ops(family).edgeGeometry(key, a, b)
+      return ops(family).edgeGeometry(key, ports)
+    },
+
+    hasAnchors: (qualified) => linkId(qualified) === null && !inFamily(qualified, "note") && !isFrame(qualified) && rectOf(qualified) !== null,
+
+    anchorPoint: (node, anchor) => {
+      const r = rectOf(node)
+      return r ? anchorPort(r, outlineOf(node), anchor).point : null
+    },
+
+    anchorPoints: (node) => {
+      const r = rectOf(node)
+      if (!r) return []
+      const outline = outlineOf(node)
+      return offeredAnchors(outline).map((anchor) => ({ anchor, point: anchorPort(r, outline, anchor).point }))
     },
 
     addNode: (at, family, variant) => {
@@ -127,7 +205,7 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       return { ...created, key: qualify(family, created.key) }
     },
 
-    addEdge: (source, target) => {
+    addEdge: (source, target, anchors = AUTO_ANCHORS) => {
       // Una nota si ancora a qualunque elemento, pool compresi (spec 3a §5): si riconosce prima
       // della guardia dei frame, che per ogni altro collegamento resta chiusa (spec 2b §2).
       if (splitKey(source).family === "note" || splitKey(target).family === "note") return anchorNote(doc, source, target)
@@ -135,9 +213,20 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       if (isFrame(source) || isFrame(target)) return null
       const a = splitKey(source)
       const b = splitKey(target)
-      if (a.family !== b.family) return connectAcross(doc, source, target)
+      if (a.family !== b.family) return connectAcross(doc, source, target, anchors)
       const created = ops(a.family).addEdge(a.key, b.key)
-      return created ? { type: "created" as const, key: qualify(a.family, created.key), recipe: created.recipe } : null
+      if (!created) return null
+      const key = qualify(a.family, created.key)
+      return { type: "created" as const, key, recipe: withAnchors(key, created.recipe, anchors) }
+    },
+
+    setEdgeAnchor: (edgeKey, end, anchor) => {
+      if (isNoteLine(edgeKey)) return null
+      const edge = allEdges().find((e) => e.key === edgeKey)
+      if (!edge) return null
+      const current = anchorsOf(edge)
+      if (current[end] === anchor) return null
+      return writeEdgeAnchors(edgeKey, { ...current, [end]: anchor })
     },
 
     commitDrag: (keys, dx, dy) =>
@@ -210,3 +299,25 @@ export function nodeRects(doc: DevDocument): Rect[] {
   const ops = canvasOps(doc)
   return [...ops.nodeKeys(), ...ops.frameKeys()].flatMap((key) => ops.rectOf(key) ?? [])
 }
+
+/**
+ * I porti di tutti gli archi del canvas a riposo (spec agganci §7): la sola fonte per il canvas,
+ * l'export e l'editor d'etichetta. Memo sul documento, che Immer sostituisce a ogni cambiamento.
+ *
+ * **Riusa l'oggetto dei porti di un arco quando i numeri non cambiano**: ogni arco sul canvas si
+ * sottoscrive ai propri porti con un `useStore` per identità, e senza questo ogni battitura in un
+ * pannello ridisegnerebbe tutti gli archi.
+ */
+export const canvasPorts: (doc: DevDocument) => ReadonlyMap<string, EdgePorts> = (() => {
+  let previous = new Map<string, EdgePorts>()
+  return memoOnIdentity((doc: DevDocument) => {
+    const ops = canvasOps(doc)
+    const next = ops.portsOf(ops.allEdges(), (key) => ops.rectOf(key))
+    for (const [key, ports] of next) {
+      const old = previous.get(key)
+      if (old && samePorts(old, ports)) next.set(key, old)
+    }
+    previous = next
+    return next
+  })
+})()

@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema } from "../shared"
+import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
 
 export const VisibilitySchema = z.enum(["public", "private", "protected", "package"])
 export type Visibility = z.infer<typeof VisibilitySchema>
@@ -75,6 +75,8 @@ export const ClassRelationSchema = z.object({
   source: ClassEndSchema,
   /** Il padre: superclasse, interfaccia, tutto, dipendenza. */
   target: ClassEndSchema,
+  /** Dove l'arco tocca i suoi nodi (spec agganci §3). Assente: due capi automatici. */
+  anchors: EdgeAnchorsSchema.optional(),
 })
 export type ClassRelation = z.infer<typeof ClassRelationSchema>
 

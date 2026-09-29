@@ -3,9 +3,10 @@ import { validateClass } from "@/model/class/validate"
 import type { DevDocument } from "@/model/document"
 import type { Issue } from "@/model/issue"
 import type { LayoutGraph } from "@/model/layout"
+import { writeAnchors } from "@/model/shared"
 import { classDiagram } from "../class-access"
-import { addClass, addRelation, classLayoutGraph, deleteClassItems, duplicateClasses } from "../class/commands"
-import { classEdgeGeometry, classEdgeOffsets, classRect } from "../class/geometry"
+import { addClass, addRelation, classLayoutGraph, deleteClassItems, duplicateClasses, updateRelation } from "../class/commands"
+import { classEdgeGeometry, classRect } from "../class/geometry"
 import type { EdgeGeometry } from "../edge-routing"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
@@ -32,13 +33,14 @@ export function classOps(doc: DevDocument): DiagramOps {
     edgesTouching: (keys): EdgeEnds[] =>
       Object.entries(diagram().model.relations)
         .filter(([, rel]) => keys.has(rel.source.class) || keys.has(rel.target.class))
-        .map(([key, rel]) => ({ key, source: rel.source.class, target: rel.target.class })),
+        .map(([key, rel]) => ({ key, source: rel.source.class, target: rel.target.class, anchors: rel.anchors })),
 
-    edgeGeometry: (key, a, b): EdgeGeometry | null => {
-      const model = diagram().model
-      const rel = model.relations[key]
-      return rel ? classEdgeGeometry(a, b, rel, classEdgeOffsets(model.relations).get(key) ?? 0) : null
+    edgeGeometry: (key, ports): EdgeGeometry | null => {
+      const rel = diagram().model.relations[key]
+      return rel ? classEdgeGeometry(ports, rel) : null
     },
+
+    setEdgeAnchors: (key, anchors) => updateRelation(key, (r) => writeAnchors(r, anchors)),
 
     addNode: (at, variant) => ({ ...addClass(diagram().model.classes, at, StereotypeSchema.catch("class").parse(variant)), edit: "name" }),
 

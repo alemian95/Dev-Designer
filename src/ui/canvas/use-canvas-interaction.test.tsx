@@ -8,7 +8,7 @@ import { qualify } from "@/editor/families"
 import { withPool } from "@/editor/flow/pool-fixture"
 import { selId, sessionStore } from "@/editor/session-store"
 import { IDENTITY } from "@/editor/viewport"
-import { useCanvasInteraction } from "./use-canvas-interaction"
+import { hitTest, useCanvasInteraction } from "./use-canvas-interaction"
 
 /**
  * Il cablaggio degli eventi, cioè quel che è rimasto nell'hook dopo che la macchina a stati se n'è
@@ -251,6 +251,21 @@ describe("il resto del cablaggio", () => {
     expect(sessionStore.getState().editing).toEqual({ key: qualify("er", "a"), target: "name" })
   })
 
+  it("il doppio click su un aggancio vale come sul nodo (flowchart: apre il testo)", () => {
+    documentStore.getState().load(createDocument("f", "f"))
+    documentStore.getState().dispatch((draft) => {
+      draft.diagram.flow.model.nodes["a"] = { label: "", shape: "process", lane: null }
+      draft.diagram.flow.view.nodes["a"] = { x: 0, y: 0, collapsed: false }
+    })
+    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle")
+    dot.setAttribute("data-anchor", "e2")
+    dot.setAttribute("data-anchor-node", qualify("flow", "a"))
+    svg.append(dot)
+    sotto = dot
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
+    expect(sessionStore.getState().editing).toEqual({ key: qualify("flow", "a"), target: "body" })
+  })
+
   it("il doppio click fuori dall'header di un'entità non apre niente", () => {
     // Nell'ER il corpo non ha un formato di testo: il doppio click rinomina solo sull'header.
     sotto = nodo
@@ -354,5 +369,28 @@ describe("il resto del cablaggio", () => {
     expect(viewport()).toEqual(IDENTITY)
     // `afterEach` smonterebbe di nuovo: rimontare tiene la radice valida.
     monta()
+  })
+})
+
+describe("hitTest degli agganci", () => {
+  const SVG = "http://www.w3.org/2000/svg"
+
+  it("un aggancio vince sul nodo che lo contiene", () => {
+    const g = document.createElementNS(SVG, "g")
+    g.setAttribute("data-anchor", "n1")
+    g.setAttribute("data-anchor-node", "flow/a")
+    const dot = document.createElementNS(SVG, "circle")
+    g.append(dot)
+    nodo.append(g)
+    expect(hitTest(dot)).toEqual({ kind: "anchor", node: "flow/a", anchor: "n1" })
+  })
+
+  it("la maniglia di un capo porta arco, capo e nodo", () => {
+    const g = document.createElementNS(SVG, "g")
+    g.setAttribute("data-edge-end", "source")
+    g.setAttribute("data-edge-end-edge", "flow/e")
+    g.setAttribute("data-edge-end-node", "flow/a")
+    svg.append(g)
+    expect(hitTest(g)).toEqual({ kind: "edge-end", edge: "flow/e", end: "source", node: "flow/a" })
   })
 })

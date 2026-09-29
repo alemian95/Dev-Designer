@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { ShapeDiagram } from "@/model/shape/schema"
-import { arrowGeometry, arrowOffsets, resizedShape, shapeDrawOrder, shapeSize, shapeTextSize } from "./geometry"
+import { autoPorts } from "../ports"
+import { arrowGeometry, resizedShape, shapeDrawOrder, shapeOutline, shapeSize, shapeTextSize } from "./geometry"
 
 const at = (w: number | null = null, h: number | null = null) => ({ x: 0, y: 0, collapsed: false, w, h })
 
@@ -42,21 +43,19 @@ describe("geometria delle frecce", () => {
   const end = (d: string) => d.split(" L").at(-1)!
 
   it("la punta segue head: nessuna, solo alla fine, a entrambi i capi", () => {
-    expect(arrowGeometry(a, b, { head: "none" })).toMatchObject({ sourceMarker: "", targetMarker: "" })
-    const fine = arrowGeometry(a, b, { head: "end" })
+    expect(arrowGeometry(autoPorts(a, b), { head: "none" })).toMatchObject({ sourceMarker: "", targetMarker: "" })
+    const fine = arrowGeometry(autoPorts(a, b), { head: "end" })
     expect(fine.sourceMarker).toBe("")
     expect(fine.targetMarker.startsWith(`M${end(fine.d)}`)).toBe(true)
-    const entrambe = arrowGeometry(a, b, { head: "both" })
+    const entrambe = arrowGeometry(autoPorts(a, b), { head: "both" })
     expect(entrambe.sourceMarker.startsWith(`M${start(entrambe.d)}`)).toBe(true)
     expect(entrambe.targetMarker).not.toBe("")
   })
 
-  it("due frecce fra le stesse forme hanno scarti diversi", () => {
-    const offsets = arrowOffsets({
-      f1: { source: "a", target: "b", head: "end", dashed: false },
-      f2: { source: "a", target: "b", head: "end", dashed: false },
-    })
-    expect(offsets.get("f1")).not.toBe(offsets.get("f2"))
+  it("il contorno per gli agganci: l'ellisse è un'ellisse, il resto un rettangolo", () => {
+    expect(shapeOutline("ellipse")).toBe("ellipse")
+    expect(shapeOutline("rect")).toBe("rect")
+    expect(shapeOutline("text")).toBe("rect")
   })
 })
 

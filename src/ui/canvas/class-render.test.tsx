@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { classSize } from "@/editor/class/geometry"
 import { HEADER_H } from "@/editor/geometry"
+import { autoPorts } from "@/editor/ports"
 import type { ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
 import { ClassNodeView } from "./ClassNode"
 import { ClassEdgeView } from "./ClassEdge"
@@ -112,20 +113,20 @@ describe("ClassNodeView", () => {
 })
 
 describe("ClassEdgeView", () => {
-  const rects = { source: { x: 0, y: 200, w: 160, h: 40 }, target: { x: 0, y: 0, w: 160, h: 40 } }
+  const ports = autoPorts({ x: 0, y: 200, w: 160, h: 40 }, { x: 0, y: 0, w: 160, h: 40 })
 
   it("realizzazione e dipendenza sono tratteggiate, le altre no", () => {
     for (const kind of ["realization", "dependency"] as const) {
-      expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione(kind)} {...rects} selected={false} offset={0} />)).toContain("stroke-dasharray")
+      expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione(kind)} ports={ports} selected={false} />)).toContain("stroke-dasharray")
     }
-    expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("generalization")} {...rects} selected={false} offset={0} />)).not.toContain("stroke-dasharray")
+    expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("generalization")} ports={ports} selected={false} />)).not.toContain("stroke-dasharray")
   })
 
   it("la composizione ha la punta piena, l'aggregazione vuota", () => {
     // Il fill cade sul marker del target: è lì che UML distingue i due rombi, e
     // se `isFilled` fosse cablato al contrario questi due sarebbero scambiati.
     const punta = (kind: RelationKind) => {
-      const html = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione(kind)} {...rects} selected={false} offset={0} />)
+      const html = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione(kind)} ports={ports} selected={false} />)
       return html.slice(html.indexOf("data-edge-target"))
     }
     expect(punta("composition")).toContain('fill="var(--muted-foreground)"')
@@ -135,17 +136,17 @@ describe("ClassEdgeView", () => {
   })
 
   it("l'associazione navigabile disegna la freccia sul target, quella nuda no", () => {
-    const nuda = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} {...rects} selected={false} offset={0} />)
+    const nuda = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} ports={ports} selected={false} />)
     expect(nuda).toContain('data-edge-target="true" d=""')
-    const navigabile = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={{ ...relazione("association"), navigable: true }} {...rects} selected={false} offset={0} />)
+    const navigabile = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={{ ...relazione("association"), navigable: true }} ports={ports} selected={false} />)
     expect(navigabile).not.toContain('data-edge-target="true" d=""')
   })
 
   it("le molteplicità compaiono solo quando non sono vuote", () => {
-    expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} {...rects} selected={false} offset={0} />))
+    expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} ports={ports} selected={false} />))
       .not.toContain("data-edge-source-label")
     const conMolt = relazione("association", { sourceMult: "0..*", targetMult: "1" })
-    const html = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={conMolt} {...rects} selected={false} offset={0} />)
+    const html = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={conMolt} ports={ports} selected={false} />)
     expect(html).toContain("data-edge-source-label")
     expect(html).toContain(">0..*<")
   })
@@ -154,7 +155,7 @@ describe("ClassEdgeView", () => {
     // Una sola etichetta per capo e non due: la molteplicità e il ruolo condividono il `<text>`,
     // così la geometria non guadagna due punti né il drag due `querySelector` per arco.
     const html = renderToStaticMarkup(
-      <ClassEdgeView edgeKey="r" relation={relazione("association", { sourceMult: "0..*", sourceRole: "ordini" })} {...rects} selected={false} offset={0} />,
+      <ClassEdgeView edgeKey="r" relation={relazione("association", { sourceMult: "0..*", sourceRole: "ordini" })} ports={ports} selected={false} />,
     )
     expect(html).toContain(">0..* ordini<")
   })
@@ -163,7 +164,7 @@ describe("ClassEdgeView", () => {
     // È il caso che prima si perdeva: il ruolo si scriveva nel pannello, finiva nel file salvato
     // e non compariva da nessuna parte.
     const html = renderToStaticMarkup(
-      <ClassEdgeView edgeKey="r" relation={relazione("association", { targetRole: "titolare" })} {...rects} selected={false} offset={0} />,
+      <ClassEdgeView edgeKey="r" relation={relazione("association", { targetRole: "titolare" })} ports={ports} selected={false} />,
     )
     expect(html).toContain("data-edge-target-label")
     expect(html).toContain(">titolare<")
@@ -174,9 +175,9 @@ describe("ClassEdgeView", () => {
   it("l'etichetta del nome compare solo se il nome c'è", () => {
     // Come RelationshipEdgeView: il testo sta dentro un `&&`, quindi senza nome
     // l'elemento non esiste — non è un elemento vuoto da nascondere.
-    expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} {...rects} selected={false} offset={0} />))
+    expect(renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association")} ports={ports} selected={false} />))
       .not.toContain("data-edge-label")
-    const con = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association", { name: "possiede" })} {...rects} selected={false} offset={0} />)
+    const con = renderToStaticMarkup(<ClassEdgeView edgeKey="r" relation={relazione("association", { name: "possiede" })} ports={ports} selected={false} />)
     expect(con).toContain("data-edge-label")
     expect(con).toContain(">possiede<")
   })

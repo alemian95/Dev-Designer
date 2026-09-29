@@ -37,6 +37,18 @@ export interface SessionState {
    */
   editing: { key: string; target: EditTarget | "label" } | null
   canvasSize: Size
+  /**
+   * Il nodo che mostra i suoi punti di aggancio (spec agganci §6), con prefisso, o `null`. Uno solo
+   * alla volta: quello sotto il puntatore, il bersaglio di Collega, o il nodo del capo che si sposta.
+   */
+  anchorsFor: string | null
+  setAnchorsFor: (key: string | null) => void
+  /**
+   * Un drag di nodi è in corso: l'anteprima sposta il DOM ma non il documento, quindi agganci e
+   * maniglie dei capi (calcolati dal documento) resterebbero fermi al posto vecchio. Il layer si nasconde.
+   */
+  dragging: boolean
+  setDragging: (dragging: boolean) => void
   setViewport: (viewport: Viewport) => void
   setSelection: (ids: Iterable<string>) => void
   setTool: (tool: Tool, family?: Family | null, variant?: string | null) => void
@@ -52,6 +64,10 @@ export const sessionStore = createStore<SessionState>()((set) => ({
   variant: null,
   editing: null,
   canvasSize: { w: 0, h: 0 },
+  anchorsFor: null,
+  setAnchorsFor: (anchorsFor) => set({ anchorsFor }),
+  dragging: false,
+  setDragging: (dragging) => set({ dragging }),
   setViewport: (viewport) => set({ viewport }),
   setSelection: (ids) => set({ selection: new Set(ids) }),
   setTool: (tool, family = null, variant = null) => set({ tool, family, variant }),

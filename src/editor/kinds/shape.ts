@@ -1,8 +1,8 @@
 import type { DevDocument } from "@/model/document"
 import { ShapeKindSchema } from "@/model/shape/schema"
 import { validateShapes } from "@/model/shape/validate"
-import { addArrow, addShape, deleteShapeItems, duplicateShapes, resizeShape, shapeLayoutGraph } from "../shape/commands"
-import { arrowGeometry, arrowOffsets, resizedShape, shapeDrawOrder, shapeRect } from "../shape/geometry"
+import { addArrow, addShape, deleteShapeItems, duplicateShapes, resizeShape, setArrowAnchors, shapeLayoutGraph } from "../shape/commands"
+import { arrowGeometry, resizedShape, shapeDrawOrder, shapeOutline, shapeRect } from "../shape/geometry"
 import { shapeDiagram } from "../shape-access"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
@@ -26,12 +26,18 @@ export function shapeOps(doc: DevDocument): DiagramOps {
     edgesTouching: (keys): EdgeEnds[] =>
       Object.entries(diagram().model.arrows)
         .filter(([, arrow]) => keys.has(arrow.source) || keys.has(arrow.target))
-        .map(([key, arrow]) => ({ key, source: arrow.source, target: arrow.target })),
+        .map(([key, arrow]) => ({ key, source: arrow.source, target: arrow.target, anchors: arrow.anchors })),
 
-    edgeGeometry: (key, a, b) => {
-      const model = diagram().model
-      const arrow = model.arrows[key]
-      return arrow ? arrowGeometry(a, b, arrow, arrowOffsets(model.arrows).get(key) ?? 0) : null
+    edgeGeometry: (key, ports) => {
+      const arrow = diagram().model.arrows[key]
+      return arrow ? arrowGeometry(ports, arrow) : null
+    },
+
+    setEdgeAnchors: setArrowAnchors,
+
+    outlineOf: (key) => {
+      const s = diagram().model.shapes[key]
+      return s ? shapeOutline(s.kind) : "rect"
     },
 
     addNode: (at, variant) => ({ ...addShape(at, ShapeKindSchema.safeParse(variant).data ?? "rect"), edit: "body" }),

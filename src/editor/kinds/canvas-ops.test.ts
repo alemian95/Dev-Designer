@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { createDocument } from "@/model/document"
-import { addEntity, addRelationship, removeAttribute } from "../commands/er"
+import { anchorsOf } from "@/model/shared"
+import { addEntity, addRelationship, removeAttribute, renameEntity } from "../commands/er"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
-import { qualify, splitKey } from "../families"
+import { linkId, qualify, splitKey } from "../families"
 import { flowDiagram } from "../flow-access"
 import { withPool } from "../flow/pool-fixture"
 import { noteDiagram } from "../note-access"
 import { shapeDiagram } from "../shape-access"
-import { canvasOps, familyHasContent } from "./canvas-ops"
+import { autoPorts } from "../ports"
+import { canvasOps, canvasPorts, familyHasContent } from "./canvas-ops"
 
 const state = () => documentStore.getState()
 
@@ -43,7 +45,7 @@ describe("canvasOps (una famiglia)", () => {
     const ra = ops.rectOf(`er/${a}`)!
     const rb = ops.rectOf(`er/${b}`)!
     expect(ra.x).toBe(0)
-    expect(ops.edgeGeometry(`er/${rel}`, ra, rb)).not.toBeNull()
+    expect(ops.edgeGeometry(`er/${rel}`, autoPorts(ra, rb))).not.toBeNull()
   })
 
   it("addNode crea nella famiglia data e restituisce la chiave con prefisso", () => {
@@ -250,8 +252,8 @@ describe("canvasOps (collegamenti)", () => {
   it("edgeGeometry disegna un collegamento, e un id che non c'è dà null", () => {
     const { entity, cls, link } = collegati()
     const ops = canvasOps(state().doc)
-    expect(ops.edgeGeometry(link, ops.rectOf(cls)!, ops.rectOf(entity)!)).not.toBeNull()
-    expect(ops.edgeGeometry("link/fantasma", ops.rectOf(cls)!, ops.rectOf(entity)!)).toBeNull()
+    expect(ops.edgeGeometry(link, autoPorts(ops.rectOf(cls)!, ops.rectOf(entity)!))).not.toBeNull()
+    expect(ops.edgeGeometry("link/fantasma", autoPorts(ops.rectOf(cls)!, ops.rectOf(entity)!))).toBeNull()
   })
 
   it("deleteItems di un collegamento elimina solo lui", () => {
@@ -348,7 +350,7 @@ describe("canvasOps e le note (spec 3a §5)", () => {
     const line = { key: note, source: note, target: entity }
     expect(ops.edgesTouching(new Set([entity]))).toContainEqual(line)
     expect(ops.edgesTouching(new Set([note]))).toContainEqual(line)
-    expect(ops.edgeGeometry(note, ops.rectOf(note)!, ops.rectOf(entity)!)?.targetMarker).toBe("")
+    expect(ops.edgeGeometry(note, autoPorts(ops.rectOf(note)!, ops.rectOf(entity)!))?.targetMarker).toBe("")
   })
 
   it("Canc sulla linea stacca la nota, che resta", () => {
@@ -488,5 +490,90 @@ describe("canvasOps e le forme (spec 3b)", () => {
     expect(familyHasContent(state().doc, "shape")).toBe(false)
     const issues = canvasOps(state().doc).validate()
     expect(issues.some((i) => i.code === "shape-dangling-arrow")).toBe(true)
+  })
+})
+
+describe("gli agganci (spec agganci §3)", () => {
+  it("setEdgeAnchor scrive un capo, in una voce di annulla, e l'annulla torna automatico", () => {
+    const { rel } = erConDueEntita()
+    const recipe = canvasOps(state().doc).setEdgeAnchor(`er/${rel}`, "target", "n1")
+    expect(recipe).not.toBeNull()
+    state().dispatch(recipe!)
+    expect(anchorsOf(erDiagram(state().doc).model.relationships[rel]!)).toEqual({ source: null, target: "n1" })
+    state().undo()
+    expect(erDiagram(state().doc).model.relationships[rel]!.anchors).toBeUndefined()
+  })
+
+  it("setEdgeAnchor con lo stesso aggancio o su un arco che non c'è non produce niente", () => {
+    const { rel } = erConDueEntita()
+    expect(canvasOps(state().doc).setEdgeAnchor(`er/${rel}`, "source", null)).toBeNull()
+    expect(canvasOps(state().doc).setEdgeAnchor("er/manca", "source", "n1")).toBeNull()
+  })
+
+  it("addEdge con agganci li scrive sull'arco nuovo, nella stessa voce", () => {
+    const { a, b } = erConDueEntita()
+    const result = canvasOps(state().doc).addEdge(`er/${a}`, `er/${b}`, { source: "e2", target: "w2" })
+    if (result?.type !== "created") throw new Error("atteso un arco nuovo")
+    state().dispatch(result.recipe)
+    expect(erDiagram(state().doc).model.relationships[splitKey(result.key).key]!.anchors).toEqual({ source: "e2", target: "w2" })
+    state().undo()
+    expect(erDiagram(state().doc).model.relationships[splitKey(result.key).key]).toBeUndefined()
+  })
+
+  it("la rinomina di un'entità lascia gli agganci sull'arco", () => {
+    const { a, rel } = erConDueEntita()
+    state().dispatch(canvasOps(state().doc).setEdgeAnchor(`er/${rel}`, "source", "s1")!)
+    state().dispatch(renameEntity(a, "rinominata")!)
+    const moved = Object.values(erDiagram(state().doc).model.relationships)
+    expect(moved).toHaveLength(1)
+    expect(moved[0]!.anchors).toEqual({ source: "s1", target: null })
+  })
+
+  it("canvasPorts riusa l'oggetto dei porti di un arco che non si è mosso", () => {
+    const { rel } = erConDueEntita()
+    const before = canvasPorts(state().doc).get(`er/${rel}`)
+    expect(before).toBeDefined()
+    const c = addEntity(erDiagram(state().doc).model.entities, { x: 2000, y: 2000 })
+    state().dispatch(c.recipe)
+    expect(canvasPorts(state().doc).get(`er/${rel}`)).toBe(before)
+  })
+
+  it("le linee delle note hanno i porti di autoPorts, fuori dal fascio", () => {
+    const { a } = erConDueEntita()
+    const note = canvasOps(state().doc).addNode({ x: 0, y: 300 }, "note")
+    state().dispatch(note.recipe)
+    const anchored = canvasOps(state().doc).addEdge(note.key, `er/${a}`)
+    if (anchored?.type !== "created") throw new Error("attesa una nota ancorata")
+    state().dispatch(anchored.recipe)
+    const ops = canvasOps(state().doc)
+    expect(canvasPorts(state().doc).get(note.key)).toEqual(autoPorts(ops.rectOf(note.key)!, ops.rectOf(`er/${a}`)!))
+  })
+
+  /** Un'entità e un nodo di flusso, con prefisso: fra loro nasce un `accesses` nel verso flusso → entità. */
+  function entitaENodo() {
+    const entity = canvasOps(state().doc).addNode({ x: 0, y: 0 }, "er")
+    state().dispatch(entity.recipe)
+    const node = canvasOps(state().doc).addNode({ x: 400, y: 0 }, "flow", "process")
+    state().dispatch(node.recipe)
+    return { entity: entity.key, node: node.key }
+  }
+
+  it("un collegamento creato al contrario scambia anche gli agganci", () => {
+    const { entity, node } = entitaENodo()
+    const r = canvasOps(state().doc).addEdge(entity, node, { source: "n1", target: "s1" })
+    if (r?.type !== "created") throw new Error("atteso un collegamento nuovo")
+    state().dispatch(r.recipe)
+    const link = state().doc.diagram.links[linkId(r.key)!]!
+    expect(link.source).toBe(node)
+    expect(link.anchors).toEqual({ source: "s1", target: "n1" })
+  })
+
+  it("Collega verso un collegamento già presente lo seleziona e non gli cambia gli agganci", () => {
+    const { entity, node } = entitaENodo()
+    const first = canvasOps(state().doc).addEdge(node, entity)
+    if (first?.type !== "created") throw new Error("atteso un collegamento nuovo")
+    state().dispatch(first.recipe)
+    expect(canvasOps(state().doc).addEdge(node, entity, { source: "n1", target: "s1" })).toEqual({ type: "existing", key: first.key })
+    expect(state().doc.diagram.links[linkId(first.key)!]!.anchors).toBeUndefined()
   })
 })

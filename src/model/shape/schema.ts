@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema } from "../shared"
+import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
 
 /** Le tre forme (spec 3b §3). `kind` non cambia dopo la creazione. */
 export const ShapeKindSchema = z.enum(["rect", "ellipse", "text"])
@@ -20,7 +20,14 @@ export type ArrowHead = z.infer<typeof ArrowHeadSchema>
  * (`shape-dangling-arrow`), non un file illeggibile.
  */
 export const ArrowSchema = z
-  .object({ source: Identifier, target: Identifier, head: ArrowHeadSchema, dashed: z.boolean() })
+  .object({
+    source: Identifier,
+    target: Identifier,
+    head: ArrowHeadSchema,
+    dashed: z.boolean(),
+    /** Dove l'arco tocca i suoi nodi (spec agganci §3). Assente: due capi automatici. */
+    anchors: EdgeAnchorsSchema.optional(),
+  })
   .refine((a) => a.source !== a.target, { message: "una freccia non collega una forma a sé stessa" })
 export type Arrow = z.infer<typeof ArrowSchema>
 

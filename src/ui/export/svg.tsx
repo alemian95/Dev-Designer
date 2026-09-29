@@ -1,12 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { classDiagram } from "@/editor/class-access"
-import { edgeOffsets } from "@/editor/edge-routing"
 import { erDiagram } from "@/editor/er-access"
-import { qualify } from "@/editor/families"
+import { linkKey, qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { poolIds, poolRect } from "@/editor/flow/geometry"
 import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
-import { canvasOps } from "@/editor/kinds/canvas-ops"
+import { canvasPorts } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
 import { noteDiagram } from "@/editor/note-access"
 import { shapeDiagram } from "@/editor/shape-access"
@@ -130,7 +129,6 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
       keys,
       rects,
       edges,
-      offsets: edgeOffsets(edges),
       view,
       nodeModels,
       edgeModels: edgeModelsOf(doc, family),
@@ -150,8 +148,8 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
   const w = bounds.w + 2 * EXPORT_PADDING
   const h = bounds.h + 2 * EXPORT_PADDING
 
-  // Gli estremi dei collegamenti sono chiavi con prefisso, di famiglie diverse: li risolve `CanvasOps`.
-  const allOps = canvasOps(doc)
+  // I porti di tutti gli archi, dalla stessa fonte del canvas (spec agganci §7).
+  const ports = canvasPorts(doc)
 
   // Le famiglie `backdrop` sotto tutto, anche sotto pool e archi, come nel canvas (spec 3b §3).
   const nodesOf = (list: typeof sections) =>
@@ -177,44 +175,30 @@ export function buildSvg(doc: DevDocument, { vars, fontFace }: BuildSvgOptions):
       <g data-layer="edges">
         {sections.flatMap((s) =>
           s.edges.map((edge) => {
-            const source = s.rects.get(edge.source)
-            const target = s.rects.get(edge.target)
             const relation = s.edgeModels[edge.key]
-            // `edgeGeometry` verifica che l'arco esista davvero nel modello (torna null altrimenti,
-            // stessa guardia di `relation` qui sotto): la vista ricalcola comunque la propria
-            // geometria dalle prop, come già fa nel canvas.
-            if (!source || !target || !relation || !s.ops.edgeGeometry(edge.key, source, target)) return null
-            return (
-              <s.view.EdgeView
-                key={qualify(s.family, edge.key)}
-                edgeKey={edge.key}
-                relation={relation}
-                source={source}
-                target={target}
-                selected={false}
-                offset={s.offsets.get(edge.key) ?? 0}
-              />
-            )
+            const p = ports.get(qualify(s.family, edge.key))
+            // I due estremi devono essere fra i nodi esportati (un testo vuoto non lo è, spec 3b §8), e
+            // `edgeGeometry` verifica che l'arco esista davvero nel modello.
+            if (!s.rects.has(edge.source) || !s.rects.has(edge.target) || !relation || !p || !s.ops.edgeGeometry(edge.key, p)) return null
+            return <s.view.EdgeView key={qualify(s.family, edge.key)} edgeKey={edge.key} relation={relation} ports={p} selected={false} />
           }),
         )}
       </g>
       <g data-layer="anchors">
         {Object.entries(noteDiagram(doc).model.notes).map(([key, note]) => {
           if (note.anchor === null) return null
-          const source = allOps.rectOf(qualify("note", key))
-          const target = allOps.rectOf(note.anchor)
+          const p = ports.get(qualify("note", key))
           // Un'àncora pendente non si disegna, come sul canvas.
-          if (!source || !target) return null
-          return <AnchorEdgeView key={key} noteKey={key} source={source} target={target} selected={false} />
+          if (!p) return null
+          return <AnchorEdgeView key={key} noteKey={key} ports={p} selected={false} />
         })}
       </g>
       <g data-layer="links">
         {Object.entries(doc.diagram.links).map(([id, link]) => {
-          const source = allOps.rectOf(link.source)
-          const target = allOps.rectOf(link.target)
+          const p = ports.get(linkKey(id))
           // Un collegamento pendente non si disegna, come sul canvas.
-          if (!source || !target) return null
-          return <LinkEdgeView key={id} id={id} link={link} source={source} target={target} selected={false} />
+          if (!p) return null
+          return <LinkEdgeView key={id} id={id} link={link} ports={p} selected={false} />
         })}
       </g>
       <g data-layer="nodes">{nodesOf(sections.filter((s) => !s.view.backdrop))}</g>

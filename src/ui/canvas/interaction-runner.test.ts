@@ -158,6 +158,50 @@ describe("l'anteprima del drag scrive solo ciò che si vede", () => {
   })
 })
 
+describe("l'anteprima del drag riscrive i vicini diretti (spec agganci §8)", () => {
+  const CHIAVI_V = ["a", "b", "c", "d", "e"] as const
+  const ARCHI_V = ["ab", "cb", "de"] as const
+
+  afterEach(() => {
+    for (const k of ARCHI_V) registerEdge(qualify("er", k), null)
+    sessionStore.getState().setSelection([])
+  })
+
+  it("un arco che non tocca il nodo mosso ma condivide un nodo con un suo arco si riscrive, uno fra estranei no", () => {
+    // Tutto in vista: il filtro dell'inquadratura non c'entra. `a` si muove; `ab` lo tocca; `cb`
+    // tocca solo `b`, il vicino di `a`, e il fascio sul lato di `b` cambia con `ab`; `de` è estraneo.
+    const doc = createDocument("t", "t")
+    const m = doc.diagram.er.model
+    const arco = (source: string, target: string) => ({
+      source: { entity: source, attributes: [], cardinality: "many" as const },
+      target: { entity: target, attributes: [], cardinality: "one" as const },
+      identifying: false,
+    })
+    for (const [key, x, y] of [["a", 20, 20], ["b", 300, 20], ["c", 300, 300], ["d", 20, 300], ["e", 20, 450]] as const) {
+      m.entities[key] = entita(key)
+      doc.diagram.er.view.nodes[key] = { x, y, collapsed: false }
+    }
+    m.relationships["ab"] = arco("a", "b")
+    m.relationships["cb"] = arco("c", "b")
+    m.relationships["de"] = arco("d", "e")
+    documentStore.getState().load(doc)
+    sessionStore.getState().setSelection([selId("node", qualify("er", "a"))])
+    for (const k of CHIAVI_V) registerNode(qualify("er", k), fintoNodo([], qualify("er", k)))
+    for (const k of ARCHI_V) registerEdge(qualify("er", k), fintoArco(tocchi, qualify("er", k)))
+
+    const partenza = { x: 20 + W / 2, y: 20 + H / 2 }
+    const runner = createInteractionRunner()
+    runner.step(giu({ world: partenza, hit: { kind: "node", key: qualify("er", "a") } }))
+    runner.step(muovi({ world: { x: partenza.x, y: partenza.y + 40 } }))
+
+    expect(tocchi.get(qualify("er", "ab")) ?? 0).toBeGreaterThan(0)
+    expect(tocchi.get(qualify("er", "cb")) ?? 0).toBeGreaterThan(0)
+    expect(tocchi.get(qualify("er", "de")) ?? 0).toBe(0)
+    runner.step({ type: "cancel" })
+    for (const k of CHIAVI_V) registerNode(qualify("er", k), null)
+  })
+})
+
 describe("un comando al rilascio", () => {
   it("nessun comando durante il drag, esattamente uno al rilascio", () => {
     const prima = documentStore.getState().past.length
@@ -409,5 +453,75 @@ describe("Collega fra famiglie", () => {
     const [id] = Object.keys(documentStore.getState().doc.diagram.links)
     expect(documentStore.getState().past.length).toBe(past)
     expect([...sessionStore.getState().selection]).toEqual([selId("edge", `link/${id}`)])
+  })
+})
+
+describe("gli agganci nel runner (spec agganci §6)", () => {
+  /** Due nodi di flusso creati coi comandi veri, con prefisso; strumento Seleziona. */
+  function dueNodi() {
+    documentStore.getState().load(createDocument("t", "t"))
+    sessionStore.getState().setTool("select")
+    const a = addFlowNode({ x: 0, y: 0 }, "process", null)
+    documentStore.getState().dispatch(a.recipe)
+    const b = addFlowNode({ x: 400, y: 0 }, "process", null)
+    documentStore.getState().dispatch(b.recipe)
+    return { a: qualify("flow", a.key), b: qualify("flow", b.key) }
+  }
+  const edges = () => flowDiagram(documentStore.getState().doc).model.edges
+
+  it("Collega da un aggancio a un aggancio crea l'arco con i due agganci", () => {
+    const { a, b } = dueNodi()
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "anchor", node: a, anchor: "e2" } }))
+    runner.step(su({ hit: { kind: "anchor", node: b, anchor: "w2" } }))
+    const created = Object.values(edges())
+    expect(created).toHaveLength(1)
+    expect(created[0]!.anchors).toEqual({ source: "e2", target: "w2" })
+  })
+
+  it("lo spostamento di un capo scrive l'aggancio in una voce di annulla", () => {
+    const { a, b } = dueNodi()
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "anchor", node: a, anchor: "e2" } }))
+    runner.step(su({ hit: { kind: "node", key: b } }))
+    const [key] = Object.keys(edges())
+    runner.step(giu({ hit: { kind: "edge-end", edge: qualify("flow", key!), end: "target", node: b } }))
+    runner.step(su({ hit: { kind: "anchor", node: b, anchor: "n1" } }))
+    expect(edges()[key!]!.anchors).toEqual({ source: "e2", target: "n1" })
+    documentStore.getState().undo()
+    expect(edges()[key!]!.anchors).toEqual({ source: "e2", target: null })
+  })
+
+  it("durante Collega un pool non mostra agganci, un nodo sì, e Esc li nasconde", () => {
+    const { a, b } = dueNodi()
+    documentStore.getState().dispatch((draft) => {
+      withPool(draft)
+    })
+    sessionStore.getState().setTool("edge")
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "node", key: a } }))
+    runner.step(muovi({ hit: { kind: "node", key: "flow/p1" } }))
+    expect(sessionStore.getState().anchorsFor).toBeNull()
+    runner.step(muovi({ hit: { kind: "node", key: b } }))
+    expect(sessionStore.getState().anchorsFor).toBe(b)
+    runner.step({ type: "cancel" })
+    expect(sessionStore.getState().anchorsFor).toBeNull()
+  })
+
+  it("durante un drag agganci e maniglie sono nascosti, e tornano dopo il rilascio e dopo Esc", () => {
+    const { a } = dueNodi()
+    sessionStore.getState().setSelection([selId("node", a)])
+    sessionStore.getState().setAnchorsFor(a)
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "node", key: a }, world: { x: 10, y: 10 } }))
+    runner.step(muovi({ world: { x: 60, y: 60 } }))
+    expect(sessionStore.getState().dragging).toBe(true)
+    runner.step(su({ hit: { kind: "node", key: a }, world: { x: 60, y: 60 } }))
+    expect(sessionStore.getState().dragging).toBe(false)
+    runner.step(giu({ hit: { kind: "node", key: a }, world: { x: 10, y: 10 } }))
+    runner.step(muovi({ world: { x: 60, y: 60 } }))
+    expect(sessionStore.getState().dragging).toBe(true)
+    runner.step({ type: "cancel" })
+    expect(sessionStore.getState().dragging).toBe(false)
   })
 })

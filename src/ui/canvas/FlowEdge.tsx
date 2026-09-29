@@ -4,31 +4,28 @@ import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
 import { flowDiagram } from "@/editor/flow-access"
 import { flowEdgeGeometry } from "@/editor/flow/geometry"
-import type { Rect } from "@/editor/geometry"
+import type { EdgePorts } from "@/editor/ports"
 import { selId, sessionStore } from "@/editor/session-store"
 import type { FlowEdge as FlowEdgeModel } from "@/model/flow/schema"
 import { registerEdge } from "./dom-registry"
-import { useNodeRect } from "./use-node-rect"
+import { useEdgePorts } from "./use-edge-ports"
 
 interface Props {
   edgeKey: string
   edge: FlowEdgeModel
-  source: Rect
-  target: Rect
+  ports: EdgePorts
   selected: boolean
-  /** Scarto del fascio: arriva dal layer, che è l'unico a vedere tutti gli archi. */
-  offset: number
 }
 
 /**
- * Sulla forma di `ClassEdgeView` (`ClassEdge.tsx`): `routeEdge` (via `flowEdgeGeometry`) per il
+ * Sulla forma di `ClassEdgeView` (`ClassEdge.tsx`): `routePorts` (via `flowEdgeGeometry`) per il
  * percorso, una freccia piena in punta — un solo marker per arco, sempre sul target, a differenza
  * del crow's foot a due capi dell'ER — e l'etichetta sul primo segmento, che eredita gratis la
- * separazione del fascio (spec §8, vedi il docblock di `flowEdgeGeometry`).
+ * separazione del fascio per lato (spec §8, vedi il docblock di `flowEdgeGeometry`).
  */
-export const FlowEdgeView = memo(function FlowEdgeView({ edgeKey, edge, source, target, selected, offset }: Props) {
+export const FlowEdgeView = memo(function FlowEdgeView({ edgeKey, edge, ports, selected }: Props) {
   const id = qualify("flow", edgeKey)
-  const geo = flowEdgeGeometry(source, target, edge, offset)
+  const geo = flowEdgeGeometry(ports, edge)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   return (
     <g
@@ -50,13 +47,10 @@ export const FlowEdgeView = memo(function FlowEdgeView({ edgeKey, edge, source, 
   )
 })
 
-export function FlowEdge({ edgeKey, offset }: { edgeKey: string; offset: number }) {
+export function FlowEdge({ edgeKey }: { edgeKey: string }) {
   const edge = useStore(documentStore, (s) => flowDiagram(s.doc).model.edges[edgeKey])
-  // `useNodeRect` lavora su chiavi con prefisso di qualunque famiglia (`use-node-rect.ts`): un arco
-  // di flusso resta sempre dentro la sua famiglia, ma la chiave va comunque qualificata.
-  const source = useNodeRect(edge && qualify("flow", edge.source))
-  const target = useNodeRect(edge && qualify("flow", edge.target))
+  const ports = useEdgePorts(qualify("flow", edgeKey))
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", qualify("flow", edgeKey))))
-  if (!edge || !source || !target) return null
-  return <FlowEdgeView edgeKey={edgeKey} edge={edge} source={source} target={target} selected={selected} offset={offset} />
+  if (!edge || !ports) return null
+  return <FlowEdgeView edgeKey={edgeKey} edge={edge} ports={ports} selected={selected} />
 }

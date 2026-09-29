@@ -1,6 +1,10 @@
 import type { Family } from "@/model/family"
+import type { Anchor, EdgeAnchors } from "@/model/shared"
 import type { Point, Rect } from "./geometry"
 import { selId, selectedKeys, type Tool } from "./session-store"
+
+/** I due capi di un arco. */
+export type EdgeEnd = "source" | "target"
 
 /**
  * `backdrop` è vero quando il nodo colpito appartiene a una famiglia `backdrop` (le forme, spec 3b
@@ -13,6 +17,10 @@ export type Hit =
   | { kind: "node"; key: string; backdrop?: boolean }
   | { kind: "edge"; key: string }
   | { kind: "resize"; key: string; lane: string | null }
+  /** Un punto di aggancio del nodo `node` (spec agganci §6). */
+  | { kind: "anchor"; node: string; anchor: Anchor }
+  /** La maniglia di un capo dell'arco selezionato; `node` è il nodo di quel capo. */
+  | { kind: "edge-end"; edge: string; end: EdgeEnd; node: string }
   | { kind: "canvas" }
 
 /** Stato della macchina: uno solo alla volta sul root SVG (spec §4.3). */
@@ -21,7 +29,8 @@ export type Mode =
   | { type: "pan"; last: Point }
   | { type: "drag"; keys: string[]; start: Point; moved: boolean }
   | { type: "marquee"; start: Point; additive: boolean }
-  | { type: "connect"; source: string }
+  | { type: "connect"; source: string; sourceAnchor: Anchor | null }
+  | { type: "reanchor"; edge: string; end: EdgeEnd; node: string }
   | { type: "resize"; key: string; lane: string | null; start: Point; moved: boolean }
 
 export const IDLE: Mode = { type: "idle" }
@@ -49,8 +58,11 @@ export type Effect =
   | { type: "commit-drag"; keys: string[]; dx: number; dy: number }
   | { type: "preview-marquee"; rect: Rect | null }
   | { type: "commit-marquee"; rect: Rect; additive: boolean }
-  | { type: "preview-connect"; source: string; to: Point | null }
-  | { type: "commit-connect"; source: string; target: string }
+  | { type: "preview-connect"; source: string; anchor: Anchor | null; to: Point | null }
+  | { type: "commit-connect"; source: string; target: string; anchors: EdgeAnchors }
+  | { type: "show-anchors"; node: string | null }
+  | { type: "preview-reanchor"; edge: string; end: EdgeEnd; to: Point | null }
+  | { type: "commit-anchor"; edge: string; end: EdgeEnd; anchor: Anchor | null }
   | { type: "create-node"; at: Point; family: Family; variant?: string }
   | { type: "preview-resize"; key: string; lane: string | null; dx: number; dy: number }
   | { type: "commit-resize"; key: string; lane: string | null; dx: number; dy: number }
@@ -71,6 +83,13 @@ function normalizeRect(a: Point, b: Point): Rect {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) }
 }
 
+/** Il nodo sotto il puntatore per gli agganci: il nodo colpito, o quello dell'aggancio colpito. */
+function hoveredNode(hit: Hit): string | null {
+  if (hit.kind === "node") return hit.key
+  if (hit.kind === "anchor") return hit.node
+  return null
+}
+
 export function reduce(mode: Mode, event: InteractionEvent, ctx: Context): Step {
   switch (event.type) {
     case "down":
@@ -88,6 +107,20 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
   if (info.button === 1 || spaceHeld) return { mode: { type: "pan", last: info.screen }, effects: [] }
   if (info.button !== 0) return { mode: IDLE, effects: [] }
 
+  // Un aggancio o la maniglia di un capo valgono con qualsiasi strumento che non crei nodi: gli
+  // agganci non si mostrano sotto lo strumento nodo (spec agganci §6), e questa guardia lo ripete.
+  if (ctx.tool !== "node" && info.hit.kind === "anchor") {
+    const { node, anchor } = info.hit
+    return { mode: { type: "connect", source: node, sourceAnchor: anchor }, effects: [{ type: "preview-connect", source: node, anchor, to: info.world }] }
+  }
+  if (ctx.tool !== "node" && info.hit.kind === "edge-end") {
+    const { edge, end, node } = info.hit
+    return {
+      mode: { type: "reanchor", edge, end, node },
+      effects: [{ type: "show-anchors", node }, { type: "preview-reanchor", edge, end, to: info.world }],
+    }
+  }
+
   if (ctx.tool === "node") {
     // Crea anche dentro una zona (spec 3b §1, §3, §5): un hit backdrop non è un nodo da selezionare
     // per questo strumento, è lo sfondo che la forma dipinge. Con Seleziona (sotto) resta un nodo a
@@ -99,7 +132,10 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
   }
   if (ctx.tool === "edge") {
     if (info.hit.kind === "node") {
-      return { mode: { type: "connect", source: info.hit.key }, effects: [{ type: "preview-connect", source: info.hit.key, to: info.world }] }
+      return {
+        mode: { type: "connect", source: info.hit.key, sourceAnchor: null },
+        effects: [{ type: "preview-connect", source: info.hit.key, anchor: null, to: info.world }],
+      }
     }
     return { mode: IDLE, effects: [] }
   }
@@ -131,6 +167,10 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
         : [id]
       return { mode: IDLE, effects: [{ type: "select", ids }] }
     }
+    case "anchor":
+    case "edge-end":
+      // Ci si arriva solo con lo strumento nodo.
+      return { mode: IDLE, effects: [] }
     case "canvas":
       return {
         mode: { type: "marquee", start: info.world, additive: info.shift },
@@ -156,7 +196,17 @@ function onMove(mode: Mode, info: PointerInfo): Step {
     case "marquee":
       return { mode, effects: [{ type: "preview-marquee", rect: normalizeRect(mode.start, info.world) }] }
     case "connect":
-      return { mode, effects: [{ type: "preview-connect", source: mode.source, to: info.world }] }
+      // Qui, e solo qui, `onMove` legge `hit`: il getter memoizzato di `use-canvas-interaction.ts`
+      // costa un `elementFromPoint`, che il drag non paga e Collega sì, per mostrare gli agganci del bersaglio.
+      return {
+        mode,
+        effects: [
+          { type: "preview-connect", source: mode.source, anchor: mode.sourceAnchor, to: info.world },
+          { type: "show-anchors", node: hoveredNode(info.hit) },
+        ],
+      }
+    case "reanchor":
+      return { mode, effects: [{ type: "preview-reanchor", edge: mode.edge, end: mode.end, to: info.world }] }
     case "resize": {
       const dx = info.world.x - mode.start.x
       const dy = info.world.y - mode.start.y
@@ -183,8 +233,30 @@ function onUp(mode: Mode, info: PointerInfo): Step {
       return { mode: IDLE, effects }
     }
     case "connect": {
-      const effects: Effect[] = [{ type: "preview-connect", source: mode.source, to: null }]
-      if (info.hit.kind === "node") effects.push({ type: "commit-connect", source: mode.source, target: info.hit.key })
+      const hit = info.hit
+      const clear: Effect = { type: "preview-connect", source: mode.source, anchor: mode.sourceAnchor, to: null }
+      // Un click sull'aggancio di partenza, senza spostarsi, non è un arco: niente cappio per sbaglio (un
+      // cappio voluto va verso un altro aggancio dello stesso nodo). Gli agganci restano dove sono: il
+      // puntatore è ancora sul nodo, e un doppio click lì deve poterlo raggiungere (`click` non parte se
+      // il punto premuto sparisce dal DOM).
+      if (hit.kind === "anchor" && hit.node === mode.source && hit.anchor === mode.sourceAnchor) return { mode: IDLE, effects: [clear] }
+      const effects: Effect[] = [clear, { type: "show-anchors", node: null }]
+      if (hit.kind === "node") {
+        effects.push({ type: "commit-connect", source: mode.source, target: hit.key, anchors: { source: mode.sourceAnchor, target: null } })
+      } else if (hit.kind === "anchor") {
+        effects.push({ type: "commit-connect", source: mode.source, target: hit.node, anchors: { source: mode.sourceAnchor, target: hit.anchor } })
+      }
+      return { mode: IDLE, effects }
+    }
+    case "reanchor": {
+      const effects: Effect[] = [
+        { type: "preview-reanchor", edge: mode.edge, end: mode.end, to: null },
+        { type: "show-anchors", node: null },
+      ]
+      const hit = info.hit
+      // Si cambia solo l'aggancio sul nodo di quel capo, mai il bersaglio (spec agganci §2).
+      if (hit.kind === "anchor" && hit.node === mode.node) effects.push({ type: "commit-anchor", edge: mode.edge, end: mode.end, anchor: hit.anchor })
+      else if (hit.kind === "node" && hit.key === mode.node) effects.push({ type: "commit-anchor", edge: mode.edge, end: mode.end, anchor: null })
       return { mode: IDLE, effects }
     }
     case "resize": {
@@ -204,7 +276,9 @@ function onCancel(mode: Mode): Step {
     case "marquee":
       return { mode: IDLE, effects: [{ type: "preview-marquee", rect: null }] }
     case "connect":
-      return { mode: IDLE, effects: [{ type: "preview-connect", source: mode.source, to: null }] }
+      return { mode: IDLE, effects: [{ type: "preview-connect", source: mode.source, anchor: mode.sourceAnchor, to: null }, { type: "show-anchors", node: null }] }
+    case "reanchor":
+      return { mode: IDLE, effects: [{ type: "preview-reanchor", edge: mode.edge, end: mode.end, to: null }, { type: "show-anchors", node: null }] }
     case "resize":
       return { mode: IDLE, effects: [{ type: "clear-resize" }] }
     default:

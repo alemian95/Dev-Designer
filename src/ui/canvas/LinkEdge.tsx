@@ -3,19 +3,18 @@ import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { linkKey } from "@/editor/families"
-import type { Rect } from "@/editor/geometry"
+import type { EdgePorts } from "@/editor/ports"
 import { linkGeometry } from "@/editor/links/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import { linkLabel } from "@/model/links/labels"
 import type { Link } from "@/model/links/schema"
 import { registerEdge } from "./dom-registry"
-import { useNodeRect } from "./use-node-rect"
+import { useEdgePorts } from "./use-edge-ports"
 
 interface Props {
   id: string
   link: Link
-  source: Rect
-  target: Rect
+  ports: EdgePorts
   selected: boolean
 }
 
@@ -24,9 +23,9 @@ interface Props {
  * aperta verso il target, etichetta sul primo segmento. Gli attributi `data-edge-*` sono quelli
  * degli archi, quindi l'anteprima del drag la aggiorna senza codice nuovo (spec 4a §6).
  */
-export const LinkEdgeView = memo(function LinkEdgeView({ id, link, source, target, selected }: Props) {
+export const LinkEdgeView = memo(function LinkEdgeView({ id, link, ports, selected }: Props) {
   const key = linkKey(id)
-  const geo = linkGeometry(source, target)
+  const geo = linkGeometry(ports)
   const stroke = selected ? "var(--primary)" : "var(--muted-foreground)"
   return (
     <g
@@ -48,12 +47,11 @@ export const LinkEdgeView = memo(function LinkEdgeView({ id, link, source, targe
 
 function LinkEdge({ id }: { id: string }) {
   const link = useStore(documentStore, (s) => s.doc.diagram.links[id])
-  const source = useNodeRect(link?.source)
-  const target = useNodeRect(link?.target)
+  const ports = useEdgePorts(linkKey(id))
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("edge", linkKey(id))))
   // Un collegamento pendente non si disegna: lo segnala la validazione, e dal pannello Problemi si seleziona.
-  if (!link || !source || !target) return null
-  return <LinkEdgeView id={id} link={link} source={source} target={target} selected={selected} />
+  if (!link || !ports) return null
+  return <LinkEdgeView id={id} link={link} ports={ports} selected={selected} />
 }
 
 /** I collegamenti, sopra gli archi di famiglia e sotto ogni nodo (spec 4a §6). */

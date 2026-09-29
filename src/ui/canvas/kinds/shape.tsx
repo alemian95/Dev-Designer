@@ -3,7 +3,7 @@ import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
-import { arrowOffsets, shapeDrawOrder } from "@/editor/shape/geometry"
+import { shapeDrawOrder } from "@/editor/shape/geometry"
 import { shapeDiagram } from "@/editor/shape-access"
 import type { Arrow, Shape, ShapeView } from "@/model/shape/schema"
 import { ShapeProperties } from "@/ui/panels/ShapeProperties"
@@ -21,13 +21,12 @@ function NodesLayer() {
   )
 }
 
-/** Gli scarti di fascio si leggono qui, non in `ArrowEdge`: dipendono da tutte le frecce. */
+/** Le frecce: il layer itera le chiavi, ogni freccia legge i propri porti da `canvasPorts`. */
 function EdgesLayer() {
-  const arrows = useStore(documentStore, (s) => shapeDiagram(s.doc).model.arrows)
-  const offsets = arrowOffsets(arrows)
+  const keys = useStore(documentStore, useShallow((s) => Object.keys(shapeDiagram(s.doc).model.arrows)))
   return (
     <g data-layer="edges">
-      {Object.keys(arrows).map((key) => <ArrowEdge key={key} arrowKey={key} offset={offsets.get(key) ?? 0} />)}
+      {keys.map((key) => <ArrowEdge key={key} arrowKey={key} />)}
     </g>
   )
 }
@@ -37,8 +36,8 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   return <ShapeNodeView id={qualify("shape", nodeKey)} shape={node as Shape} view={view as ShapeView} selected={selected} />
 }
 
-function EdgeView({ edgeKey, relation, source, target, selected, offset }: EdgeViewProps) {
-  return <ArrowEdgeView arrowKey={edgeKey} arrow={relation as Arrow} source={source} target={target} selected={selected} offset={offset} />
+function EdgeView({ edgeKey, relation, ports, selected }: EdgeViewProps) {
+  return <ArrowEdgeView arrowKey={edgeKey} arrow={relation as Arrow} ports={ports} selected={selected} />
 }
 
 /**

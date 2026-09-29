@@ -1,6 +1,7 @@
-import type { Arrow, Shape, ShapeDiagram, ShapeView } from "@/model/shape/schema"
-import { edgeOffsets, filledArrowPath, memoOnIdentity, pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
+import type { Arrow, Shape, ShapeDiagram, ShapeKind, ShapeView } from "@/model/shape/schema"
+import { filledArrowPath, pathFromPoints, routePorts, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, MIN_NODE_H, MIN_NODE_W, PAD_X, ROW_H, snap, type Rect, type Size } from "../geometry"
+import type { EdgePorts, Outline } from "../ports"
 
 /** Quello che un testo vuoto mostra sul canvas (spec 3b §5): senza, sarebbe invisibile e impossibile da afferrare. */
 export const TEXT_PLACEHOLDER = "Testo"
@@ -68,12 +69,12 @@ export function shapeDrawOrder(d: ShapeDiagram): string[] {
 
 /**
  * Tutta la geometria di una freccia (spec 3b §5): il percorso ortogonale di tutti gli archi
- * (`routeEdge`, mai un cappio: lo schema rifiuta una freccia verso sé stessa), una punta piena a ogni
+ * (`routePorts`, mai un cappio: lo schema rifiuta una freccia verso sé stessa), una punta piena a ogni
  * capo che `head` chiede, e l'etichetta — che una freccia non ha — sul segmento centrale, perché
  * `EdgeGeometry` la vuole. Serve al disegno statico e all'anteprima del drag.
  */
-export function arrowGeometry(source: Rect, target: Rect, arrow: Pick<Arrow, "head">, offset = 0): EdgeGeometry {
-  const route = routeEdge(source, target, false, offset)
+export function arrowGeometry(ports: EdgePorts, arrow: Pick<Arrow, "head">): EdgeGeometry {
+  const route = routePorts(ports)
   const pts = route.points
   const mid = Math.floor((pts.length - 1) / 2)
   const a = pts[mid]!
@@ -86,10 +87,10 @@ export function arrowGeometry(source: Rect, target: Rect, arrow: Pick<Arrow, "he
   }
 }
 
-/** Gli scarti di fascio delle frecce: più frecce fra le stesse due forme si affiancano (spec 3b §3). Gemella di `flowEdgeOffsets`. */
-export const arrowOffsets = memoOnIdentity((arrows: Readonly<Record<string, Arrow>>) =>
-  edgeOffsets(Object.entries(arrows).map(([key, a]) => ({ key, source: a.source, target: a.target }))),
-)
+/** Il contorno di una forma per gli agganci: l'ellisse è un'ellisse, rettangolo e testo un rettangolo. */
+export function shapeOutline(kind: ShapeKind): Outline {
+  return kind === "ellipse" ? "ellipse" : "rect"
+}
 
 /**
  * Il ridimensionamento dall'angolo (spec 3b §5): la misura vera più il trascinamento, allineata alla

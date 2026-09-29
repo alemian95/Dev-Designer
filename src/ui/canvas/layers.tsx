@@ -2,7 +2,6 @@ import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
-import { erEdgeOffsets } from "@/editor/er/geometry"
 import { EntityNode } from "./EntityNode"
 import { RelationshipEdge } from "./RelationshipEdge"
 
@@ -22,23 +21,12 @@ export function NodesLayer() {
   )
 }
 
-/**
- * Gli scarti di fascio si leggono **qui e non in `RelationshipEdge`**: dipendono da tutte le
- * relazioni, e farli calcolare a ciascun arco sarebbe la stessa scansione ripetuta n volte.
- * `erEdgeOffsets` è già memoizzata sull'identità della mappa, che Immer sostituisce solo quando il
- * modello cambia davvero: un drag muove `view.nodes` e non fa ripartire il calcolo, quindi non
- * serve un `useMemo` che ripeta la stessa guardia.
- *
- * Per questo il selettore prende l'oggetto e non più le sole chiavi: gli estremi servono, e le
- * chiavi da sole non li portano. I figli restano `memo` e ricevono un numero, che si confronta per
- * valore.
- */
+/** Le relazioni: il layer itera le chiavi, ogni arco legge i propri porti da `canvasPorts`. */
 export function EdgesLayer() {
-  const relationships = useStore(documentStore, (s) => erDiagram(s.doc).model.relationships)
-  const offsets = erEdgeOffsets(relationships)
+  const keys = useStore(documentStore, useShallow((s) => Object.keys(erDiagram(s.doc).model.relationships)))
   return (
     <g data-layer="edges">
-      {Object.keys(relationships).map((key) => <RelationshipEdge key={key} edgeKey={key} offset={offsets.get(key) ?? 0} />)}
+      {keys.map((key) => <RelationshipEdge key={key} edgeKey={key} />)}
     </g>
   )
 }

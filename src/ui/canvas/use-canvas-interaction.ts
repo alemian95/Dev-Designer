@@ -4,9 +4,10 @@ import { classDiagram } from "@/editor/class-access"
 import { documentStore } from "@/editor/document-store"
 import { linkId, splitKey } from "@/editor/families"
 import type { Point } from "@/editor/geometry"
-import type { Hit, PointerInfo } from "@/editor/interaction"
+import type { EdgeEnd, Hit, PointerInfo } from "@/editor/interaction"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
 import { sessionStore } from "@/editor/session-store"
+import type { Anchor } from "@/model/shared"
 import { panBy, screenToWorld, zoomAt } from "@/editor/viewport"
 import { createInteractionRunner } from "./interaction-runner"
 
@@ -21,7 +22,19 @@ function elementAt(e: MouseEvent): Element | null {
   return document.elementFromPoint(e.clientX, e.clientY)
 }
 
-function hitTest(el: Element | null): Hit {
+export function hitTest(el: Element | null): Hit {
+  // Gli agganci e le maniglie dei capi stanno sopra i nodi (`AnchorsLayer`): vanno guardati per primi.
+  const anchor = el?.closest("[data-anchor]")
+  if (anchor) return { kind: "anchor", node: anchor.getAttribute("data-anchor-node")!, anchor: anchor.getAttribute("data-anchor") as Anchor }
+  const end = el?.closest("[data-edge-end]")
+  if (end) {
+    return {
+      kind: "edge-end",
+      edge: end.getAttribute("data-edge-end-edge")!,
+      end: end.getAttribute("data-edge-end") as EdgeEnd,
+      node: end.getAttribute("data-edge-end-node")!,
+    }
+  }
   // Le maniglie stanno dentro il gruppo del pool, che è un nodo: vanno guardate prima.
   const handle = el?.closest("[data-resize]")
   if (handle) return { kind: "resize", key: handle.getAttribute("data-resize")!, lane: handle.getAttribute("data-resize-lane") }
@@ -138,8 +151,10 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     }
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
-      const hit = hitTest(el)
-      if (hit.kind === "canvas") return
+      const raw = hitTest(el)
+      if (raw.kind === "canvas" || raw.kind === "edge-end") return
+      // Gli agganci sporgono dal bordo: un doppio click lì vale come sul nodo.
+      const hit: Hit = raw.kind === "anchor" ? { kind: "node", key: raw.node } : raw
       // Un collegamento fra famiglie non ha niente da modificare sul canvas (spec 4a §7), e la sua
       // chiave non ha una famiglia: `splitKey` la rifiuterebbe.
       if (linkId(hit.key) !== null) return
@@ -171,6 +186,23 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       // una feature non chiesta: il contratto DOM basta da solo, il doppio click rinomina solo
       // quando cade sull'header.
       if (headerHit) session().setEditing({ key: hit.key, target: "name" })
+    }
+    /**
+     * Il nodo sotto il puntatore mostra i suoi agganci (spec agganci §6). `pointerover` e non
+     * `pointermove`: scatta solo entrando in un elemento, e `busy()` resta quello di prima. Durante un
+     * gesto decide il runner (`show-anchors`): il pointer capture ritarget gli eventi all'svg.
+     * Passando dal nodo a uno dei suoi agganci, che sporgono oltre il bordo, gli agganci restano.
+     */
+    const onPointerOver = (e: PointerEvent) => {
+      if (runner.busy()) return
+      const target = e.target instanceof Element ? e.target : null
+      if (target?.closest("[data-anchor], [data-edge-end]")) return
+      const key = session().tool === "node" ? null : (target?.closest("[data-node-id]")?.getAttribute("data-node-id") ?? null)
+      const next = key !== null && canvasOps(documentStore.getState().doc).hasAnchors(key) ? key : null
+      if (session().anchorsFor !== next) session().setAnchorsFor(next)
+    }
+    const onPointerLeave = () => {
+      if (!runner.busy() && session().anchorsFor !== null) session().setAnchorsFor(null)
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTextInput(e.target)) return
@@ -213,6 +245,8 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     svg.addEventListener("pointermove", onPointerMove)
     svg.addEventListener("pointerup", onPointerUp)
     svg.addEventListener("pointercancel", onPointerCancel)
+    svg.addEventListener("pointerover", onPointerOver)
+    svg.addEventListener("pointerleave", onPointerLeave)
     svg.addEventListener("wheel", onWheel, { passive: false })
     svg.addEventListener("dblclick", onDblClick)
     svg.addEventListener("contextmenu", onContextMenu)
@@ -226,6 +260,8 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
       svg.removeEventListener("pointermove", onPointerMove)
       svg.removeEventListener("pointerup", onPointerUp)
       svg.removeEventListener("pointercancel", onPointerCancel)
+      svg.removeEventListener("pointerover", onPointerOver)
+      svg.removeEventListener("pointerleave", onPointerLeave)
       svg.removeEventListener("wheel", onWheel)
       svg.removeEventListener("dblclick", onDblClick)
       svg.removeEventListener("contextmenu", onContextMenu)

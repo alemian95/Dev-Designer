@@ -1,17 +1,19 @@
 import type { DevDocument } from "@/model/document"
 import type { Family } from "@/model/family"
 import type { Issue } from "@/model/issue"
+import type { EdgeAnchors } from "@/model/shared"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import type { EdgeEnds, EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
+import type { EdgePorts, Outline } from "../ports"
 import { classOps } from "./class"
 import { erOps } from "./er"
 import { flowOps } from "./flow"
 import { noteOps } from "./note"
 import { shapeOps } from "./shape"
 
-// `EdgeEnds` sta in `edge-routing.ts`, dove `edgeOffsets` lo consuma; qui si ri-esporta perché è
+// `EdgeEnds` sta in `edge-routing.ts`, dove `routePorts` lo consuma; qui si ri-esporta perché è
 // il tipo di ritorno di `edgesTouching` e i chiamanti lo importano dal contratto.
 export type { EdgeEnds }
 
@@ -41,7 +43,12 @@ export interface DiagramOps {
   /** `at` sovrascrive la posizione: serve all'anteprima del drag. */
   rectOf(key: string, at?: Point): Rect | null
   edgesTouching(keys: ReadonlySet<string>): EdgeEnds[]
-  edgeGeometry(key: string, a: Rect, b: Rect): EdgeGeometry | null
+  /** La geometria di un arco dai suoi porti (`canvasPorts`, o l'anteprima del drag). `null` se l'arco non c'è. */
+  edgeGeometry(key: string, ports: EdgePorts): EdgeGeometry | null
+  /** Il contorno del nodo per gli agganci (spec agganci §4). Assente: `"rect"`. */
+  outlineOf?(key: string): Outline
+  /** Scrive gli agganci di un arco della famiglia. Assente: la famiglia non ha archi agganciabili (le note). */
+  setEdgeAnchors?(key: string, anchors: EdgeAnchors): Recipe
   /**
    * Crea un nodo. `variant` è una stringa opaca per la giuntura: la dichiara `DiagramView.tools` e
    * la interpreta solo il modulo `kinds/` del tipo che l'ha dichiarata. `edit` dice dove va il

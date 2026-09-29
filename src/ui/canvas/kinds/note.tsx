@@ -37,8 +37,8 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   return <NotePureView id={qualify("note", nodeKey)} note={node as Note} view={view} selected={selected} />
 }
 
-function EdgeView({ edgeKey, source, target, selected }: EdgeViewProps) {
-  return <AnchorEdgeView noteKey={edgeKey} source={source} target={target} selected={selected} />
+function EdgeView({ edgeKey, ports, selected }: EdgeViewProps) {
+  return <AnchorEdgeView noteKey={edgeKey} ports={ports} selected={selected} />
 }
 
 /** `DiagramView` per le note: uno strumento solo, «Nota» (spec 3a §5). */

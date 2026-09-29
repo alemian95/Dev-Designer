@@ -1,6 +1,6 @@
 import * as z from "zod"
 import { inFamily, type Family } from "../family"
-import { Identifier } from "../shared"
+import { EdgeAnchorsSchema, Identifier } from "../shared"
 
 /** I tipi di collegamento fra famiglie: «mappa su» (4a), l'accesso e la chiamata del flusso (4b). */
 export const LinkKindSchema = z.enum(["maps-to", "accesses", "calls"])
@@ -23,7 +23,8 @@ export const LINK_ENDS: Readonly<Record<LinkKind, { source: Family; target: Fami
   calls: { source: "flow", target: "class" },
 }
 
-const ends = { source: Identifier, target: Identifier }
+/** Dove l'arco tocca i suoi nodi (spec agganci §3). Assente: due capi automatici. */
+const ends = { source: Identifier, target: Identifier, anchors: EdgeAnchorsSchema.optional() }
 
 /**
  * Un collegamento: gli estremi sono chiavi **con prefisso** (`class/Ordine`, `er/ordini`), il solo

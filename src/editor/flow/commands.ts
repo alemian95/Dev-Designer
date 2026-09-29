@@ -1,5 +1,6 @@
 import { LANE_MIN_H, POOL_MIN_W, nextName, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
 import type { LayoutPositions } from "@/model/layout"
+import { writeAnchors, type EdgeAnchors } from "@/model/shared"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
 import { DUPLICATE_OFFSET, GRID, snap, type Point } from "../geometry"
@@ -415,5 +416,13 @@ export function applyFlowLayout(positions: LayoutPositions, offset: Point): Reci
     }
     d.view.pools = Object.fromEntries(Object.entries(placed.pools).map(([id, v]) => [id, { ...v, x: v.x + offset.x, y: v.y + offset.y }]))
     d.view.lanes = placed.lanes
+  }
+}
+
+/** Gli agganci di un arco (spec agganci §3): la coppia intera, un passo di annulla. */
+export function setFlowEdgeAnchors(key: string, anchors: EdgeAnchors): Recipe {
+  return (draft) => {
+    const edge = flowDiagram(draft).model.edges[key]
+    if (edge) writeAnchors(edge, anchors)
   }
 }

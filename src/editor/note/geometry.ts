@@ -1,7 +1,8 @@
 import type { Note } from "@/model/note/schema"
 import type { NodeView } from "@/model/shared"
-import { pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
+import { pathFromPoints, routePorts, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, MIN_W, PAD_X, ROW_H, type Rect, type Size } from "../geometry"
+import type { EdgePorts } from "../ports"
 
 /** Lato del triangolo piegato nell'angolo in alto a destra della nota. Nessun consumatore fuori da
  *  questo modulo: `noteSize` e `notePath` lo usano entrambi, ma solo qui dentro. */
@@ -42,12 +43,12 @@ export function notePath(w: number, h: number): { body: string; fold: string } {
 }
 
 /**
- * La linea di ancoraggio (spec 3a §5): lo stesso instradamento ortogonale dei collegamenti, con
- * scarto 0 perché una nota ha una linea sola, e **nessun marker** a nessuno dei due capi — un
+ * La linea di ancoraggio (spec 3a §5): lo stesso instradamento ortogonale dei collegamenti, coi
+ * porti di `autoPorts` (le note restano fuori dal fascio), e **nessun marker** a nessuno dei due capi — un
  * ancoraggio non ha verso. Tratteggiata la rende chi disegna.
  */
-export function anchorGeometry(source: Rect, target: Rect): EdgeGeometry {
-  const route = routeEdge(source, target, false)
+export function anchorGeometry(ports: EdgePorts): EdgeGeometry {
+  const route = routePorts(ports)
   const pts = route.points
   const p0 = pts[0]!
   const p1 = pts[1]!

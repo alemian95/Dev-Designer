@@ -1,6 +1,6 @@
 import type { ComponentType } from "react"
 import { Spline, type LucideIcon } from "lucide-react"
-import type { Rect } from "@/editor/geometry"
+import type { EdgePorts } from "@/editor/ports"
 import type { Tool } from "@/editor/session-store"
 import type { Family } from "@/model/family"
 import type { NodeView as NodeViewModel } from "@/model/shared"
@@ -26,12 +26,9 @@ export interface NodeViewProps {
 export interface EdgeViewProps {
   edgeKey: string
   relation: unknown
-  source: Rect
-  target: Rect
+  /** Dove l'arco tocca i suoi nodi (`canvasPorts`): prop e non calcolo interno, perché dipende da tutti gli archi. */
+  ports: EdgePorts
   selected: boolean
-  /** Scarto del fascio (`edgeOffsets`): 0 per l'arco unico fra due nodi. Prop e non calcolo interno
-   *  perché dipende da *tutti* gli archi, e la vista pura vede solo il proprio. */
-  offset: number
 }
 
 /**

@@ -1413,6 +1413,32 @@ il piano non chiedeva di risolvere qui.
   testuali e aggiungere i select. Costo-se-sbagliato: un ⌘Z che sembra non funzionare finché non si
   clicca fuori.
 
+### Gli agganci degli archi (2026-09-29)
+
+- **`dragAll` non rimisurato con `assignPorts`**, per scelta dell'utente («niente perf»). Il memo di
+  `edgeOffsets` era nato da una misura (p95 da 25,9 a 125,1 ms senza), e trascinando tutto il fascio
+  per lato ricalcola i porti di tutti gli archi a ogni frame, O(E log E). Il rimedio, se il drag scatta,
+  è restringere l'insieme ai soli archi nell'inquadratura più i loro vicini di lato. Costo-se-sbagliato:
+  un drag di selezioni larghe sotto i 60 FPS (spec agganci §9).
+- **«Disponi» non passa gli agganci a ELK.** Il layout ordina i nodi come se ogni capo fosse
+  automatico; gli agganci salvati restano com'erano. Rinviato perché ELK vuole porte per nodo (spec
+  agganci §2), un'altra API. Costo-se-sbagliato: dopo «Disponi» un aggancio sul lato «sbagliato» fa girare
+  l'arco attorno al nodo, perché il router continua a non aggirare i nodi (spec §7).
+- **Cappi concentrici sullo stesso nodo si incrociano.** Il cappio esterno entra dal lato `n` più
+  vicino allo spigolo, e l'indice dello `stub` segue l'ordine dell'array mentre gli slot seguono l'ordine
+  delle chiavi. Rinviato perché serve un ordine unico per cappi e slot. Costo-se-sbagliato: due o più
+  cappi sullo stesso nodo con linee che si tagliano.
+- **Un cappio fra lati opposti (`w`→`e`, `n`→`s`) gira di soli `stub` dall'asse.** `routePorts` non riceve
+  il rettangolo del nodo, quindi su un nodo alto o largo il giro può attraversarne il corpo. Rinviato
+  perché il router non conosce i nodi (spec §7). Costo-se-sbagliato: linea che taglia il nodo.
+- **La giunzione a metà del percorso a S può attraversare il nodo.** Con un cappio `w`→`e` e agganci a
+  altezze diverse la linea mediana passa dentro al corpo. Stessa causa e stesso rimedio del punto sopra.
+- **Il re-import di un DDL perde gli agganci delle relazioni da FK.** `src/editor/commands/import.ts`
+  (righe 73-79) cancella le relazioni derivate da una FK delle tabelle in arrivo e le ricrea da capo, quindi
+  i loro `anchors` spariscono. Rinviato perché servirebbe riconoscere la stessa relazione fra import
+  (oggi la chiave è ricalcolata da `uniqueKey`). Costo-se-sbagliato: dopo un re-import gli archi
+  tornano ad agganci automatici e l'utente deve riposizionarli.
+
 ---
 
 ## Perduto

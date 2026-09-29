@@ -1,15 +1,15 @@
 import { openArrowPath } from "../class/geometry"
-import { pathFromPoints, routeEdge, type EdgeGeometry } from "../edge-routing"
-import type { Rect } from "../geometry"
+import { pathFromPoints, routePorts, type EdgeGeometry } from "../edge-routing"
+import type { EdgePorts } from "../ports"
 
 /**
- * Lo stesso instradamento ortogonale degli archi, con scarto 0: fra gli stessi due nodi non esistono
- * due collegamenti (`connectAcross` seleziona quello che c'è), quindi non serve un fascio. Freccia
+ * Lo stesso instradamento ortogonale degli archi, dai porti: il collegamento partecipa al fascio per
+ * lato (`assignPorts`) insieme agli archi di famiglia. Freccia
  * aperta verso il target, nessun marker sul source, etichetta a metà del primo segmento come nel
  * flowchart. Mai un cappio: i due estremi sono di famiglie diverse.
  */
-export function linkGeometry(source: Rect, target: Rect): EdgeGeometry {
-  const route = routeEdge(source, target, false)
+export function linkGeometry(ports: EdgePorts): EdgeGeometry {
+  const route = routePorts(ports)
   const pts = route.points
   const p0 = pts[0]!
   const p1 = pts[1]!

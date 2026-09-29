@@ -220,13 +220,24 @@ export function createInteractionRunner(): InteractionRunner {
         session().setSelection(fx.additive ? [...session().selection, ...ids] : ids)
         break
       }
-      case "preview-connect":
-        showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
+      case "preview-connect": {
+        const ops = canvasOps(documentStore.getState().doc)
+        const from = fx.to ? (fx.anchor ? ops.anchorPoint(fx.source, fx.anchor) : nodeCenter(fx.source)) : null
+        showConnect(from, fx.to)
         break
-      // Task 7: gli agganci visibili e l'anteprima del capo spostato.
-      case "show-anchors":
-      case "preview-reanchor":
+      }
+      case "show-anchors": {
+        const node = fx.node !== null && canvasOps(documentStore.getState().doc).hasAnchors(fx.node) ? fx.node : null
+        if (session().anchorsFor !== node) session().setAnchorsFor(node)
         break
+      }
+      case "preview-reanchor": {
+        // L'anteprima parte dal porto dell'altro capo, quello che non si muove (spec agganci §6).
+        const ports = canvasPorts(documentStore.getState().doc).get(fx.edge)
+        const other = ports ? (fx.end === "source" ? ports.target : ports.source) : null
+        showConnect(fx.to && other ? other.point : null, fx.to)
+        break
+      }
       case "commit-anchor": {
         const recipe = canvasOps(documentStore.getState().doc).setEdgeAnchor(fx.edge, fx.end, fx.anchor)
         if (recipe) documentStore.getState().dispatch(recipe)

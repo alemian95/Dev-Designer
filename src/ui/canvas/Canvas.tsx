@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from "react"
 import { FONT_SIZE, GRID } from "@/editor/geometry"
 import { FAMILIES } from "@/model/family"
+import { AnchorsLayer } from "./AnchorsLayer"
 import { FlowNodeEditor } from "./FlowNodeEditor"
 import { InlineEditor } from "./InlineEditor"
 import { viewFor } from "./kinds/registry"
@@ -55,6 +56,8 @@ export function Canvas({ children }: { children?: ReactNode }) {
             const { NodesLayer } = viewFor(f)
             return <NodesLayer key={`nodes-${f}`} />
           })}
+          {/* Agganci e maniglie dei capi: sopra i nodi, perché si afferrano (spec agganci §6). */}
+          <AnchorsLayer />
           {children}
           <Overlay />
         </ViewportGroup>

@@ -455,3 +455,56 @@ describe("Collega fra famiglie", () => {
     expect([...sessionStore.getState().selection]).toEqual([selId("edge", `link/${id}`)])
   })
 })
+
+describe("gli agganci nel runner (spec agganci §6)", () => {
+  /** Due nodi di flusso creati coi comandi veri, con prefisso; strumento Seleziona. */
+  function dueNodi() {
+    documentStore.getState().load(createDocument("t", "t"))
+    sessionStore.getState().setTool("select")
+    const a = addFlowNode({ x: 0, y: 0 }, "process", null)
+    documentStore.getState().dispatch(a.recipe)
+    const b = addFlowNode({ x: 400, y: 0 }, "process", null)
+    documentStore.getState().dispatch(b.recipe)
+    return { a: qualify("flow", a.key), b: qualify("flow", b.key) }
+  }
+  const edges = () => flowDiagram(documentStore.getState().doc).model.edges
+
+  it("Collega da un aggancio a un aggancio crea l'arco con i due agganci", () => {
+    const { a, b } = dueNodi()
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "anchor", node: a, anchor: "e2" } }))
+    runner.step(su({ hit: { kind: "anchor", node: b, anchor: "w2" } }))
+    const created = Object.values(edges())
+    expect(created).toHaveLength(1)
+    expect(created[0]!.anchors).toEqual({ source: "e2", target: "w2" })
+  })
+
+  it("lo spostamento di un capo scrive l'aggancio in una voce di annulla", () => {
+    const { a, b } = dueNodi()
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "anchor", node: a, anchor: "e2" } }))
+    runner.step(su({ hit: { kind: "node", key: b } }))
+    const [key] = Object.keys(edges())
+    runner.step(giu({ hit: { kind: "edge-end", edge: qualify("flow", key!), end: "target", node: b } }))
+    runner.step(su({ hit: { kind: "anchor", node: b, anchor: "n1" } }))
+    expect(edges()[key!]!.anchors).toEqual({ source: "e2", target: "n1" })
+    documentStore.getState().undo()
+    expect(edges()[key!]!.anchors).toEqual({ source: "e2", target: null })
+  })
+
+  it("durante Collega un pool non mostra agganci, un nodo sì, e Esc li nasconde", () => {
+    const { a, b } = dueNodi()
+    documentStore.getState().dispatch((draft) => {
+      withPool(draft)
+    })
+    sessionStore.getState().setTool("edge")
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "node", key: a } }))
+    runner.step(muovi({ hit: { kind: "node", key: "flow/p1" } }))
+    expect(sessionStore.getState().anchorsFor).toBeNull()
+    runner.step(muovi({ hit: { kind: "node", key: b } }))
+    expect(sessionStore.getState().anchorsFor).toBe(b)
+    runner.step({ type: "cancel" })
+    expect(sessionStore.getState().anchorsFor).toBeNull()
+  })
+})

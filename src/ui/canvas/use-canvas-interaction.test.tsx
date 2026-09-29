@@ -8,7 +8,7 @@ import { qualify } from "@/editor/families"
 import { withPool } from "@/editor/flow/pool-fixture"
 import { selId, sessionStore } from "@/editor/session-store"
 import { IDENTITY } from "@/editor/viewport"
-import { useCanvasInteraction } from "./use-canvas-interaction"
+import { hitTest, useCanvasInteraction } from "./use-canvas-interaction"
 
 /**
  * Il cablaggio degli eventi, cioè quel che è rimasto nell'hook dopo che la macchina a stati se n'è
@@ -354,5 +354,28 @@ describe("il resto del cablaggio", () => {
     expect(viewport()).toEqual(IDENTITY)
     // `afterEach` smonterebbe di nuovo: rimontare tiene la radice valida.
     monta()
+  })
+})
+
+describe("hitTest degli agganci", () => {
+  const SVG = "http://www.w3.org/2000/svg"
+
+  it("un aggancio vince sul nodo che lo contiene", () => {
+    const g = document.createElementNS(SVG, "g")
+    g.setAttribute("data-anchor", "n1")
+    g.setAttribute("data-anchor-node", "flow/a")
+    const dot = document.createElementNS(SVG, "circle")
+    g.append(dot)
+    nodo.append(g)
+    expect(hitTest(dot)).toEqual({ kind: "anchor", node: "flow/a", anchor: "n1" })
+  })
+
+  it("la maniglia di un capo porta arco, capo e nodo", () => {
+    const g = document.createElementNS(SVG, "g")
+    g.setAttribute("data-edge-end", "source")
+    g.setAttribute("data-edge-end-edge", "flow/e")
+    g.setAttribute("data-edge-end-node", "flow/a")
+    svg.append(g)
+    expect(hitTest(g)).toEqual({ kind: "edge-end", edge: "flow/e", end: "source", node: "flow/a" })
   })
 })

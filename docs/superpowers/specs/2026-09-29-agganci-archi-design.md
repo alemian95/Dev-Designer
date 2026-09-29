@@ -47,33 +47,39 @@ export const AnchorSchema = z.enum([
   "n1", "n2", "n3", "e1", "e2", "e3", "s1", "s2", "s3", "w1", "w2", "w3", // lati: ¼, ½, ¾ in senso orario
   "nw", "ne", "se", "sw",                                                 // spigoli
 ])
-export const EdgeAnchorsSchema = z
-  .object({ source: AnchorSchema.nullable(), target: AnchorSchema.nullable() })
-  .default({ source: null, target: null })
+export const EdgeAnchorsSchema = z.object({ source: AnchorSchema.nullable(), target: AnchorSchema.nullable() })
+export const AUTO_ANCHORS: EdgeAnchors = { source: null, target: null }
+export const anchorsOf = (edge: { anchors?: EdgeAnchors }): EdgeAnchors => edge.anchors ?? AUTO_ANCHORS
 ```
 
 La cifra conta in senso orario lungo il perimetro: `n1` è il punto di `n` più vicino a `nw`, `e1`
 quello di `e` più vicino a `ne`, `s1` quello di `s` più vicino a `se`, `w1` quello di `w` più vicino a
 `sw`.
 
-**Ogni tipo di arco ha lo stesso campo** `anchors: EdgeAnchors`: `Relationship` (ER), `ClassRelation`,
-`FlowEdge`, `Arrow`, e ogni variante dell'unione `Link`. `null` è il capo automatico. Stesso nome e
-stessa forma ovunque, così il codice generico (`assignPorts`, `CanvasOps`) legge `edge.anchors` senza
-conoscere la famiglia.
+**Ogni tipo di arco ha lo stesso campo facoltativo** `anchors?: EdgeAnchors`: `Relationship` (ER), `ClassRelation`,
+`FlowEdge`, `Arrow`, e ogni variante dell'unione `Link`. `null` è il capo automatico, e il campo assente vale
+due capi automatici: si legge sempre con `anchorsOf`. Stesso nome e stessa forma ovunque, così il codice
+generico (`assignPorts`, `CanvasOps`) lo legge senza conoscere la famiglia. Facoltativo e non con un
+`.default()` di zod, sul precedente di `navigable` (`class/schema.ts`): con il default il tipo in uscita
+lo renderebbe obbligatorio, e ogni punto che costruisce un arco (comandi, import DDL, fixture) andrebbe
+toccato. `writeAnchors(edge, anchors)` scrive il campo, e lo toglie quando torna a due capi automatici.
 
-**Niente `SCHEMA_VERSION` nuova né migrazione**: il default di zod riempie il campo nei file che non
-lo hanno.
+**Niente `SCHEMA_VERSION` nuova né migrazione.**
 
 **Nessuna regola di validazione nuova.** Uno spigolo su una forma che non ne offre (un `nw` su un
 rombo) non è un errore: si proietta sul contorno (§4). Cambiare la forma di un nodo non obbliga a
 ripulire gli archi.
 
-**Comandi.** Per ogni famiglia con archi, e per i link in `links/commands.ts`:
+**Comandi.** Ogni famiglia con archi implementa `DiagramOps.setEdgeAnchors(key, anchors): Recipe`,
+e i link hanno `setLinkAnchors(id, anchors)` in `links/commands.ts`: scrivono la coppia intera con
+`writeAnchors`. Sopra, in `CanvasOps`, un solo punto decide:
 
 - `setEdgeAnchor(edgeKey, end: "source" | "target", anchor: Anchor | null): Recipe | null`: una voce
   di undo, `null` se l'arco non esiste o l'aggancio è già quello.
-- `addEdge(source, target, anchors?)`: gli agganci facoltativi del gesto Collega; assenti, entrambi
-  `null`.
+- `addEdge(source, target, anchors?)`: la recipe della famiglia (o di `connectAcross`) più
+  `setEdgeAnchors` sull'arco appena creato, in una recipe sola. Se `connectAcross` rovescia il verso,
+  gli agganci si scambiano con lui. Un collegamento già presente si seleziona e basta, come oggi: gli
+  agganci del gesto non lo toccano. L'àncora di una nota li ignora.
 
 ## 4. Geometria: dal capo al porto
 
@@ -92,10 +98,12 @@ flowchart lo ricava da `FlowShape` (`decision` → rombo, `terminal` → stadio,
   sinistra.
 - Il punto di un lato si proietta sul contorno vero muovendosi verso l'interno, perpendicolare al
   lato. `dir` è la normale uscente del lato.
-- Uno spigolo, sul rettangolo, resta l'angolo. Sulle forme senza spigoli si proietta sul contorno lungo
-  la diagonale verso il centro. In entrambi i casi `dir` è l'asse dominante verso `toward`, il centro
-  del nodo all'altro capo: orizzontale se `|dx| ≥ |dy|`.
-- Su contorni non rettangolari gli spigoli non si mostrano (§6): i punti offerti sono 12.
+- Uno spigolo, sul rettangolo, resta l'angolo; sul parallelogramma diventa il vertice vero dalla stessa
+  parte. Su rombo, ellisse e stadio si proietta sul contorno lungo la diagonale verso il centro. `dir` è
+  quella, fra le due normali uscenti dello spigolo (per `nw`: sinistra e su), che punta di più verso
+  `toward`, il centro del nodo all'altro capo; a parità, l'orizzontale.
+- Rombo, ellisse e stadio non mostrano gli spigoli (§6): offrono 12 punti. Rettangolo e
+  parallelogramma ne offrono 16.
 
 **`assignPorts(edges, rectOf, outlineOf): Map<string, { source: Port; target: Port }>`** sostituisce
 `edgeOffsets`. `edges` è un elenco di `{ key, source, target, anchors }` con chiavi di nodo qualificate
@@ -105,17 +113,18 @@ lato dello stesso nodo si separano fra loro.
 1. **Capo fissato**: il porto viene da `anchorPort`.
 2. **Capo automatico**: il lato è quello rivolto verso l'altro estremo, con la regola di oggi (l'asse
    dominante fra i due centri decide fra `e`/`w` e `n`/`s`).
-3. **Fascio per lato**: per ogni coppia (nodo, lato), tutti i capi che ci cadono, fissati e automatici,
-   si ordinano per la coordinata **del centro del nodo all'altro capo** lungo il lato (`x` per `n`/`s`,
-   `y` per `e`/`w`); a parità di coordinata decide la chiave dell'arco, così l'ordine è stabile. I
-   capi fissati restano al loro punto e spezzano il lato in intervalli. I capi automatici di ogni
-   intervallo si distribuiscono a passo uniforme dentro l'intervallo: `k` capi in `[a, b]` vanno in
-   `a + (i + 1)(b − a)/(k + 1)`. Gli estremi del lato rientrano di `EDGE_INSET` (6), come oggi. Poi il
-   punto si proietta sul contorno come in §4. Un capo fissato su uno spigolo appartiene al lato del
+3. **Fascio per lato**: per ogni coppia (nodo, lato), i capi fissati restano al loro punto e spezzano
+   il lato in intervalli; gli estremi del lato rientrano di `EDGE_INSET` (6), come oggi. Ogni capo
+   automatico cade nell'intervallo che contiene la coordinata **del centro del nodo all'altro capo**
+   lungo il lato (`x` per `n`/`s`, `y` per `e`/`w`), portata dentro il lato se sta fuori. Dentro un
+   intervallo `[a, b]` i `k` capi automatici si ordinano per quella coordinata (a parità, per chiave
+   dell'arco: l'ordine è stabile) e vanno in `a + (i + 1)(b − a)/(k + 1)`. Poi il punto si proietta sul
+   contorno come sopra. Un capo fissato su uno spigolo appartiene al lato del
    suo `dir`. Un capo automatico solo sul suo lato cade a metà, come oggi.
-4. **Cappio automatico** (`source === target`, entrambi automatici): esce da `e` ed entra da `n`, come
-   oggi, e partecipa ai fasci di quei due lati. Il cappio con un capo fissato usa lo stesso percorso di
-   `routeEdge` fra i due porti.
+4. **Cappio** (`source === target`): i capi automatici escono da `e` ed entrano da `n`, come oggi, e
+   partecipano ai fasci di quei due lati. Il suo `stub` (§5) è `SELF_LOOP_OFFSET` (30) più 14 per ogni
+   cappio precedente sullo stesso nodo: due cappi con lo stesso tratto si sovrapporrebbero sul lato
+   lungo.
 
 **L'ordinamento usa il centro dell'altro nodo, non il suo porto.** Così il porto su un nodo X dipende
 solo dal rettangolo di X, da quelli dei suoi vicini diretti e dagli agganci salvati, e l'anteprima del
@@ -126,18 +135,21 @@ Un arco il cui estremo non ha rettangolo (nodo mancante) non riceve porti e non 
 
 ## 5. Routing fra due porti
 
-`routeEdge(p0: Port, p3: Port): Point[]` sostituisce `routeEdge(a, b, loop, offset)`. Il percorso è
-sempre ortogonale, il primo segmento esce lungo `p0.dir` e l'ultimo entra lungo l'opposto di `p3.dir`.
+`routePorts(ports: EdgePorts): EdgeRoute` sostituisce `routeEdge(a, b, loop, offset)`, con
+`EdgePorts = { source: Port; target: Port; stub: number }` e lo stesso `EdgeRoute` di oggi (`points`,
+`sourceDir`, `targetDir`): le geometrie di famiglia cambiano solo la chiamata. Il percorso è sempre
+ortogonale, il primo segmento esce lungo `source.dir` e l'ultimo entra lungo l'opposto di `target.dir`.
 
 - **Dritto o Z**: i porti si guardano in faccia (`p0.dir = −p3.dir`, e `p3` sta davanti a `p0`). Stesso
   risultato di oggi: un segmento se sono allineati, altrimenti due pieghe sulla mediana.
 - **L**: direzioni perpendicolari e ognuno dei due porti sta davanti all'altro sul proprio asse. Una
   piega.
 - **Altrimenti** (stessa direzione, o opposte ma rivolte all'indietro): da ogni porto esce un tratto di
-  `STUB` (16 px) e i due tratti si congiungono con una o due pieghe (U o S attorno ai tratti).
+  `stub` (16 px, `STUB`, salvo i cappi) e i due tratti si congiungono con una o due pieghe (U o S
+  attorno ai tratti).
 
 Le geometrie di famiglia (`edgeGeometry` ER, `classEdgeGeometry`, `flowEdgeGeometry`, `arrowGeometry`,
-`linkGeometry`) ricevono `(p0, p3, arco)` invece di `(rectA, rectB, arco, offset)` e usano `p.dir` per i
+`linkGeometry`) ricevono `(ports, arco)` invece di `(rectA, rectB, arco, offset)` e usano `p.dir` per i
 marker. Il resto (etichette sul segmento centrale o sul primo) non cambia.
 
 ## 6. Interazione
@@ -175,11 +187,13 @@ per Collega.
 
 ## 7. Rendering, export, Disponi
 
-**Una sola fonte dei porti.** `canvasOps(doc).ports()` restituisce `assignPorts` su tutti gli archi del
-canvas, link compresi, memoizzato sul documento con `memoOnIdentity`. Canvas, export SVG/PNG e
-`InlineEditor` (dove sta l'etichetta) leggono da lì.
+**Una sola fonte dei porti.** `canvasPorts(doc)` restituisce i porti di tutti gli archi del canvas, link
+e linee delle note compresi, memoizzato sul documento. Canvas, export SVG/PNG e `InlineEditor` (dove
+sta l'etichetta) leggono da lì. Le linee delle note restano fuori dal fascio: ricevono `autoPorts`, il
+centro del lato come oggi. La memo riusa l'oggetto `EdgePorts` di un arco quando i numeri non cambiano,
+così ogni arco sul canvas si sottoscrive ai propri porti e si ridisegna solo quando cambiano.
 
-`DiagramOps.edgeGeometry(key, p0, p3)` sostituisce `(key, a, b)`. I componenti di famiglia
+`DiagramOps.edgeGeometry(key, ports)` sostituisce `(key, a, b)`. I componenti di famiglia
 (`layers.tsx`, `kinds/flow.tsx`, `kinds/class.tsx`, `ShapeArrow.tsx`, `LinkEdge.tsx`, …) smettono di
 calcolare scarti propri. Spariscono `edgeOffsets`, `erEdgeOffsets`, `classEdgeOffsets`,
 `flowEdgeOffsets`, `arrowOffsets` e `BUNDLE_GAP`.
@@ -189,11 +203,13 @@ sbagliata fa girare l'arco attorno al nodo (§5, caso U): si corregge a mano o c
 
 ## 8. Anteprima del drag
 
-All'inizio del gesto `DragTargets` raccoglie gli archi che toccano i nodi trascinati **e quelli che
-toccano i loro vicini diretti**: per la regola di §4 sono gli unici i cui porti possono cambiare. A ogni
-frame `assignPorts` gira su quell'insieme con i rettangoli dell'anteprima, e si scrive con
-`setEdgeGeometry` quello che cade nell'inquadratura, come oggi. `resetDragTargets` usa lo stesso
-insieme. Vale anche per il resize di pool e forme, che già riscrive gli archi toccati.
+All'inizio del gesto `DragTargets` misura una volta i rettangoli di tutti i nodi agli estremi di un arco,
+e raccoglie gli archi che toccano i nodi trascinati **e quelli che toccano i loro vicini diretti**: per
+la regola di §4 sono gli unici i cui porti possono cambiare. A ogni frame i porti si calcolano su tutti
+gli archi con i rettangoli dell'anteprima (un sottoinsieme darebbe fasci incompleti sui nodi al bordo),
+e si scrive con `setEdgeGeometry` solo quell'insieme, e di quello solo ciò che cade nell'inquadratura,
+come oggi. `resetDragTargets` riscrive lo stesso insieme con i porti a riposo. Il resize non cambia: gli
+archi li ridisegna React al rilascio.
 
 ## 9. Prestazioni
 
@@ -213,7 +229,7 @@ TDD, vitest.
 
 - `anchorPort`: i 16 punti del rettangolo; la proiezione su rombo, ellisse, stadio, parallelogramma;
   lo spigolo sulle forme senza spigoli; `dir` dello spigolo verso `toward`.
-- `routeEdge(p0, p3)`: dritto, Z, L, U. Invarianti su tutti: segmenti ortogonali, primo segmento lungo
+- `routePorts`: dritto, Z, L, U. Invarianti su tutti: segmenti ortogonali, primo segmento lungo
   `p0.dir`, ultimo lungo `−p3.dir`.
 - `assignPorts`: lo screenshot riprodotto (due sorgenti diverse, stesso lato del bersaglio → due punti
   distinti); l'ordine senza incroci; i fissati che spezzano il lato; il cappio; una coppia con due archi

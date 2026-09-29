@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { IDLE, reduce, type Context, type Hit, type InteractionEvent, type Mode, type PointerInfo } from "./interaction"
+import type { Anchor } from "@/model/shared"
 import { selId } from "./session-store"
 
 const info = (over: Partial<PointerInfo>): PointerInfo => ({
@@ -153,16 +154,18 @@ describe("reduce", () => {
       up({ hit: { kind: "node", key: "b" }, world: { x: 50, y: 50 } }),
     ], ctx({ tool: "edge" }))
     expect(r.effects).toEqual([
-      { type: "preview-connect", source: "a", to: { x: 0, y: 0 } },
-      { type: "preview-connect", source: "a", to: { x: 50, y: 50 } },
-      { type: "preview-connect", source: "a", to: null },
-      { type: "commit-connect", source: "a", target: "b" },
+      { type: "preview-connect", source: "a", anchor: null, to: { x: 0, y: 0 } },
+      { type: "preview-connect", source: "a", anchor: null, to: { x: 50, y: 50 } },
+      { type: "show-anchors", node: null },
+      { type: "preview-connect", source: "a", anchor: null, to: null },
+      { type: "show-anchors", node: null },
+      { type: "commit-connect", source: "a", target: "b", anchors: { source: null, target: null } },
     ])
   })
 
   it("tool edge rilasciato sul canvas: solo pulizia dell'anteprima", () => {
     const r = run([down({ hit: { kind: "node", key: "a" } }), up({})], ctx({ tool: "edge" }))
-    expect(r.effects.at(-1)).toEqual({ type: "preview-connect", source: "a", to: null })
+    expect(r.effects).toContainEqual({ type: "preview-connect", source: "a", anchor: null, to: null })
   })
 
   it("cancel durante il drag riporta i nodi a zero", () => {
@@ -223,5 +226,78 @@ describe("strumento nodo con variante", () => {
   it("senza famiglia lo strumento nodo non crea niente", () => {
     const step = reduce(IDLE, down({ hit: { kind: "canvas" }, world: { x: 10, y: 20 } }), ctx({ tool: "node", family: null }))
     expect(step.effects.some((e) => e.type === "create-node")).toBe(false)
+  })
+})
+
+describe("gli agganci (spec agganci §6)", () => {
+  const anchorHit = (node: string, anchor: Anchor): Hit => ({ kind: "anchor", node, anchor })
+  const endHit: Hit = { kind: "edge-end", edge: "flow/e", end: "target", node: "flow/b" }
+  const at = { x: 10, y: 10 }
+
+  it("down su un aggancio apre Collega da quel punto, anche con Seleziona", () => {
+    const step = reduce(IDLE, down({ hit: anchorHit("flow/a", "e2"), world: at }), ctx({ tool: "select" }))
+    expect(step.mode).toEqual({ type: "connect", source: "flow/a", sourceAnchor: "e2" })
+    expect(step.effects).toContainEqual({ type: "preview-connect", source: "flow/a", anchor: "e2", to: at })
+  })
+
+  it("con lo strumento nodo un aggancio non apre niente", () => {
+    const step = reduce(IDLE, down({ hit: anchorHit("flow/a", "e2") }), ctx({ tool: "node", family: "flow" }))
+    expect(step.mode.type).not.toBe("connect")
+  })
+
+  it("Collega dal corpo del nodo parte con il capo automatico", () => {
+    const step = reduce(IDLE, down({ hit: { kind: "node", key: "flow/a" } }), ctx({ tool: "edge" }))
+    expect(step.mode).toEqual({ type: "connect", source: "flow/a", sourceAnchor: null })
+  })
+
+  it("durante Collega il nodo sotto il puntatore mostra i suoi agganci", () => {
+    const mode: Mode = { type: "connect", source: "flow/a", sourceAnchor: null }
+    expect(reduce(mode, move({ hit: { kind: "node", key: "flow/b" } }), ctx({ tool: "edge" })).effects).toContainEqual({ type: "show-anchors", node: "flow/b" })
+    expect(reduce(mode, move({ hit: anchorHit("flow/b", "n1") }), ctx({ tool: "edge" })).effects).toContainEqual({ type: "show-anchors", node: "flow/b" })
+    expect(reduce(mode, move({ hit: { kind: "canvas" } }), ctx({ tool: "edge" })).effects).toContainEqual({ type: "show-anchors", node: null })
+  })
+
+  it("up su un aggancio crea l'arco con i due agganci, up sul corpo con il bersaglio automatico", () => {
+    const mode: Mode = { type: "connect", source: "flow/a", sourceAnchor: "e2" }
+    const onAnchor = reduce(mode, up({ hit: anchorHit("flow/b", "w2") }), ctx({ tool: "edge" }))
+    expect(onAnchor.effects).toContainEqual({ type: "commit-connect", source: "flow/a", target: "flow/b", anchors: { source: "e2", target: "w2" } })
+    expect(onAnchor.effects).toContainEqual({ type: "show-anchors", node: null })
+    const onBody = reduce(mode, up({ hit: { kind: "node", key: "flow/b" } }), ctx({ tool: "edge" }))
+    expect(onBody.effects).toContainEqual({ type: "commit-connect", source: "flow/a", target: "flow/b", anchors: { source: "e2", target: null } })
+  })
+
+  it("down sulla maniglia di un capo apre il suo spostamento e mostra gli agganci del suo nodo", () => {
+    const step = reduce(IDLE, down({ hit: endHit }), ctx({ tool: "select" }))
+    expect(step.mode).toEqual({ type: "reanchor", edge: "flow/e", end: "target", node: "flow/b" })
+    expect(step.effects).toContainEqual({ type: "show-anchors", node: "flow/b" })
+  })
+
+  const reanchor: Mode = { type: "reanchor", edge: "flow/e", end: "target", node: "flow/b" }
+
+  it("spostare un capo su un aggancio del suo nodo lo fissa lì", () => {
+    const step = reduce(reanchor, up({ hit: anchorHit("flow/b", "n3") }), ctx())
+    expect(step.effects).toContainEqual({ type: "commit-anchor", edge: "flow/e", end: "target", anchor: "n3" })
+    expect(step.mode).toEqual(IDLE)
+  })
+
+  it("spostare un capo sul corpo del suo nodo lo rimette automatico", () => {
+    const step = reduce(reanchor, up({ hit: { kind: "node", key: "flow/b" } }), ctx())
+    expect(step.effects).toContainEqual({ type: "commit-anchor", edge: "flow/e", end: "target", anchor: null })
+  })
+
+  it("rilasciato altrove, o su un altro nodo, non cambia niente", () => {
+    const hits: Hit[] = [{ kind: "canvas" }, anchorHit("flow/c", "n1"), { kind: "node", key: "flow/c" }]
+    for (const hit of hits) {
+      expect(reduce(reanchor, up({ hit }), ctx()).effects.some((e) => e.type === "commit-anchor")).toBe(false)
+    }
+  })
+
+  it("Esc durante lo spostamento nasconde anteprima e agganci", () => {
+    const step = reduce(reanchor, { type: "cancel" }, ctx())
+    expect(step.mode).toEqual(IDLE)
+    expect(step.effects).toEqual([
+      { type: "preview-reanchor", edge: "flow/e", end: "target", to: null },
+      { type: "show-anchors", node: null },
+    ])
   })
 })

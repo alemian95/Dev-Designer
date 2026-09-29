@@ -139,7 +139,7 @@ export function useCanvasInteraction(svgRef: RefObject<SVGSVGElement | null>): v
     const onDblClick = (e: MouseEvent) => {
       const el = elementAt(e)
       const hit = hitTest(el)
-      if (hit.kind === "canvas") return
+      if (hit.kind === "canvas" || hit.kind === "anchor" || hit.kind === "edge-end") return
       // Un collegamento fra famiglie non ha niente da modificare sul canvas (spec 4a §7), e la sua
       // chiave non ha una famiglia: `splitKey` la rifiuterebbe.
       if (linkId(hit.key) !== null) return

@@ -223,11 +223,20 @@ export function createInteractionRunner(): InteractionRunner {
       case "preview-connect":
         showConnect(fx.to ? nodeCenter(fx.source) : null, fx.to)
         break
+      // Task 7: gli agganci visibili e l'anteprima del capo spostato.
+      case "show-anchors":
+      case "preview-reanchor":
+        break
+      case "commit-anchor": {
+        const recipe = canvasOps(documentStore.getState().doc).setEdgeAnchor(fx.edge, fx.end, fx.anchor)
+        if (recipe) documentStore.getState().dispatch(recipe)
+        break
+      }
       case "commit-connect": {
         // `null`: dentro una famiglia i due nodi non si collegano (nota → nota), e non c'è niente da
         // dire. Un rifiuto fra famiglie invece si spiega nella barra degli avvisi, e lo strumento resta
         // attivo per riprovare (spec 4a §4). Un collegamento già presente si seleziona soltanto.
-        const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target)
+        const result = canvasOps(documentStore.getState().doc).addEdge(fx.source, fx.target, fx.anchors)
         if (!result) break
         if (result.type === "rejected") {
           lastRefusal = result.notice

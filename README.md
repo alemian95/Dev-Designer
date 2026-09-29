@@ -13,7 +13,9 @@ ogni push su `master` parte il deploy su Vercel.
 Canvas SVG con pan, zoom, trascinamento di uno o più elementi, selezione a riquadro, creazione di
 nodi e collegamenti. In alto la barra con annulla, ripeti, zoom, «Disponi» e tema chiaro o scuro; a
 sinistra gli strumenti; a destra il pannello delle proprietà e quello dei problemi. I nomi si
-modificano col doppio clic sul canvas. Ogni azione si annulla.
+modificano col doppio clic sul canvas. Ogni azione si annulla. Passando sopra un nodo compaiono i punti
+di aggancio: trascinando da un punto l'arco parte da lì, e selezionato un arco se ne spostano i capi. I
+capi lasciati automatici si distribuiscono lungo il lato.
 
 - **ER**: entità con attributi tipizzati, chiavi e relazioni con cardinalità.
 - **Classi UML**: classi con stereotipo `class`, `interface`, `abstract` o `enum`. Attributi e metodi
@@ -172,6 +174,8 @@ ognuno in un contesto di browser separato:
 - **Nota**: ancoraggio a entità, nodo di flusso e pool, stacco, «Disponi», file della versione 6.
 - **Forme**: freccia con punte, tratteggio e inversione, forma creata dentro un'altra,
   ridimensionamento e undo, nota ancorata, «Disponi», Collega rifiutato verso un'entità.
+- **Agganci**: due archi verso lo stesso nodo in punti diversi, Collega da un aggancio a un aggancio,
+  capo riportato in automatico e annullato.
 - **Flowchart**: pool con due corsie, nodi e archi etichettati, «Disponi» dentro le corsie,
   spostamento fra corsie con un solo undo, nodo portato fuori dal pool, export Mermaid.
 - **Canvas misto**: entità, classe e nodo di flusso insieme, collegamenti fra famiglie,

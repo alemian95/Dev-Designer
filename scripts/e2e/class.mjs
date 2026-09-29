@@ -131,7 +131,7 @@ export async function run(browser, base) {
 
     await step("un testo non valido lascia la textarea aperta, col testo intatto, e avvisa", async () => {
       const rect = await rectByName(page, "Persona")
-      await page.mouse.dblclick(rect.x + rect.w / 2, rect.y + rect.h - 5)
+      await page.mouse.dblclick(rect.x + rect.w / 2, rect.y + rect.h - 20) // non più vicino al bordo: lì stanno gli agganci
       await membersEditor.waitFor()
       const invalid = "+ salva(x: int"
       await membersEditor.fill(invalid)

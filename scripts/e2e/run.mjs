@@ -4,7 +4,7 @@
  * l'e2e della persistenza esercita il lock fra schede e IndexedDB sulla stessa origine, e due
  * scenari concorrenti se li disturberebbero a vicenda — gli scenari della persistenza, dell'import,
  * dell'export immagini, dell'export testo, dell'auto layout, del class diagram, del flowchart, del
- * canvas misto, dei collegamenti fra famiglie, dei pool, della nota e delle forme. Ognuno apre il
+ * canvas misto, dei collegamenti fra famiglie, dei pool, della nota, delle forme e degli agganci. Ognuno apre il
  * proprio contesto di browser, cosa che isola l'IndexedDB fra loro senza pagare due volte il costo
  * fisso di build, server e avvio del browser (avvio condiviso con `helpers.mjs#startEnv`, la stessa
  * funzione usata dalla guardia di esecuzione diretta di ciascuno scenario). Per lanciare un solo
@@ -12,10 +12,11 @@
  * `node scripts/e2e/persistenza.mjs`, `node scripts/e2e/export.mjs`,
  * `node scripts/e2e/export-testo.mjs`, `node scripts/e2e/layout.mjs`, `node scripts/e2e/class.mjs`,
  * `node scripts/e2e/flow.mjs`, `node scripts/e2e/misto.mjs`, `node scripts/e2e/collegamenti.mjs`,
- * `node scripts/e2e/pool.mjs`, `node scripts/e2e/note.mjs` o `node scripts/e2e/forme.mjs`.
+ * `node scripts/e2e/pool.mjs`, `node scripts/e2e/note.mjs`, `node scripts/e2e/forme.mjs` o `node scripts/e2e/agganci.mjs`.
  *
  * Uso: `pnpm e2e`. `HEADLESS=0` per vedere il browser.
  */
+import { run as runAgganci } from "./agganci.mjs"
 import { run as runClass } from "./class.mjs"
 import { run as runCollegamenti } from "./collegamenti.mjs"
 import { run as runExport } from "./export.mjs"
@@ -47,7 +48,8 @@ try {
   const poolOk = await runPool(browser, base)
   const noteOk = await runNote(browser, base)
   const formeOk = await runForme(browser, base)
-  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && flowOk && mistoOk && collegamentiOk && poolOk && noteOk && formeOk
+  const agganciOk = await runAgganci(browser, base)
+  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && flowOk && mistoOk && collegamentiOk && poolOk && noteOk && formeOk && agganciOk
 } catch (e) {
   console.error("\nFALLITO:", e)
 } finally {

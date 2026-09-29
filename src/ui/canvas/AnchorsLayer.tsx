@@ -1,7 +1,7 @@
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import { canvasOps, canvasPorts } from "@/editor/kinds/canvas-ops"
-import { parseSelId, sessionStore } from "@/editor/session-store"
+import { parseSelId, selId, sessionStore } from "@/editor/session-store"
 import { inFamily } from "@/model/family"
 
 /** Raggio del punto e dell'area di clic, in pixel dello schermo: si dividono per la scala. */
@@ -26,12 +26,15 @@ export function AnchorsLayer() {
   const scale = useStore(sessionStore, (s) => s.viewport.scale)
   const edge = useStore(sessionStore, (s) => singleEdge(s.selection))
   const dragging = useStore(sessionStore, (s) => s.dragging)
+  // La forma selezionata da sola mostra la maniglia di ridimensionamento nello spigolo `se`: l'aggancio
+  // lì sopra la coprirebbe e ne impedirebbe il trascinamento.
+  const resizing = useStore(sessionStore, (s) => node !== null && inFamily(node, "shape") && s.selection.size === 1 && s.selection.has(selId("node", node)))
   const doc = useStore(documentStore, (s) => s.doc)
   if (dragging || (node === null && edge === null)) return null
   const ops = canvasOps(doc)
   const dot = DOT_R / scale
   const hit = HIT_R / scale
-  const points = node !== null ? ops.anchorPoints(node) : []
+  const points = node !== null ? ops.anchorPoints(node).filter((p) => !(resizing && p.anchor === "se")) : []
   const ends = edge !== null ? ops.allEdges().find((e) => e.key === edge) : undefined
   const ports = edge !== null ? canvasPorts(doc).get(edge) : undefined
   return (

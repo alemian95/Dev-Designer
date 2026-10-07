@@ -3,9 +3,8 @@
 Editor web di diagrammi per sviluppatori: entità **ER**, **classi UML** e **flowchart** sullo stesso
 canvas, con **note** e **forme** libere.
 
-Funziona tutto nel browser, senza backend né account. Il documento si apre e si salva come file. A
-ogni push su `master` parte il deploy su Vercel, pubblicato su
-[dev-designer.alessandromian.dev](https://dev-designer.alessandromian.dev).
+Funziona tutto nel browser, senza backend né account. Il documento si apre e si salva come file.
+Pubblicato su [dev-designer.alessandromian.dev](https://dev-designer.alessandromian.dev).
 
 ## Cosa fa
 

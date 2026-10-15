@@ -25,6 +25,7 @@ import { run as runFlow } from "./flow.mjs"
 import { run as runForme } from "./forme.mjs"
 import { startEnv } from "./helpers.mjs"
 import { run as runImport } from "./import.mjs"
+import { run as runImportMermaid } from "./import-mermaid.mjs"
 import { run as runLayout } from "./layout.mjs"
 import { run as runMisto } from "./misto.mjs"
 import { run as runNote } from "./note.mjs"
@@ -38,6 +39,7 @@ try {
   ;({ preview, browser, base } = await startEnv())
   const persistenzaOk = await runPersistenza(browser, base)
   const importOk = await runImport(browser, base)
+  const importMermaidOk = await runImportMermaid(browser, base)
   const exportOk = await runExport(browser, base)
   const exportTestoOk = await runExportTesto(browser, base)
   const layoutOk = await runLayout(browser, base)
@@ -49,7 +51,7 @@ try {
   const noteOk = await runNote(browser, base)
   const formeOk = await runForme(browser, base)
   const agganciOk = await runAgganci(browser, base)
-  ok = persistenzaOk && importOk && exportOk && exportTestoOk && layoutOk && classOk && flowOk && mistoOk && collegamentiOk && poolOk && noteOk && formeOk && agganciOk
+  ok = persistenzaOk && importOk && importMermaidOk && exportOk && exportTestoOk && layoutOk && classOk && flowOk && mistoOk && collegamentiOk && poolOk && noteOk && formeOk && agganciOk
 } catch (e) {
   console.error("\nFALLITO:", e)
 } finally {

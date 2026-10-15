@@ -40,7 +40,10 @@ function blockLabel(block: MermaidBlock, index: number): string {
 }
 
 function importFates(doc: DevDocument, ready: Ready): Record<string, ImportFate> {
-  return ready.kind === "er" ? erImportFates(doc, ready.fragment.entities) : classImportFates(doc, ready.fragment.classes)
+  const referenced = new Set(ready.fragment.referenced)
+  return ready.kind === "er"
+    ? erImportFates(doc, ready.fragment.entities, referenced)
+    : classImportFates(doc, ready.fragment.classes, referenced)
 }
 
 /** Relazioni e note presenti nella famiglia: la differenza prima/dopo il dispatch dice quante ne sono entrate davvero. */

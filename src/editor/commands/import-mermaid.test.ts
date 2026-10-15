@@ -80,6 +80,11 @@ describe("erImportFates e selectErFragment", () => {
     expect(erImportFates(doc(), { a: entity("a"), b: entity("b", ["id", "x"]), c: entity("c") })).toEqual({ a: "identico", b: "sostituisce", c: "nuovo" })
   })
 
+  it("lasciano stare un'entità presente che il testo nomina solo in una relazione", () => {
+    documentStore.getState().dispatch(importMermaidEr({ a: entity("a") }, [], { a: { x: 0, y: 0 } }))
+    expect(erImportFates(doc(), { a: entity("a", []), c: entity("c", []) }, new Set(["a", "c"]))).toEqual({ a: "identico", c: "nuovo" })
+  })
+
   it("tiene solo le relazioni con estremi scelti o già presenti", () => {
     const out = selectErFragment({ a: entity("a"), b: entity("b"), c: entity("c") }, [rel("b", "a"), rel("c", "a"), rel("b", "z")], new Set(["a", "b"]), new Set(["z"]))
     expect(Object.keys(out.entities)).toEqual(["a", "b"])
@@ -188,6 +193,11 @@ describe("classImportFates, sameClassRelation e selectClassFragment", () => {
   it("distinguono nuovo, sostituisce e identico", () => {
     documentStore.getState().dispatch(importMermaidClass({ classes: { A: cls("A"), B: cls("B") }, relations: [], notes: {} }, { classes: { A: at(0, 0), B: at(0, 0) }, notes: {} }))
     expect(classImportFates(doc(), { A: cls("A"), B: cls("B", ["x"]), C: cls("C") })).toEqual({ A: "identico", B: "sostituisce", C: "nuovo" })
+  })
+
+  it("lasciano stare una classe presente che il testo nomina solo in una relazione", () => {
+    documentStore.getState().dispatch(importMermaidClass({ classes: { A: cls("A", ["x"]) }, relations: [], notes: {} }, { classes: { A: at(0, 0) }, notes: {} }))
+    expect(classImportFates(doc(), { A: cls("A"), C: cls("C") }, new Set(["A", "C"]))).toEqual({ A: "identico", C: "nuovo" })
   })
 
   it("considerano uguali una navigabilità assente e una falsa, e diverse due molteplicità", () => {

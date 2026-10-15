@@ -55,6 +55,10 @@ describe("mapClass: classi e membri", () => {
     expect(map("classDiagram\n  A --> B\n").classes.B).toEqual({ name: "B", stereotype: "class", attributes: [], methods: [] })
   })
 
+  it("elenca le classi che compaiono solo nelle relazioni, non quelle dichiarate", () => {
+    expect(map("classDiagram\n  A --> B\n  class B\n  C : +x\n  C <|-- D\n").referenced).toEqual(["A", "D"])
+  })
+
   it("legge visibilità, statici, astratti e generici dei membri", () => {
     const ordine = map(CLASS_VALID.members!).classes.Ordine!
     expect(ordine.stereotype).toBe("abstract")

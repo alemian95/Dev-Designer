@@ -164,7 +164,19 @@ export async function run(browser, base) {
       if (edges !== 2) throw new Error(`attese 2 relazioni, trovate ${edges}`)
     })
 
-    await step("annulla con ⌘Z il re-import e poi l'import delle classi", async () => {
+    await step("una classe presente nominata solo in una relazione non si svuota", async () => {
+      await openDialog(page)
+      await paste(page, "classDiagram\n  Forma <-- Pennello\n")
+      await expectText(page, "[data-import-mermaid-dialog]", "identica, saltata")
+      await page.getByRole("button", { name: /^Importa 1 classi$/ }).click()
+      await page.waitForSelector("[data-import-mermaid-dialog] strong")
+      await closeDialog(page)
+      await expectNodes(page, 5)
+      await expectText(page, '[data-node-id="class/Forma"]', "area")
+    })
+
+    await step("annulla con ⌘Z gli import delle classi", async () => {
+      await page.keyboard.press("ControlOrMeta+z")
       await page.keyboard.press("ControlOrMeta+z")
       await page.keyboard.press("ControlOrMeta+z")
       await expectNodes(page, 0)

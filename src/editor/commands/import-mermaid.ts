@@ -41,12 +41,18 @@ export function sameRelationship(a: Relationship, b: Relationship): boolean {
   return sameEnd(a.source, b.source) && sameEnd(a.target, b.target) && a.name === b.name && a.identifying === b.identifying
 }
 
-export function erImportFates(doc: DevDocument, entities: Readonly<Record<string, Entity>>): Record<string, ImportFate> {
+/**
+ * L'esito di ogni entità in arrivo. Una presente che il testo nomina solo in una relazione
+ * (`referenced`) è «identica»: il testo non dice niente del suo contenuto, e sostituirla la svuoterebbe.
+ */
+export function erImportFates(
+  doc: DevDocument, entities: Readonly<Record<string, Entity>>, referenced: ReadonlySet<string> = new Set(),
+): Record<string, ImportFate> {
   const present = erDiagram(doc).model.entities
   return Object.fromEntries(
     Object.entries(entities).map(([key, e]) => {
       const old = present[key]
-      return [key, old === undefined ? "nuovo" : sameEntity(old, e) ? "identico" : "sostituisce"]
+      return [key, old === undefined ? "nuovo" : referenced.has(key) || sameEntity(old, e) ? "identico" : "sostituisce"]
     }),
   )
 }
@@ -184,12 +190,15 @@ export function sameClassRelation(a: ClassRelation, b: ClassRelation): boolean {
 /** Una nota con lo stesso testo e la stessa àncora c'è già (spec §5). */
 const sameNote = (a: Note, b: Note): boolean => a.text === b.text && a.anchor === b.anchor
 
-export function classImportFates(doc: DevDocument, classes: Readonly<Record<string, ClassNode>>): Record<string, ImportFate> {
+/** L'esito di ogni classe in arrivo, con la stessa regola di `erImportFates` per quelle nominate solo in una relazione. */
+export function classImportFates(
+  doc: DevDocument, classes: Readonly<Record<string, ClassNode>>, referenced: ReadonlySet<string> = new Set(),
+): Record<string, ImportFate> {
   const present = classDiagram(doc).model.classes
   return Object.fromEntries(
     Object.entries(classes).map(([key, c]) => {
       const old = present[key]
-      return [key, old === undefined ? "nuovo" : sameClass(old, c) ? "identico" : "sostituisce"]
+      return [key, old === undefined ? "nuovo" : referenced.has(key) || sameClass(old, c) ? "identico" : "sostituisce"]
     }),
   )
 }

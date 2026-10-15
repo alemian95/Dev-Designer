@@ -1439,6 +1439,25 @@ il piano non chiedeva di risolvere qui.
   (oggi la chiave è ricalcolata da `uniqueKey`). Costo-se-sbagliato: dopo un re-import gli archi
   tornano ad agganci automatici e l'utente deve riposizionarli.
 
+### Import Mermaid delle classi (2026-10-15)
+
+Rilievi Minor della revisione finale di `feat/import-mermaid-class` (PR #14), rinviati.
+
+- **Due note identiche nello stesso testo lasciano un buco nel blocco disposto.** `placeClassImport`
+  (`src/editor/commands/import-mermaid.ts`) confronta le note solo con il documento: le due ricevono un
+  posto da ELK, poi la ricetta salta la seconda. Rimedio: deduplicare le note fra loro prima del grafo.
+  Costo-se-sbagliato: uno spazio vuoto nel blocco importato.
+- **Una nota ancorata a una classe già presente finisce nel blocco nuovo**, lontana dalla sua classe
+  (segnato `ponytail:` in `placeClassImport`). Rimedio: metterla accanto al rettangolo della classe invece
+  che nel grafo. Costo-se-sbagliato: la nota va trascinata a mano.
+- **`note for X`, con `X` presente solo nel documento, diventa una nota libera con un avviso.** `mapClass`
+  non vede il documento. Rimedio: tenere il bersaglio nel frammento e risolverlo in `selectClassFragment`,
+  che conosce le classi presenti. Costo-se-sbagliato: la nota va ancorata a mano.
+- **Una stringa di nota su più righe non si legge** (segnato `ponytail:` in `parseClass`): la grammatica
+  la ammette, l'export usa `<br>` e non la produce. Costo-se-sbagliato: errore «Riga non riconosciuta».
+- **`A~T~ --> B` conta come dichiarazione di `A`** (PR #15): una `A` già presente viene sostituita da
+  una classe vuota, come prima della #15. Costo-se-sbagliato: i membri di `A` spariscono, annullabile.
+
 ---
 
 ## Perduto

@@ -9,6 +9,11 @@ export interface ClassFragment {
   relations: ClassRelation[]
   /** Le note libere e quelle ancorate a una classe del frammento (`class/Nome`). Le chiavi le dà il comando. */
   notes: Note[]
+  /**
+   * Le chiavi che il testo nomina solo in una relazione, senza dichiararle: una presente nel
+   * documento non va svuotata, e il comando di import la lascia stare.
+   */
+  referenced: string[]
   warnings: ParseWarning[]
 }
 
@@ -131,5 +136,8 @@ export function mapClass(ast: ClassAst, text: string): ClassFragment {
     return { text: n.text, anchor: null }
   })
 
-  return { classes, relations, notes, warnings: aggregate(findings, text, MESSAGES) }
+  // Il nome con un generico in una relazione vale come dichiarazione: lo è anche nell'AST.
+  const declared = new Set(ast.classes.map((c) => c.id))
+  const referenced = Object.keys(classes).filter((key) => !declared.has(key))
+  return { classes, relations, notes, referenced, warnings: aggregate(findings, text, MESSAGES) }
 }

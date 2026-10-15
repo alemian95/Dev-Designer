@@ -22,6 +22,10 @@ describe("mapEr", () => {
     expect(read(ER_VALID.basic!).entities.ORDER).toEqual({ name: "ORDER", attributes: [] })
   })
 
+  it("elenca le entità che compaiono solo nelle relazioni, non quelle dichiarate", () => {
+    expect(read("erDiagram\n  A ||--o{ B : x\n  B {\n    int id\n  }\n  C\n  C ||--|| D : y\n").referenced).toEqual(["A", "D"])
+  })
+
   it("traduce le chiavi e deduce nullable dalla chiave primaria", () => {
     const { entities } = read(ER_VALID.keysAndComments!)
     const e = entities["pub.utenti"]!

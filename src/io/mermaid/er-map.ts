@@ -6,6 +6,11 @@ import type { ErAst, ErCardinalityToken } from "./er-parse"
 export interface ErFragment {
   entities: Record<string, Entity>
   relationships: Relationship[]
+  /**
+   * Le chiavi che il testo nomina solo in una relazione, senza dichiararle: una presente nel
+   * documento non va svuotata, e il comando di import la lascia stare.
+   */
+  referenced: string[]
   warnings: ParseWarning[]
 }
 
@@ -50,8 +55,10 @@ export function mapEr(ast: ErAst, text: string): ErFragment {
     return key
   }
 
+  const declared = new Set<string>()
   for (const decl of ast.entities) {
     const key = ensure(decl.id)
+    declared.add(key)
     if (decl.alias !== null) findings.push({ category: "alias", at: decl.at, subject: decl.id })
     const entity = entities[key]!
     for (const a of decl.attributes) {
@@ -87,5 +94,6 @@ export function mapEr(ast: ErAst, text: string): ErFragment {
     }
   })
 
-  return { entities, relationships, warnings: aggregate(findings, text, MESSAGES) }
+  const referenced = Object.keys(entities).filter((key) => !declared.has(key))
+  return { entities, relationships, referenced, warnings: aggregate(findings, text, MESSAGES) }
 }

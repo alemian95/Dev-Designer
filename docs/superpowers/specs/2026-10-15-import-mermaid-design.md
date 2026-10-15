@@ -193,6 +193,10 @@ Un comando per famiglia, sul modello di `importEr` (`src/editor/commands/import.
   Quella presente viene **sostituita per intero** e **tiene la posizione**. Il testo è la verità per
   quell'elemento: un'entità nata dal DDL e re-importata da Mermaid perde la nullabilità vera e le
   colonne delle relazioni.
+- **Nominati solo in una relazione**: un'entità o una classe che il testo nomina solo in una relazione,
+  senza dichiararla, e che è già nel documento, non si sostituisce: il testo non dice niente del suo
+  contenuto, e la sostituzione la svuoterebbe. Il dialog la mostra come *identica, saltata*. Una nuova
+  entra vuota, come da §4.1 e §4.2. Decisione del 2026-10-15, dopo la revisione dell'import delle classi.
 - **Relazioni ER e di classe**: una relazione in arrivo identica a una presente si salta. Il confronto
   è su estremi, cardinalità o molteplicità, specie, nome e `identifying`/`navigable`. Non si pota
   niente, quindi re-importare lo stesso testo non cambia nulla. Una relazione modificata compare

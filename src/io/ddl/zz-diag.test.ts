@@ -11,19 +11,14 @@ const gen = (n: number): string => {
 }
 const cpu = (): number => { const u = process.cpuUsage(); return (u.user + u.system) / 1000 }
 it("diagnostica", () => {
-  const lines: string[] = []
-  for (const order of [[800, 1600, 3200], [3200, 1600, 800]]) {
-    for (const n of order) {
-      const s = gen(n)
-      const c: string[] = []
-      const w: string[] = []
-      for (let i = 0; i < 8; i++) {
-        const t0 = cpu(); const w0 = performance.now()
-        splitStatements(s)
-        c.push((cpu() - t0).toFixed(1)); w.push((performance.now() - w0).toFixed(1))
-      }
-      lines.push(`n=${n} cpu=[${c.join(" ")}] wall=[${w.join(" ")}]`)
-    }
+  const small = gen(800)
+  const big = gen(3200)
+  for (let i = 0; i < 10; i++) splitStatements(big)
+  let a = Infinity
+  let b = Infinity
+  for (let i = 0; i < 10; i++) {
+    let t0 = cpu(); splitStatements(small); a = Math.min(a, cpu() - t0)
+    t0 = cpu(); splitStatements(big); b = Math.min(b, cpu() - t0)
   }
-  throw new Error("DIAG\n" + lines.join("\n"))
+  throw new Error(`DIAG small=${a.toFixed(1)} big=${b.toFixed(1)} ratio=${(b / a).toFixed(2)}`)
 })

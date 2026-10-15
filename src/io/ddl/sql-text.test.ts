@@ -133,13 +133,17 @@ describe("splitStatements", () => {
    * processo: `cpuUsage()` è del processo, e con i worker in thread conterebbe anche il lavoro degli
    * altri file.
    *
-   * Il tempo CPU non bastava ancora: in CI il test cadeva a 3,2x (42,0 ms contro 39,7). La causa era
-   * il **JIT**: le prime chiamate su 800 tabelle girano in codice non ottimizzato (~16 ms), dalla
-   * quinta in poi ~5 ms. Misurando `small` per primo, a freddo, e `big` dopo, mezzo caldo, il rapporto
-   * dipendeva da quando V8 finiva di ottimizzare — locale ~1.7, in CI oltre 3. Ora tre chiamate di
-   * riscaldamento precedono ogni misura, e le taglie sono 800 e 3200: a regime il rapporto lineare
-   * è ~4 e il quadratico ~16, e la soglia 8 (la loro media geometrica) lascia un fattore 2 per parte
-   * invece dell'1,5 di 2x contro 3x.
+   * Il tempo CPU non bastava ancora: in CI il test cadeva a 3,2x (42,0 ms contro 39,7). La causa è
+   * il **JIT**. Le prime chiamate girano in codice non ottimizzato, e V8 sale di livello in tempi che
+   * cambiano da macchina a macchina: sul runner di GitHub, dopo una ventina di chiamate, 800 tabelle
+   * costavano ancora ~9 ms e 1600 ~18, contro 5 e 10 a regime. Misurare prima tutte le `small` e
+   * poi tutte le `big` confrontava quindi livelli di ottimizzazione diversi, e il rapporto oscillava
+   * fra 1,7 e oltre 8 restando lineare la funzione.
+   *
+   * Ora le misure sono **alternate** (small, big, small, big…) dopo un riscaldamento, e di ciascuna
+   * taglia si prende il minimo: le due arrivano al codice migliore negli stessi giri. Le taglie sono
+   * 800 e 3200: a regime il rapporto lineare è ~4 e il quadratico ~16, e la soglia 8 (la loro media
+   * geometrica) lascia un fattore 2 per parte.
    */
   it("il tempo quadruplicando l'input non è quadratico (non più di ~8x, non ~16x)", () => {
     // Genera N CREATE TABLE con identificatori backtick-quoted, come un vero dump MySQL: è la grafia
@@ -162,21 +166,20 @@ describe("splitStatements", () => {
       return (u.user + u.system) / 1000
     }
 
-    // Riscaldamento sul testo grande, poi il minimo di cinque giri su tempo CPU: vedi il docblock.
-    for (let i = 0; i < 3; i++) splitStatements(big)
-    const fastest = (sql: string): { ms: number; out: string[] } => {
-      let ms = Infinity
-      let out: string[] = []
-      for (let i = 0; i < 5; i++) {
-        const t0 = cpuMs()
-        out = splitStatements(sql)
-        ms = Math.min(ms, cpuMs() - t0)
-      }
-      return { ms, out }
+    // Riscaldamento, poi misure alternate prendendo il minimo di ciascuna taglia: vedi il docblock.
+    for (let i = 0; i < 10; i++) splitStatements(big)
+    let msSmall = Infinity
+    let msBig = Infinity
+    let rSmall: string[] = []
+    let rBig: string[] = []
+    for (let i = 0; i < 10; i++) {
+      let t0 = cpuMs()
+      rSmall = splitStatements(small)
+      msSmall = Math.min(msSmall, cpuMs() - t0)
+      t0 = cpuMs()
+      rBig = splitStatements(big)
+      msBig = Math.min(msBig, cpuMs() - t0)
     }
-
-    const { ms: msSmall, out: rSmall } = fastest(small)
-    const { ms: msBig, out: rBig } = fastest(big)
 
     // La prestazione non deve aver cambiato la semantica: stesso numero di statement, stesso
     // contenuto. `big` è `small` con altre 2400 tabelle in coda, quindi i primi 800 statement dei due

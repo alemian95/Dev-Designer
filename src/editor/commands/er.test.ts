@@ -91,6 +91,12 @@ describe("comandi ER", () => {
     expect(state().dispatch(renameEntity("users", "posts")!)).toBe(false)
   })
 
+  it("renameEntity accetta un nome che è una chiave del prototipo", () => {
+    expect(state().dispatch(renameEntity("users", "constructor")!)).toBe(true)
+    expect(er().model.entities["constructor"]?.name).toBe("constructor")
+    expect(uniqueKey(er().model.entities, "toString")).toBe("toString")
+  })
+
   it("attributi: add con nome unico, update, move, remove", () => {
     state().dispatch(addAttribute("users"))
     state().dispatch(addAttribute("users"))

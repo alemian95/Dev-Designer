@@ -36,6 +36,12 @@ beforeEach(() => {
 })
 
 describe("importEr", () => {
+  it("dà un nodo a un'entità che si chiama come una chiave del prototipo", () => {
+    expect(Object.keys(placeNew({ constructor: entity("constructor") }, diagram(), occupied()))).toEqual(["constructor"])
+    documentStore.getState().dispatch(importEr({ constructor: entity("constructor") }, [], occupied()))
+    expect(Object.keys(diagram().view.nodes)).toEqual(["constructor"])
+  })
+
   it("crea le entità nuove con una posizione e le relazioni con la convenzione delle chiavi", () => {
     documentStore.getState().dispatch(importEr({ a: entity("a"), b: entity("b") }, [derived("a", "b")], occupied()))
     const d = diagram()

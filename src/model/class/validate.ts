@@ -23,7 +23,7 @@ function findGeneralizationCycles(model: ClassModel): string[][] {
   const children = new Map<string, string[]>()
   for (const rel of Object.values(model.relations)) {
     if (!isHierarchyRelation(rel.kind)) continue
-    if (!(rel.source.class in model.classes) || !(rel.target.class in model.classes)) continue
+    if (!Object.hasOwn(model.classes, rel.source.class) || !Object.hasOwn(model.classes, rel.target.class)) continue
     const list = children.get(rel.source.class) ?? []
     list.push(rel.target.class)
     children.set(rel.source.class, list)
@@ -94,7 +94,7 @@ export function validateClass(model: ClassModel): Issue[] {
 
   for (const [key, rel] of Object.entries(model.relations)) {
     for (const end of [rel.source, rel.target]) {
-      if (!(end.class in model.classes)) {
+      if (!Object.hasOwn(model.classes, end.class)) {
         issues.push({ code: "dangling-relation", severity: "error", edge: key, message: `relazione "${key}": classe "${end.class}" inesistente` })
       }
     }

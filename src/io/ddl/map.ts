@@ -43,8 +43,14 @@ function label(t: Pick<SqlTable, "name" | "schema">): string {
 
 export function mapToEr({ tables, model }: MapInput): MapOutput {
   const warnings: string[] = []
-  const entities: Record<string, Entity> = {}
+  // Senza prototipo: le chiavi vengono dal DDL, e una tabella `constructor` è legittima.
+  const entities: Record<string, Entity> = Object.create(null)
   for (const t of tables) {
+    // Il documento non può tenere la chiave `__proto__`: zod e immer la perdono in silenzio.
+    if (entityKey(t) === "__proto__") {
+      warnings.push(`tabella saltata: "__proto__" è un nome che il documento non può tenere`)
+      continue
+    }
     const fkColumns = new Set(t.foreignKeys.flatMap((f) => f.columns))
     const entity: Entity = {
       name: t.name,
@@ -55,7 +61,7 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
     // Due tabelle diverse possono produrre la stessa chiave, perché il punto che separa schema e
     // nome è ammesso anche dentro un nome: `utenti` nello schema `pub` e `pub.utenti` senza schema
     // danno entrambe `pub.utenti`. Assegnare senza guardare farebbe sparire la prima in silenzio.
-    if (key in entities) {
+    if (Object.hasOwn(entities, key)) {
       warnings.push(`tabella saltata: "${label(t)}" produce la stessa chiave di "${label(entities[key]!)}"`)
       continue
     }
@@ -98,6 +104,7 @@ export function mapToEr({ tables, model }: MapInput): MapOutput {
   for (const t of tables) {
     compositeUnique += t.unique.filter((u) => u.length > 1).length
     const sourceKey = entityKey({ name: t.name, schema: t.schema })
+    if (sourceKey === "__proto__") continue
     const nullableOf = new Map(t.columns.map((c) => [c.name, c.nullable]))
     for (const fk of t.foreignKeys) {
       // Una FK senza colonne sul lato figlio è un DDL malformato (richiederebbe una FOREIGN KEY ()

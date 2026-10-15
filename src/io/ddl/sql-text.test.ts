@@ -132,8 +132,20 @@ describe("splitStatements", () => {
    * Vale solo perché questo file gira in ambiente node e Vitest mette ogni file di test nel proprio
    * processo: `cpuUsage()` è del processo, e con i worker in thread conterebbe anche il lavoro degli
    * altri file.
+   *
+   * Il tempo CPU non bastava ancora: in CI il test cadeva a 3,2x (42,0 ms contro 39,7). La causa è
+   * il **JIT**. Le prime chiamate girano in codice non ottimizzato, e V8 sale di livello in tempi che
+   * cambiano da macchina a macchina: sul runner di GitHub, dopo una ventina di chiamate, 800 tabelle
+   * costavano ancora ~9 ms e 1600 ~18, contro 5 e 10 a regime. Misurare prima tutte le `small` e
+   * poi tutte le `big` confrontava quindi livelli di ottimizzazione diversi, e il rapporto oscillava
+   * fra 1,7 e oltre 8 restando lineare la funzione.
+   *
+   * Ora le misure sono **alternate** (small, big, small, big…) dopo un riscaldamento, e di ciascuna
+   * taglia si prende il minimo: le due arrivano al codice migliore negli stessi giri. Le taglie sono
+   * 800 e 3200: a regime il rapporto lineare è ~4 e il quadratico ~16, e la soglia 8 (la loro media
+   * geometrica) lascia un fattore 2 per parte.
    */
-  it("il tempo raddoppiando l'input non è quadratico (non più di ~3x, non ~4x)", () => {
+  it("il tempo quadruplicando l'input non è quadratico (non più di ~8x, non ~16x)", () => {
     // Genera N CREATE TABLE con identificatori backtick-quoted, come un vero dump MySQL: è la grafia
     // che fa crescere il numero di tratti di `spans()` e che rendeva `inCode` costoso.
     const genMysqlLike = (n: number): string => {
@@ -146,7 +158,7 @@ describe("splitStatements", () => {
     }
 
     const small = genMysqlLike(800)
-    const big = genMysqlLike(1600)
+    const big = genMysqlLike(3200)
 
     // Tempo CPU del processo, in millisecondi: `cpuUsage()` conta microsecondi di user + system.
     const cpuMs = (): number => {
@@ -154,32 +166,32 @@ describe("splitStatements", () => {
       return (u.user + u.system) / 1000
     }
 
-    // Il minimo di tre giri, e su tempo CPU: vedi il docblock qui sopra.
-    const fastest = (sql: string): { ms: number; out: string[] } => {
-      let ms = Infinity
-      let out: string[] = []
-      for (let i = 0; i < 3; i++) {
-        const t0 = cpuMs()
-        out = splitStatements(sql)
-        ms = Math.min(ms, cpuMs() - t0)
-      }
-      return { ms, out }
+    // Riscaldamento, poi misure alternate prendendo il minimo di ciascuna taglia: vedi il docblock.
+    for (let i = 0; i < 10; i++) splitStatements(big)
+    let msSmall = Infinity
+    let msBig = Infinity
+    let rSmall: string[] = []
+    let rBig: string[] = []
+    for (let i = 0; i < 10; i++) {
+      let t0 = cpuMs()
+      rSmall = splitStatements(small)
+      msSmall = Math.min(msSmall, cpuMs() - t0)
+      t0 = cpuMs()
+      rBig = splitStatements(big)
+      msBig = Math.min(msBig, cpuMs() - t0)
     }
 
-    const { ms: msSmall, out: rSmall } = fastest(small)
-    const { ms: msBig, out: rBig } = fastest(big)
-
     // La prestazione non deve aver cambiato la semantica: stesso numero di statement, stesso
-    // contenuto. `big` è `small` con altre 800 tabelle in coda, quindi i primi 800 statement dei due
+    // contenuto. `big` è `small` con altre 2400 tabelle in coda, quindi i primi 800 statement dei due
     // input devono coincidere esattamente.
     expect(rSmall).toHaveLength(800)
-    expect(rBig).toHaveLength(1600)
+    expect(rBig).toHaveLength(3200)
     expect(rBig.slice(0, 800)).toEqual(rSmall)
     expect(rSmall[0]).toContain("CREATE TABLE `tbl_0`")
     expect(rSmall[799]).toContain("CREATE TABLE `tbl_799`")
-    expect(rBig[1599]).toContain("CREATE TABLE `tbl_1599`")
+    expect(rBig[3199]).toContain("CREATE TABLE `tbl_3199`")
 
-    expect(msBig).toBeLessThanOrEqual(msSmall * 3)
+    expect(msBig).toBeLessThanOrEqual(msSmall * 8)
   })
 })
 

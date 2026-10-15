@@ -50,7 +50,10 @@ describe("oracolo Mermaid: classDiagram", () => {
           name: "Ordine",
           stereotype: "abstract",
           attributes: [{ name: "pesi", type: "Map<string, List<int>>", visibility: "private", isStatic: true }],
-          methods: [{ name: "totale", type: "double", visibility: "public", isStatic: false, isAbstract: true, parameters: [{ name: "x", type: "int" }] }],
+          methods: [
+            { name: "totale", type: "double", visibility: "public", isStatic: false, isAbstract: true, parameters: [{ name: "x", type: "int" }] },
+            { name: "callback", type: "Func<(int) => void>", visibility: "public", isStatic: false, isAbstract: false, parameters: [] },
+          ],
         },
         Riga: { name: "Riga", stereotype: "class", attributes: [], methods: [] },
       },

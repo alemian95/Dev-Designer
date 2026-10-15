@@ -163,6 +163,16 @@ function splitTopLevel(text: string): string[] {
   return parts.map((p) => p.trim()).filter((p) => p !== "")
 }
 
+/** La `)` che chiude la `(` in `open`, contando le tonde: un ritorno `Func~(int) => void~` ne ha altre. -1 se manca. */
+function closingParen(text: string, open: number): number {
+  let depth = 0
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === "(") depth++
+    else if (text[i] === ")" && --depth === 0) return i
+  }
+  return -1
+}
+
 /** `nome: tipo`, `tipo nome` o `nome`. Il `::` di `std::string` non è il separatore. */
 function nameAndType(text: string): { name: string; type: string } {
   const colon = /^([^\s:]+)\s*:(?!:)\s*(.+)$/.exec(text)
@@ -185,7 +195,7 @@ function parseMember(raw: string, at: number, findings: Finding<ClassSyntaxCateg
   const visibility = (/^[+\-#~]/.exec(raw)?.[0] ?? "") as ClassAstVisibility
   const body = raw.slice(visibility.length).trim()
   const open = body.indexOf("(")
-  const close = body.lastIndexOf(")")
+  const close = open === -1 ? -1 : closingParen(body, open)
   if (open !== -1 && close > open) {
     const after = body.slice(close + 1).trim()
     const classifiers = (/^[$*]*/.exec(after)?.[0] ?? "") + (/[$*]*$/.exec(after)?.[0] ?? "")

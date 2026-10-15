@@ -170,10 +170,13 @@ export function sameClass(a: ClassNode, b: ClassNode): boolean {
   )
 }
 
-/** Due relazioni dicono la stessa cosa (spec §5): estremi, molteplicità, specie, nome e navigabilità. Gli agganci non contano. */
+/**
+ * Due relazioni dicono la stessa cosa (spec §5): estremi, molteplicità, specie, nome e navigabilità.
+ * Agganci e ruoli non contano: Mermaid non porta i ruoli, e il re-import del proprio export duplicherebbe.
+ */
 export function sameClassRelation(a: ClassRelation, b: ClassRelation): boolean {
   const sameEnd = (x: ClassRelation["source"], y: ClassRelation["source"]) =>
-    x.class === y.class && x.multiplicity === y.multiplicity && x.role === y.role
+    x.class === y.class && x.multiplicity === y.multiplicity
   return sameEnd(a.source, b.source) && sameEnd(a.target, b.target) && a.kind === b.kind && a.name === b.name &&
     (a.navigable ?? false) === (b.navigable ?? false)
 }

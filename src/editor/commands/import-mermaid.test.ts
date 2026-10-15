@@ -195,6 +195,11 @@ describe("classImportFates, sameClassRelation e selectClassFragment", () => {
     expect(sameClassRelation(classRel("B", "A"), { ...classRel("B", "A"), target: { class: "A", multiplicity: "1", role: "" } })).toBe(false)
   })
 
+  it("ignorano il ruolo, che Mermaid non porta: il re-import del proprio export non duplica", () => {
+    const withRole: ClassRelation = { ...classRel("B", "A"), source: { class: "B", multiplicity: "", role: "cliente" } }
+    expect(sameClassRelation(withRole, classRel("B", "A"))).toBe(true)
+  })
+
   it("tengono solo relazioni e note ancorate con estremi scelti o già presenti, e danno una chiave alle note", () => {
     const out = selectClassFragment(
       { A: cls("A"), B: cls("B"), C: cls("C") },

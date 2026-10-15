@@ -22,6 +22,7 @@ const MODEL: ClassModel = {
       ],
       methods: [
         { name: "Quadrato", type: "", visibility: "public", isStatic: false, isAbstract: false, parameters: [{ name: "lato", type: "double" }] },
+        { name: "callback", type: "Func<(int) => void>", visibility: "public", isStatic: false, isAbstract: false, parameters: [] },
         { name: "scala", type: "Quadrato", visibility: "package", isStatic: true, isAbstract: false, parameters: [{ name: "f", type: "double" }, { name: "pesi", type: "Map<K, V>" }] },
       ],
     },

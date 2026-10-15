@@ -84,6 +84,13 @@ describe("parseClass: membri", () => {
     ])
   })
 
+  it("chiude la lista dei parametri sulla parentesi giusta, anche con un tipo funzione nel ritorno", () => {
+    expect(members(`    +get() Func~(int) => void~\n    +on(Func~(int) => void~ f) Func~(int) => void~`)).toMatchObject([
+      { kind: "method", name: "get", parameters: [], returnType: "Func<(int) => void>" },
+      { kind: "method", name: "on", parameters: [{ name: "f", type: "Func<(int) => void>" }], returnType: "Func<(int) => void>" },
+    ])
+  })
+
   it("non spezza un tipo sul :: né sulla freccia di un tipo funzione", () => {
     expect(members(`    std::string nome\n    +on(Func~(int) => void~ f, int n)`)).toMatchObject([
       { name: "nome", type: "std::string" },

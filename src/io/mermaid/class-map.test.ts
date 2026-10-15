@@ -96,6 +96,12 @@ describe("mapClass: classi e membri", () => {
     ])
   })
 
+  it("scarta i membri senza nome, che il modello non può salvare", () => {
+    const text = "classDiagram\n  class A {\n    +\n    +x\n  }\n  A : +()\n"
+    expect(map(text).classes.A).toMatchObject({ attributes: [{ name: "x" }], methods: [] })
+    expect(warnings(text)).toEqual(["Membri senza nome scartati: A (righe 3, 6)"])
+  })
+
   it("scarta etichetta e parametro generico delle classi, con un avviso", () => {
     const fragment = map(CLASS_VALID.namespaceAndStyle!)
     expect(Object.keys(fragment.classes)).toEqual(["Cliente", "Ordine Web", "Square"])

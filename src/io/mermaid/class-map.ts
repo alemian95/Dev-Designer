@@ -14,7 +14,7 @@ export interface ClassFragment {
 
 type ClassMapCategory =
   | "label" | "generic" | "stereotype" | "annotations" | "abstractAttribute" | "duplicateAttribute" | "duplicateMethod"
-  | "dotted" | "twoHeads" | "lollipop" | "danglingNote"
+  | "dotted" | "twoHeads" | "lollipop" | "danglingNote" | "unnamed"
 
 const MESSAGES: Record<ClassMapCategory, string> = {
   label: "Etichette delle classi scartate, il nome resta l'id",
@@ -28,6 +28,7 @@ const MESSAGES: Record<ClassMapCategory, string> = {
   twoHeads: "Relazioni con due teste scartate",
   lollipop: "Interfacce lollipop scartate",
   danglingNote: "Note su una classe che non c'è, diventate libere",
+  unnamed: "Membri senza nome scartati",
 }
 
 const VISIBILITY: Record<ClassAstVisibility, Visibility> = { "+": "public", "-": "private", "#": "protected", "~": "package", "": "public" }
@@ -69,6 +70,11 @@ export function mapClass(ast: ClassAst, text: string): ClassFragment {
     if (decl.generic !== null) findings.push({ category: "generic", at: decl.at, subject: `${decl.id}~${decl.generic}~` })
     for (const a of decl.annotations) annotations.set(decl.id, [...(annotations.get(decl.id) ?? []), a])
     for (const m of decl.members) {
+      // Il modello vuole un nome non vuoto (`Identifier`): un membro senza nome renderebbe il file illeggibile.
+      if (m.name === "") {
+        findings.push({ category: "unnamed", at: m.at, subject: decl.id })
+        continue
+      }
       const subject = `${decl.id}.${m.name}`
       if (m.kind === "attribute") {
         if (m.isAbstract) findings.push({ category: "abstractAttribute", at: m.at, subject })

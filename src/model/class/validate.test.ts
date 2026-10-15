@@ -63,6 +63,11 @@ describe("validateClass", () => {
     expect(issues[0]).toMatchObject({ code: "dangling-relation", severity: "error" })
   })
 
+  it("una relazione verso «toString» che non c'è è pendente: la proprietà ereditata non conta", () => {
+    const issues = validateClass(modello([classe("Cliente")], [gen("Cliente", "toString")]))
+    expect(issues[0]).toMatchObject({ code: "dangling-relation", severity: "error" })
+  })
+
   it("un ciclo di generalizzazione di due: errore", () => {
     const issues = validateClass(modello([classe("A"), classe("B")], [gen("A", "B"), gen("B", "A")]))
     expect(issues.filter((i) => i.code === "generalization-cycle")).toHaveLength(1)

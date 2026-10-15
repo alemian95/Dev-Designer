@@ -56,6 +56,14 @@ describe("validateEr", () => {
     expect(dangling).toHaveLength(2)
   })
 
+  it("una relazione verso «constructor» che non c'è è pendente: la proprietà ereditata non conta", () => {
+    const issues = validateEr(model({
+      entities: { a: { name: "a", attributes: [] } },
+      relationships: { r: { source: { entity: "a", attributes: [], cardinality: "many" }, target: { entity: "constructor", attributes: [], cardinality: "one" }, identifying: false } },
+    }))
+    expect(issues.filter((i) => i.code === "dangling-relationship")).toHaveLength(1)
+  })
+
   it("segnala la FK che nessuna relazione collega, anche se l'entità ne ha un'altra", () => {
     const issues = validateEr(model({
       entities: {

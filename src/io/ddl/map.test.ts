@@ -28,6 +28,21 @@ const child = (over: Partial<SqlTable> = {}): SqlTable =>
 const parent = (): SqlTable => table({ name: "parent", columns: [{ name: "id", type: "bigint", nullable: false }], primaryKey: ["id"] })
 
 describe("mapToEr — entità e attributi", () => {
+  it("legge come tabelle qualunque i nomi del prototipo, e salta «__proto__» senza toccarlo", () => {
+    const fk = { name: "fk", columns: ["p"], refTable: "__proto__", refColumns: ["id"] }
+    const r = mapToEr({
+      tables: [table({ name: "constructor" }), table({ name: "__proto__", columns: [{ name: "id", type: "int", nullable: false }] }), table({ name: "toString", foreignKeys: [fk] })],
+      model: EMPTY_MODEL,
+    })
+    expect(Object.keys(r.entities)).toEqual(["constructor", "toString"])
+    expect(r.relationships).toEqual([])
+    expect(r.warnings).toEqual([
+      `tabella saltata: "__proto__" è un nome che il documento non può tenere`,
+      `relazione saltata: toString(p) punta a "__proto__", che non è nel diagramma`,
+    ])
+    expect(({} as Record<string, unknown>).attributes).toBeUndefined()
+  })
+
   it("la chiave dell'entità è schema.nome quando lo schema c'è, il nome nudo quando manca", () => {
     const r = mapToEr({ tables: [table({ name: "t", schema: "app" }), table({ name: "u" })], model: EMPTY_MODEL })
     expect(Object.keys(r.entities).sort()).toEqual(["app.t", "u"])

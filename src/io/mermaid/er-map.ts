@@ -14,13 +14,14 @@ export interface ErFragment {
   warnings: ParseWarning[]
 }
 
-type ErMapCategory = "alias" | "comment" | "duplicate" | "mdParent"
+type ErMapCategory = "alias" | "comment" | "duplicate" | "mdParent" | "reserved"
 
 const MESSAGES: Record<ErMapCategory, string> = {
   alias: "Alias delle entità scartati, il nome resta l'id",
   comment: "Commenti degli attributi scartati",
   duplicate: "Attributi ripetuti nella stessa entità, si tiene il primo",
   mdParent: "Cardinalità «u» (genitore master-detail) letta come «esattamente uno»",
+  reserved: "Entità «__proto__» scartata con le sue relazioni: il documento non può tenere questo nome",
 }
 
 /** I gettoni della grammatica sui quattro valori del modello (spec §4.1). `MD_PARENT` non ha un equivalente. */
@@ -46,18 +47,25 @@ function splitName(id: string): Pick<Entity, "name" | "schema"> {
  */
 export function mapEr(ast: ErAst, text: string): ErFragment {
   const findings: Finding<ErMapCategory>[] = []
-  const entities: Record<string, Entity> = {}
+  // Senza prototipo: le chiavi vengono dal testo, e «constructor» o «toString» sono nomi validi.
+  const entities: Record<string, Entity> = Object.create(null)
 
-  const ensure = (id: string): string => {
+  /** La chiave dell'entità, creata se manca; `null` per «__proto__», che zod e immer perderebbero. */
+  const ensure = (id: string, at: number): string | null => {
     const parts = splitName(id)
     const key = entityKey(parts)
+    if (key === "__proto__") {
+      findings.push({ category: "reserved", at })
+      return null
+    }
     entities[key] ??= { ...parts, attributes: [] }
     return key
   }
 
   const declared = new Set<string>()
   for (const decl of ast.entities) {
-    const key = ensure(decl.id)
+    const key = ensure(decl.id, decl.at)
+    if (key === null) continue
     declared.add(key)
     if (decl.alias !== null) findings.push({ category: "alias", at: decl.at, subject: decl.id })
     const entity = entities[key]!
@@ -81,17 +89,18 @@ export function mapEr(ast: ErAst, text: string): ErFragment {
     }
   }
 
-  const relationships = ast.relationships.map((r): Relationship => {
-    if (r.leftCard === "MD_PARENT" || r.rightCard === "MD_PARENT") findings.push({ category: "mdParent", at: r.at })
+  const relationships = ast.relationships.flatMap((r): Relationship[] => {
     // Sinistra = padre (`target`), destra = figlio (`source`), sempre: è il verso dell'export (spec §4.1).
-    const target = ensure(r.left)
-    const source = ensure(r.right)
-    return {
+    const target = ensure(r.left, r.at)
+    const source = ensure(r.right, r.at)
+    if (target === null || source === null) return []
+    if (r.leftCard === "MD_PARENT" || r.rightCard === "MD_PARENT") findings.push({ category: "mdParent", at: r.at })
+    return [{
       ...(r.label === null ? {} : { name: r.label }),
       source: { entity: source, attributes: [], cardinality: CARDINALITY[r.rightCard] },
       target: { entity: target, attributes: [], cardinality: CARDINALITY[r.leftCard] },
       identifying: r.identifying,
-    }
+    }]
   })
 
   const referenced = Object.keys(entities).filter((key) => !declared.has(key))

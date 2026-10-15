@@ -126,4 +126,19 @@ describe("mapClass: note", () => {
     ])
     expect(fragment.warnings.map((w) => w.message)).toEqual(["Note su una classe che non c'è, diventate libere: Fantasma (riga 5)"])
   })
+
+  it("legge come classi qualunque i nomi del prototipo, e scarta «__proto__» con le sue relazioni senza toccarlo", () => {
+    const fragment = map(
+      "classDiagram\n  class constructor {\n    +int id\n  }\n  <<constructor>> toString\n  toString --> constructor\n  class __proto__\n  __proto__ <|-- B\n",
+    )
+    expect(Object.keys(fragment.classes)).toEqual(["constructor", "toString", "B"])
+    expect(fragment.classes["constructor"]!.attributes.map((a) => a.name)).toEqual(["id"])
+    expect(fragment.classes["toString"]!.stereotype).toBe("class")
+    expect(fragment.relations.map((r) => `${r.source.class}>${r.target.class}`)).toEqual(["toString>constructor"])
+    expect(fragment.warnings.map((w) => w.message)).toEqual([
+      "Classe «__proto__» scartata con le sue relazioni: il documento non può tenere questo nome (righe 7, 8)",
+      "Stereotipi sconosciuti, letti come classe: toString «constructor» (riga 5)",
+    ])
+    expect(({} as Record<string, unknown>).attributes).toBeUndefined()
+  })
 })

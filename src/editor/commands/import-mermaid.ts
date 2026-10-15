@@ -54,7 +54,7 @@ export function erImportFates(
   const present = erDiagram(doc).model.entities
   return Object.fromEntries(
     Object.entries(entities).map(([key, e]) => {
-      const old = present[key]
+      const old = Object.hasOwn(present, key) ? present[key] : undefined
       return [key, old === undefined ? "nuovo" : referenced.has(key) || sameEntity(old, e) ? "identico" : "sostituisce"]
     }),
   )
@@ -69,7 +69,7 @@ export function selectErFragment(
   present: ReadonlySet<string>,
 ): { entities: Record<string, Entity>; relationships: Relationship[] } {
   const picked = Object.fromEntries(Object.entries(entities).filter(([key]) => chosen.has(key)))
-  const reachable = (key: string) => key in picked || present.has(key)
+  const reachable = (key: string) => Object.hasOwn(picked, key) || present.has(key)
   return { entities: picked, relationships: relationships.filter((r) => reachable(r.source.entity) && reachable(r.target.entity)) }
 }
 
@@ -89,7 +89,7 @@ export async function placeErImport(
   layout: (g: LayoutGraph) => Promise<LayoutPositions>,
 ): Promise<ErPlacement> {
   const diagram = erDiagram(doc)
-  const fresh = Object.keys(entities).filter((key) => !(key in diagram.view.nodes))
+  const fresh = Object.keys(entities).filter((key) => !Object.hasOwn(diagram.view.nodes, key))
   if (fresh.length === 0) return { positions: {}, fallback: null }
   const freshSet = new Set(fresh)
 
@@ -160,7 +160,7 @@ export function importMermaidEr(
     for (const [key, entity] of Object.entries(entities)) {
       d.model.entities[key] = entity
       const pos = positions[key]
-      if (pos && !(key in d.view.nodes)) d.view.nodes[key] = { ...pos, collapsed: false }
+      if (pos && !Object.hasOwn(d.view.nodes, key)) d.view.nodes[key] = { ...pos, collapsed: false }
     }
     for (const rel of relationships) {
       if (Object.values(d.model.relationships).some((old) => sameRelationship(old, rel))) continue
@@ -210,7 +210,7 @@ export function classImportFates(
   const present = classDiagram(doc).model.classes
   return Object.fromEntries(
     Object.entries(classes).map(([key, c]) => {
-      const old = present[key]
+      const old = Object.hasOwn(present, key) ? present[key] : undefined
       return [key, old === undefined ? "nuovo" : referenced.has(key) || sameClass(old, c) ? "identico" : "sostituisce"]
     }),
   )
@@ -233,7 +233,7 @@ export function selectClassFragment(
   chosen: ReadonlySet<string>, present: ReadonlySet<string>,
 ): ClassImport {
   const picked = Object.fromEntries(Object.entries(classes).filter(([key]) => chosen.has(key)))
-  const reachable = (key: string) => key in picked || present.has(key)
+  const reachable = (key: string) => Object.hasOwn(picked, key) || present.has(key)
   return {
     classes: picked,
     relations: relations.filter((r) => reachable(r.source.class) && reachable(r.target.class)),
@@ -262,7 +262,7 @@ export async function placeClassImport(
   doc: DevDocument, fragment: ClassImport, layout: (g: LayoutGraph) => Promise<LayoutPositions>,
 ): Promise<ClassPlacement> {
   const diagram = classDiagram(doc)
-  const fresh = Object.keys(fragment.classes).filter((key) => !(key in diagram.view.nodes))
+  const fresh = Object.keys(fragment.classes).filter((key) => !Object.hasOwn(diagram.view.nodes, key))
   const freshSet = new Set(fresh)
   const existingNotes = Object.values(noteDiagram(doc).model.notes)
   const notes = Object.entries(fragment.notes).filter(([, n]) => !existingNotes.some((old) => sameNote(old, n)))
@@ -309,7 +309,7 @@ export function importMermaidClass(fragment: ClassImport, placement: Pick<ClassP
     for (const [key, cls] of Object.entries(fragment.classes)) {
       d.model.classes[key] = cls
       const pos = placement.classes[key]
-      if (pos && !(key in d.view.nodes)) d.view.nodes[key] = { ...pos, collapsed: false }
+      if (pos && !Object.hasOwn(d.view.nodes, key)) d.view.nodes[key] = { ...pos, collapsed: false }
     }
     for (const rel of fragment.relations) {
       if (Object.values(d.model.relations).some((old) => sameClassRelation(old, rel))) continue

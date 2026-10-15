@@ -96,6 +96,19 @@ describe("erImportFates e selectErFragment", () => {
   })
 })
 
+describe("import di un'entità che si chiama come una chiave del prototipo", () => {
+  it("la vede nuova, la dispone, la sceglie e la innesta con il suo nodo", async () => {
+    const entities = { constructor: entity("constructor"), toString: entity("toString") }
+    expect(erImportFates(doc(), entities)).toEqual({ constructor: "nuovo", toString: "nuovo" })
+    const { positions } = await placeErImport(doc(), entities, [], fakeLayout)
+    expect(Object.keys(positions)).toEqual(["constructor", "toString"])
+    const picked = selectErFragment(entities, [rel("toString", "constructor")], new Set(["toString"]), new Set())
+    expect(picked.relationships).toEqual([])
+    documentStore.getState().dispatch(importMermaidEr(entities, [], positions))
+    expect(Object.keys(diagram().view.nodes)).toEqual(["constructor", "toString"])
+  })
+})
+
 describe("placeErImport", () => {
   it("dispone con il motore le sole entità nuove, in un blocco sotto il contenuto esistente", async () => {
     documentStore.getState().dispatch(importMermaidEr({ a: entity("a") }, [], { a: { x: 40, y: 40 } }))

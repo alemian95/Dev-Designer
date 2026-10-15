@@ -45,6 +45,13 @@ describe("comandi delle classi", () => {
     expect(Object.keys(cd().model.classes).sort()).toEqual(["Cliente", "Persona"])
   })
 
+  it("renameClass accetta un nome che è una chiave del prototipo, e la copia lo trova libero", () => {
+    expect(state().dispatch(renameClass("Cliente", "constructor")!)).toBe(true)
+    expect(Object.keys(cd().model.classes).sort()).toEqual(["Persona", "constructor"])
+    const { keys } = duplicateClasses(cd().model, ["constructor", "toString"])
+    expect(keys).toEqual(["constructor_2"])
+  })
+
   it("renameClass aggiorna anche il target di una relazione, non solo il source", () => {
     // Il test qui sotto rinomina Cliente, che in `r1` è il `source`: il ramo del `target` non era
     // mai percorso, e `renameClass` deve toccarli entrambi.

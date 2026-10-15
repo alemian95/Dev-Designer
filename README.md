@@ -61,6 +61,14 @@ Da un dump **PostgreSQL** o **MySQL/MariaDB**, incollato o caricato, si scelgono
 importare. Entrano nel documento aperto in un solo passo annullabile, con le cardinalità dedotte
 dalle foreign key. Una tabella già presente viene sostituita e resta nella sua posizione.
 
+### Importa un diagramma Mermaid
+
+Da un `erDiagram`, incollato o caricato (anche dentro un file Markdown, scegliendo il blocco), si
+scelgono le entità da importare. Le entità nuove si dispongono da sole sotto il contenuto esistente;
+una già presente viene sostituita e resta nella sua posizione, e re-importare lo stesso testo non
+duplica le relazioni. Stili, alias, commenti e direzione si scartano con un avviso. `classDiagram` e
+`flowchart` non si importano ancora.
+
 ### Esporta
 
 - **Immagini**: SVG e PNG del documento intero, più «Copia PNG» negli appunti. Sempre col tema
@@ -108,6 +116,8 @@ Un documento si modifica da una scheda sola: le altre lo mostrano in sola lettur
 - **Prestazioni misurate fino a 600 entità ER** (p95 del tempo di frame ≤ 20 ms in produzione:
   [la misura](docs/perf/2026-09-13-gate-verde.md)). Classi, flowchart, note e forme non sono
   misurati.
+- **Import Mermaid**: un'istruzione per riga fuori dai blocchi, e un'etichetta di relazione con spazi
+  va fra virgolette. Le relazioni importate non hanno colonne, come quelle disegnate a mano.
 - **Import DDL**: i vincoli `UNIQUE` su più colonne vengono ignorati, con un avviso. In MySQL un
   `REFERENCES` senza lista di colonne fa scartare l'intero `CREATE TABLE`.
 - **Classi**: i generici annidati escono in Mermaid in forma approssimata, con un avviso. Non ci sono
@@ -167,6 +177,8 @@ ognuno in un contesto di browser separato:
 - **Persistenza**: autosave, salvataggio e riapertura del file, file non valido, seconda scheda in
   sola lettura che prende il controllo (sul percorso `?fallback=1`).
 - **Import DDL**: import di entità e relazione, undo, reimport senza duplicati.
+- **Import Mermaid**: erDiagram incollato e disposto, reimport senza duplicati, undo, blocco scelto
+  in un Markdown, errore con la riga.
 - **Export immagini**: SVG, PNG e copia negli appunti col tema scuro attivo.
 - **Export testo**: i tre formati, copia e download.
 - **Auto layout**: «Disponi» sposta i nodi senza sovrapporli, e si annulla.

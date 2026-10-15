@@ -92,6 +92,12 @@ describe("parseFlow: il resto", () => {
     expect(ast.subgraphs.map((s) => [s.id, s.title?.text ?? null])).toEqual([["a", "Uno"], ["b", "Due"], ["subGraph2", "Tre parole"], ["c", "c"]])
   })
 
+  it("dà l'id subGraphN anche alle menzioni e ai figli di un subgraph con spazi", () => {
+    const { ast } = parseFlow("flowchart LR\n  subgraph Due parole\n    A\n    subgraph c\n      B\n    end\n  end\n")
+    expect(ast.nodes.map((n) => [n.id, n.subgraph])).toEqual([["A", "subGraph1"], ["B", "c"]])
+    expect(ast.subgraphs.map((s) => [s.id, s.parent])).toEqual([["c", "subGraph1"], ["subGraph1", null]])
+  })
+
   it("separa le istruzioni sul ;, e legge `graph` e le direzioni", () => {
     const { ast, warnings } = parseFlow("graph TD; A-->B; B-->C")
     expect(ast.direction).toBe("TD")
@@ -99,6 +105,12 @@ describe("parseFlow: il resto", () => {
     expect(warnings.map((w) => w.message)).toEqual(["Direzione ignorata: il flusso si dispone da sinistra a destra (riga 1)"])
     expect(parseFlow("flowchart\n  A").ast.direction).toBe("TB")
     expect(parseFlow("flowchart LR\n  subgraph s\n    direction LR\n  end\n").warnings).toEqual([])
+  })
+
+  it("non fa assorbire le righe dopo a una parentesi aperta nel testo", () => {
+    const { ast } = flow("A[Costo (euro] --> B\n  B --> C")
+    expect(ast.edges.map((e) => `${e.source}${e.target}`)).toEqual(["AB", "BC"])
+    expect(ast.nodes[0]!.text?.text).toBe("Costo (euro")
   })
 
   it("scarta stili, interazioni e accessibilità con un avviso per categoria", () => {

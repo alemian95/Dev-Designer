@@ -144,7 +144,9 @@ function readQuoted(s: string, pos: number, base: number): { text: FlowAstText; 
 function statements(text: string): { s: string; at: number }[] {
   const out: { s: string; at: number }[] = []
   let start = 0
-  let depth = 0
+  // `[` e `(` si chiudono sulla riga; `{` no, perché `@{ … }` e `accDescr { … }` vanno su più righe.
+  let brackets = 0
+  let braces = 0
   let quote = false
   const push = (end: number) => {
     const raw = text.slice(start, end)
@@ -156,9 +158,14 @@ function statements(text: string): { s: string; at: number }[] {
     const c = text[i]!
     if (c === '"') quote = !quote
     else if (quote) continue
-    else if (c === "[" || c === "(" || c === "{") depth++
-    else if ((c === "]" || c === ")" || c === "}") && depth > 0) depth--
-    else if ((c === "\n" || c === ";") && depth === 0) push(i)
+    else if (c === "[" || c === "(") brackets++
+    else if ((c === "]" || c === ")") && brackets > 0) brackets--
+    else if (c === "{") braces++
+    else if (c === "}" && braces > 0) braces--
+    else if (c === "\n" && braces === 0) {
+      brackets = 0
+      push(i)
+    } else if (c === ";" && braces === 0 && brackets === 0) push(i)
   }
   if (quote) throw new MermaidSyntaxError("Virgolette senza chiusura", text.lastIndexOf('"'))
   push(text.length)

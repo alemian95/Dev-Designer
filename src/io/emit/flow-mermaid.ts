@@ -15,13 +15,10 @@ import type { EmitResult } from "./result"
  * testo va sempre fra virgolette"), non un escape carattere per carattere.
  *
  * `|` invece si scappa come entità (`#124;`), nella stessa lista e nello stesso ordine (dopo `&`,
- * come tutte le altre): il progetto non ha mermaid installato per misurare se il lexer
- * dell'etichetta di un arco (`-->|"…"|`) legge un `|` dentro le virgolette come testo o come il
- * delimitatore che chiude anticipatamente l'etichetta — invece di verificarlo, la domanda si
- * rende superflua: un'entità non contiene mai il carattere delimitatore, quindi l'uscita è valida
- * qualunque cosa faccia quel lexer. Vale anche nel testo di un nodo, dove il `|` non avrebbe
- * bisogno di protezione: una regola sola per tutte le etichette costa meno di un ramo speciale
- * solo per gli archi.
+ * come tutte le altre). Misurato con `mermaid@12.2.0` (`src/io/mermaid/oracle.test.ts`): fra
+ * virgolette il lexer legge `-->|"a | b"|` come etichetta «a | b», quindi l'entità non serve a
+ * Mermaid. Resta perché non costa niente, l'import la decodifica, e togliere una riga dall'escape
+ * cambierebbe il testo esportato di chi lo tiene sotto versione.
  */
 function escapeLabel(text: string): string {
   return text

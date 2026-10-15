@@ -67,8 +67,11 @@ Da un `erDiagram` o un `classDiagram`, incollato o caricato (anche dentro un fil
 scegliendo il blocco), si scelgono le entità o le classi da importare, e con le classi entrano le
 note. Gli elementi nuovi si dispongono da soli sotto il contenuto esistente; uno già presente viene
 sostituito e resta nella sua posizione, e re-importare lo stesso testo non duplica relazioni e note.
-Stili, alias, etichette, namespace e direzione si scartano con un avviso. `flowchart` non si importa
-ancora.
+Stili, alias, etichette, namespace e direzione si scartano con un avviso.
+
+Un `flowchart` o un `graph` si importa intero, senza scelta: i subgraph di primo livello diventano
+pool e i loro figli corsie, e le forme senza equivalente diventano processi, con un avviso.
+Re-importarlo lo aggiunge di nuovo.
 
 ### Esporta
 
@@ -117,8 +120,10 @@ Un documento si modifica da una scheda sola: le altre lo mostrano in sola lettur
 - **Prestazioni misurate fino a 600 entità ER** (p95 del tempo di frame ≤ 20 ms in produzione:
   [la misura](docs/perf/2026-09-13-gate-verde.md)). Classi, flowchart, note e forme non sono
   misurati.
-- **Import Mermaid**: un'istruzione per riga fuori dai blocchi, e un'etichetta di relazione con spazi
-  va fra virgolette. Le relazioni importate non hanno colonne, come quelle disegnate a mano.
+- **Import Mermaid**: nell'ER e nelle classi un'istruzione per riga fuori dai blocchi, e
+  un'etichetta di relazione con spazi va fra virgolette. Le relazioni importate non hanno colonne,
+  come quelle disegnate a mano. Del flowchart si perdono lo stile delle linee, le teste diverse
+  dalla freccia e gli archi da o verso un subgraph.
 - **Import DDL**: i vincoli `UNIQUE` su più colonne vengono ignorati, con un avviso. In MySQL un
   `REFERENCES` senza lista di colonne fa scartare l'intero `CREATE TABLE`.
 - **Classi**: i generici annidati escono in Mermaid in forma approssimata, con un avviso; l'import li
@@ -179,7 +184,8 @@ ognuno in un contesto di browser separato:
   sola lettura che prende il controllo (sul percorso `?fallback=1`).
 - **Import DDL**: import di entità e relazione, undo, reimport senza duplicati.
 - **Import Mermaid**: erDiagram e classDiagram incollati e disposti, reimport senza duplicati, undo,
-  blocco scelto in un Markdown, errore con la riga.
+  blocco scelto in un Markdown, errore con la riga; flowchart con pool e corsie, senza caselle,
+  aggiunto di nuovo al re-import.
 - **Export immagini**: SVG, PNG e copia negli appunti col tema scuro attivo.
 - **Export testo**: i tre formati, copia e download.
 - **Auto layout**: «Disponi» sposta i nodi senza sovrapporli, e si annulla.

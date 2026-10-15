@@ -2,12 +2,15 @@ import type { ClassDiagram, ClassNode, ClassRelation } from "@/model/class/schem
 import type { DevDocument } from "@/model/document"
 import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
 import { splitKey } from "@/model/family"
+import { POOL_MIN_W, type FlowDiagram, type FlowModel, type LaneView, type PoolView } from "@/model/flow/schema"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Note } from "@/model/note/schema"
 import { classLayoutGraph } from "../class/commands"
 import { classDiagram } from "../class-access"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
+import { flowDiagram } from "../flow-access"
+import { flowLayoutGraph, placedBounds, placeInLanes } from "../flow/layout"
 import { rectsBounds, snap, type Point, type Rect } from "../geometry"
 import { nodeRects } from "../kinds/canvas-ops"
 import { nodesBounds } from "../layout-pack"
@@ -111,23 +114,33 @@ export async function placeErImport(
   return { positions, fallback: null }
 }
 
+/** ELK sul grafo; un nodo solo, o nessuno, non passa per il motore. `null` se il motore fallisce. */
+async function runEngine(graph: LayoutGraph, layout: (g: LayoutGraph) => Promise<LayoutPositions>): Promise<LayoutPositions | null> {
+  try {
+    return graph.nodes.length > 1 ? await layout(graph) : Object.fromEntries(graph.nodes.map((n) => [n.id, { x: 0, y: 0 }]))
+  } catch {
+    return null
+  }
+}
+
+/** L'angolo del blocco nuovo: sotto tutto ciò che è sul canvas, con l'origine di `placeNew` (spec §6). */
+function originBelow(occupied: readonly Rect[]): Point {
+  const bounds = rectsBounds(occupied)
+  return bounds ? { x: bounds.x, y: bounds.y + bounds.h + GUTTER } : { x: GUTTER, y: GUTTER }
+}
+
 /**
- * ELK sul grafo dei soli nodi nuovi, poi il blocco traslato sotto `occupied`, con l'origine di
- * `placeNew` (spec §6). Un nodo solo non passa per il motore. `null` se il motore fallisce: il
- * ripiego sulla griglia lo sceglie il chiamante, che conosce le misure della sua famiglia.
+ * ELK sul grafo dei soli nodi nuovi, poi il blocco traslato sotto `occupied` (spec §6). `null` se il
+ * motore fallisce: il ripiego sulla griglia lo sceglie il chiamante, che conosce le misure della sua
+ * famiglia.
  */
 async function layoutBelow(
   graph: LayoutGraph, occupied: readonly Rect[], layout: (g: LayoutGraph) => Promise<LayoutPositions>,
 ): Promise<Record<string, Point> | null> {
-  let raw: LayoutPositions
-  try {
-    raw = graph.nodes.length > 1 ? await layout(graph) : { [graph.nodes[0]!.id]: { x: 0, y: 0 } }
-  } catch {
-    return null
-  }
+  const raw = await runEngine(graph, layout)
+  if (raw === null) return null
   const block = nodesBounds(graph.nodes, raw)!
-  const bounds = rectsBounds(occupied)
-  const origin = bounds ? { x: bounds.x, y: bounds.y + bounds.h + GUTTER } : { x: GUTTER, y: GUTTER }
+  const origin = originBelow(occupied)
   return Object.fromEntries(
     Object.entries(raw).map(([key, p]) => [key, { x: snap(origin.x + p.x - block.x), y: snap(origin.y + p.y - block.y) }]),
   )
@@ -309,5 +322,91 @@ export function importMermaidClass(fragment: ClassImport, placement: Pick<ClassP
       n.model.notes[key] = note
       n.view.nodes[key] = { ...pos, collapsed: false }
     }
+  }
+}
+
+/**
+ * Il flowchart da innestare, con chiavi nuove (spec §5): nodi, archi, pool e corsie prendono un uuid,
+ * come in `addFlowNode` e `addPool`, quindi re-importare lo stesso testo lo duplica. L'ordine dei pool
+ * resta quello del testo.
+ */
+export function rekeyFlow(model: FlowModel): FlowModel {
+  const renamer = () => {
+    const seen = new Map<string, string>()
+    return (old: string): string => {
+      if (!seen.has(old)) seen.set(old, crypto.randomUUID())
+      return seen.get(old)!
+    }
+  }
+  const node = renamer()
+  const lane = renamer()
+  return {
+    pools: Object.fromEntries(
+      Object.values(model.pools).map((p) => [crypto.randomUUID(), { name: p.name, lanes: p.lanes.map((l) => ({ id: lane(l.id), name: l.name })) }]),
+    ),
+    nodes: Object.fromEntries(Object.entries(model.nodes).map(([key, n]) => [node(key), { ...n, lane: n.lane === null ? null : lane(n.lane) }])),
+    edges: Object.fromEntries(Object.values(model.edges).map((e) => [crypto.randomUUID(), { ...e, source: node(e.source), target: node(e.target) }])),
+  }
+}
+
+export interface FlowPlacement {
+  nodes: Record<string, Point>
+  pools: Record<string, PoolView>
+  lanes: Record<string, LaneView>
+  /** Il messaggio del ripiego sulla griglia, se c'è stato. */
+  fallback: string | null
+}
+
+/**
+ * Posizioni dei nodi, pool e altezze delle corsie del flowchart in arrivo (spec §6): la pipeline di
+ * «Disponi» del flowchart (`flowLayoutGraph`, ELK, `placeInLanes`) su un `FlowDiagram` temporaneo
+ * con il solo frammento, poi il blocco, pool compresi, traslato sotto tutto ciò che è sul canvas.
+ * Il temporaneo dà a ogni nodo una vista (`flowLayoutGraph` salta chi non ce l'ha) e ai pool la `y`
+ * del loro ordine nel testo, che `placeInLanes` usa per impilarli. Se il motore fallisce, la griglia
+ * di `placeInGrid` fa da posizioni grezze: corsie e pool restano coerenti, perché passano comunque
+ * per `placeInLanes`.
+ */
+export async function placeFlowImport(
+  doc: DevDocument, model: FlowModel, layout: (g: LayoutGraph) => Promise<LayoutPositions>,
+): Promise<FlowPlacement> {
+  const temporary: FlowDiagram = {
+    model,
+    view: {
+      nodes: Object.fromEntries(Object.keys(model.nodes).map((key) => [key, { x: 0, y: 0, collapsed: false }])),
+      pools: Object.fromEntries(Object.keys(model.pools).map((key, i) => [key, { x: 0, y: i, w: POOL_MIN_W }])),
+      lanes: {},
+    },
+  }
+  const graph = flowLayoutGraph(temporary)
+  const engine = await runEngine(graph, layout)
+  const raw = engine ?? placeInGrid(graph.nodes.map((n) => [n.id, { w: n.w, h: n.h }] as const), [])
+  const fallback = engine === null ? "La disposizione automatica non è riuscita: i nodi nuovi sono in griglia." : null
+  const placed = placeInLanes(temporary, raw)
+  const block = placedBounds(temporary, raw)
+  if (block === null) return { nodes: {}, pools: {}, lanes: {}, fallback }
+  const origin = originBelow(nodeRects(doc))
+  const dx = snap(origin.x - block.x)
+  const dy = snap(origin.y - block.y)
+  return {
+    nodes: Object.fromEntries(Object.entries(placed.positions).map(([key, p]) => [key, { x: p.x + dx, y: p.y + dy }])),
+    pools: Object.fromEntries(Object.entries(placed.pools).map(([key, v]) => [key, { ...v, x: v.x + dx, y: v.y + dy }])),
+    lanes: placed.lanes,
+    fallback,
+  }
+}
+
+/**
+ * Innesta un flowchart letto da Mermaid (spec §5), in un solo comando: si aggiunge sempre, con le
+ * chiavi che gli ha dato `rekeyFlow`, e non tocca niente di ciò che c'era.
+ */
+export function importMermaidFlow(model: FlowModel, placement: Pick<FlowPlacement, "nodes" | "pools" | "lanes">): Recipe {
+  return (draft) => {
+    const d = flowDiagram(draft)
+    Object.assign(d.model.pools, model.pools)
+    Object.assign(d.model.nodes, model.nodes)
+    Object.assign(d.model.edges, model.edges)
+    for (const [key, p] of Object.entries(placement.nodes)) d.view.nodes[key] = { ...p, collapsed: false }
+    Object.assign(d.view.pools, placement.pools)
+    Object.assign(d.view.lanes, placement.lanes)
   }
 }

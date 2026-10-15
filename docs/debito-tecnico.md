@@ -1458,6 +1458,38 @@ Rilievi Minor della revisione finale di `feat/import-mermaid-class` (PR #14), ri
 - **`A~T~ --> B` conta come dichiarazione di `A`** (PR #15): una `A` già presente viene sostituita da
   una classe vuota, come prima della #15. Costo-se-sbagliato: i membri di `A` spariscono, annullabile.
 
+### Import Mermaid del flowchart (2026-10-15)
+
+Rilievi Minor delle revisioni di `feat/import-mermaid-flow`, rinviati.
+
+- **`@{ label: "a}b" }`: la `}` fra virgolette chiude il blocco.** `node()` in
+  `src/io/mermaid/flow-parse.ts` usa `indexOf("}")`; Mermaid lo accetta. Rimedio: scorrere il blocco
+  rispettando le virgolette. Costo-se-sbagliato: errore «Testo inatteso», nessun import sbagliato.
+- **Una `{` non chiusa fuori dalle virgolette assorbe le righe dopo** (`statements()`), perché `{` resta
+  aperta su più righe per `@{…}` e `accDescr{…}`. Rimedio: limitare l'assorbimento ai due casi. Costo-se-sbagliato:
+  finisce in un errore, nessun import sbagliato.
+- **`parseFlow` è lunga, con closure annidate**; `{ text: decode(x.trim()), markdown: false }` e `/^".*"$/s`
+  sono ripetuti. Rimedio: estrarre un helper per il testo e spezzare la funzione. Costo-se-sbagliato:
+  manutenzione più cara.
+- **Test di linearità a tetto assoluto (2 s)**, come ER e classi. Rimedio: confrontare due taglie.
+  Costo-se-sbagliato: falso rosso su una macchina lenta.
+- **`FlowAstEdge.at` è l'inizio della dichiarazione, non della freccia**, e non è documentato.
+  Rimedio: un commento sul tipo. Costo-se-sbagliato: righe d'avviso fuorvianti per un chi riusa il campo.
+- **`mapFlow`**: l'avviso markdown può citare una menzione il cui testo è poi sovrascritto;
+  `path[Math.min(1, …)]` è poco leggibile; il round-trip è provato su un solo modello. Rimedio: citare la
+  menzione che vince, nominare l'indice, aggiungere modelli. Costo-se-sbagliato: avviso impreciso.
+- **Oracolo** (`src/io/mermaid/oracle.test.ts`): i subgraph si confrontano in un solo verso (dal db al
+  nostro AST), i nodi come Set, con cast `as unknown as` all'API interna di Mermaid (fallisce a runtime al
+  primo aggiornamento); il `|` nel testo dei nodi e il testo degli archi non sono confrontati col db.
+  Rimedio: confronto nei due versi, Array, estendere il confronto. Costo-se-sbagliato: una divergenza
+  passa inosservata.
+- **I test di `placeFlowImport` non verificano il contenimento dei nodi nei rettangoli dei pool.**
+  Costo-se-sbagliato: un nodo fuori dal suo pool non fa rosso.
+- **Dialog** (`src/ui/import/ImportMermaidDialog.tsx`): niente singolare («Importa 1 nodi», «1 archi»),
+  come già per entità e classi; le catene `kind === …` vanno in una tabella alla quarta famiglia; il
+  conteggio dei pool del riepilogo è coperto solo dall'e2e. Costo-se-sbagliato: testi sgrammaticati.
+- **README**: non cita i subgraph oltre il secondo livello; «senza caselle» nella lista e2e è ambiguo.
+
 ---
 
 ## Perduto

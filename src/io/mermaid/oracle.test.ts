@@ -3,12 +3,17 @@ import mermaid from "mermaid"
 import { describe, expect, it } from "vitest"
 import { emitClassMermaid } from "@/io/emit/class-mermaid"
 import { emitMermaid } from "@/io/emit/er-mermaid"
+import { emitFlowMermaid } from "@/io/emit/flow-mermaid"
 import type { ClassModel } from "@/model/class/schema"
 import type { ErModel } from "@/model/er/schema"
+import type { FlowModel } from "@/model/flow/schema"
 import { CLASS_VALID } from "./class-fixtures"
 import { parseClass } from "./class-parse"
 import { ER_VALID } from "./er-fixtures"
 import { parseEr } from "./er-parse"
+import { FLOW_VALID } from "./flow-fixtures"
+import { mapFlow } from "./flow-map"
+import { parseFlow } from "./flow-parse"
 
 /**
  * Mermaid stesso come oracolo (spec §8): ciò che il nostro parser accetta come valido lo deve
@@ -63,5 +68,60 @@ describe("oracolo Mermaid: classDiagram", () => {
     }
     const notes = { n: { text: "a < b & \"c\"\nd", anchor: "class/Ordine" } }
     expect(await mermaidAccepts(emitClassMermaid(model, notes).text)).toBe(true)
+  })
+})
+
+/** Il db di Mermaid per un flowchart: API interna e deprecata, che qui serve solo da confronto (spec §3.1). */
+interface FlowDb {
+  getVertices(): Map<string, { id: string }>
+  getEdges(): { start: string; end: string; text: string }[]
+  getSubGraphs(): { id: string; nodes: string[] }[]
+}
+const flowDb = async (text: string): Promise<FlowDb> => {
+  const api = (mermaid as unknown as { mermaidAPI: { getDiagramFromText(t: string): Promise<{ db: FlowDb }> } }).mermaidAPI
+  return (await api.getDiagramFromText(text)).db
+}
+
+describe("oracolo Mermaid: flowchart", () => {
+  it.each(Object.entries(FLOW_VALID))("la fixture %s piace a entrambi i parser, con gli stessi nodi, archi e subgraph", async (_, text) => {
+    expect(await mermaidAccepts(text)).toBe(true)
+    const { ast } = parseFlow(text)
+    const db = await flowDb(text)
+    const subgraphIds = new Set(db.getSubGraphs().map((s) => s.id))
+    const ours = new Set(ast.nodes.map((n) => n.id).filter((id) => !ast.subgraphs.some((s) => s.id === id)))
+    expect(ours).toEqual(new Set([...db.getVertices().keys()].filter((id) => !subgraphIds.has(id))))
+    expect(ast.edges.map((e) => [e.source, e.target])).toEqual(db.getEdges().map((e) => [e.start, e.end]))
+    // Il nodo di ogni subgraph è il primo che lo nomina in ordine di chiusura, come `makeUniq`.
+    const owner = (id: string) => ast.subgraphs.find((s) => ast.nodes.some((n) => n.id === id && n.subgraph === s.id))?.id
+    for (const sg of db.getSubGraphs()) {
+      for (const id of sg.nodes.filter((n) => !subgraphIds.has(n))) expect([id, owner(id)]).toEqual([id, sg.id])
+    }
+  })
+
+  it("legge un «|» fra virgolette nell'etichetta di un arco come testo, e l'export lo scappa comunque", async () => {
+    const db = await flowDb('flowchart LR\n  A -->|"a | b"| B\n')
+    expect(db.getEdges()[0]!.text).toBe("a | b")
+    const model: FlowModel = {
+      pools: {},
+      nodes: { a: { label: "x | y", shape: "process", lane: null }, b: { label: "b", shape: "decision", lane: null } },
+      edges: { e: { source: "a", target: "b", label: "a | b" } },
+    }
+    const { text } = emitFlowMermaid(model)
+    expect(await mermaidAccepts(text)).toBe(true)
+    expect(mapFlow(parseFlow(text).ast, text).model.edges["0"]!.label).toBe("a | b")
+  })
+
+  it("l'export del flowchart è Mermaid valido, con pool, corsie, entità e a capo", async () => {
+    const model: FlowModel = {
+      pools: { p: { name: "Ufficio", lanes: [{ id: "l1", name: "A & B" }, { id: "l2", name: "Corsia" }] } },
+      nodes: {
+        a: { label: "Inizio", shape: "terminal", lane: null },
+        b: { label: 'a < b & "c"\nd', shape: "io", lane: "l1" },
+        c: { label: "Va?", shape: "decision", lane: "l2" },
+        d: { label: "Sotto", shape: "subprocess", lane: "l2" },
+      },
+      edges: { e1: { source: "a", target: "b", label: "" }, e2: { source: "b", target: "c", label: "sì" }, e3: { source: "c", target: "d", label: "" } },
+    }
+    expect(await mermaidAccepts(emitFlowMermaid(model).text)).toBe(true)
   })
 })

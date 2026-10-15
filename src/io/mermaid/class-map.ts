@@ -19,7 +19,7 @@ export interface ClassFragment {
 
 type ClassMapCategory =
   | "label" | "generic" | "stereotype" | "annotations" | "abstractAttribute" | "duplicateAttribute" | "duplicateMethod"
-  | "dotted" | "twoHeads" | "lollipop" | "danglingNote" | "unnamed"
+  | "dotted" | "twoHeads" | "lollipop" | "danglingNote" | "unnamed" | "reserved"
 
 const MESSAGES: Record<ClassMapCategory, string> = {
   label: "Etichette delle classi scartate, il nome resta l'id",
@@ -34,6 +34,7 @@ const MESSAGES: Record<ClassMapCategory, string> = {
   lollipop: "Interfacce lollipop scartate",
   danglingNote: "Note su una classe che non c'è, diventate libere",
   unnamed: "Membri senza nome scartati",
+  reserved: "Classe «__proto__» scartata con le sue relazioni: il documento non può tenere questo nome",
 }
 
 const VISIBILITY: Record<ClassAstVisibility, Visibility> = { "+": "public", "-": "private", "#": "protected", "~": "package", "": "public" }
@@ -64,13 +65,22 @@ const signature = (m: { name: string; parameters: readonly { type: string }[] })
  */
 export function mapClass(ast: ClassAst, text: string): ClassFragment {
   const findings: Finding<ClassMapCategory>[] = []
-  const classes: Record<string, ClassNode> = {}
+  // Senza prototipo: le chiavi vengono dal testo, e «constructor» o «toString» sono nomi validi.
+  const classes: Record<string, ClassNode> = Object.create(null)
   const annotations = new Map<string, string[]>()
 
-  const ensure = (id: string): ClassNode => (classes[id] ??= { name: id, stereotype: "class", attributes: [], methods: [] })
+  /** La classe, creata se manca; `null` per «__proto__», che zod e immer perderebbero. */
+  const ensure = (id: string, at: number): ClassNode | null => {
+    if (id === "__proto__") {
+      findings.push({ category: "reserved", at })
+      return null
+    }
+    return (classes[id] ??= { name: id, stereotype: "class", attributes: [], methods: [] })
+  }
 
   for (const decl of ast.classes) {
-    const cls = ensure(decl.id)
+    const cls = ensure(decl.id, decl.at)
+    if (cls === null) continue
     if (decl.label !== null) findings.push({ category: "label", at: decl.at, subject: decl.id })
     if (decl.generic !== null) findings.push({ category: "generic", at: decl.at, subject: `${decl.id}~${decl.generic}~` })
     for (const a of decl.annotations) annotations.set(decl.id, [...(annotations.get(decl.id) ?? []), a])
@@ -104,15 +114,16 @@ export function mapClass(ast: ClassAst, text: string): ClassFragment {
 
   for (const [id, list] of annotations) {
     const at = ast.classes.find((c) => c.id === id)!.at
-    const stereotype = STEREOTYPE[list[0]!.toLowerCase()]
+    const word = list[0]!.toLowerCase()
+    const stereotype = Object.hasOwn(STEREOTYPE, word) ? STEREOTYPE[word] : undefined
     if (stereotype === undefined) findings.push({ category: "stereotype", at, subject: `${id} «${list[0]}»` })
     if (list.length > 1) findings.push({ category: "annotations", at, subject: id })
     classes[id]!.stereotype = stereotype ?? "class"
   }
 
   const relations = ast.relations.flatMap((r: ClassAstRelation): ClassRelation[] => {
-    ensure(r.left)
-    ensure(r.right)
+    const ends = [ensure(r.left, r.at), ensure(r.right, r.at)]
+    if (ends.includes(null)) return []
     if (r.leftHead === "lollipop" || r.rightHead === "lollipop") {
       findings.push({ category: "lollipop", at: r.at })
       return []

@@ -69,4 +69,18 @@ describe("mapEr", () => {
     expect(relationships[0]!.target.cardinality).toBe("one")
     expect(warnings).toHaveLength(1)
   })
+
+  it("legge come entità qualunque i nomi del prototipo, e scarta «__proto__» con le sue relazioni senza toccarlo", () => {
+    const { entities, relationships, referenced, warnings } = read(
+      "erDiagram\n  constructor {\n    int id\n  }\n  toString ||--o{ constructor : x\n  __proto__ {\n    int id\n  }\n  __proto__ ||--|| B : y\n",
+    )
+    expect(Object.keys(entities)).toEqual(["constructor", "toString", "B"])
+    expect(entities["constructor"]!.attributes.map((a) => a.name)).toEqual(["id"])
+    expect(relationships.map((r) => `${r.source.entity}>${r.target.entity}`)).toEqual(["constructor>toString"])
+    expect(referenced).toEqual(["toString", "B"])
+    expect(warnings.map((w) => w.message)).toEqual([
+      "Entità «__proto__» scartata con le sue relazioni: il documento non può tenere questo nome (righe 6, 9)",
+    ])
+    expect(({} as Record<string, unknown>).attributes).toBeUndefined()
+  })
 })

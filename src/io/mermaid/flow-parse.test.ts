@@ -104,6 +104,11 @@ describe("parseFlow: il resto", () => {
     expect(ast.nodes.map((n) => [n.id, n.subgraph])).toEqual([["x", "subGraph1"]])
   })
 
+  it("non dà a un subgraph con spazi l'id di un subgraph già chiuso dentro di lui", () => {
+    const { ast } = parseFlow("flowchart LR\n  subgraph Due parole\n    subgraph subGraph1\n      x\n    end\n  end\n")
+    expect(ast.subgraphs.map((s) => [s.id, s.parent])).toEqual([["subGraph1", "subGraph2"], ["subGraph2", null]])
+  })
+
   it("legge un subgraph riaperto dentro sé stesso come lo stesso subgraph", () => {
     const self = parseFlow(FLOW_VALID.selfNested!).ast
     expect(self.subgraphs.map((s) => [s.id, s.parent])).toEqual([["A", null]])

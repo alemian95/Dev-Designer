@@ -115,5 +115,8 @@ describe("mapFlow: subgraph", () => {
     const { model } = map("flowchart LR\n  subgraph subGraph0\n    subgraph Due parole\n      x\n    end\n  end\n")
     expect(model.pools).toEqual({ subGraph0: { name: "subGraph0", lanes: [{ id: "subGraph1", name: "Due parole" }] } })
     expect(model.nodes.x!.lane).toBe("subGraph1")
+    const closed = map("flowchart LR\n  subgraph Due parole\n    subgraph subGraph1\n      x\n    end\n  end\n")
+    expect(closed.model.pools).toEqual({ subGraph2: { name: "Due parole", lanes: [{ id: "subGraph1", name: "subGraph1" }] } })
+    expect(closed.model.nodes.x!.lane).toBe("subGraph1")
   })
 })

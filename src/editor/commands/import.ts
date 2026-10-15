@@ -23,7 +23,7 @@ export const GUTTER = 40
  * Non è auto layout: è una disposizione leggibile e trascinabile.
  */
 export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram, occupied: readonly Rect[]): Record<string, Point> {
-  const fresh = Object.entries(entities).filter(([key]) => !(key in diagram.view.nodes))
+  const fresh = Object.entries(entities).filter(([key]) => !Object.hasOwn(diagram.view.nodes, key))
   return placeInGrid(fresh.map(([key, entity]) => [key, entitySize(entity, false)]), occupied)
 }
 
@@ -69,13 +69,13 @@ export function importEr(entities: Record<string, Entity>, relationships: readon
       // `placeNew` copre esattamente le chiavi nuove: leggere la posizione prima di scrivere il nodo
       // fa dire al tipo ciò che prima si sapeva soltanto leggendo le due funzioni insieme.
       const pos = positions[key]
-      if (pos && !(key in d.view.nodes)) d.view.nodes[key] = { ...pos, collapsed: false }
+      if (pos && !Object.hasOwn(d.view.nodes, key)) d.view.nodes[key] = { ...pos, collapsed: false }
     }
 
     // Via le relazioni derivate da una FK delle tabelle in arrivo, altrimenti il re-import le duplica.
     // `source.attributes` vuoto è il marcatore delle relazioni disegnate a mano: quelle sopravvivono.
     for (const [key, rel] of Object.entries(d.model.relationships)) {
-      if (rel.source.entity in entities && rel.source.attributes.length > 0) delete d.model.relationships[key]
+      if (Object.hasOwn(entities, rel.source.entity) && rel.source.attributes.length > 0) delete d.model.relationships[key]
     }
 
     // Le chiavi si assegnano qui, dopo la potatura: prima collidevano con relazioni che stanno per sparire.

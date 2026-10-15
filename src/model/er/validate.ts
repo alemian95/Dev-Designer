@@ -56,7 +56,7 @@ export function validateEr(model: ErModel): Issue[] {
 
   for (const [key, rel] of Object.entries(model.relationships)) {
     for (const end of [rel.source, rel.target]) {
-      const entity = model.entities[end.entity]
+      const entity = Object.hasOwn(model.entities, end.entity) ? model.entities[end.entity] : undefined
       if (!entity) {
         issues.push({ code: "dangling-relationship", severity: "error", edge: key, message: `relazione "${key}": entità "${end.entity}" inesistente` })
         continue

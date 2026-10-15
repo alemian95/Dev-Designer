@@ -44,7 +44,7 @@ export function renameClass(key: string, name: string): Recipe | null {
       if (cls.name !== newName) cls.name = newName
       return
     }
-    if (newName in d.model.classes) return
+    if (Object.hasOwn(d.model.classes, newName)) return
     const moved: ClassNode = { ...cls, name: newName }
     delete d.model.classes[key]
     d.model.classes[newName] = moved
@@ -133,7 +133,7 @@ export function duplicateClasses(model: ClassModel, keys: readonly string[]): { 
   const taken: Record<string, true> = Object.fromEntries(Object.keys(model.classes).map((k) => [k, true]))
   const plan: { from: string; to: string }[] = []
   for (const from of keys) {
-    if (from in model.classes) {
+    if (Object.hasOwn(model.classes, from)) {
       const to = uniqueKey(taken, from)
       taken[to] = true
       plan.push({ from, to })

@@ -22,9 +22,9 @@ const NEW_ATTRIBUTE: Attribute = {
 
 /** `base` se libera, altrimenti `base_2`, `base_3`, … */
 export function uniqueKey(existing: Record<string, unknown>, base: string): string {
-  if (!(base in existing)) return base
+  if (!Object.hasOwn(existing, base)) return base
   let i = 2
-  while (`${base}_${i}` in existing) i++
+  while (Object.hasOwn(existing, `${base}_${i}`)) i++
   return `${base}_${i}`
 }
 
@@ -54,7 +54,7 @@ export function renameEntity(key: string, name: string, schema?: string): Recipe
     const entity = d.model.entities[key]
     if (!entity) return
     const newKey = entityKey({ name: newName, schema: newSchema })
-    if (newKey !== key && newKey in d.model.entities) return
+    if (newKey !== key && Object.hasOwn(d.model.entities, newKey)) return
     if (newKey === key) {
       // Assegnare comunque produrrebbe una patch anche a valore identico: su un'entità senza schema
       // `entity.schema = undefined` crea una chiave che nel base non c'è, e Immer la conta come modifica.
@@ -179,7 +179,7 @@ export function duplicateEntities(model: ErModel, keys: readonly string[]): { ke
     if (!entity) continue
     let i = 1
     let name = `${entity.name}_copy`
-    while (entityKey({ name, schema: entity.schema }) in taken) name = `${entity.name}_copy${++i}`
+    while (Object.hasOwn(taken, entityKey({ name, schema: entity.schema }))) name = `${entity.name}_copy${++i}`
     const to = entityKey({ name, schema: entity.schema })
     taken[to] = true
     plan.push({ from, to, name })

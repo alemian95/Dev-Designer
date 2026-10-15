@@ -363,7 +363,10 @@ export function parseFlow(input: string): FlowParseResult {
       if (closing.alias) continue
       const { sg, auto, members, children } = closing
       if (auto) {
-        sg.id = `subGraph${ast.subgraphs.length}`
+        // Un `subGraphN` uguale a un subgraph ancora aperto ne sarebbe figlio e omonimo: il map girerebbe all'infinito.
+        let n = ast.subgraphs.length
+        while (open.some((o) => o.sg.id === `subGraph${n}`)) n++
+        sg.id = `subGraph${n}`
         for (const m of members) if (m.subgraph === "") m.subgraph = sg.id
         for (const c of children) c.parent = sg.id
       }

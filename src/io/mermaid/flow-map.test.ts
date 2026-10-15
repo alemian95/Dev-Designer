@@ -110,4 +110,10 @@ describe("mapFlow: subgraph", () => {
     expect(nested.model.nodes.A!.lane).toBe("l")
     expect(nested.warnings).toEqual([])
   })
+
+  it("termina anche con un subgraph esplicito che si chiama come un id automatico", () => {
+    const { model } = map("flowchart LR\n  subgraph subGraph0\n    subgraph Due parole\n      x\n    end\n  end\n")
+    expect(model.pools).toEqual({ subGraph0: { name: "subGraph0", lanes: [{ id: "subGraph1", name: "Due parole" }] } })
+    expect(model.nodes.x!.lane).toBe("subGraph1")
+  })
 })

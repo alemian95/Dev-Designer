@@ -1,5 +1,5 @@
 /**
- * End-to-end dell'import Mermaid, ER e classi: incolla → analizza → importa → re-importa senza
+ * End-to-end dell'import Mermaid, ER, classi e flowchart: incolla → analizza → importa → re-importa senza
  * duplicare → annulla. Copre quello che i test unitari non vedono: la voce di menu, l'incollata vera, la
  * disposizione col worker di ELK sulla build di produzione e il selettore dei blocchi di un `.md`.
  *
@@ -32,6 +32,17 @@ const CLASSES = `classDiagram
   direction LR
 `
 
+const FLOW = `flowchart TD
+  inizio([Inizio]) --> a
+  subgraph p [Ufficio]
+    a[Raccogli] --> b{Completo?}
+    subgraph c [Contabilità]
+      b -->|sì| d[[Registra]]
+    end
+  end
+  b -.-> a
+`
+
 const MARKDOWN = "# Note\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\n" + ER + "```\n"
 
 /** Apre «Importa Mermaid…» e aspetta il dialog, per la stessa ragione di `openImportDialog` in import.mjs. */
@@ -60,6 +71,8 @@ async function closeDialog(page) {
 
 const edgeCount = (page) => page.evaluate(() => document.querySelectorAll("[data-edge-id]").length)
 const classEdgeCount = (page) => page.evaluate(() => document.querySelectorAll('[data-edge-id^="class/"]').length)
+const flowEdgeCount = (page) => page.evaluate(() => document.querySelectorAll('[data-edge-id^="flow/"]').length)
+const poolCount = (page) => page.evaluate(() => document.querySelectorAll("[data-pool]").length)
 
 /** Esegue lo scenario in un proprio contesto del browser condiviso. `true` se tutti i passi passano. */
 export async function run(browser, base) {
@@ -118,10 +131,10 @@ export async function run(browser, base) {
       await expectNodes(page, 0)
     })
 
-    await step("in un .md sceglie il blocco ER e spiega quello che non si importa", async () => {
+    await step("in un .md analizza il primo blocco, un flowchart, e passa al blocco ER", async () => {
       await openDialog(page)
       await paste(page, MARKDOWN)
-      await expectText(page, "[data-import-error]", "Per ora si importano erDiagram e classDiagram")
+      await expectText(page, "[data-import-summary]", "2 nodi, 1 archi, 0 pool")
       await page.locator("[data-import-blocks]").getByText("Blocco 2 · ER").click()
       await expectText(page, "[data-import-summary]", "3 entità")
       await closeDialog(page)
@@ -180,6 +193,40 @@ export async function run(browser, base) {
       await page.keyboard.press("ControlOrMeta+z")
       await page.keyboard.press("ControlOrMeta+z")
       await expectNodes(page, 0)
+    })
+
+    await step("analizza il flowchart incollato, senza caselle e con gli avvisi su direzione e stile", async () => {
+      await openDialog(page)
+      await paste(page, FLOW)
+      await expectText(page, "[data-import-summary]", "4 nodi, 4 archi, 1 pool")
+      await expectText(page, "[data-import-warnings]", "2 avvisi")
+      const boxes = await page.getByRole("checkbox").count()
+      if (boxes !== 0) throw new Error(`il flowchart non ha caselle, trovate ${boxes}`)
+    })
+
+    await step("importa il flowchart intero, con il pool e le sue corsie, disposto da ELK", async () => {
+      await page.getByRole("button", { name: /^Importa 4 nodi$/ }).click()
+      await page.waitForSelector("[data-import-mermaid-dialog] strong")
+      await expectText(page, "[data-import-mermaid-dialog]", "con 1 pool")
+      await closeDialog(page)
+      await expectNodes(page, 4)
+      const edges = await flowEdgeCount(page)
+      if (edges !== 4) throw new Error(`attesi 4 archi, trovati ${edges}`)
+      if ((await poolCount(page)) !== 1) throw new Error("atteso 1 pool")
+    })
+
+    await step("il re-import del flowchart lo aggiunge di nuovo, e due ⌘Z lo tolgono", async () => {
+      await openDialog(page)
+      await paste(page, FLOW)
+      await page.getByRole("button", { name: /^Importa 4 nodi$/ }).click()
+      await page.waitForSelector("[data-import-mermaid-dialog] strong")
+      await closeDialog(page)
+      await expectNodes(page, 8)
+      if ((await poolCount(page)) !== 2) throw new Error("attesi 2 pool")
+      await page.keyboard.press("ControlOrMeta+z")
+      await page.keyboard.press("ControlOrMeta+z")
+      await expectNodes(page, 0)
+      if ((await poolCount(page)) !== 0) throw new Error("attesi 0 pool")
     })
   } catch (e) {
     failed = true

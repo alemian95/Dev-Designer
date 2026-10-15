@@ -6,11 +6,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { classDiagram } from "@/editor/class-access"
 import {
-  classImportFates, erImportFates, importMermaidClass, importMermaidEr, placeClassImport, placeErImport, selectClassFragment,
-  selectErFragment, type ImportFate,
+  classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
+  placeFlowImport, rekeyFlow, selectClassFragment, selectErFragment, type ImportFate,
 } from "@/editor/commands/import-mermaid"
 import { documentStore, type Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
+import { flowDiagram } from "@/editor/flow-access"
 import { noteDiagram } from "@/editor/note-access"
 import { layoutEngine } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
@@ -23,12 +24,12 @@ type Stage =
   | { kind: "vuoto" }
   | { kind: "analizzato"; block: MermaidBlock; result: MermaidAnalysis }
   | { kind: "importa" }
-  | { kind: "fatto"; family: Family; elements: number; relations: number; notes: number; warnings: string[] }
+  | { kind: "fatto"; family: Family; elements: number; relations: number; notes: number; pools: number; warnings: string[] }
 
 type Ready = Extract<MermaidAnalysis, { ok: true }>
 type Family = Ready["kind"]
 
-const NOUN: Record<Family, string> = { er: "entità", class: "classi" }
+const NOUN: Record<Family, string> = { er: "entità", class: "classi", flow: "nodi" }
 
 const FATE_LABEL: Record<ImportFate, string> = { nuovo: "nuova", sostituisce: "già presente, verrà sostituita", identico: "identica, saltata" }
 
@@ -39,17 +40,28 @@ function blockLabel(block: MermaidBlock, index: number): string {
   return `Blocco ${index + 1} · ${name}`
 }
 
+/** L'esito di ogni elemento con la casella. Il flowchart non ne ha: si aggiunge sempre, intero (spec §7). */
 function importFates(doc: DevDocument, ready: Ready): Record<string, ImportFate> {
+  if (ready.kind === "flow") return {}
   const referenced = new Set(ready.fragment.referenced)
   return ready.kind === "er"
     ? erImportFates(doc, ready.fragment.entities, referenced)
     : classImportFates(doc, ready.fragment.classes, referenced)
 }
 
-/** Relazioni e note presenti nella famiglia: la differenza prima/dopo il dispatch dice quante ne sono entrate davvero. */
-function counts(doc: DevDocument, family: Family): { relations: number; notes: number } {
-  if (family === "er") return { relations: Object.keys(erDiagram(doc).model.relationships).length, notes: 0 }
-  return { relations: Object.keys(classDiagram(doc).model.relations).length, notes: Object.keys(noteDiagram(doc).model.notes).length }
+/** Quanti elementi entrano col pulsante: quelli scelti, o i nodi del flowchart. Un flowchart di soli subgraph vuoti non si importa. */
+function importable(ready: Ready, chosen: ReadonlySet<string>): number {
+  return ready.kind === "flow" ? Object.keys(ready.fragment.model.nodes).length : chosen.size
+}
+
+/** Relazioni (o archi), note e pool presenti nella famiglia: la differenza prima/dopo il dispatch dice quanti ne sono entrati davvero. */
+function counts(doc: DevDocument, family: Family): { relations: number; notes: number; pools: number } {
+  if (family === "er") return { relations: Object.keys(erDiagram(doc).model.relationships).length, notes: 0, pools: 0 }
+  if (family === "flow") {
+    const { model } = flowDiagram(doc)
+    return { relations: Object.keys(model.edges).length, notes: 0, pools: Object.keys(model.pools).length }
+  }
+  return { relations: Object.keys(classDiagram(doc).model.relations).length, notes: Object.keys(noteDiagram(doc).model.notes).length, pools: 0 }
 }
 
 /** Selezione, disposizione e comando della famiglia: ciò che resta da fare è il dispatch. */
@@ -63,6 +75,11 @@ async function prepareImport(
     const { positions, fallback } = await placeErImport(doc, entities, relationships, layout)
     return { recipe: importMermaidEr(entities, relationships, positions), elements: Object.keys(entities).length, fallback }
   }
+  if (ready.kind === "flow") {
+    const model = rekeyFlow(ready.fragment.model)
+    const placement = await placeFlowImport(doc, model, layout)
+    return { recipe: importMermaidFlow(model, placement), elements: Object.keys(model.nodes).length, fallback: placement.fallback }
+  }
   const present = new Set(Object.keys(classDiagram(doc).model.classes))
   const fragment = selectClassFragment(ready.fragment.classes, ready.fragment.relations, ready.fragment.notes, chosen, present)
   const placement = await placeClassImport(doc, fragment, layout)
@@ -72,6 +89,10 @@ async function prepareImport(
 /** I conteggi del riepilogo, prima dell'import. */
 function summary(ready: Ready): string {
   if (ready.kind === "er") return `${Object.keys(ready.fragment.entities).length} entità, ${ready.fragment.relationships.length} relazioni`
+  if (ready.kind === "flow") {
+    const { nodes, edges, pools } = ready.fragment.model
+    return `${Object.keys(nodes).length} nodi, ${Object.keys(edges).length} archi, ${Object.keys(pools).length} pool`
+  }
   const { classes, relations, notes } = ready.fragment
   return `${Object.keys(classes).length} classi, ${relations.length} relazioni, ${notes.length} note`
 }
@@ -140,6 +161,7 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
       elements,
       relations: after.relations - before.relations,
       notes: after.notes - before.notes,
+      pools: after.pools - before.pools,
       warnings: [...ready.fragment.warnings.map((w) => w.message), ...(fallback ? [fallback] : [])],
     })
   }
@@ -175,17 +197,24 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
         <DialogHeader>
           <DialogTitle>Importa Mermaid</DialogTitle>
           <DialogDescription>
-            Incolla o carica un erDiagram o un classDiagram, anche dentro un file Markdown: gli elementi scelti entrano nel
-            diagramma aperto, in un solo passo annullabile.
+            Incolla o carica un erDiagram, un classDiagram o un flowchart, anche dentro un file Markdown: gli elementi scelti
+            entrano nel diagramma aperto, in un solo passo annullabile.
           </DialogDescription>
         </DialogHeader>
 
         {stage.kind === "fatto" ? (
           <div className="min-h-0 flex-1 space-y-3 overflow-auto text-sm">
-            <p>
-              Importate <strong>{stage.elements}</strong> {NOUN[stage.family]} e <strong>{stage.relations}</strong> relazioni
-              {stage.family === "class" && <>, con <strong>{stage.notes}</strong> note</>}.
-            </p>
+            {stage.family === "flow" ? (
+              <p>
+                Importati <strong>{stage.elements}</strong> nodi e <strong>{stage.relations}</strong> archi, con{" "}
+                <strong>{stage.pools}</strong> pool.
+              </p>
+            ) : (
+              <p>
+                Importate <strong>{stage.elements}</strong> {NOUN[stage.family]} e <strong>{stage.relations}</strong> relazioni
+                {stage.family === "class" && <>, con <strong>{stage.notes}</strong> note</>}.
+              </p>
+            )}
             {stage.warnings.length > 0 && (
               <details open data-import-warnings>
                 <summary className="cursor-pointer text-muted-foreground">{stage.warnings.length} avvisi</summary>
@@ -202,7 +231,7 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
               value={text}
               onChange={(e) => setText(e.target.value)}
               onPaste={onPaste}
-              placeholder="erDiagram o classDiagram …"
+              placeholder="erDiagram, classDiagram o flowchart …"
               className="h-32 w-full resize-y rounded-md border bg-transparent px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
             <div className="flex items-center gap-2">
@@ -270,8 +299,8 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
                   Questo documento è aperto in un&apos;altra scheda: qui è in sola lettura.
                 </p>
               )}
-              <Button onClick={() => void onImport()} disabled={chosen.size === 0 || readOnly}>
-                Importa {chosen.size} {NOUN[ready.kind]}
+              <Button onClick={() => void onImport()} disabled={importable(ready, chosen) === 0 || readOnly}>
+                Importa {importable(ready, chosen)} {NOUN[ready.kind]}
               </Button>
             </>
           )}

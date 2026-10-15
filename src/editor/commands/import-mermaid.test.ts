@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest"
+import type { ClassNode, ClassRelation } from "@/model/class/schema"
 import { createDocument } from "@/model/document"
 import type { Entity, Relationship } from "@/model/er/schema"
 import type { LayoutGraph } from "@/model/layout"
+import { classDiagram } from "../class-access"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
+import { noteDiagram } from "../note-access"
 import { importEr } from "./import"
-import { erImportFates, importMermaidEr, placeErImport, selectErFragment } from "./import-mermaid"
+import {
+  classImportFates, erImportFates, importMermaidClass, importMermaidEr, placeClassImport, placeErImport, sameClassRelation,
+  selectClassFragment, selectErFragment, type ClassImport,
+} from "./import-mermaid"
 
 const entity = (name: string, attributes: string[] = ["id"]): Entity => ({
   name,
@@ -112,5 +118,136 @@ describe("placeErImport", () => {
     })
     expect(Object.keys(positions)).toEqual(["a", "b"])
     expect(fallback).toMatch(/griglia/)
+  })
+})
+
+const cls = (name: string, attributes: string[] = []): ClassNode => ({
+  name,
+  stereotype: "class",
+  attributes: attributes.map((n) => ({ name: n, type: "int", visibility: "public", isStatic: false })),
+  methods: [],
+})
+
+/** Una relazione come la produce `mapClass`: ruoli vuoti. */
+const classRel = (source: string, target: string, kind: ClassRelation["kind"] = "generalization"): ClassRelation => ({
+  kind,
+  source: { class: source, multiplicity: "", role: "" },
+  target: { class: target, multiplicity: "", role: "" },
+})
+
+const classes = () => classDiagram(doc())
+const notes = () => Object.values(noteDiagram(doc()).model.notes)
+const at = (x: number, y: number) => ({ x, y })
+
+describe("importMermaidClass", () => {
+  it("crea classi, relazioni e note alle posizioni date", () => {
+    const fragment: ClassImport = { classes: { A: cls("A"), B: cls("B") }, relations: [classRel("B", "A")], notes: { n1: { text: "ciao", anchor: "class/A" } } }
+    documentStore.getState().dispatch(importMermaidClass(fragment, { classes: { A: at(40, 40), B: at(340, 40) }, notes: { n1: at(40, 300) } }))
+    expect(Object.keys(classes().model.classes)).toEqual(["A", "B"])
+    expect(classes().view.nodes.B).toEqual({ x: 340, y: 40, collapsed: false })
+    expect(Object.values(classes().model.relations)).toEqual([classRel("B", "A")])
+    expect(noteDiagram(doc()).model.notes.n1).toEqual({ text: "ciao", anchor: "class/A" })
+    expect(noteDiagram(doc()).view.nodes.n1).toEqual({ x: 40, y: 300, collapsed: false })
+  })
+
+  it("sostituisce una classe presente, le lascia la posizione e le tiene la nota ancorata", () => {
+    documentStore.getState().dispatch(importMermaidClass({ classes: { A: cls("A") }, relations: [], notes: { n1: { text: "x", anchor: "class/A" } } }, { classes: { A: at(40, 40) }, notes: { n1: at(0, 300) } }))
+    documentStore.getState().dispatch(importMermaidClass({ classes: { A: cls("A", ["id"]) }, relations: [], notes: {} }, { classes: { A: at(999, 999) }, notes: {} }))
+    expect(classes().model.classes.A!.attributes.map((a) => a.name)).toEqual(["id"])
+    expect(classes().view.nodes.A).toMatchObject({ x: 40, y: 40 })
+    expect(notes()).toEqual([{ text: "x", anchor: "class/A" }])
+  })
+
+  it("re-importare lo stesso testo non duplica relazioni e note, una relazione diversa si aggiunge", () => {
+    const run = (kind: ClassRelation["kind"], noteKey: string) =>
+      documentStore.getState().dispatch(importMermaidClass(
+        { classes: { A: cls("A"), B: cls("B") }, relations: [classRel("B", "A", kind)], notes: { [noteKey]: { text: "nota", anchor: null } } },
+        { classes: { A: at(40, 40), B: at(340, 40) }, notes: { [noteKey]: at(40, 300) } },
+      ))
+    run("generalization", "n1")
+    run("generalization", "n2")
+    expect(Object.keys(classes().model.relations)).toHaveLength(1)
+    expect(notes()).toHaveLength(1)
+    run("realization", "n3")
+    expect(Object.keys(classes().model.relations)).toHaveLength(2)
+  })
+
+  it("si annulla con un solo undo", () => {
+    documentStore.getState().dispatch(importMermaidClass(
+      { classes: { A: cls("A"), B: cls("B") }, relations: [classRel("B", "A")], notes: { n1: { text: "x", anchor: null } } },
+      { classes: { A: at(0, 0), B: at(0, 0) }, notes: { n1: at(0, 0) } },
+    ))
+    documentStore.getState().undo()
+    expect(classes().model.classes).toEqual({})
+    expect(classes().model.relations).toEqual({})
+    expect(notes()).toEqual([])
+  })
+})
+
+describe("classImportFates, sameClassRelation e selectClassFragment", () => {
+  it("distinguono nuovo, sostituisce e identico", () => {
+    documentStore.getState().dispatch(importMermaidClass({ classes: { A: cls("A"), B: cls("B") }, relations: [], notes: {} }, { classes: { A: at(0, 0), B: at(0, 0) }, notes: {} }))
+    expect(classImportFates(doc(), { A: cls("A"), B: cls("B", ["x"]), C: cls("C") })).toEqual({ A: "identico", B: "sostituisce", C: "nuovo" })
+  })
+
+  it("considerano uguali una navigabilità assente e una falsa, e diverse due molteplicità", () => {
+    expect(sameClassRelation(classRel("B", "A", "association"), { ...classRel("B", "A", "association"), navigable: false })).toBe(true)
+    expect(sameClassRelation(classRel("B", "A"), { ...classRel("B", "A"), target: { class: "A", multiplicity: "1", role: "" } })).toBe(false)
+  })
+
+  it("ignorano il ruolo, che Mermaid non porta: il re-import del proprio export non duplica", () => {
+    const withRole: ClassRelation = { ...classRel("B", "A"), source: { class: "B", multiplicity: "", role: "cliente" } }
+    expect(sameClassRelation(withRole, classRel("B", "A"))).toBe(true)
+  })
+
+  it("tengono solo relazioni e note ancorate con estremi scelti o già presenti, e danno una chiave alle note", () => {
+    const out = selectClassFragment(
+      { A: cls("A"), B: cls("B"), C: cls("C") },
+      [classRel("B", "A"), classRel("C", "A"), classRel("B", "Z")],
+      [{ text: "libera", anchor: null }, { text: "su C", anchor: "class/C" }, { text: "su Z", anchor: "class/Z" }],
+      new Set(["A", "B"]), new Set(["Z"]),
+    )
+    expect(Object.keys(out.classes)).toEqual(["A", "B"])
+    expect(out.relations).toEqual([classRel("B", "A"), classRel("B", "Z")])
+    expect(Object.values(out.notes)).toEqual([{ text: "libera", anchor: null }, { text: "su Z", anchor: "class/Z" }])
+    expect(Object.keys(out.notes).every((k) => /^[0-9a-f-]{36}$/.test(k))).toBe(true)
+  })
+})
+
+describe("placeClassImport", () => {
+  it("dispone con il motore le sole classi nuove e le note, con l'arco dalla classe alla sua nota", async () => {
+    documentStore.getState().dispatch(importMermaidClass({ classes: { A: cls("A") }, relations: [], notes: {} }, { classes: { A: at(40, 40) }, notes: {} }))
+    const fragment: ClassImport = {
+      classes: { A: cls("A"), B: cls("B"), C: cls("C") },
+      relations: [classRel("C", "B"), classRel("B", "A")],
+      notes: { n1: { text: "su C", anchor: "class/C" } },
+    }
+    const { classes: placed, notes: placedNotes, fallback } = await placeClassImport(doc(), fragment, async (g) => {
+      expect(g.nodes.map((n) => n.id)).toEqual(["B", "C", "n1"])
+      expect(g.edges.map((e) => [e.source, e.target])).toEqual([["B", "C"], ["C", "n1"]])
+      return fakeLayout(g)
+    })
+    expect(fallback).toBeNull()
+    expect(Object.keys(placed)).toEqual(["B", "C"])
+    expect(Object.keys(placedNotes)).toEqual(["n1"])
+    expect(placed.B!.x).toBe(40)
+    expect(placed.B!.y).toBeGreaterThan(classes().view.nodes.A!.y)
+  })
+
+  it("non dispone una nota identica a una presente", async () => {
+    documentStore.getState().dispatch(importMermaidClass({ classes: {}, relations: [], notes: { n1: { text: "x", anchor: null } } }, { classes: {}, notes: { n1: at(40, 40) } }))
+    const placement = await placeClassImport(doc(), { classes: {}, relations: [], notes: { n2: { text: "x", anchor: null } } }, async () => {
+      throw new Error("non doveva essere chiamato")
+    })
+    expect(placement).toEqual({ classes: {}, notes: {}, fallback: null })
+  })
+
+  it("se il motore fallisce ripiega sulla griglia, con un messaggio", async () => {
+    const placement = await placeClassImport(doc(), { classes: { A: cls("A"), B: cls("B") }, relations: [], notes: { n1: { text: "x", anchor: null } } }, async () => {
+      throw new Error("timeout")
+    })
+    expect(Object.keys(placement.classes)).toEqual(["A", "B"])
+    expect(Object.keys(placement.notes)).toEqual(["n1"])
+    expect(placement.fallback).toMatch(/griglia/)
   })
 })

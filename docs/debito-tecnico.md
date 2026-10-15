@@ -1489,10 +1489,6 @@ Rilievi Minor delle revisioni di `feat/import-mermaid-flow`, rinviati.
   come già per entità e classi; le catene `kind === …` vanno in una tabella alla quarta famiglia; il
   conteggio dei pool del riepilogo è coperto solo dall'e2e. Costo-se-sbagliato: testi sgrammaticati.
 - **README**: non cita i subgraph oltre il secondo livello; «senza caselle» nella lista e2e è ambiguo.
-- **Fuori da questo branch, già in master**: `er-map.ts` (`entities[key] ??=`) e `class-map.ts`
-  (`classes[id] ??=`) hanno il difetto di prototipo corretto qui in `flow-map.ts`: un nome `constructor` o
-  `__proto__` perde l'elemento o sporca `Object.prototype`. Rimedio: `Object.create(null)` come in
-  `flow-map.ts`, con un test. Costo-se-sbagliato: un elemento sparisce in silenzio.
 
 ---
 

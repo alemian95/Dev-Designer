@@ -2,15 +2,19 @@ import { beforeEach, describe, expect, it } from "vitest"
 import type { ClassNode, ClassRelation } from "@/model/class/schema"
 import { createDocument } from "@/model/document"
 import type { Entity, Relationship } from "@/model/er/schema"
+import { FlowDiagramSchema, LANE_MIN_H, POOL_MIN_W, type FlowModel } from "@/model/flow/schema"
 import type { LayoutGraph } from "@/model/layout"
 import { classDiagram } from "../class-access"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
+import { flowDiagram } from "../flow-access"
+import { expectLaneInvariant } from "../flow/lane-invariant"
+import { withPool } from "../flow/pool-fixture"
 import { noteDiagram } from "../note-access"
 import { importEr } from "./import"
 import {
-  classImportFates, erImportFates, importMermaidClass, importMermaidEr, placeClassImport, placeErImport, sameClassRelation,
-  selectClassFragment, selectErFragment, type ClassImport,
+  classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
+  placeFlowImport, rekeyFlow, sameClassRelation, selectClassFragment, selectErFragment, type ClassImport,
 } from "./import-mermaid"
 
 const entity = (name: string, attributes: string[] = ["id"]): Entity => ({
@@ -259,5 +263,95 @@ describe("placeClassImport", () => {
     expect(Object.keys(placement.classes)).toEqual(["A", "B"])
     expect(Object.keys(placement.notes)).toEqual(["n1"])
     expect(placement.fallback).toMatch(/griglia/)
+  })
+})
+
+/** Un flowchart come lo produce `mapFlow`: un nodo libero e un pool con la corsia implicita e una figlia. */
+const FLOW: FlowModel = {
+  pools: { p: { name: "Ufficio", lanes: [{ id: "p", name: "Ufficio" }, { id: "c", name: "Conti" }] } },
+  nodes: {
+    a: { label: "Inizio", shape: "terminal", lane: null },
+    b: { label: "Passo", shape: "process", lane: "p" },
+    c: { label: "Va?", shape: "decision", lane: "c" },
+  },
+  edges: { "0": { source: "a", target: "b", label: "" }, "1": { source: "b", target: "c", label: "sì" } },
+}
+
+const flow = () => flowDiagram(doc())
+
+/** Disposizione e innesto come li fa il dialog. */
+async function importFlow(model: FlowModel, layout = fakeLayout): Promise<FlowModel> {
+  const fresh = rekeyFlow(model)
+  documentStore.getState().dispatch(importMermaidFlow(fresh, await placeFlowImport(doc(), fresh, layout)))
+  return fresh
+}
+
+describe("rekeyFlow", () => {
+  it("dà uuid nuovi a nodi, archi, pool e corsie, e tiene i riferimenti", () => {
+    const fresh = rekeyFlow(FLOW)
+    const [pool] = Object.values(fresh.pools)
+    const byLabel = Object.fromEntries(Object.entries(fresh.nodes).map(([key, n]) => [n.label, { key, ...n }]))
+    expect(Object.keys(fresh.nodes).some((k) => k in FLOW.nodes)).toBe(false)
+    expect(pool!.lanes.map((l) => l.name)).toEqual(["Ufficio", "Conti"])
+    expect(byLabel.Passo!.lane).toBe(pool!.lanes[0]!.id)
+    expect(byLabel["Va?"]!.lane).toBe(pool!.lanes[1]!.id)
+    expect(Object.values(fresh.edges).map((e) => [e.source, e.target])).toEqual([
+      [byLabel.Inizio!.key, byLabel.Passo!.key], [byLabel.Passo!.key, byLabel["Va?"]!.key],
+    ])
+  })
+})
+
+describe("placeFlowImport e importMermaidFlow", () => {
+  it("passa per il grafo di «Disponi» e mette nodi e pool sotto il contenuto, con i minimi", async () => {
+    documentStore.getState().load(withPool(createDocument("prova", "doc-1")))
+    const fresh = rekeyFlow(FLOW)
+    const placement = await placeFlowImport(doc(), fresh, async (g) => {
+      expect(g.direction).toBe("RIGHT")
+      expect(g.edges).toHaveLength(2)
+      return fakeLayout(g)
+    })
+    expect(placement.fallback).toBeNull()
+    const [poolKey] = Object.keys(fresh.pools)
+    const pool = placement.pools[poolKey!]!
+    expect(pool.y).toBeGreaterThanOrEqual(160 + 40)
+    expect(pool.w).toBeGreaterThanOrEqual(POOL_MIN_W)
+    expect(Object.values(placement.lanes).every((l) => l.h >= LANE_MIN_H)).toBe(true)
+    expect(Object.keys(placement.nodes).sort()).toEqual(Object.keys(fresh.nodes).sort())
+  })
+
+  it("aggiunge sempre: re-importare lo stesso flowchart lo duplica, e lascia stare ciò che c'era", async () => {
+    documentStore.getState().load(withPool(createDocument("prova", "doc-1")))
+    await importFlow(FLOW)
+    await importFlow(FLOW)
+    expect(Object.keys(flow().model.nodes)).toHaveLength(6)
+    expect(Object.keys(flow().model.edges)).toHaveLength(4)
+    expect(Object.keys(flow().model.pools)).toHaveLength(3)
+    expect(flow().model.pools.p1).toEqual({ name: "Pool 1", lanes: [{ id: "l1", name: "l1" }] })
+    expect(FlowDiagramSchema.safeParse(flow()).success).toBe(true)
+    expectLaneInvariant(flow())
+  })
+
+  it("se il motore fallisce ripiega sulla griglia, con un messaggio, e i nodi restano nelle corsie", async () => {
+    await importFlow(FLOW, async () => {
+      throw new Error("timeout")
+    })
+    expect(Object.keys(flow().view.nodes)).toHaveLength(3)
+    expectLaneInvariant(flow())
+    const fresh = rekeyFlow(FLOW)
+    expect((await placeFlowImport(doc(), fresh, async () => Promise.reject(new Error("x")))).fallback).toMatch(/griglia/)
+  })
+
+  it("importa anche un flowchart di soli pool vuoti", async () => {
+    await importFlow({ pools: { v: { name: "Vuoto", lanes: [{ id: "v", name: "Vuoto" }] } }, nodes: {}, edges: {} })
+    const [pool] = Object.values(flow().view.pools)
+    expect(pool).toMatchObject({ x: 40, y: 40, w: POOL_MIN_W })
+    expect(Object.values(flow().view.lanes)).toEqual([{ h: LANE_MIN_H }])
+  })
+
+  it("si annulla con un solo undo", async () => {
+    await importFlow(FLOW)
+    documentStore.getState().undo()
+    expect(flow().model).toEqual({ pools: {}, nodes: {}, edges: {} })
+    expect(flow().view).toEqual({ nodes: {}, pools: {}, lanes: {} })
   })
 })

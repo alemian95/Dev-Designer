@@ -1,13 +1,20 @@
+import type { ClassDiagram, ClassNode, ClassRelation } from "@/model/class/schema"
 import type { DevDocument } from "@/model/document"
 import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
+import { splitKey } from "@/model/family"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
+import type { Note } from "@/model/note/schema"
+import { classLayoutGraph } from "../class/commands"
+import { classDiagram } from "../class-access"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
 import { rectsBounds, snap, type Point, type Rect } from "../geometry"
 import { nodeRects } from "../kinds/canvas-ops"
 import { nodesBounds } from "../layout-pack"
+import { noteDiagram } from "../note-access"
+import { noteSize } from "../note/geometry"
 import { uniqueKey } from "./er"
-import { GUTTER, placeNew } from "./import"
+import { GUTTER, placeInGrid, placeNew } from "./import"
 import { layoutGraph } from "./layout"
 
 /** Cosa succede a un'entità in arrivo, rispetto al documento (spec §7): lo mostra il dialog. */
@@ -139,6 +146,156 @@ export function importMermaidEr(
     for (const rel of relationships) {
       if (Object.values(d.model.relationships).some((old) => sameRelationship(old, rel))) continue
       d.model.relationships[uniqueKey(d.model.relationships, `${rel.source.entity}_${rel.target.entity}`)] = rel
+    }
+  }
+}
+
+/** Uguaglianza campo per campo, come `sameEntity`: l'ordine delle chiavi non conta, quello dei membri sì. */
+export function sameClass(a: ClassNode, b: ClassNode): boolean {
+  return (
+    a.name === b.name &&
+    a.stereotype === b.stereotype &&
+    a.attributes.length === b.attributes.length &&
+    a.attributes.every((x, i) => {
+      const y = b.attributes[i]!
+      return x.name === y.name && x.type === y.type && x.visibility === y.visibility && x.isStatic === y.isStatic
+    }) &&
+    a.methods.length === b.methods.length &&
+    a.methods.every((x, i) => {
+      const y = b.methods[i]!
+      return x.name === y.name && x.type === y.type && x.visibility === y.visibility && x.isStatic === y.isStatic &&
+        x.isAbstract === y.isAbstract && x.parameters.length === y.parameters.length &&
+        x.parameters.every((p, j) => p.name === y.parameters[j]!.name && p.type === y.parameters[j]!.type)
+    })
+  )
+}
+
+/** Due relazioni dicono la stessa cosa (spec §5): estremi, molteplicità, specie, nome e navigabilità. Gli agganci non contano. */
+export function sameClassRelation(a: ClassRelation, b: ClassRelation): boolean {
+  const sameEnd = (x: ClassRelation["source"], y: ClassRelation["source"]) =>
+    x.class === y.class && x.multiplicity === y.multiplicity && x.role === y.role
+  return sameEnd(a.source, b.source) && sameEnd(a.target, b.target) && a.kind === b.kind && a.name === b.name &&
+    (a.navigable ?? false) === (b.navigable ?? false)
+}
+
+/** Una nota con lo stesso testo e la stessa àncora c'è già (spec §5). */
+const sameNote = (a: Note, b: Note): boolean => a.text === b.text && a.anchor === b.anchor
+
+export function classImportFates(doc: DevDocument, classes: Readonly<Record<string, ClassNode>>): Record<string, ImportFate> {
+  const present = classDiagram(doc).model.classes
+  return Object.fromEntries(
+    Object.entries(classes).map(([key, c]) => {
+      const old = present[key]
+      return [key, old === undefined ? "nuovo" : sameClass(old, c) ? "identico" : "sostituisce"]
+    }),
+  )
+}
+
+/** Il frammento di classi pronto per l'innesto: le note hanno già la loro chiave. */
+export interface ClassImport {
+  classes: Record<string, ClassNode>
+  relations: ClassRelation[]
+  notes: Record<string, Note>
+}
+
+/**
+ * Le sole classi scelte, e relazioni e note ancorate i cui estremi sono tutti scelti o già nel
+ * documento (spec §7). Le note libere entrano sempre. Le note prendono qui la chiave, un uuid come
+ * in `addNote`: serve già alla disposizione.
+ */
+export function selectClassFragment(
+  classes: Readonly<Record<string, ClassNode>>, relations: readonly ClassRelation[], notes: readonly Note[],
+  chosen: ReadonlySet<string>, present: ReadonlySet<string>,
+): ClassImport {
+  const picked = Object.fromEntries(Object.entries(classes).filter(([key]) => chosen.has(key)))
+  const reachable = (key: string) => key in picked || present.has(key)
+  return {
+    classes: picked,
+    relations: relations.filter((r) => reachable(r.source.class) && reachable(r.target.class)),
+    notes: Object.fromEntries(
+      notes.filter((n) => n.anchor === null || reachable(splitKey(n.anchor).key)).map((n) => [crypto.randomUUID(), n]),
+    ),
+  }
+}
+
+export interface ClassPlacement {
+  classes: Record<string, Point>
+  notes: Record<string, Point>
+  /** Il messaggio del ripiego sulla griglia, se c'è stato. */
+  fallback: string | null
+}
+
+/**
+ * Le posizioni delle classi **nuove** e delle note da aggiungere (spec §6): lo stesso blocco di
+ * `placeErImport`, con il grafo di «Disponi» delle classi. Le note entrano nel grafo come nodi, con
+ * un arco dalla loro classe quando anche quella è nuova, così ELK le mette accanto.
+ *
+ * ponytail: una nota ancorata a una classe che c'era già finisce nel blocco nuovo, lontana dalla
+ * sua classe. Se dà fastidio, va messa accanto al rettangolo della classe invece che nel grafo.
+ */
+export async function placeClassImport(
+  doc: DevDocument, fragment: ClassImport, layout: (g: LayoutGraph) => Promise<LayoutPositions>,
+): Promise<ClassPlacement> {
+  const diagram = classDiagram(doc)
+  const fresh = Object.keys(fragment.classes).filter((key) => !(key in diagram.view.nodes))
+  const freshSet = new Set(fresh)
+  const existingNotes = Object.values(noteDiagram(doc).model.notes)
+  const notes = Object.entries(fragment.notes).filter(([, n]) => !existingNotes.some((old) => sameNote(old, n)))
+  if (fresh.length === 0 && notes.length === 0) return { classes: {}, notes: {}, fallback: null }
+
+  const temporary: ClassDiagram = {
+    model: {
+      classes: Object.fromEntries(fresh.map((key) => [key, fragment.classes[key]!])),
+      relations: Object.fromEntries(
+        fragment.relations.filter((r) => freshSet.has(r.source.class) && freshSet.has(r.target.class)).map((r, i) => [String(i), r]),
+      ),
+    },
+    view: { nodes: Object.fromEntries(fresh.map((key) => [key, { x: 0, y: 0, collapsed: false }])) },
+  }
+  const graph = classLayoutGraph(temporary)
+  for (const [key, note] of notes) {
+    graph.nodes.push({ id: key, ...noteSize(note) })
+    const anchor = note.anchor === null ? null : splitKey(note.anchor).key
+    if (anchor !== null && freshSet.has(anchor)) graph.edges.push({ id: `note:${key}`, source: anchor, target: key })
+  }
+
+  const occupied = nodeRects(doc)
+  const split = (positions: Record<string, Point>) => ({
+    classes: Object.fromEntries(Object.entries(positions).filter(([key]) => freshSet.has(key))),
+    notes: Object.fromEntries(Object.entries(positions).filter(([key]) => !freshSet.has(key))),
+  })
+  const positions = await layoutBelow(graph, occupied, layout)
+  if (positions === null) {
+    const sizes = graph.nodes.map((n) => [n.id, { w: n.w, h: n.h }] as const)
+    return { ...split(placeInGrid(sizes, occupied)), fallback: "La disposizione automatica non è riuscita: gli elementi nuovi sono in griglia." }
+  }
+  return { ...split(positions), fallback: null }
+}
+
+/**
+ * Innesta un frammento di classi letto da Mermaid (spec §5), in un solo comando. Una classe
+ * presente viene sostituita e tiene il suo nodo; una nuova prende la posizione da `placement`. Una
+ * relazione uguale a una presente si salta, e così una nota con lo stesso testo e la stessa
+ * àncora; nessuna si pota.
+ */
+export function importMermaidClass(fragment: ClassImport, placement: Pick<ClassPlacement, "classes" | "notes">): Recipe {
+  return (draft) => {
+    const d = classDiagram(draft)
+    for (const [key, cls] of Object.entries(fragment.classes)) {
+      d.model.classes[key] = cls
+      const pos = placement.classes[key]
+      if (pos && !(key in d.view.nodes)) d.view.nodes[key] = { ...pos, collapsed: false }
+    }
+    for (const rel of fragment.relations) {
+      if (Object.values(d.model.relations).some((old) => sameClassRelation(old, rel))) continue
+      d.model.relations[uniqueKey(d.model.relations, `${rel.source.class}_${rel.target.class}`)] = rel
+    }
+    const n = noteDiagram(draft)
+    for (const [key, note] of Object.entries(fragment.notes)) {
+      const pos = placement.notes[key]
+      if (!pos || Object.values(n.model.notes).some((old) => sameNote(old, note))) continue
+      n.model.notes[key] = note
+      n.view.nodes[key] = { ...pos, collapsed: false }
     }
   }
 }

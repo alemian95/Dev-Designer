@@ -197,8 +197,8 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
         <DialogHeader>
           <DialogTitle>Importa Mermaid</DialogTitle>
           <DialogDescription>
-            Incolla o carica un erDiagram, un classDiagram o un flowchart, anche dentro un file Markdown: gli elementi scelti
-            entrano nel diagramma aperto, in un solo passo annullabile.
+            Incolla o carica un erDiagram, un classDiagram o un flowchart, anche dentro un file Markdown: gli elementi scelti, o
+            il flowchart intero, entrano nel diagramma aperto, in un solo passo annullabile.
           </DialogDescription>
         </DialogHeader>
 

@@ -573,14 +573,16 @@ quinto della CPU non fa in tempo. È saturazione della macchina, non un difetto:
 in CI gira una suite sola. Si scrive qui perché chi vedrà quel rosso sappia
 cosa guardare.
 
-**Ripreso il 2026-10-15.** In CI il test è caduto ancora due volte (42,0 ms
-contro 39,7; 32,7 contro 30,4), con una suite sola, quindi non per contesa. La
-causa era il JIT: su 800 tabelle le prime chiamate costano ~16 ms, dalla quinta
-~5. `small` si misurava a freddo e `big` mezzo caldo, e il rapporto dipendeva da
-quando V8 finiva di ottimizzare. Ora tre chiamate di riscaldamento precedono le
-misure, i giri sono cinque e le taglie 800 e 3200: lineare ~4x, quadratico ~16x,
-soglia 8. Cinquanta corse di fila e cinque tornate da quattro in parallelo, nessun
-fallimento.
+**Ripreso il 2026-10-15.** In CI il test è caduto ancora (42,0 ms contro
+39,7; 32,7 contro 30,4; poi 78,5 contro 77,1), con una suite sola, quindi non
+per contesa. La causa è il JIT: sul runner di GitHub V8 sale di livello molto
+più tardi che in locale — dopo una ventina di chiamate 800 tabelle costavano
+ancora ~9 ms e 1600 ~18, contro 5 e 10 a regime. Misurare prima tutte le
+`small` e poi tutte le `big` confrontava livelli di ottimizzazione diversi.
+Ora dieci chiamate di riscaldamento, poi dieci giri **alternati** small/big col
+minimo di ciascuna, taglie 800 e 3200, soglia 8 (lineare ~4x, quadratico ~16x).
+Misurato in CI con una diagnostica temporanea: rapporto fra 3,94 e 4,07 su
+cinque corse. In locale cinquanta corse di fila senza fallimenti.
 
 ### DT-26 · una tabella da 42 colonne alzava tutte le righe dell'import
 

@@ -132,8 +132,16 @@ describe("splitStatements", () => {
    * Vale solo perché questo file gira in ambiente node e Vitest mette ogni file di test nel proprio
    * processo: `cpuUsage()` è del processo, e con i worker in thread conterebbe anche il lavoro degli
    * altri file.
+   *
+   * Il tempo CPU non bastava ancora: in CI il test cadeva a 3,2x (42,0 ms contro 39,7). La causa era
+   * il **JIT**: le prime chiamate su 800 tabelle girano in codice non ottimizzato (~16 ms), dalla
+   * quinta in poi ~5 ms. Misurando `small` per primo, a freddo, e `big` dopo, mezzo caldo, il rapporto
+   * dipendeva da quando V8 finiva di ottimizzare — locale ~1.7, in CI oltre 3. Ora tre chiamate di
+   * riscaldamento precedono ogni misura, e le taglie sono 800 e 3200: a regime il rapporto lineare
+   * è ~4 e il quadratico ~16, e la soglia 8 (la loro media geometrica) lascia un fattore 2 per parte
+   * invece dell'1,5 di 2x contro 3x.
    */
-  it("il tempo raddoppiando l'input non è quadratico (non più di ~3x, non ~4x)", () => {
+  it("il tempo quadruplicando l'input non è quadratico (non più di ~8x, non ~16x)", () => {
     // Genera N CREATE TABLE con identificatori backtick-quoted, come un vero dump MySQL: è la grafia
     // che fa crescere il numero di tratti di `spans()` e che rendeva `inCode` costoso.
     const genMysqlLike = (n: number): string => {
@@ -146,7 +154,7 @@ describe("splitStatements", () => {
     }
 
     const small = genMysqlLike(800)
-    const big = genMysqlLike(1600)
+    const big = genMysqlLike(3200)
 
     // Tempo CPU del processo, in millisecondi: `cpuUsage()` conta microsecondi di user + system.
     const cpuMs = (): number => {
@@ -154,11 +162,12 @@ describe("splitStatements", () => {
       return (u.user + u.system) / 1000
     }
 
-    // Il minimo di tre giri, e su tempo CPU: vedi il docblock qui sopra.
+    // Riscaldamento sul testo grande, poi il minimo di cinque giri su tempo CPU: vedi il docblock.
+    for (let i = 0; i < 3; i++) splitStatements(big)
     const fastest = (sql: string): { ms: number; out: string[] } => {
       let ms = Infinity
       let out: string[] = []
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) {
         const t0 = cpuMs()
         out = splitStatements(sql)
         ms = Math.min(ms, cpuMs() - t0)
@@ -170,16 +179,16 @@ describe("splitStatements", () => {
     const { ms: msBig, out: rBig } = fastest(big)
 
     // La prestazione non deve aver cambiato la semantica: stesso numero di statement, stesso
-    // contenuto. `big` è `small` con altre 800 tabelle in coda, quindi i primi 800 statement dei due
+    // contenuto. `big` è `small` con altre 2400 tabelle in coda, quindi i primi 800 statement dei due
     // input devono coincidere esattamente.
     expect(rSmall).toHaveLength(800)
-    expect(rBig).toHaveLength(1600)
+    expect(rBig).toHaveLength(3200)
     expect(rBig.slice(0, 800)).toEqual(rSmall)
     expect(rSmall[0]).toContain("CREATE TABLE `tbl_0`")
     expect(rSmall[799]).toContain("CREATE TABLE `tbl_799`")
-    expect(rBig[1599]).toContain("CREATE TABLE `tbl_1599`")
+    expect(rBig[3199]).toContain("CREATE TABLE `tbl_3199`")
 
-    expect(msBig).toBeLessThanOrEqual(msSmall * 3)
+    expect(msBig).toBeLessThanOrEqual(msSmall * 8)
   })
 })
 

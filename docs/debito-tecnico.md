@@ -573,6 +573,15 @@ quinto della CPU non fa in tempo. È saturazione della macchina, non un difetto:
 in CI gira una suite sola. Si scrive qui perché chi vedrà quel rosso sappia
 cosa guardare.
 
+**Ripreso il 2026-10-15.** In CI il test è caduto ancora due volte (42,0 ms
+contro 39,7; 32,7 contro 30,4), con una suite sola, quindi non per contesa. La
+causa era il JIT: su 800 tabelle le prime chiamate costano ~16 ms, dalla quinta
+~5. `small` si misurava a freddo e `big` mezzo caldo, e il rapporto dipendeva da
+quando V8 finiva di ottimizzare. Ora tre chiamate di riscaldamento precedono le
+misure, i giri sono cinque e le taglie 800 e 3200: lineare ~4x, quadratico ~16x,
+soglia 8. Cinquanta corse di fila e cinque tornate da quattro in parallelo, nessun
+fallimento.
+
 ### DT-26 · una tabella da 42 colonne alzava tutte le righe dell'import
 
 `placeNew` disponeva le entità nuove in una griglia a passo **uniforme**, con la

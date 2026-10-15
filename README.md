@@ -123,7 +123,7 @@ Un documento si modifica da una scheda sola: le altre lo mostrano in sola lettur
 - **Import Mermaid**: nell'ER e nelle classi un'istruzione per riga fuori dai blocchi, e
   un'etichetta di relazione con spazi va fra virgolette. Le relazioni importate non hanno colonne,
   come quelle disegnate a mano. Del flowchart si perdono lo stile delle linee, le teste diverse
-  dalla freccia e gli archi verso un subgraph.
+  dalla freccia e gli archi da o verso un subgraph.
 - **Import DDL**: i vincoli `UNIQUE` su più colonne vengono ignorati, con un avviso. In MySQL un
   `REFERENCES` senza lista di colonne fa scartare l'intero `CREATE TABLE`.
 - **Classi**: i generici annidati escono in Mermaid in forma approssimata, con un avviso; l'import li

@@ -6,7 +6,7 @@ import { rectsBounds, snap, type Point, type Rect } from "../geometry"
 import { uniqueKey } from "./er"
 
 /** Spazio fra le celle della griglia e fra l'import e ciò che c'è già. */
-const GUTTER = 40
+export const GUTTER = 40
 
 /**
  * Posizioni per le sole entità nuove: griglia deterministica di `ceil(√n)` colonne, larghe quanto

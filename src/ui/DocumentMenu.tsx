@@ -16,6 +16,7 @@ import { requestOpen, UPLOAD_INPUT_ID } from "./document-actions"
 import { copyPng, exportPng, exportSvg } from "./export/lazy"
 import { TextExportDialog } from "./export/TextExportDialog"
 import { ImportDdlDialog } from "./import/ImportDdlDialog"
+import { ImportMermaidDialog } from "./import/ImportMermaidDialog"
 
 const when = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" })
 
@@ -37,6 +38,7 @@ export function DocumentMenu() {
   /** Chiudendosi il menu ridà il fuoco al trigger: se si sta rinominando lo ruberebbe al campo appena montato. */
   const renamingRef = useRef(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [mermaidOpen, setMermaidOpen] = useState(false)
   const [textExportOpen, setTextExportOpen] = useState(false)
 
   const refreshRecent = () => void documentDb.listRecent().then(setRecent, () => setRecent([]))
@@ -92,6 +94,7 @@ export function DocumentMenu() {
             <DropdownMenuItem onSelect={() => void documentIo.newDocument()}><FilePlus2 /> Nuovo documento</DropdownMenuItem>
             <DropdownMenuItem onSelect={requestOpen}><FolderOpen /> Apri… <DropdownMenuShortcut>⌘O</DropdownMenuShortcut></DropdownMenuItem>
             <DropdownMenuItem disabled={readOnly} onSelect={() => setImportOpen(true)}><FileCode2 /> Importa DDL…</DropdownMenuItem>
+            <DropdownMenuItem disabled={readOnly} onSelect={() => setMermaidOpen(true)}><FileCode2 /> Importa Mermaid…</DropdownMenuItem>
             <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.save()}><Save /> Salva <DropdownMenuShortcut>⌘S</DropdownMenuShortcut></DropdownMenuItem>
             <DropdownMenuItem disabled={readOnly} onSelect={() => void documentIo.saveAs()}><SaveAll /> Salva con nome… <DropdownMenuShortcut>⇧⌘S</DropdownMenuShortcut></DropdownMenuItem>
             <DropdownMenuItem disabled={readOnly} onSelect={startRename}><PencilLine /> Rinomina…</DropdownMenuItem>
@@ -143,6 +146,7 @@ export function DocumentMenu() {
       <input id={UPLOAD_INPUT_ID} type="file" accept=".dd.json,application/json" hidden aria-label="Carica documento" onChange={(e) => void onUpload(e)} />
       {/* Fratello del DropdownMenu, non figlio: aperto dalla voce di menu, litigherebbe sul fuoco col menu che si chiude. */}
       <ImportDdlDialog open={importOpen} onOpenChange={setImportOpen} />
+      <ImportMermaidDialog open={mermaidOpen} onOpenChange={setMermaidOpen} />
       <TextExportDialog open={textExportOpen} onOpenChange={setTextExportOpen} />
     </>
   )

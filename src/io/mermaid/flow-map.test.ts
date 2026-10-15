@@ -34,6 +34,15 @@ describe("mapFlow: nodi", () => {
     expect(model.nodes.B!.label).toBe("fa:fa-car Auto")
     expect(warnings.map((w) => w.message)).toEqual(["Stringhe markdown lette come testo semplice (riga 2)"])
   })
+
+  it("legge come nodi qualunque gli id che sono nomi del prototipo, senza toccarlo", () => {
+    const { model, warnings } = flow("constructor[Uno] --> toString\n  __proto__[X] --> B\n  A@{ shape: toString }\n  subgraph __proto__2\n    hasOwnProperty\n  end")
+    expect(Object.keys(model.nodes)).toEqual(["constructor", "toString", "__proto__", "B", "A", "hasOwnProperty"])
+    expect(model.nodes.constructor).toEqual({ label: "Uno", shape: "process", lane: null })
+    expect(model.nodes.A!.shape).toBe("process")
+    expect(warnings.map((w) => w.message)).toEqual(["Forme senza equivalente, lette come processo: A (toString) (riga 4)"])
+    expect(({} as Record<string, unknown>).label).toBeUndefined()
+  })
 })
 
 describe("mapFlow: archi", () => {

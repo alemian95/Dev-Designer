@@ -63,7 +63,8 @@ export function mapFlow(ast: FlowAst, text: string): FlowFragment {
   }
 
   // Ultima forma ed etichetta date vincono, come in `flowDb.addVertex`.
-  const nodes: Record<string, FlowNode> = {}
+  // Senza prototipo: gli id vengono dal testo, e «constructor» o «__proto__» sono id validi.
+  const nodes: Record<string, FlowNode> = Object.create(null)
   const shapeOf = new Map<string, { shape: string; at: number }>()
   for (const m of ast.nodes) {
     if (subgraphs.has(m.id)) continue
@@ -72,7 +73,7 @@ export function mapFlow(ast: FlowAst, text: string): FlowFragment {
     if (m.shape !== null) shapeOf.set(m.id, { shape: m.shape, at: m.at })
   }
   for (const [id, { shape, at }] of shapeOf) {
-    const known = SHAPES[shape]
+    const known = Object.hasOwn(SHAPES, shape) ? SHAPES[shape] : undefined
     if (known === undefined) findings.push({ category: "shape", at, subject: `${id} (${shape})` })
     nodes[id]!.shape = known ?? "process"
   }
@@ -93,7 +94,7 @@ export function mapFlow(ast: FlowAst, text: string): FlowFragment {
     }
   }
 
-  const pools: Record<string, Pool> = {}
+  const pools: Record<string, Pool> = Object.create(null)
   const roots = [...subgraphs.values()].filter((sg) => sg.parent === null).sort((a, b) => a.at - b.at)
   const name = (sg: FlowAstSubgraph) => (sg.title === null ? sg.id : label(sg.title, sg.at))
   const owners = new Set(owner.values())

@@ -3,7 +3,7 @@ import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
-import { rectsBounds, snap, type Point } from "../geometry"
+import { rectsBounds, snap, type Point, type Rect } from "../geometry"
 import { nodeRects } from "../kinds/canvas-ops"
 import { nodesBounds } from "../layout-pack"
 import { uniqueKey } from "./er"
@@ -88,23 +88,36 @@ export async function placeErImport(
   }
   const graph = layoutGraph(temporary)
   const occupied = nodeRects(doc)
-
-  let raw: LayoutPositions
-  try {
-    raw = graph.nodes.length > 1 ? await layout(graph) : { [fresh[0]!]: { x: 0, y: 0 } }
-  } catch {
+  const positions = await layoutBelow(graph, occupied, layout)
+  if (positions === null) {
     return {
       positions: placeNew(temporary.model.entities, diagram, occupied),
       fallback: "La disposizione automatica non è riuscita: le entità nuove sono in griglia.",
     }
   }
+  return { positions, fallback: null }
+}
+
+/**
+ * ELK sul grafo dei soli nodi nuovi, poi il blocco traslato sotto `occupied`, con l'origine di
+ * `placeNew` (spec §6). Un nodo solo non passa per il motore. `null` se il motore fallisce: il
+ * ripiego sulla griglia lo sceglie il chiamante, che conosce le misure della sua famiglia.
+ */
+async function layoutBelow(
+  graph: LayoutGraph, occupied: readonly Rect[], layout: (g: LayoutGraph) => Promise<LayoutPositions>,
+): Promise<Record<string, Point> | null> {
+  let raw: LayoutPositions
+  try {
+    raw = graph.nodes.length > 1 ? await layout(graph) : { [graph.nodes[0]!.id]: { x: 0, y: 0 } }
+  } catch {
+    return null
+  }
   const block = nodesBounds(graph.nodes, raw)!
   const bounds = rectsBounds(occupied)
   const origin = bounds ? { x: bounds.x, y: bounds.y + bounds.h + GUTTER } : { x: GUTTER, y: GUTTER }
-  const positions = Object.fromEntries(
+  return Object.fromEntries(
     Object.entries(raw).map(([key, p]) => [key, { x: snap(origin.x + p.x - block.x), y: snap(origin.y + p.y - block.y) }]),
   )
-  return { positions, fallback: null }
 }
 
 /**

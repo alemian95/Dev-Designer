@@ -2,7 +2,7 @@ import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
 import { entitySize } from "../er/geometry"
-import { rectsBounds, snap, type Point, type Rect } from "../geometry"
+import { rectsBounds, snap, type Point, type Rect, type Size } from "../geometry"
 import { uniqueKey } from "./er"
 
 /** Spazio fra le celle della griglia e fra l'import e ciò che c'è già. */
@@ -24,10 +24,14 @@ export const GUTTER = 40
  */
 export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram, occupied: readonly Rect[]): Record<string, Point> {
   const fresh = Object.entries(entities).filter(([key]) => !(key in diagram.view.nodes))
+  return placeInGrid(fresh.map(([key, entity]) => [key, entitySize(entity, false)]), occupied)
+}
+
+/** La griglia di `placeNew` per nodi di qualunque famiglia, già filtrati e misurati: la usa anche l'import delle classi. */
+export function placeInGrid(fresh: readonly (readonly [string, Size])[], occupied: readonly Rect[]): Record<string, Point> {
   if (fresh.length === 0) return {}
 
-  const sizes = fresh.map(([, entity]) => entitySize(entity, false))
-  const cellW = snap(Math.max(...sizes.map((s) => s.w)) + GUTTER)
+  const cellW = snap(Math.max(...fresh.map(([, s]) => s.w)) + GUTTER)
   const cols = Math.ceil(Math.sqrt(fresh.length))
 
   const bounds = rectsBounds(occupied)
@@ -35,14 +39,14 @@ export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram, o
   const originY = snap(bounds ? bounds.y + bounds.h + GUTTER : GUTTER)
 
   const out: Record<string, Point> = {}
-  // Quota corrente di ogni colonna, in ordine di lettura: l'entità i-esima si appoggia sotto quella
-  // che l'ha preceduta nella sua colonna.
+  // Quota corrente di ogni colonna, in ordine di lettura: il nodo i-esimo si appoggia sotto quello
+  // che l'ha preceduto nella sua colonna.
   const colY = new Array<number>(cols).fill(originY)
-  fresh.forEach(([key], i) => {
+  fresh.forEach(([key, size], i) => {
     const col = i % cols
     const y = colY[col] ?? originY
     out[key] = { x: snap(originX + col * cellW), y: snap(y) }
-    colY[col] = y + (sizes[i]?.h ?? 0) + GUTTER
+    colY[col] = y + size.h + GUTTER
   })
   return out
 }

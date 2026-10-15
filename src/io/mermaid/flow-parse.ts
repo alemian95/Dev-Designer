@@ -203,7 +203,7 @@ export function parseFlow(input: string): FlowParseResult {
    * numero di subgraph già chiusi, come `subCount` di `flowDb`: per questo si tengono le menzioni e i
    * figli da aggiornare.
    */
-  const open: { sg: FlowAstSubgraph; auto: boolean; members: FlowAstNode[]; children: FlowAstSubgraph[] }[] = []
+  const open: { sg: FlowAstSubgraph; auto: boolean; alias: boolean; members: FlowAstNode[]; children: FlowAstSubgraph[] }[] = []
   const edgeIds = new Set<string>()
   let seenHeader = false
 
@@ -360,6 +360,7 @@ export function parseFlow(input: string): FlowParseResult {
     else if (s === "end") {
       const closing = open.pop()
       if (!closing) throw new MermaidSyntaxError("«end» senza un subgraph aperto", at)
+      if (closing.alias) continue
       const { sg, auto, members, children } = closing
       if (auto) {
         sg.id = `subGraph${ast.subgraphs.length}`
@@ -382,7 +383,10 @@ export function parseFlow(input: string): FlowParseResult {
         title = rest === "" ? null : /^".*"$/s.test(rest) ? quoted(rest.slice(1, -1)) : { text: decode(rest), markdown: false }
         id = title === null || /\s/.test(title.text) ? "" : title.text
       }
-      open.push({ sg: { id, title, parent: null, at }, auto: id === "", members: [], children: [] })
+      // Mermaid appiattisce un subgraph riaperto dentro sé stesso: senza l'alias il suo genitore sarebbe sé stesso e `chain` nella mappa non finirebbe
+      const same = id === "" ? undefined : open.find((o) => o.sg.id === id)
+      if (same) open.push({ sg: same.sg, auto: false, alias: true, members: [], children: [] })
+      else open.push({ sg: { id, title, parent: null, at }, auto: id === "", alias: false, members: [], children: [] })
     } else vertexStatement(s, at)
   }
 

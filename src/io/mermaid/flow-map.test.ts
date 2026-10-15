@@ -76,6 +76,13 @@ describe("mapFlow: subgraph", () => {
     })
   })
 
+  it("termina su un subgraph riaperto dentro sé stesso, e lo tratta come uno", () => {
+    expect(map(FLOW_VALID.selfNested!).model.pools).toEqual({ A: { name: "A", lanes: [{ id: "A", name: "A" }] } })
+    const { model } = map(FLOW_VALID.cycleNested!)
+    expect(model.pools).toEqual({ A: { name: "A", lanes: [{ id: "A", name: "A" }, { id: "B", name: "B" }] } })
+    expect(model.nodes.x!.lane).toBe("A")
+  })
+
   it("non dà la corsia implicita a un pool che ha solo figli", () => {
     expect(flow("subgraph p\n    subgraph l\n      A\n    end\n  end").model.pools.p!.lanes).toEqual([{ id: "l", name: "l" }])
   })

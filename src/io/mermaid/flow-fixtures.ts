@@ -85,6 +85,22 @@ export const FLOW_VALID: Readonly<Record<string, string>> = {
     B
   end
 `,
+  selfNested: `flowchart LR
+  subgraph A
+    subgraph A
+      x
+    end
+  end
+`,
+  cycleNested: `flowchart LR
+  subgraph A
+    subgraph B
+      subgraph A
+        x
+      end
+    end
+  end
+`,
   text: `flowchart LR
   A["\`**grassetto**\`"] --> B["fa:fa-car Auto"]
   B -->|"a | b"| C["x; y"]; C --> D

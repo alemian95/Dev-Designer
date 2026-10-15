@@ -98,6 +98,22 @@ describe("parseFlow: il resto", () => {
     expect(ast.subgraphs.map((s) => [s.id, s.parent])).toEqual([["c", "subGraph1"], ["subGraph1", null]])
   })
 
+  it("legge un subgraph riaperto dentro sé stesso come lo stesso subgraph", () => {
+    const self = parseFlow(FLOW_VALID.selfNested!).ast
+    expect(self.subgraphs.map((s) => [s.id, s.parent])).toEqual([["A", null]])
+    expect(self.nodes.map((n) => [n.id, n.subgraph])).toEqual([["x", "A"]])
+    const cycle = parseFlow(FLOW_VALID.cycleNested!).ast
+    expect(cycle.subgraphs.map((s) => [s.id, s.parent])).toEqual([["B", "A"], ["A", null]])
+    expect(cycle.nodes.map((n) => [n.id, n.subgraph])).toEqual([["x", "A"]])
+  })
+
+  it("legge `@{…}` e `accDescr {…}` su più righe", () => {
+    const { ast, warnings } = parseFlow('flowchart LR\n  A@{\n    shape: diam\n    label: "Va?"\n  }\n  accDescr {\n    riga uno\n    riga due\n  }\n  A --> B\n')
+    expect(ast.nodes[0]).toMatchObject({ id: "A", shape: "diam", text: { text: "Va?" } })
+    expect(ast.edges.map((e) => [e.source, e.target])).toEqual([["A", "B"]])
+    expect(warnings.filter((w) => w.message.startsWith("Titolo e descrizione di accessibilità"))).toHaveLength(1)
+  })
+
   it("separa le istruzioni sul ;, e legge `graph` e le direzioni", () => {
     const { ast, warnings } = parseFlow("graph TD; A-->B; B-->C")
     expect(ast.direction).toBe("TD")

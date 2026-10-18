@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { documentStore } from "@/editor/document-store"
 import { createDocument } from "@/model/document"
 import { TextExportDialog } from "./TextExportDialog"
@@ -77,5 +77,38 @@ describe("TextExportDialog (F2)", () => {
     render()
     const dialog = document.querySelector("[data-text-export-dialog]")!
     expect(dialog.textContent).not.toContain("Le note libere")
+  })
+
+  const withSequences = (count: number) => {
+    const doc = createDocument("t", "t")
+    for (let i = 1; i <= count; i++) {
+      doc.diagram.sequence.model.sequences[`s${i}`] = { title: "", autonumber: false, participants: [], steps: [] }
+      doc.diagram.sequence.view.nodes[`s${i}`] = { x: 0, y: 0, collapsed: false }
+    }
+    return doc
+  }
+
+  it("il formato delle sequenze compare solo con sequenze presenti", () => {
+    documentStore.getState().load(createDocument("t", "t"))
+    render()
+    expect(document.querySelector("[data-text-export-dialog]")!.textContent).not.toContain("Mermaid sequenze")
+    documentStore.getState().load(withSequences(1))
+    render()
+    const dialog = document.querySelector("[data-text-export-dialog]")!
+    expect(dialog.textContent).toContain("Le Note ancorate non escono")
+    expect(dialog.querySelector("[data-export-preview]")!.textContent).toContain("sequenceDiagram")
+  })
+
+  it("con due sequenze scarica un file .md", () => {
+    documentStore.getState().load(withSequences(2))
+    render()
+    const downloaded = vi.fn()
+    const create = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      downloaded(this.download)
+    })
+    const scarica = [...document.querySelectorAll("button")].find((b) => b.textContent === "Scarica")!
+    act(() => scarica.click())
+    create.mockRestore()
+    expect(downloaded).toHaveBeenCalledWith(expect.stringMatching(/\.md$/))
   })
 })

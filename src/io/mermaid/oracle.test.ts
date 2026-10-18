@@ -6,7 +6,9 @@ import { emitMermaid } from "@/io/emit/er-mermaid"
 import { emitFlowMermaid } from "@/io/emit/flow-mermaid"
 import type { ClassModel } from "@/model/class/schema"
 import type { ErModel } from "@/model/er/schema"
+import { qualify } from "@/model/family"
 import type { FlowModel } from "@/model/flow/schema"
+import { analyseMermaid } from "./analyse"
 import { CLASS_VALID } from "./class-fixtures"
 import { parseClass } from "./class-parse"
 import { ER_VALID } from "./er-fixtures"
@@ -14,6 +16,9 @@ import { parseEr } from "./er-parse"
 import { FLOW_VALID } from "./flow-fixtures"
 import { mapFlow } from "./flow-map"
 import { parseFlow } from "./flow-parse"
+import { STATE_VALID } from "./state-fixtures"
+import { mapState } from "./state-map"
+import { parseState } from "./state-parse"
 
 /**
  * Mermaid stesso come oracolo (spec §8): ciò che il nostro parser accetta come valido lo deve
@@ -77,10 +82,11 @@ interface FlowDb {
   getEdges(): { start: string; end: string; text: string }[]
   getSubGraphs(): { id: string; nodes: string[] }[]
 }
-const flowDb = async (text: string): Promise<FlowDb> => {
-  const api = (mermaid as unknown as { mermaidAPI: { getDiagramFromText(t: string): Promise<{ db: FlowDb }> } }).mermaidAPI
+const diagramDb = async <Db>(text: string): Promise<Db> => {
+  const api = (mermaid as unknown as { mermaidAPI: { getDiagramFromText(t: string): Promise<{ db: Db }> } }).mermaidAPI
   return (await api.getDiagramFromText(text)).db
 }
+const flowDb = diagramDb<FlowDb>
 
 describe("oracolo Mermaid: flowchart", () => {
   it.each(Object.entries(FLOW_VALID))("la fixture %s piace a entrambi i parser, con gli stessi nodi, archi e subgraph", async (_, text) => {
@@ -135,5 +141,77 @@ describe("oracolo Mermaid: flowchart", () => {
       edges: { e1: { source: "a", target: "b", label: "" }, e2: { source: "b", target: "c", label: "sì" }, e3: { source: "c", target: "d", label: "" } },
     }
     expect(await mermaidAccepts(emitFlowMermaid(model).text)).toBe(true)
+  })
+})
+
+/** Il db di Mermaid per uno state, come `FlowDb`: `getData()` è ciò che il renderer disegna. */
+interface StateDbNode { id: string; shape: string; isGroup: boolean; parentId?: string; label: string }
+interface StateDb { getData(): { nodes: StateDbNode[]; edges: { start: string; end: string; label?: string }[] } }
+const stateDb = async (text: string): Promise<StateDb> => {
+  // Senza il parse prima, `getDiagramFromText` riusa lo stato del db del diagramma precedente.
+  await mermaid.parse(text)
+  return diagramDb<StateDb>(text)
+}
+
+/** Le etichette di `getData()` hanno le entità protette: tornano HTML, e poi testo come nel nostro parser. */
+const decodeLabel = (s: string): string => {
+  const html = document.createElement("textarea")
+  html.innerHTML = s.replaceAll("ﬂ°°", "&#").replaceAll("ﬂ°", "&").replaceAll("¶ß", ";")
+  return html.value.replace(/<br\s*\/?>/gi, "\n")
+}
+
+describe("oracolo Mermaid: stateDiagram", () => {
+  it.each(Object.entries(STATE_VALID))("la fixture %s piace a entrambi i parser", async (_, text) => {
+    expect(() => parseState(text)).not.toThrow()
+    expect(await mermaidAccepts(text)).toBe(true)
+  })
+
+  it.each(Object.entries(STATE_VALID))("la fixture %s ha gli stati, le corsie, le transizioni e le note di Mermaid", async (_, text) => {
+    const fragment = mapState(parseState(text).ast, text)
+    const { nodes, edges } = (await stateDb(text)).getData()
+    const byId = new Map(nodes.map((n) => [n.id, n]))
+    const node = (id: string): StateDbNode => byId.get(id)!
+    const states = nodes.filter((n) => !n.isGroup && !["note", "noteGroup", "divider"].includes(n.shape))
+    // Mermaid dà un inizio e una fine a ogni regione, noi uno solo al composto: si riscrivono i suoi.
+    const key = (n: StateDbNode): string => {
+      const parent = n.parentId === undefined ? undefined : node(n.parentId)
+      if (parent?.shape !== "divider" || !["stateStart", "stateEnd"].includes(n.shape)) return n.id
+      return `${parent.parentId}_${n.shape === "stateStart" ? "start" : "end"}`
+    }
+    expect(new Set(Object.keys(fragment.model.nodes))).toEqual(new Set(states.map(key)))
+
+    // La corsia dal `parentId`: il composto di secondo livello, o la regione per posizione, o il pool.
+    const laneOf = (parentId: string | undefined): string | null => {
+      const path: string[] = []
+      for (let p = parentId; p !== undefined; p = node(p).parentId) path.unshift(p)
+      const composites = path.filter((p) => node(p).shape !== "divider")
+      if (composites.length === 0) return null
+      if (composites.length > 1) return composites[1]!
+      if (path.length === 1) return path[0]!
+      const regions = nodes.filter((n) => n.shape === "divider" && n.parentId === path[0])
+      return `${path[0]}#${regions.findIndex((n) => n.id === path[1]) + 1}`
+    }
+    for (const n of states) expect([key(n), fragment.model.nodes[key(n)]?.lane]).toEqual([key(n), laneOf(n.parentId)])
+
+    // Una transizione su un composto entra dal suo inizio ed esce dalla sua fine; senza, si scarta.
+    const known = new Set(states.map(key))
+    const end = (id: string, inner: "start" | "end"): string => (node(id).isGroup ? `${id}_${inner}` : key(node(id)))
+    const theirs = edges
+      .filter((e) => node(e.start).shape !== "note" && node(e.end).shape !== "note")
+      .map((e) => [end(e.start, "end"), end(e.end, "start"), decodeLabel(e.label ?? "")])
+      .filter(([source, target]) => known.has(source!) && known.has(target!))
+    expect(Object.values(fragment.model.edges).map((e) => [e.source, e.target, e.label])).toEqual(theirs)
+
+    // Una nota sta sul suo stato, o sul pool del composto che la porta; la flottante Mermaid non la disegna.
+    const top = (id: string): string => (node(id).parentId === undefined ? id : top(node(id).parentId!))
+    const anchor = (target: string): string => qualify("flow", node(target).isGroup ? top(target) : target)
+    const theirNotes = nodes.filter((n) => n.shape === "note").map((n) => anchor(n.id.split("----")[0]!))
+    expect(fragment.notes.map((n) => n.anchor)).toEqual(theirNotes)
+  })
+
+  it.each(Object.entries(STATE_VALID))("la fixture %s, importata ed esportata come flowchart, è Mermaid valido", async (_, text) => {
+    const analysis = analyseMermaid(text)
+    if (!analysis.ok || analysis.kind !== "flow") throw new Error(`non è un flusso: ${JSON.stringify(analysis)}`)
+    expect(await mermaidAccepts(emitFlowMermaid(analysis.fragment.model).text)).toBe(true)
   })
 })

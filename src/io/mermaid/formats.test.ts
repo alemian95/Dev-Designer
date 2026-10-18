@@ -25,6 +25,6 @@ describe("registro dei formati", () => {
     })
 
   it("l'errore sui formati sconosciuti li elenca tutti", () => {
-    expect(analyseMermaid("gantt")).toEqual({ ok: false, message: "«gantt» non si importa: solo erDiagram, classDiagram e flowchart.", at: null })
+    expect(analyseMermaid("gantt")).toEqual({ ok: false, message: "«gantt» non si importa: solo erDiagram, classDiagram, flowchart e stateDiagram.", at: null })
   })
 })

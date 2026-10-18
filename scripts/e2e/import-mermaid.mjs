@@ -1,5 +1,5 @@
 /**
- * End-to-end dell'import Mermaid, ER, classi e flowchart: incolla → analizza → importa → re-importa senza
+ * End-to-end dell'import Mermaid, ER, classi, flowchart e state: incolla → analizza → importa → re-importa senza
  * duplicare → annulla. Copre quello che i test unitari non vedono: la voce di menu, l'incollata vera, la
  * disposizione col worker di ELK sulla build di produzione e il selettore dei blocchi di un `.md`.
  *
@@ -43,7 +43,31 @@ const FLOW = `flowchart TD
   b -.-> a
 `
 
+const STATE = `stateDiagram-v2
+    [*] --> Ingested: Scraping / Polling completato
+    Ingested --> Deduplicated: Check impronta / URL univoco
+    Ingested --> Discarded: Duplicato esatto già catalogato
+    Deduplicated --> Clustered: Raggruppato con topic correlati
+    Clustered --> Enriched: Classificazione, Scoring e Tagging LLM
+    Enriched --> SelectedForDraft: Scelto per inclusione in articolo
+    SelectedForDraft --> Drafted: Bozza generata con successo
+    Drafted --> Published: Revisione umana e approvazione
+    Drafted --> Archived: Notizia superata o non pubblicata
+    Discarded --> [*]
+    Published --> [*]
+    Archived --> [*]
+    Published --> Distribuzione
+    state Distribuzione {
+        [*] --> Newsletter
+        Newsletter --> Social
+        Social --> [*]
+    }
+    Distribuzione --> [*]
+    note right of Drafted : Revisione umana obbligatoria
+`
+
 const MARKDOWN = "# Note\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\n" + ER + "```\n"
+const MARKDOWN_STATE = "```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\n" + STATE + "```\n"
 
 /** Apre «Importa Mermaid…» e aspetta il dialog, per la stessa ragione di `openImportDialog` in import.mjs. */
 async function openDialog(page) {
@@ -73,6 +97,7 @@ const edgeCount = (page) => page.evaluate(() => document.querySelectorAll("[data
 const classEdgeCount = (page) => page.evaluate(() => document.querySelectorAll('[data-edge-id^="class/"]').length)
 const flowEdgeCount = (page) => page.evaluate(() => document.querySelectorAll('[data-edge-id^="flow/"]').length)
 const poolCount = (page) => page.evaluate(() => document.querySelectorAll("[data-pool]").length)
+const noteCount = (page) => page.evaluate(() => document.querySelectorAll("[data-note-fold]").length)
 
 /** Esegue lo scenario in un proprio contesto del browser condiviso. `true` se tutti i passi passano. */
 export async function run(browser, base) {
@@ -227,6 +252,36 @@ export async function run(browser, base) {
       await page.keyboard.press("ControlOrMeta+z")
       await expectNodes(page, 0)
       if ((await poolCount(page)) !== 0) throw new Error("attesi 0 pool")
+    })
+
+    await step("analizza lo stateDiagram incollato, senza caselle, con il composto e la nota", async () => {
+      await openDialog(page)
+      await paste(page, STATE)
+      await expectText(page, "[data-import-summary]", "15 nodi, 17 archi, 1 pool, 1 note")
+      const boxes = await page.getByRole("checkbox").count()
+      if (boxes !== 0) throw new Error(`lo state non ha caselle, trovate ${boxes}`)
+    })
+
+    await step("importa lo state con il pool del composto e la nota, e ⌘Z lo toglie", async () => {
+      await page.getByRole("button", { name: /^Importa 15 nodi$/ }).click()
+      await page.waitForSelector("[data-import-mermaid-dialog] strong")
+      await closeDialog(page)
+      await expectNodes(page, 16)
+      if ((await poolCount(page)) !== 1) throw new Error("atteso 1 pool")
+      if ((await noteCount(page)) !== 1) throw new Error("attesa 1 nota")
+      await page.keyboard.press("ControlOrMeta+z")
+      await expectNodes(page, 0)
+      if ((await poolCount(page)) !== 0) throw new Error("attesi 0 pool")
+    })
+
+    await step("in un .md con un flowchart e uno state passa al blocco state e lo rianalizza", async () => {
+      await openDialog(page)
+      await paste(page, MARKDOWN_STATE)
+      await expectText(page, "[data-import-blocks]", "Blocco 1 · flowchart")
+      await expectText(page, "[data-import-summary]", "2 nodi, 1 archi, 0 pool")
+      await page.locator("[data-import-blocks]").getByText("Blocco 2 · state").click()
+      await expectText(page, "[data-import-summary]", "15 nodi, 17 archi, 1 pool, 1 note")
+      await closeDialog(page)
     })
   } catch (e) {
     failed = true

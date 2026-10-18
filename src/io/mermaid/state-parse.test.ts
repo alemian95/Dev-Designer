@@ -250,3 +250,14 @@ describe("parseState: fixture valide", () => {
     expect(() => parseState(text)).not.toThrow()
   })
 })
+
+describe("parseState: prestazioni", () => {
+  it("resta lineare su un testo grande", () => {
+    const lines = ["stateDiagram-v2"]
+    for (let i = 0; i < 4999; i++) lines.push(`  s${i} --> s${i + 1} : passo ${i}`)
+    const started = performance.now()
+    const { ast } = parseState(lines.join("\n"))
+    expect(ast.transitions.length).toBe(4999)
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+})

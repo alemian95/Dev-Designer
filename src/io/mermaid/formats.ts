@@ -6,6 +6,8 @@ import { mapEr, type ErFragment } from "./er-map"
 import { parseEr } from "./er-parse"
 import { mapFlow, type FlowFragment } from "./flow-map"
 import { parseFlow } from "./flow-parse"
+import { mapState } from "./state-map"
+import { parseState } from "./state-parse"
 
 /** Il frammento che ogni famiglia di import produce: una famiglia nuova è una riga qui. */
 export interface FragmentByFamily {
@@ -55,6 +57,13 @@ export const MERMAID_FORMATS = {
     analyse(text) {
       const { ast, warnings } = parseFlow(text)
       return withWarnings(warnings, mapFlow(ast, text))
+    },
+  }),
+  stateDiagram: format({
+    keywords: ["stateDiagram", "stateDiagram-v2"], label: "state", named: "uno stateDiagram", family: "flow",
+    analyse(text) {
+      const { ast, warnings } = parseState(text)
+      return withWarnings(warnings, mapState(ast, text))
     },
   }),
 }

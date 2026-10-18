@@ -206,6 +206,7 @@ export function createInteractionRunner(): InteractionRunner {
         if (!dragTargets) session().setDragging(true)
         dragTargets ??= collectDragTargets(canvasOps(documentStore.getState().doc).withFollowers(fx.keys))
         previewDrag(dragTargets, fx.dx, fx.dy)
+        session().setDragOffset({ x: fx.dx, y: fx.dy })
         break
       case "commit-drag": {
         if (dragTargets) resetDragTargets(dragTargets)
@@ -313,6 +314,7 @@ export function createInteractionRunner(): InteractionRunner {
     if (mode.type !== "drag") {
       dragTargets = null
       if (session().dragging) session().setDragging(false)
+      if (session().dragOffset) session().setDragOffset(null)
     }
   }
 

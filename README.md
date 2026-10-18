@@ -37,6 +37,13 @@ capi lasciati automatici si distribuiscono lungo il lato.
   nasce grande quanto il suo testo e si allarga dalla maniglia nell'angolo. La freccia ha la punta
   alla fine, a entrambi i capi o da nessuna parte, è continua o tratteggiata, e si inverte dal
   pannello.
+- **Sequenze**: lo strumento «Sequenza» (`S`) crea una sequenza con due partecipanti e un messaggio.
+  Una sequenza è un nodo unico: partecipanti (riquadro o attore), messaggi con linea e punta a
+  scelta, note, blocchi (`loop`, `alt`, `opt`, `par`, `critical`, `break`) con le loro sezioni e
+  `autonumber`. I messaggi si creano con Collega fra due intestazioni (o dalla stessa a sé stessa) e
+  si riordinano trascinandoli; partecipanti e passi si riordinano trascinandoli, e una linea mostra
+  dove cade un passo. Il resto (testo, punte, mittente e destinatario, sezioni, «Avvolgi in blocco»)
+  si fa dal pannello.
 
 Collega fra famiglie diverse crea **collegamenti tipizzati**:
 
@@ -69,6 +76,10 @@ note. Gli elementi nuovi si dispongono da soli sotto il contenuto esistente; uno
 sostituito e resta nella sua posizione, e re-importare lo stesso testo non duplica relazioni e note.
 Stili, alias, etichette, namespace e direzione si scartano con un avviso.
 
+Un `sequenceDiagram` si importa intero, come una sequenza nuova: attivazioni, `rect`, `box`,
+`create`/`destroy` e le mezze frecce si scartano o si semplificano con un avviso. Re-importarlo
+aggiunge un'altra sequenza.
+
 Un `flowchart` o un `graph` si importa intero, senza scelta: i subgraph di primo livello diventano
 pool e i loro figli corsie, e le forme senza equivalente diventano processi, con un avviso.
 Re-importarlo lo aggiunge di nuovo.
@@ -80,7 +91,9 @@ Re-importarlo lo aggiunge di nuovo.
 - **Testo**, da copiare o scaricare:
   - ER: DDL PostgreSQL, DDL MySQL, Mermaid `erDiagram`;
   - classi: Mermaid `classDiagram`, con le note libere e quelle ancorate a una classe (`note for`);
-  - flowchart: Mermaid `flowchart LR`, con una `subgraph` per ogni pool e per ogni corsia.
+  - flowchart: Mermaid `flowchart LR`, con una `subgraph` per ogni pool e per ogni corsia;
+  - sequenze: Mermaid `sequenceDiagram`. Un `;` dentro un testo esce come `#59;`, e va scritto così
+    anche a mano nel testo Mermaid: Mermaid lo legge come fine istruzione.
 
   Le forme escono solo come immagine. Il dialog di export avvisa di quello che resta fuori.
 
@@ -105,6 +118,7 @@ Un documento si modifica da una scheda sola: le altre lo mostrano in sola lettur
 | `P` | pool |
 | `N` | nota |
 | `Q` · `O` · `T` | rettangolo · ellisse · testo |
+| `S` | sequenza |
 | `R` | Collega |
 | `F` · `L` | adatta alla finestra · disponi |
 | `⌘Z` · `⇧⌘Z` / `⌘Y` · `⌘D` · `⌫` | annulla · ripeti · duplica · elimina |
@@ -114,7 +128,9 @@ Un documento si modifica da una scheda sola: le altre lo mostrano in sola lettur
 
 ## Limiti noti
 
-- **Niente sequence diagram.**
+- **Sequenze**: gli a capo di messaggi e note si disegnano su una riga sola; non ci sono
+  attivazioni, `rect`, `box` né `create`/`destroy` come elementi del modello. Il riordino di un
+  partecipante non ha anteprima durante il trascinamento.
 - **Solo desktop**: niente gesti touch. Collaudato su Chrome; su Firefox e Safari i file passano da
   upload e download.
 - **Prestazioni misurate fino a 600 entità ER** (p95 del tempo di frame ≤ 20 ms in produzione:

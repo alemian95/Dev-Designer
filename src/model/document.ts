@@ -4,6 +4,7 @@ import { emptyErDiagram, ErDiagramSchema } from "./er/schema"
 import { emptyFlowDiagram, FlowDiagramSchema } from "./flow/schema"
 import { LinksSchema } from "./links/schema"
 import { emptyNoteDiagram, NoteDiagramSchema } from "./note/schema"
+import { emptySequenceDiagram, SequenceDiagramSchema } from "./sequence/schema"
 import { emptyShapeDiagram, ShapeDiagramSchema } from "./shape/schema"
 import { Identifier, SCHEMA_VERSION } from "./shared"
 
@@ -17,6 +18,7 @@ export const DiagramSchema = z.object({
   class: ClassDiagramSchema,
   flow: FlowDiagramSchema,
   note: NoteDiagramSchema,
+  sequence: SequenceDiagramSchema,
   links: LinksSchema,
 })
 export type Diagram = z.infer<typeof DiagramSchema>
@@ -30,12 +32,20 @@ export const DocumentSchema = z.object({
 /** "Document" collide con il DOM: il documento dell'app si chiama DevDocument. */
 export type DevDocument = z.infer<typeof DocumentSchema>
 
-/** Il solo modo di creare un documento: cinque famiglie vuote e nessun collegamento. */
+/** Il solo modo di creare un documento: sei famiglie vuote e nessun collegamento. */
 export function createDocument(name: string, id: string = crypto.randomUUID()): DevDocument {
   return {
     schemaVersion: SCHEMA_VERSION,
     id,
     name,
-    diagram: { shape: emptyShapeDiagram(), er: emptyErDiagram(), class: emptyClassDiagram(), flow: emptyFlowDiagram(), note: emptyNoteDiagram(), links: {} },
+    diagram: {
+      shape: emptyShapeDiagram(),
+      er: emptyErDiagram(),
+      class: emptyClassDiagram(),
+      flow: emptyFlowDiagram(),
+      note: emptyNoteDiagram(),
+      sequence: emptySequenceDiagram(),
+      links: {},
+    },
   }
 }

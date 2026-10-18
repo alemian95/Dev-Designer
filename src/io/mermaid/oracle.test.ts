@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest"
 import { emitClassMermaid } from "@/io/emit/class-mermaid"
 import { emitMermaid } from "@/io/emit/er-mermaid"
 import { emitFlowMermaid } from "@/io/emit/flow-mermaid"
+import { emitSequenceMermaid } from "@/io/emit/sequence-mermaid"
 import type { ClassModel } from "@/model/class/schema"
 import type { ErModel } from "@/model/er/schema"
 import { qualify } from "@/model/family"
 import type { FlowModel } from "@/model/flow/schema"
+import type { Head, Line, Operator, Placement, Sequence, Step } from "@/model/sequence/schema"
 import { analyseMermaid } from "./analyse"
 import { CLASS_VALID } from "./class-fixtures"
 import { parseClass } from "./class-parse"
@@ -16,6 +18,7 @@ import { parseEr } from "./er-parse"
 import { FLOW_VALID } from "./flow-fixtures"
 import { mapFlow } from "./flow-map"
 import { parseFlow } from "./flow-parse"
+import { SEQUENCE_MODELS, SEQUENCE_REWRITTEN, SEQUENCE_VALID } from "./sequence-fixtures"
 import { STATE_VALID } from "./state-fixtures"
 import { mapState } from "./state-map"
 import { parseState } from "./state-parse"
@@ -207,5 +210,124 @@ describe("oracolo Mermaid: stateDiagram", () => {
     const analysis = analyseMermaid(text)
     if (!analysis.ok || analysis.kind !== "flow") throw new Error(`non è un flusso: ${JSON.stringify(analysis)}`)
     expect(await mermaidAccepts(emitFlowMermaid(analysis.fragment.model).text)).toBe(true)
+  })
+})
+
+/** Il db di Mermaid per un sequenceDiagram (ricerca §2.3): `getMessages()` è piatta, i blocchi sono coppie di voci. */
+interface SequenceDbMessage { from?: string; to?: string; message: string; type: number; placement?: number }
+interface SequenceDb {
+  getActors(): Map<string, { name: string; description: string; type: string }>
+  getMessages(): SequenceDbMessage[]
+  LINETYPE: Record<string, number>
+  PLACEMENT: Record<"LEFTOF" | "RIGHTOF" | "OVER", number>
+}
+const sequenceDb = async (text: string): Promise<SequenceDb> => {
+  await mermaid.parse(text)
+  return diagramDb<SequenceDb>(text)
+}
+
+const importSequence = (text: string): Sequence => {
+  const analysis = analyseMermaid(text)
+  if (!analysis.ok || analysis.kind !== "sequence") throw new Error(`non è una sequenza: ${JSON.stringify(analysis)}`)
+  return analysis.fragment.sequence
+}
+
+/** I passi senza id, con i partecipanti per nome: la forma in cui si confrontano con il db. */
+const sequenceSteps = (seq: Sequence): unknown[] => {
+  const name = (id: string) => seq.participants.find((p) => p.id === id)!.name
+  const steps = (list: readonly Step[]): unknown[] =>
+    list.map((s) => {
+      switch (s.kind) {
+        case "message": return { message: [name(s.from), name(s.to), s.text, s.line, s.head] }
+        case "note": return { note: [s.placement, s.participants.map(name), s.text] }
+        case "block": return { block: s.operator, sections: s.sections.map((x) => ({ condition: x.condition, steps: steps(x.steps) })) }
+      }
+    })
+  return steps(seq.steps)
+}
+
+/**
+ * `getMessages()` ripiegata nella stessa forma: le coppie di inizio e fine fanno i blocchi, le voci di
+ * attivazione, numerazione, rect e connessione centrale restano fuori, come i costrutti persi con avviso.
+ */
+const dbSteps = (db: SequenceDb): unknown[] => {
+  const T = db.LINETYPE
+  const opens: Record<number, Operator> = {
+    [T.LOOP_START!]: "loop", [T.ALT_START!]: "alt", [T.OPT_START!]: "opt", [T.PAR_START!]: "par",
+    [T.PAR_OVER_START!]: "par", [T.CRITICAL_START!]: "critical", [T.BREAK_START!]: "break",
+  }
+  const sections = new Set([T.ALT_ELSE, T.PAR_AND, T.CRITICAL_OPTION])
+  const ends = new Set([T.LOOP_END, T.ALT_END, T.OPT_END, T.PAR_END, T.CRITICAL_END, T.BREAK_END])
+  const skipped = new Set([T.ACTIVE_START, T.ACTIVE_END, T.AUTONUMBER, T.RECT_START, T.RECT_END, T.CENTRAL_CONNECTION, T.CENTRAL_CONNECTION_REVERSE, T.CENTRAL_CONNECTION_DUAL])
+  const arrows: Record<number, [Line, Head]> = {
+    [T.SOLID_OPEN!]: ["solid", "none"], [T.DOTTED_OPEN!]: ["dashed", "none"], [T.SOLID!]: ["solid", "filled"], [T.DOTTED!]: ["dashed", "filled"],
+    [T.SOLID_CROSS!]: ["solid", "cross"], [T.DOTTED_CROSS!]: ["dashed", "cross"], [T.SOLID_POINT!]: ["solid", "open"], [T.DOTTED_POINT!]: ["dashed", "open"],
+    [T.BIDIRECTIONAL_SOLID!]: ["solid", "double"], [T.BIDIRECTIONAL_DOTTED!]: ["dashed", "double"],
+  }
+  const placements: Record<number, Placement> = { [db.PLACEMENT.LEFTOF]: "left", [db.PLACEMENT.RIGHTOF]: "right", [db.PLACEMENT.OVER]: "over" }
+
+  type Section = { condition: string; steps: unknown[] }
+  const root: unknown[] = []
+  const open: { block: Operator; sections: Section[] }[] = []
+  const current = () => open.at(-1)?.sections.at(-1)?.steps ?? root
+  for (const m of db.getMessages()) {
+    if (skipped.has(m.type)) continue
+    const text = decodeLabel(m.message)
+    if (opens[m.type] !== undefined) {
+      const block = { block: opens[m.type]!, sections: [{ condition: text, steps: [] }] }
+      current().push(block)
+      open.push(block)
+    } else if (sections.has(m.type)) open.at(-1)!.sections.push({ condition: text, steps: [] })
+    else if (ends.has(m.type)) open.pop()
+    else if (m.type === T.NOTE) current().push({ note: [placements[m.placement!], m.from === m.to ? [m.from] : [m.from, m.to], text] })
+    else {
+      // Le mezze frecce: la piena con la stessa linea. Per i tipi `*_REVERSE*` il renderer di Mermaid mette
+      // la punta con `marker-start` sul mittente scritto, quindi il messaggio va da `to` a `from`.
+      const name = Object.entries(T).find(([, v]) => v === m.type)![0]
+      const [line, head] = arrows[m.type] ?? [name.includes("DOTTED") ? "dashed" : "solid", "filled"]
+      const [from, to] = name.includes("REVERSE") ? [m.to, m.from] : [m.from, m.to]
+      current().push({ message: [from, to, text, line, head] })
+    }
+  }
+  return root
+}
+
+describe("oracolo Mermaid: sequenceDiagram", () => {
+  it.each(Object.entries(SEQUENCE_VALID))("la fixture %s piace a entrambi i parser", async (_, text) => {
+    expect(() => importSequence(text)).not.toThrow()
+    expect(await mermaidAccepts(text)).toBe(true)
+  })
+
+  it.each(Object.entries(SEQUENCE_VALID))("la fixture %s ha i partecipanti, i messaggi, le note e i blocchi di Mermaid", async (_, text) => {
+    const seq = importSequence(text)
+    const db = await sequenceDb(text)
+    // Le virgolette dell'alias restano, da noi come in Mermaid (spec §5); senza alias Mermaid ripete il nome.
+    const theirs = [...db.getActors().values()].map((a) => ({ name: a.name, label: decodeLabel(a.description), kind: a.type === "actor" ? "actor" : "participant" }))
+    expect(seq.participants.map((p) => ({ name: p.name, label: p.label ?? p.name, kind: p.kind }))).toEqual(theirs)
+    expect(sequenceSteps(seq)).toEqual(dbSteps(db))
+  })
+
+  it("una mezza freccia che comincia dalla punta la disegna sul mittente scritto", async () => {
+    const db = await sequenceDb("sequenceDiagram\n  A/|-B: x\n")
+    expect(db.getMessages()[0]).toMatchObject({ from: "A", to: "B", type: db.LINETYPE.SOLID_ARROW_TOP_REVERSE })
+    expect(sequenceSteps(importSequence("sequenceDiagram\n  A/|-B: x\n"))).toEqual([{ message: ["B", "A", "x", "solid", "filled"] }])
+  })
+
+  it.each(Object.entries({ ...SEQUENCE_MODELS, ...SEQUENCE_REWRITTEN }))("l'export del modello %s è Mermaid valido, con i passi che rilegge Mermaid", async (_, seq) => {
+    const { text } = emitSequenceMermaid(seq, "s")
+    expect(await mermaidAccepts(text)).toBe(true)
+    expect(sequenceSteps(importSequence(text))).toEqual(dbSteps(await sequenceDb(text)))
+  })
+
+  it.each(Object.entries(SEQUENCE_VALID))("la fixture %s, importata ed esportata, è Mermaid valido", async (_, text) => {
+    expect(await mermaidAccepts(emitSequenceMermaid(importSequence(text), "s").text)).toBe(true)
+  })
+
+  it("un nome uguale a una parola chiave lo accetta il nostro parser ma non Mermaid; l'export lo riscrive", async () => {
+    const text = "sequenceDiagram\n  A->>end: x\n"
+    expect(await mermaidAccepts(text)).toBe(false)
+    const out = emitSequenceMermaid(importSequence(text), "s").text
+    expect(out).toContain("participant p1 as end")
+    expect(await mermaidAccepts(out)).toBe(true)
   })
 })

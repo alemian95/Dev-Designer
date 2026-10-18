@@ -524,4 +524,15 @@ describe("gli agganci nel runner (spec agganci §6)", () => {
     runner.step({ type: "cancel" })
     expect(sessionStore.getState().dragging).toBe(false)
   })
+
+  it("durante un drag la sessione ha lo scarto dell'anteprima, e dopo il rilascio torna null", () => {
+    const { a } = dueNodi()
+    sessionStore.getState().setSelection([selId("node", a)])
+    const runner = createInteractionRunner()
+    runner.step(giu({ hit: { kind: "node", key: a }, world: { x: 10, y: 10 } }))
+    runner.step(muovi({ world: { x: 60, y: 35 } }))
+    expect(sessionStore.getState().dragOffset).toEqual({ x: 50, y: 25 })
+    runner.step(su({ hit: { kind: "node", key: a }, world: { x: 60, y: 35 } }))
+    expect(sessionStore.getState().dragOffset).toBeNull()
+  })
 })

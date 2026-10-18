@@ -10,7 +10,7 @@ import { linkId, linkKey, qualify, splitKey } from "../families"
 import type { Point, Rect } from "../geometry"
 import { connectAcross, deleteLinks, linksTouching, setLinkAnchors, type ConnectResult } from "../links/commands"
 import { linkGeometry } from "../links/geometry"
-import { anchorNote, anchorsTouching, detachAnchoredTo } from "../note/anchor"
+import { anchorNote, anchorsTouching, detachDangling, liveAnchored } from "../note/anchor"
 import { anchorPort, assignPorts, autoPorts, offeredAnchors, samePorts, type EdgePorts, type Outline } from "../ports"
 import { familyOps, type EdgeEnds, type EditTarget } from "./ops"
 
@@ -238,20 +238,20 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       ),
 
     deleteItems: (nodeKeys, edgeKeys) => {
-      // I collegamenti selezionati, e quelli che toccano un nodo eliminato; le note ancorate a un
-      // nodo eliminato si staccano: tutto nella stessa recipe delle famiglie, così un solo annulla
-      // riporta indietro tutto (spec 4a §4, spec 3a §5).
+      // I collegamenti selezionati, e quelli che toccano un nodo eliminato; poi, sullo stesso draft,
+      // si staccano le note la cui àncora valida non esiste più (una già pendente resta): tutto nella stessa recipe delle famiglie,
+      // così un solo annulla riporta indietro tutto (spec 4a §4, spec 3a §5).
       const selectedLinks = edgeKeys.flatMap((k) => linkId(k) ?? [])
       const cascade = linksTouching(doc.diagram.links, new Set(nodeKeys)).map(([id]) => id)
       const linkIds = [...new Set([...selectedLinks, ...cascade])]
       const nodes = byFamily(nodeKeys)
       const edges = byFamily(edgeKeys.filter((k) => linkId(k) === null))
       const touched = new Set([...nodes.keys(), ...edges.keys()])
-      return combine([
+      const deletions = combine([
         ...[...touched].map((f) => ops(f).deleteItems(nodes.get(f) ?? [], edges.get(f) ?? [])),
         linkIds.length > 0 ? deleteLinks(linkIds) : null,
-        detachAnchoredTo(doc, new Set(nodeKeys)),
       ])
+      return deletions && combine([deletions, detachDangling(liveAnchored(doc))])
     },
 
     resize: (qualified, lane, dx, dy) => {

@@ -11,11 +11,13 @@ import { flowDiagram } from "@/editor/flow-access"
 import { splitKey } from "@/editor/families"
 import { familyHasContent } from "@/editor/kinds/canvas-ops"
 import { noteDiagram } from "@/editor/note-access"
+import { sequenceDiagram } from "@/editor/sequence-access"
 import { emitDdl } from "@/io/emit/ddl"
 import type { Dialect } from "@/io/ddl/schema"
 import { emitClassMermaid } from "@/io/emit/class-mermaid"
 import { emitMermaid } from "@/io/emit/er-mermaid"
 import { emitFlowMermaid } from "@/io/emit/flow-mermaid"
+import { emitSequences } from "@/io/emit/sequence-mermaid"
 import type { EmitResult } from "@/io/emit/result"
 import { documentSession } from "@/io/document-session"
 import { download } from "@/io/file"
@@ -24,9 +26,10 @@ import type { ErModel } from "@/model/er/schema"
 import type { Family } from "@/model/family"
 import type { FlowModel } from "@/model/flow/schema"
 import type { Note } from "@/model/note/schema"
+import type { SequenceModel } from "@/model/sequence/schema"
 import { documentFileName } from "./file-name"
 
-type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid"
+type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid" | "sequence-mermaid"
 
 /**
  * Le famiglie che hanno un formato di testo: le note escono dentro quello delle classi, o in nessuno
@@ -41,6 +44,7 @@ const FORMAT_FAMILY: Record<Format, ExportFamily> = {
   mermaid: "er",
   "class-mermaid": "class",
   "flow-mermaid": "flow",
+  "sequence-mermaid": "sequence",
 }
 
 /** I modelli delle famiglie, letti dal selettore: riferimenti stabili, confrontati da `useShallow`. */
@@ -48,10 +52,14 @@ interface Models {
   er: ErModel | null
   class: ClassModel | null
   flow: FlowModel | null
+  sequence: SequenceModel | null
   notes: Readonly<Record<string, Note>>
 }
 
-function emit(models: Models, format: Format): EmitResult {
+/** L'estensione la porta il risultato solo quando dipende dal contenuto (le sequenze: `.mmd` o `.md`). */
+type ExportResult = EmitResult & { extension?: string }
+
+function emit(models: Models, format: Format): ExportResult {
   const empty = { text: "", warnings: [] }
   switch (format) {
     case "postgres":
@@ -63,6 +71,8 @@ function emit(models: Models, format: Format): EmitResult {
       return models.class ? emitClassMermaid(models.class, models.notes) : empty
     case "flow-mermaid":
       return models.flow ? emitFlowMermaid(models.flow, models.notes) : empty
+    case "sequence-mermaid":
+      return models.sequence ? emitSequences(models.sequence, models.notes) : empty
   }
 }
 
@@ -73,12 +83,13 @@ function emit(models: Models, format: Format): EmitResult {
  * l'ordine di `FORMAT_FAMILY`, cioè l'ordine di `FAMILIES`. Le tre etichette «Mermaid» hanno il
  * nome della famiglia: con le famiglie mescolate, tre «Mermaid» non sarebbero distinguibili.
  */
-const FORMATS: Record<Format, { label: string; extension: string }> = {
+const FORMATS: Record<Format, { label: string; extension: string; extensionOf?: (result: ExportResult) => string }> = {
   postgres: { label: "PostgreSQL", extension: "sql" },
   mysql: { label: "MySQL", extension: "sql" },
   mermaid: { label: "Mermaid ER", extension: "mmd" },
   "class-mermaid": { label: "Mermaid classi", extension: "mmd" },
   "flow-mermaid": { label: "Mermaid flowchart", extension: "mmd" },
+  "sequence-mermaid": { label: "Mermaid sequenze", extension: "mmd", extensionOf: (result) => result.extension ?? "mmd" },
 }
 
 /**
@@ -90,6 +101,7 @@ const MODEL_LIMITS: Record<ExportFamily, string> = {
   er: "Il modello non rappresenta DEFAULT, CHECK, indici, ON DELETE e UNIQUE su più colonne: un dump che entra ed esce non è identico all'originale.",
   class: "Il modello non rappresenta generici, package, classi di associazione, classi annidate e visibilità di pacchetto.",
   flow: "Le note non hanno equivalente in Mermaid, e le corsie diventano riquadri (subgraph) invece di bande orizzontali vere.",
+  sequence: "Le Note ancorate non escono; le Note di sequenza sì. Più sequenze escono come blocchi di un file Markdown.",
 }
 
 /**
@@ -114,6 +126,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
         er: has("er") ? erDiagram(s.doc).model : null,
         class: has("class") ? classDiagram(s.doc).model : null,
         flow: has("flow") ? flowDiagram(s.doc).model : null,
+        sequence: has("sequence") ? sequenceDiagram(s.doc).model : null,
         notes: noteDiagram(s.doc).model.notes,
       }
     }),
@@ -137,7 +150,8 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
   // funzione pura sul render, non un `useEffect` che lo risincronizza.
   const effectiveFormat = formats.includes(format) ? format : (formats[0] ?? format)
   const chosen = FORMATS[effectiveFormat]
-  const { text, warnings } = formats.length > 0 ? emit(models, effectiveFormat) : { text: "", warnings: [] }
+  const result: ExportResult = formats.length > 0 ? emit(models, effectiveFormat) : { text: "", warnings: [] }
+  const { text, warnings } = result
 
   const copy = async () => {
     const patch = documentSession.getState().patch
@@ -206,7 +220,7 @@ export function TextExportDialog({ open, onOpenChange }: { open: boolean; onOpen
         )}
         <DialogFooter>
           <Button variant="outline" disabled={formats.length === 0} onClick={() => void copy()}>Copia</Button>
-          <Button disabled={formats.length === 0} onClick={() => download(documentFileName(chosen.extension), text, "text/plain;charset=utf-8")}>
+          <Button disabled={formats.length === 0} onClick={() => download(documentFileName(chosen.extensionOf?.(result) ?? chosen.extension), text, "text/plain;charset=utf-8")}>
             Scarica
           </Button>
         </DialogFooter>

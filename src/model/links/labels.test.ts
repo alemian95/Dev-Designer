@@ -53,6 +53,41 @@ describe("endName", () => {
     expect(endName(doc, "shape/x")).toBe("(forma eliminata)")
   })
 
+  it("una sequenza si nomina col titolo, un partecipante con l'etichetta o il nome", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.sequence.model.sequences["s1"] = {
+      title: "Login",
+      autonumber: false,
+      participants: [
+        { id: "p1", name: "A", label: "Anna", kind: "actor" },
+        { id: "p2", name: "API", label: null, kind: "participant" },
+      ],
+      steps: [],
+    }
+    doc.diagram.sequence.model.sequences["s2"] = { title: "", autonumber: false, participants: [], steps: [] }
+    expect(endName(doc, "sequence/s1")).toBe("Login")
+    expect(endName(doc, "sequence/s2")).toBe("(sequenza senza titolo)")
+    expect(endName(doc, "sequence/s1/p1")).toBe("Anna")
+    expect(endName(doc, "sequence/s1/p2")).toBe("API")
+    expect(endName(doc, "sequence/s9")).toBe("(sequenza eliminata)")
+    expect(endName(doc, "sequence/s9/p1")).toBe("(sequenza eliminata)")
+    expect(endName(doc, "sequence/s1/p9")).toBe("(partecipante eliminato)")
+  })
+
+  it("titolo ed etichetta di una sequenza vanno su una riga, e un'etichetta vuota lascia il nome", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.sequence.model.sequences["s1"] = {
+      title: "Login\nutente",
+      autonumber: false,
+      participants: [{ id: "p1", name: "A", label: "", kind: "actor" }],
+      steps: [],
+    }
+    doc.diagram.sequence.model.sequences["s2"] = { title: " \n ", autonumber: false, participants: [], steps: [] }
+    expect(endName(doc, "sequence/s1")).toBe("Login utente")
+    expect(endName(doc, "sequence/s2")).toBe("(sequenza senza titolo)")
+    expect(endName(doc, "sequence/s1/p1")).toBe("A")
+  })
+
   it("un pool si nomina col suo nome, e senza nome lo dice", () => {
     const doc = createDocument("t", "t")
     doc.diagram.flow.model.pools["p1"] = { name: "Processo", lanes: [{ id: "l1", name: "Cliente" }] }

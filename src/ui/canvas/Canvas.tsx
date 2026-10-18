@@ -10,6 +10,7 @@ import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
 import { Overlay } from "./Overlay"
 import { PoolsLayer } from "./PoolsLayer"
+import { SequenceEditor } from "./SequenceEditor"
 import { ShapeEditor } from "./ShapeEditor"
 import { useCanvasInteraction } from "./use-canvas-interaction"
 import { ViewportGroup } from "./ViewportGroup"
@@ -67,6 +68,7 @@ export function Canvas({ children }: { children?: ReactNode }) {
       <NoteEditor />
       <FlowNodeEditor />
       <ShapeEditor />
+      <SequenceEditor />
     </div>
   )
 }

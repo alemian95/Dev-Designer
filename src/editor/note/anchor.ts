@@ -5,7 +5,6 @@ import type { EdgeEnds } from "../edge-routing"
 import { qualify, splitKey } from "../families"
 import type { ConnectResult } from "../links/commands"
 import { noteDiagram } from "../note-access"
-import { detachNotes } from "./commands"
 
 /**
  * Le funzioni della linea di ancoraggio che hanno bisogno di vedere più famiglie: l'altro capo di
@@ -53,12 +52,23 @@ export function anchorsTouching(doc: DevDocument, keys: ReadonlySet<string>): Ed
   })
 }
 
-/** Stacca le note ancorate a uno degli elementi `keys`, per l'eliminazione (spec 3a §5). `null` se non ce n'è nessuna. */
-export function detachAnchoredTo(doc: DevDocument, keys: ReadonlySet<string>): Recipe | null {
-  const hit = Object.entries(noteDiagram(doc).model.notes)
-    .filter(([, note]) => note.anchor !== null && keys.has(note.anchor))
-    .map(([key]) => key)
-  return hit.length === 0 ? null : detachNotes(hit)
+/** Le note con un'àncora che esiste: le sole che un'eliminazione può staccare. */
+export function liveAnchored(doc: DevDocument): Set<string> {
+  return new Set(Object.entries(noteDiagram(doc).model.notes).flatMap(([key, note]) => (note.anchor !== null && anchorExists(doc, note.anchor) ? [key] : [])))
+}
+
+/**
+ * Stacca, fra le note `live` (`liveAnchored` prima dell'eliminazione), quelle la cui àncora non
+ * esiste più. Va dopo le recipe di un'eliminazione, sullo stesso draft (spec 3a §5): vale per ogni
+ * elemento e sotto-elemento tolto senza una regola per famiglia, e un'àncora già pendente resta
+ * com'era, col suo `note-dangling-anchor`.
+ */
+export function detachDangling(live: ReadonlySet<string>): Recipe {
+  return (draft) => {
+    for (const [key, note] of Object.entries(noteDiagram(draft).model.notes)) {
+      if (live.has(key) && note.anchor !== null && !anchorExists(draft, note.anchor)) note.anchor = null
+    }
+  }
 }
 
 /** Le àncore che nominano `oldKey` passano a `newKey`: la rinomina di un'entità o di una classe ne cambia la chiave. */

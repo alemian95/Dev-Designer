@@ -5,6 +5,7 @@ import { qualify, splitKey } from "@/model/family"
 import { POOL_MIN_W, type FlowDiagram, type FlowModel, type LaneView, type PoolView } from "@/model/flow/schema"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Note } from "@/model/note/schema"
+import type { Sequence } from "@/model/sequence/schema"
 import { classLayoutGraph } from "../class/commands"
 import { classDiagram } from "../class-access"
 import type { Recipe } from "../document-store"
@@ -17,6 +18,8 @@ import { nodeRects } from "../kinds/canvas-ops"
 import { nodesBounds } from "../layout-pack"
 import { noteDiagram } from "../note-access"
 import { noteSize } from "../note/geometry"
+import { sequenceDiagram } from "../sequence-access"
+import { copySequence } from "../sequence/commands"
 import { uniqueKey } from "./er"
 import { GUTTER, placeInGrid, placeNew } from "./import"
 import { layoutGraph } from "./layout"
@@ -125,7 +128,7 @@ async function runEngine(graph: LayoutGraph, layout: (g: LayoutGraph) => Promise
 }
 
 /** L'angolo del blocco nuovo: sotto tutto ciò che è sul canvas, con l'origine di `placeNew` (spec §6). */
-function originBelow(occupied: readonly Rect[]): Point {
+export function originBelow(occupied: readonly Rect[]): Point {
   const bounds = rectsBounds(occupied)
   return bounds ? { x: bounds.x, y: bounds.y + bounds.h + GUTTER } : { x: GUTTER, y: GUTTER }
 }
@@ -467,5 +470,24 @@ export function importMermaidFlow(
       n.model.notes[key] = note
       n.view.nodes[key] = { ...pos, collapsed: false }
     }
+  }
+}
+
+/**
+ * La sequenza da innestare con uuid nuovi per partecipanti, passi e sezioni (spec §7): è la copia di
+ * «Duplica», quindi re-importare lo stesso testo la duplica.
+ */
+export const rekeySequence: (seq: Sequence) => Sequence = copySequence
+
+/** Innesta una sequenza letta da Mermaid (spec §7), in un solo comando: si aggiunge sempre, in `at`, senza ELK. */
+export function importMermaidSequence(seq: Sequence, at: Point): { key: string; recipe: Recipe } {
+  const key = crypto.randomUUID()
+  return {
+    key,
+    recipe: (draft) => {
+      const d = sequenceDiagram(draft)
+      d.model.sequences[key] = seq
+      d.view.nodes[key] = { x: snap(at.x), y: snap(at.y), collapsed: false }
+    },
   }
 }

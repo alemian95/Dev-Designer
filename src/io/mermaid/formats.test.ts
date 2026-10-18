@@ -11,7 +11,7 @@ describe("detectFormat", () => {
   })
 
   it("restituisce la parola sconosciuta, o null sul testo vuoto", () => {
-    expect(detectFormat("sequenceDiagram\n  A->>B: x")).toEqual({ unknown: "sequenceDiagram" })
+    expect(detectFormat("gantt\n  title x")).toEqual({ unknown: "gantt" })
     expect(detectFormat("  \n %% solo commento")).toBeNull()
   })
 })
@@ -25,6 +25,6 @@ describe("registro dei formati", () => {
     })
 
   it("l'errore sui formati sconosciuti li elenca tutti", () => {
-    expect(analyseMermaid("gantt")).toEqual({ ok: false, message: "«gantt» non si importa: solo erDiagram, classDiagram, flowchart e stateDiagram.", at: null })
+    expect(analyseMermaid("gantt")).toEqual({ ok: false, message: "«gantt» non si importa: solo erDiagram, classDiagram, flowchart, stateDiagram e sequenceDiagram.", at: null })
   })
 })

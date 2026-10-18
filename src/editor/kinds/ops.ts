@@ -11,6 +11,7 @@ import { classOps } from "./class"
 import { erOps } from "./er"
 import { flowOps } from "./flow"
 import { noteOps } from "./note"
+import { sequenceOps } from "./sequence"
 import { shapeOps } from "./shape"
 
 // `EdgeEnds` sta in `edge-routing.ts`, dove `routePorts` lo consuma; qui si ri-esporta perché è
@@ -114,5 +115,7 @@ export function familyOps(doc: DevDocument, family: Family): DiagramOps {
       return flowOps(doc)
     case "note":
       return noteOps(doc)
+    case "sequence":
+      return sequenceOps(doc)
   }
 }

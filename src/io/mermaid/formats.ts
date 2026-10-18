@@ -6,6 +6,8 @@ import { mapEr, type ErFragment } from "./er-map"
 import { parseEr } from "./er-parse"
 import { mapFlow, type FlowFragment } from "./flow-map"
 import { parseFlow } from "./flow-parse"
+import { mapSequence, type SequenceFragment } from "./sequence-map"
+import { parseSequence } from "./sequence-parse"
 import { mapState } from "./state-map"
 import { parseState } from "./state-parse"
 
@@ -14,6 +16,7 @@ export interface FragmentByFamily {
   er: ErFragment
   class: ClassFragment
   flow: FlowFragment
+  sequence: SequenceFragment
 }
 
 export type ImportFamily = keyof FragmentByFamily
@@ -64,6 +67,13 @@ export const MERMAID_FORMATS = {
     analyse(text) {
       const { ast, warnings } = parseState(text)
       return withWarnings(warnings, mapState(ast, text))
+    },
+  }),
+  sequenceDiagram: format({
+    keywords: ["sequenceDiagram"], label: "sequence", named: "un sequenceDiagram", family: "sequence",
+    analyse(text) {
+      const { ast, warnings } = parseSequence(text)
+      return withWarnings(warnings, mapSequence(ast, text))
     },
   }),
 }

@@ -22,6 +22,7 @@ function readyOf(entry: AnyFormatEntry, text: string): MermaidReady {
     case "er": return ready(entry, text)
     case "class": return ready(entry, text)
     case "flow": return ready(entry, text)
+    case "sequence": return ready(entry, text)
   }
 }
 

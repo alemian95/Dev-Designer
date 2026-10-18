@@ -30,7 +30,7 @@ describe("analyseMermaid", () => {
 
   it("rifiuta testo vuoto e tipi sconosciuti", () => {
     expect(analyseMermaid("  ")).toEqual({ ok: false, message: "Il testo è vuoto.", at: null })
-    expect(analyseMermaid("sequenceDiagram")).toMatchObject({ ok: false, at: null })
+    expect(analyseMermaid("gantt")).toMatchObject({ ok: false, at: null })
   })
 
   it("trasforma un errore di sintassi in un esito con l'offset", () => {

@@ -144,6 +144,8 @@ function nameEditorFor(family: Family, editing: Editing, viewport: Viewport, clo
       return null
     case "note":
       return null
+    case "sequence":
+      return null
   }
 }
 

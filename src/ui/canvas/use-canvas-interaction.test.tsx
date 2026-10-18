@@ -266,6 +266,15 @@ describe("il resto del cablaggio", () => {
     expect(sessionStore.getState().editing).toEqual({ key: qualify("flow", "a"), target: "body" })
   })
 
+  it("il doppio click su un sotto-elemento di una sequenza apre il suo testo", () => {
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g")
+    g.setAttribute("data-node-id", "sequence/s/p1")
+    svg.append(g)
+    sotto = g
+    svg.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: 10, clientY: 10 }))
+    expect(sessionStore.getState().editing).toEqual({ key: "sequence/s/p1", target: "body" })
+  })
+
   it("il doppio click fuori dall'header di un'entità non apre niente", () => {
     // Nell'ER il corpo non ha un formato di testo: il doppio click rinomina solo sull'header.
     sotto = nodo

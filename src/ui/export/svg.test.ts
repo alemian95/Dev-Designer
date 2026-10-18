@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { familyOps } from "@/editor/kinds/ops"
 import type { ClassDiagram } from "@/model/class/schema"
 import { createDocument, type DevDocument, type Diagram } from "@/model/document"
 import type { ErDiagram } from "@/model/er/schema"
@@ -513,5 +514,32 @@ describe("buildSvg e le forme (spec 3b)", () => {
     expect(svg).not.toContain('data-edge-id="shape/rotta"')
     // Le frecce stanno nel layer degli archi, sopra le forme che collegano.
     expect(svg.indexOf('data-edge-id="shape/f"')).toBeGreaterThan(svg.indexOf('data-node-id="shape/a"'))
+  })
+})
+
+describe("buildSvg e le sequenze", () => {
+  it("esporta la sequenza con linee di vita e testi, e il file la contiene tutta", () => {
+    const doc = createDocument("export", "export")
+    doc.diagram.sequence.model.sequences["s"] = {
+      title: "Login",
+      autonumber: false,
+      participants: [
+        { id: "u", name: "Utente", label: null, kind: "actor" },
+        { id: "a", name: "Auth", label: null, kind: "participant" },
+      ],
+      steps: [{ kind: "message", id: "m", from: "u", to: "a", text: "login", line: "solid", head: "filled" }],
+    }
+    doc.diagram.sequence.view.nodes["s"] = { x: 1000, y: 500, collapsed: false }
+    const svg = buildSvg(doc, { vars: {} })!
+    expect(svg).toContain('data-node-id="sequence/s"')
+    expect(svg).toContain('data-lifeline="sequence/s/u"')
+    expect(svg).toContain('data-lifeline="sequence/s/a"')
+    for (const t of [">sd Login<", ">Utente<", ">Auth<", ">login<"]) expect(svg).toContain(t)
+    const rect = familyOps(doc, "sequence").rectOf("s")!
+    const [x, y, w, h] = /viewBox="([^"]+)"/.exec(svg)![1]!.split(" ").map(Number)
+    expect(x).toBe(rect.x - EXPORT_PADDING)
+    expect(y).toBe(rect.y - EXPORT_PADDING)
+    expect(x! + w!).toBe(rect.x + rect.w + EXPORT_PADDING)
+    expect(y! + h!).toBe(rect.y + rect.h + EXPORT_PADDING)
   })
 })

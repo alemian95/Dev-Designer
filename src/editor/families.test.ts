@@ -15,7 +15,7 @@ describe("qualify / splitKey", () => {
 
   it("una chiave senza famiglia valida è un errore, non un'ipotesi", () => {
     expect(() => splitKey("utenti")).toThrow()
-    expect(() => splitKey("sequence/x")).toThrow()
+    expect(() => splitKey("gantt/x")).toThrow()
   })
 })
 

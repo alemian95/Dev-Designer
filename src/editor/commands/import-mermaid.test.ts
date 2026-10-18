@@ -5,20 +5,23 @@ import type { Entity, Relationship } from "@/model/er/schema"
 import { FlowDiagramSchema, LANE_MIN_H, POOL_MIN_W, type FlowModel } from "@/model/flow/schema"
 import type { LayoutGraph } from "@/model/layout"
 import type { Note } from "@/model/note/schema"
+import type { Sequence } from "@/model/sequence/schema"
 import { classDiagram } from "../class-access"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import { flowDiagram } from "../flow-access"
 import { flowNodeRect, poolRect } from "../flow/geometry"
 import { expectLaneInvariant } from "../flow/lane-invariant"
-import { rectsBounds, rectsIntersect } from "../geometry"
+import { rectsBounds, rectsIntersect, snap } from "../geometry"
 import { withPool } from "../flow/pool-fixture"
 import { noteDiagram } from "../note-access"
 import { noteSize } from "../note/geometry"
+import { nodeRects } from "../kinds/canvas-ops"
+import { sequenceDiagram } from "../sequence-access"
 import { GUTTER, importEr } from "./import"
 import {
-  classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
-  placeFlowImport, rekeyFlow, rekeyFlowKeys, rekeyFlowNotes, sameClassRelation, selectClassFragment, selectErFragment,
+  classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, importMermaidSequence, originBelow,
+  placeClassImport, placeErImport, placeFlowImport, rekeyFlow, rekeyFlowKeys, rekeyFlowNotes, rekeySequence, sameClassRelation, selectClassFragment, selectErFragment,
   type ClassImport, type FlowPlacement,
 } from "./import-mermaid"
 
@@ -475,5 +478,72 @@ describe("placeFlowImport e importMermaidFlow con le note", () => {
     expect(flow().model).toEqual({ pools: {}, nodes: {}, edges: {} })
     expect(flow().view).toEqual({ nodes: {}, pools: {}, lanes: {} })
     expect(noteDiagram(doc())).toEqual({ model: { notes: {} }, view: { nodes: {} } })
+  })
+})
+
+/** Una sequenza come la produce `mapSequence`: i nomi come id dei partecipanti, id progressivi per passi e sezioni. */
+const SEQ: Sequence = {
+  title: "t",
+  autonumber: true,
+  participants: [{ id: "A", name: "A", label: "Alice", kind: "actor" }, { id: "B", name: "B", label: null, kind: "participant" }],
+  steps: [
+    { kind: "message", id: "0", from: "A", to: "B", text: "x", line: "solid", head: "filled" },
+    { kind: "block", id: "1", operator: "loop", sections: [{ id: "2", condition: "c", steps: [
+      { kind: "note", id: "3", placement: "over", participants: ["A", "B"], text: "n" },
+    ] }] },
+  ],
+}
+
+describe("rekeySequence", () => {
+  it("dà uuid nuovi a partecipanti, passi e sezioni, e tiene i riferimenti", () => {
+    const fresh = rekeySequence(SEQ)
+    const [a, b] = fresh.participants.map((p) => p.id)
+    const [msg, block] = fresh.steps
+    if (msg?.kind !== "message" || block?.kind !== "block") throw new Error("forma")
+    const section = block.sections[0]!
+    const note = section.steps[0]!
+    const ids = [a, b, msg.id, block.id, section.id, note.id]
+    expect(ids.some((id) => ["A", "B", "0", "1", "2", "3"].includes(id!))).toBe(false)
+    expect(new Set(ids).size).toBe(6)
+    expect([msg.from, msg.to]).toEqual([a, b])
+    expect(note).toMatchObject({ participants: [a, b] })
+    expect(fresh.participants.map((p) => p.name)).toEqual(["A", "B"])
+  })
+})
+
+describe("importMermaidSequence", () => {
+  const importSequence = () => {
+    const { key, recipe } = importMermaidSequence(rekeySequence(SEQ), originBelow(nodeRects(doc())))
+    documentStore.getState().dispatch(recipe)
+    return key
+  }
+
+  it("mette la sequenza sotto il contenuto esistente", () => {
+    documentStore.getState().load(withPool(createDocument("prova", "doc-1")))
+    const occupied = nodeRects(doc())
+    const key = importSequence()
+    const bounds = rectsBounds(occupied)!
+    expect(sequenceDiagram(doc()).view.nodes[key]).toEqual({ x: snap(bounds.x), y: snap(bounds.y + bounds.h + GUTTER), collapsed: false })
+    expect(sequenceDiagram(doc()).model.sequences[key]).toMatchObject({ title: "t", autonumber: true })
+  })
+
+  it("sul canvas vuoto va all'origine di placeNew", () => {
+    const key = importSequence()
+    expect(sequenceDiagram(doc()).view.nodes[key]).toEqual({ x: GUTTER, y: GUTTER, collapsed: false })
+  })
+
+  it("un secondo import la duplica, sotto la prima", () => {
+    const first = importSequence()
+    const second = importSequence()
+    const { model, view } = sequenceDiagram(doc())
+    expect(Object.keys(model.sequences)).toEqual([first, second])
+    expect(model.sequences[first]!.participants[0]!.id).not.toBe(model.sequences[second]!.participants[0]!.id)
+    expect(view.nodes[second]!.y).toBeGreaterThan(view.nodes[first]!.y)
+  })
+
+  it("si annulla con un solo undo", () => {
+    importSequence()
+    documentStore.getState().undo()
+    expect(sequenceDiagram(doc())).toEqual({ model: { sequences: {} }, view: { nodes: {} } })
   })
 })

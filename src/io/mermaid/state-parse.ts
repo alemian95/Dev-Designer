@@ -70,15 +70,18 @@ const ARROW = /[ \t]*-->[ \t]*/y
 const STYLE_CLASS = /:::[\w-]+/y
 /** `:` e il resto della riga: l'etichetta di una transizione o la descrizione di uno stato. */
 const COLON = /[ \t]*:([^\n]*)/y
-const KIND = /[ \t]*(?:<<(choice|fork|join)>>|\[\[(choice|fork|join)\]\])/y
-const ALIAS = /"([^"]*)"\s+as\s+/y
-const DIRECTION = /direction\s+(TB|BT|RL|LR)(?=\s|$)/y
-const STYLE_LINE = /(?:classDef|class|style|click)[ \t][^\n]*/y
-const ACC_LINE = /acc(?:Title|Descr)\s*:[^\n]*/y
-const ACC_BLOCK = /accDescr\s*\{[^}]*\}/y
+const KIND_TOKEN = String.raw`<<(choice|fork|join)>>|\[\[(choice|fork|join)\]\]`
+const KIND = new RegExp(String.raw`[ \t]*(?:${KIND_TOKEN})`, "iy")
+/** L'id dopo `state`: si ferma anche al genere attaccato (`state f<<fork>>`), che Mermaid separa. */
+const STATE_ID = new RegExp(String.raw`(?:(?!%%|${KIND_TOKEN})[^:\s\-{])+`, "iuy")
+const ALIAS = /"([^"]*)"\s*as\s+/iy
+const DIRECTION = /direction\s+(TB|BT|RL|LR)(?=\s|$)/iy
+const STYLE_LINE = /(?:classDef|class|style|click)[ \t][^\n]*/iy
+const ACC_LINE = /acc(?:Title|Descr)\s*:[^\n]*/iy
+const ACC_BLOCK = /accDescr\s*\{[^}]*\}/iy
 /** Righe che non cambiano il db di Mermaid: si saltano senza avviso. */
-const IGNORED_LINE = /(?:hide empty description|scale\s)[^\n]*/y
-const STATE = /state\s+/y
+const IGNORED_LINE = /(?:hide empty description|scale\s)[^\n]*/iy
+const STATE = /state\s+/iy
 
 const toKind = (s: string | undefined): StateAstMention["kind"] => (s === "choice" || s === "fork" || s === "join" ? s : null)
 
@@ -136,14 +139,14 @@ export function parseState(input: string): StateParseResult {
     const alias = take(ALIAS)
     if (!alias && text[pos] === '"') throw new MermaidSyntaxError("Virgolette senza chiusura o senza «as»", pos)
     const at = pos
-    const id = take(ID)
+    const id = take(STATE_ID)
     if (!id) throw new MermaidSyntaxError("Stato atteso dopo «state»", pos)
     const kind = take(KIND)
     const description = colon()
     if (alias) {
       mention(id[0], at, decode(alias[1]!))
       if (description !== null) mention(id[0], at, description)
-    } else if (description === null) mention(id[0], at, null, toKind(kind?.[1] ?? kind?.[2]))
+    } else if (description === null) mention(id[0], at, null, toKind((kind?.[1] ?? kind?.[2])?.toLowerCase()))
     // `state L : descr` senza alias: Mermaid perde la descrizione e non crea lo stato.
   }
 
@@ -171,11 +174,11 @@ export function parseState(input: string): StateParseResult {
     const at = pos
     let m: RegExpExecArray | null
     if ((m = take(DIRECTION))) {
-      ast.direction = m[1]!
+      ast.direction = m[1]!.toUpperCase()
       directionAt = at
     } else if (take(STYLE_LINE)) findings.push({ category: "style", at })
     else if (take(ACC_LINE) || take(ACC_BLOCK)) findings.push({ category: "accessibility", at })
-    else if (/accDescr\s*\{/y.test(text.slice(at))) throw new MermaidSyntaxError("«accDescr {» senza «}»", at)
+    else if (/accDescr\s*\{/iy.test(text.slice(at))) throw new MermaidSyntaxError("«accDescr {» senza «}»", at)
     else if (take(IGNORED_LINE)) continue
     else if (take(STATE)) stateStatement()
     else transitionOrMention()

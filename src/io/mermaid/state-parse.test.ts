@@ -95,6 +95,25 @@ describe("parseState: stati e transizioni", () => {
   })
 })
 
+describe("parseState: come il lexer di Mermaid", () => {
+  it("legge le parole chiave senza badare a maiuscole e minuscole", () => {
+    const lower = parseState("stateDiagram-v2\n  direction lr\n")
+    expect(lower.ast).toMatchObject({ direction: "LR", mentions: [] })
+    expect(lower.warnings).toEqual([])
+    expect(mentions('State "X" as L')).toEqual([{ id: "L", description: "X", kind: null }])
+    expect(mentions("state f <<Fork>>")).toEqual([{ id: "f", description: null, kind: "fork" }])
+  })
+
+  it("accetta l'alias senza spazio prima di as", () => {
+    expect(mentions('state "X"as L')).toEqual([{ id: "L", description: "X", kind: null }])
+  })
+
+  it("separa il genere attaccato all'id", () => {
+    expect(mentions("state f<<fork>>")).toEqual([{ id: "f", description: null, kind: "fork" }])
+    expect(mentions("state j[[join]]")).toEqual([{ id: "j", description: null, kind: "join" }])
+  })
+})
+
 describe("parseState: righe ignorate e avvisi", () => {
   it("ignora senza avviso hide empty description, scale, front-matter e direttive", () => {
     const text = "---\ntitle: T\n---\n%%{init: {'theme': 'dark'}}%%\nstateDiagram-v2\n  direction LR\n  hide empty description\n  scale 350 width\n  A --> B\n"

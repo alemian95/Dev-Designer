@@ -135,6 +135,16 @@ describe("mapState: composti", () => {
     expect(lanes("state P {\n    A\n    --\n    [*] --> C\n  }")).toEqual({ A: "P#1", C: "P#2", P_start: "P#2" })
   })
 
+  it("dà a un composto riaperto le regioni di tutte le aperture, senza corsie sospese", () => {
+    const { model, warnings } = map("state P {\n    A\n    --\n    B\n  }\n  state P {\n    C\n    --\n    D\n    --\n    E\n  }")
+    expect(model.pools.P!.lanes.map((l) => l.id)).toEqual(["P#1", "P#2", "P#3", "P#4", "P#5"])
+    expect(Object.fromEntries(Object.entries(model.nodes).map(([id, n]) => [id, n.lane]))).toEqual({ A: "P#1", B: "P#2", C: "P#3", D: "P#4", E: "P#5" })
+    expect(warnings).toEqual([])
+    const after = map("state P {\n    A\n  }\n  state P {\n    B\n    --\n    C\n  }")
+    expect(after.model.pools.P!.lanes.map((l) => l.id)).toEqual(["P#1", "P#2", "P#3"])
+    expect(lanes("state P {\n    A\n  }\n  state P {\n    B\n    --\n    C\n  }")).toEqual({ A: "P#1", B: "P#2", C: "P#3" })
+  })
+
   it("fonde le regioni di un composto che è già una corsia, con avviso", () => {
     const body = "state P {\n    state Q {\n      A\n      --\n      B\n    }\n  }"
     expect(lanes(body)).toEqual({ A: "Q", B: "Q" })

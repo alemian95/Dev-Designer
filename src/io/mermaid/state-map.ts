@@ -22,9 +22,8 @@ const MESSAGES: Record<StateMapCategory, string> = {
 export function mapState(ast: StateAst, text: string): FlowFragment {
   const findings: Finding<StateMapCategory>[] = []
 
-  // Un id ripetuto è lo stesso composto: vale la prima apertura, il cui genitore è aperto prima di lei.
-  const composites = new Map<string, StateAstComposite>()
-  for (const c of ast.composites) if (!composites.has(c.id)) composites.set(c.id, c)
+  // Il parser dà un composto per id, con il posto della prima apertura: il genitore è aperto prima di lui.
+  const composites = new Map(ast.composites.map((c) => [c.id, c]))
   const chain = (id: string): string[] => {
     const out = [id]
     for (let p = composites.get(id)!.container; p !== null; p = composites.get(p)!.container) out.unshift(p)

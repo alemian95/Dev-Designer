@@ -186,6 +186,16 @@ describe("parseState: stati composti", () => {
     ])
   })
 
+  it("unisce un composto riaperto, accodando le sue regioni come Mermaid", () => {
+    const { ast } = state("state P {\n    A\n    --\n    B\n  }\n  state P {\n    C\n    --\n    D\n    --\n    [*] --> E\n  }")
+    expect(ast.composites.map(({ id, regions }) => ({ id, regions }))).toEqual([{ id: "P", regions: 5 }])
+    expect(ast.mentions.map(({ id, region }) => [id, region])).toEqual([["A", 0], ["B", 1], ["C", 2], ["D", 3], ["E", 4]])
+    expect(ast.transitions[0]!.region).toBe(4)
+    const plain = state("state P {\n    A\n  }\n  state P {\n    B\n  }").ast
+    expect(plain.composites.map(({ id, regions }) => ({ id, regions }))).toEqual([{ id: "P", regions: 1 }])
+    expect(plain.mentions.map(({ id, region }) => [id, region])).toEqual([["A", 0], ["B", 0]])
+  })
+
   it("non cambia la direzione della radice con una direction dentro un composto", () => {
     const text = "stateDiagram-v2\n  direction LR\n  state C {\n    direction TB\n    A\n  }\n"
     expect(parseState(text).ast.direction).toBe("LR")

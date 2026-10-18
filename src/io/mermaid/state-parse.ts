@@ -105,8 +105,23 @@ export function parseState(input: string): StateParseResult {
   const findings: Finding<StateSyntaxCategory>[] = []
   const ast: StateAst = { direction: "TB", mentions: [], transitions: [], composites: [], notes: [] }
   const place: StateAstPlace = { container: null, region: 0 }
-  /** I composti aperti, ciascuno con il posto da riprendere alla sua `}`. */
-  const open: { composite: StateAstComposite; outer: StateAstPlace }[] = []
+  /**
+   * I composti aperti: il posto da riprendere alla `}`, le regioni di questa apertura e dove cominciano
+   * le sue menzioni, transizioni e figli, per accodarne le regioni se il composto è riaperto.
+   */
+  const open: { composite: StateAstComposite; outer: StateAstPlace; regions: number; from: [number, number, number] }[] = []
+  /** Alla `}`: una riapertura con `--` accoda le sue regioni a quelle del composto, come i divider di Mermaid. */
+  const close = () => {
+    const { composite, outer, regions, from } = open.pop()!
+    const reopened = ast.composites.indexOf(composite) < from[2]
+    if (!reopened) composite.regions = regions
+    else if (regions > 1) {
+      const items = [...ast.mentions.slice(from[0]), ...ast.transitions.slice(from[1]), ...ast.composites.slice(from[2])]
+      for (const item of items) if (item.container === composite.id) item.region += composite.regions
+      composite.regions += regions
+    }
+    Object.assign(place, outer)
+  }
   let pos = 0
 
   /** Consuma `re` a `pos`: il match, o `null` senza muoversi. */
@@ -151,9 +166,14 @@ export function parseState(input: string): StateParseResult {
     const id = take(STATE_ID)
     if (!id) throw new MermaidSyntaxError("Stato atteso dopo «state»", pos)
     if (take(OPEN)) {
-      const composite: StateAstComposite = { ...place, id: id[0], alias: alias ? decode(alias[1]!) : null, regions: 1, at: statementAt }
-      ast.composites.push(composite)
-      open.push({ composite, outer: { ...place } })
+      const from: [number, number, number] = [ast.mentions.length, ast.transitions.length, ast.composites.length]
+      // Un composto riaperto è lo stesso, come in Mermaid: vale il posto della prima apertura.
+      let composite = ast.composites.find((c) => c.id === id[0])
+      if (!composite) {
+        composite = { ...place, id: id[0], alias: alias ? decode(alias[1]!) : null, regions: 1, at: statementAt }
+        ast.composites.push(composite)
+      }
+      open.push({ composite, outer: { ...place }, regions: 1, from })
       Object.assign(place, { container: id[0], region: 0 })
       return
     }
@@ -193,11 +213,11 @@ export function parseState(input: string): StateParseResult {
     let m: RegExpExecArray | null
     if (open.length > 0 && text[pos] === "}") {
       pos++
-      Object.assign(place, open.pop()!.outer)
+      close()
     } else if (take(DIVIDER)) {
       const top = open[open.length - 1]
       if (!top) throw new MermaidSyntaxError('"--" fuori da uno stato composto', at)
-      top.composite.regions++
+      top.regions++
       place.region++
     } else if ((m = take(DIRECTION))) {
       // Dentro un composto la `direction` non cambia quella globale, come in Mermaid.

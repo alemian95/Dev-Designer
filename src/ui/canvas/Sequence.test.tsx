@@ -2,6 +2,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { Sequence, Step } from "@/model/sequence/schema"
+import { sequenceLayout } from "@/editor/sequence/layout"
 import { SequenceNodeView } from "./Sequence"
 import { hitTest } from "./use-canvas-interaction"
 
@@ -36,9 +37,22 @@ describe("SequenceNodeView", () => {
 
   it("disegna etichette, testi, operatore e condizioni, coi testi modificabili marcati", () => {
     const out = html()
-    for (const t of [">sd Ordine<", ">Server<", ">Utente<", ">attenzione<", ">alt<", ">[ok]<", ">[ko]<"]) expect(out).toContain(t)
+    for (const t of [">sd Ordine<", ">Server<", ">Utente<", ">attenzione<", ">alt<", ">ko<"]) expect(out).toContain(t)
     expect(out).toContain('data-sequence-text="m1"')
-    expect(out).toContain('data-sequence-text="s1"')
+    expect(out).toMatch(/>\[<tspan data-sequence-text="s1">ok<\/tspan>\]</)
+  })
+
+  it("una condizione vuota lascia il suo tspan, vuoto", () => {
+    const s = seq({ steps: [{ kind: "block", id: "k", operator: "loop", sections: [{ id: "s1", condition: "", steps: [] }] }] })
+    expect(html(s)).toContain('<tspan data-sequence-text="s1"></tspan>')
+  })
+
+  it("un messaggio a sé stesso `double` ha la punta di partenza rivolta verso la linea di vita", () => {
+    const s = seq({ steps: [msg("m", "api", "api", { head: "double" })] })
+    const l = sequenceLayout(s)
+    const x = l.columns.api!.x
+    const y = l.rows.m!.y + l.rows.m!.h - 10 - 22
+    expect(html(s)).toContain(`d="M${x} ${y} L${x + 10} ${y - 5} L${x + 10} ${y + 5} Z"`)
   })
 
   it("il titolo vuoto lascia «sd» da solo", () => {
@@ -67,5 +81,21 @@ describe("SequenceNodeView", () => {
     const tab = svg.querySelector("[data-sequence-header]")!
     expect(hitTest(tab)).toEqual({ kind: "node", key: "sequence/s", backdrop: false })
     expect(tab.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("l'etichetta di un blocco sta sopra le fasce di presa delle linee di vita", () => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    svg.innerHTML = html()
+    const label = svg.querySelector('[data-node-id="sequence/s/k"] path')!
+    expect(hitTest(label)).toEqual({ kind: "node", key: "sequence/s/k", backdrop: false })
+    // L'ordine del DOM è l'ordine di disegno: `elementFromPoint` trova per prima l'etichetta.
+    for (const life of svg.querySelectorAll("[data-lifeline]")) {
+      expect(life.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+  })
+
+  it("l'omino segue la y della testa", () => {
+    const head = sequenceLayout(seq()).columns.u!.head
+    expect(html()).toContain(`<circle cx="${sequenceLayout(seq()).columns.u!.x}" cy="${head.y + 6}"`)
   })
 })

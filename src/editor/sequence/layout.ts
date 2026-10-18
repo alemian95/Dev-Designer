@@ -24,6 +24,9 @@ export const BLOCK_END = 8
 export const BLOCK_INSET = 14
 export const DEPTH_INSET = 6
 export const ROOT = "root"
+/** Dove comincia, a destra della linea di vita, il testo di un messaggio a sé stesso; e il margine dopo. */
+export const SELF_TEXT_DX = 8
+export const SELF_TEXT_PAD = 8
 /** Larghezza minima di una sequenza senza partecipanti: il titolo deve restare cliccabile. */
 const MIN_WIDTH = 160
 
@@ -45,6 +48,34 @@ function stepParticipants(step: Step): string[] {
   return step.sections.flatMap((s) => s.steps.flatMap(stepParticipants))
 }
 
+/** Il numero di `autonumber` di ogni messaggio, in ordine di lettura, anche dentro i blocchi. */
+export function messageNumbers(seq: Sequence): Map<string, number> {
+  const numbers = new Map<string, number>()
+  const walk = (steps: Step[]): void =>
+    steps.forEach((s) => (s.kind === "block" ? s.sections.forEach((x) => walk(x.steps)) : s.kind === "message" && numbers.set(s.id, numbers.size + 1)))
+  walk(seq.steps)
+  return numbers
+}
+
+/** Il testo di un messaggio come lo disegna `Sequence.tsx`: col numero davanti, se la sequenza numera. */
+function messageLabel(text: string, number: number | undefined): string {
+  return number === undefined ? text : `${number}. ${text}`
+}
+
+/** Per partecipante, la larghezza del testo più lungo fra i suoi messaggi a sé stesso. */
+function selfTextWidths(seq: Sequence, measure: (text: string) => number): Map<string, number> {
+  const numbers = seq.autonumber ? messageNumbers(seq) : new Map<string, number>()
+  const widths = new Map<string, number>()
+  const walk = (steps: Step[]): void =>
+    steps.forEach((s) => {
+      if (s.kind === "block") return s.sections.forEach((x) => walk(x.steps))
+      if (s.kind !== "message" || s.from !== s.to) return
+      widths.set(s.from, Math.max(widths.get(s.from) ?? 0, measure(messageLabel(s.text, numbers.get(s.id)))))
+    })
+  walk(seq.steps)
+  return widths
+}
+
 function rowHeight(step: Exclude<Step, { kind: "block" }>): number {
   if (step.kind === "note") return NOTE_H
   return step.from === step.to ? SELF_MESSAGE_H : MESSAGE_H
@@ -52,13 +83,20 @@ function rowHeight(step: Exclude<Step, { kind: "block" }>): number {
 
 export function sequenceLayout(seq: Sequence, measure: (text: string) => number = estimate): SequenceLayout {
   const columns: SequenceLayout["columns"] = {}
+  const selfText = selfTextWidths(seq, measure)
   let left = PAD
+  let right = PAD
   for (const p of seq.participants) {
     const w = Math.max(COLUMN_MIN_W, measure(p.label ?? p.name) + COLUMN_TEXT_PAD)
-    columns[p.id] = { x: left + w / 2, w, head: { x: left, y: 6, w, h: HEAD_H - 4 } }
-    left += w + COLUMN_GAP
+    const x = left + w / 2
+    columns[p.id] = { x, w, head: { x: left, y: 6, w, h: HEAD_H - 4 } }
+    // Il testo di un messaggio a sé stesso parte dalla linea di vita verso destra: la colonna dopo, o
+    // il bordo, si scosta quanto basta.
+    const text = selfText.get(p.id)
+    right = Math.max(left + w, text === undefined ? 0 : x + SELF_TEXT_DX + text + SELF_TEXT_PAD)
+    left = right + COLUMN_GAP
   }
-  const width = seq.participants.length === 0 ? MIN_WIDTH : left - COLUMN_GAP + PAD
+  const width = seq.participants.length === 0 ? MIN_WIDTH : right + PAD
   // `margin` allarga (o, se negativo, stringe) l'estensione, anche quando nessun partecipante si risolve.
   const spanOf = (step: Step, margin: number): { x0: number; x1: number } => {
     const cols = stepParticipants(step).flatMap((id) => columns[id] ?? [])

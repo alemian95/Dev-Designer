@@ -55,6 +55,11 @@ describe("DiagramOps: sequence", () => {
     expect(spostato.w).toBe(fermo.w)
   })
 
+  it("rectOf di un sotto-elemento con `at`: `at` è l'origine della sequenza, non del sotto-elemento", () => {
+    const testa = sequenceLayout(seq("uno")).columns.b!.head
+    expect(ops().rectOf("s1/b", { x: 1000, y: 300 })).toEqual({ ...testa, x: 1000 + testa.x, y: 300 + testa.y })
+  })
+
   it("nessun arco: edgesTouching vuoto, edgeGeometry null", () => {
     const o = ops()
     expect(o.edgesTouching(new Set(["s1", "s2"]))).toHaveLength(0)
@@ -70,7 +75,19 @@ describe("DiagramOps: sequence", () => {
     expect(graph.nodes).toHaveLength(2)
   })
 
-  it("validate torna un array", () => {
-    expect(Array.isArray(ops().validate())).toBe(true)
+  it("deleteItems torna null quando non c'è niente da cancellare", () => {
+    expect(ops().deleteItems([], [])).toBeNull()
+  })
+
+  it("layoutGraph esclude una sequenza senza view", () => {
+    const doc = docDueSequenze()
+    delete doc.diagram.sequence.view.nodes["s2"]
+    expect(familyOps(doc, "sequence").layoutGraph().nodes.map((n) => n.id)).toEqual(["s1"])
+  })
+
+  it("validate segnala un riferimento pendente", () => {
+    const doc = docDueSequenze()
+    doc.diagram.sequence.model.sequences["s1"]!.steps.push({ kind: "message", id: "x", from: "a", to: "fantasma", text: "", line: "solid", head: "filled" })
+    expect(familyOps(doc, "sequence").validate().map((i) => i.code)).toContain("sequence-dangling-participant")
   })
 })

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { Sequence, Step } from "@/model/sequence/schema"
 import type { Rect } from "../geometry"
-import { COLUMN_MIN_W, NOTE_H, PAD, SELF_MESSAGE_H, TOP, sequenceLayout } from "./layout"
+import { CHAR_W } from "../geometry"
+import { COLUMN_MIN_W, NOTE_H, PAD, SELF_MESSAGE_H, SELF_TEXT_DX, TOP, messageNumbers, sequenceLayout } from "./layout"
 
 const part = (id: string) => ({ id, name: id, label: null, kind: "participant" as const })
 const msg = (id: string, from: string, to: string): Step => ({ kind: "message", id, from, to, text: "", line: "solid", head: "filled" })
@@ -104,5 +105,27 @@ describe("sequenceLayout", () => {
       expect(b.sections.s2!.h).toBe(24 + 18 + 8)
       expect(b.rect.h).toBe(30 + 18 + 24 + 18 + 8)
     })
+  })
+})
+
+describe("messaggi a sé stessi", () => {
+  const lungo = "un testo molto più lungo della colonna"
+  const self = (id: string, p: string): Step => ({ kind: "message", id, from: p, to: p, text: lungo, line: "solid", head: "filled" })
+
+  it("il testo sull'ultima colonna sta dentro la larghezza, numero compreso", () => {
+    const s: Sequence = { ...seq(["a", "b"], [msg("m0", "a", "b"), self("m1", "b")]), autonumber: true }
+    const l = sequenceLayout(s)
+    const end = l.columns.b!.x + SELF_TEXT_DX + `2. ${lungo}`.length * CHAR_W
+    expect(end).toBeLessThanOrEqual(l.width - PAD)
+  })
+
+  it("il testo su una colonna di mezzo non arriva alla colonna dopo", () => {
+    const l = sequenceLayout(seq(["a", "b"], [self("m1", "a")]))
+    expect(l.columns.a!.x + SELF_TEXT_DX + lungo.length * CHAR_W).toBeLessThan(l.columns.b!.head.x)
+  })
+
+  it("messageNumbers numera i messaggi in ordine di lettura, anche dentro i blocchi", () => {
+    const s = seq(["a", "b"], [msg("m1", "a", "b"), block("k", { id: "s", steps: [msg("m2", "b", "a")] }), msg("m3", "a", "b")])
+    expect([...messageNumbers(s)]).toEqual([["m1", 1], ["m2", 2], ["m3", 3]])
   })
 })

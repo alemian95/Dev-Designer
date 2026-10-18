@@ -17,7 +17,8 @@ export function sequenceOps(doc: DevDocument): DiagramOps {
   return {
     nodeKeys,
 
-    // `<seq>` è la sequenza, `<seq>/<sub>` un suo sotto-elemento; `at` sposta la sequenza intera.
+    // `<seq>` è la sequenza, `<seq>/<sub>` un suo sotto-elemento. `at` è sempre l'origine della
+    // sequenza, anche per un sotto-elemento: il sotto-elemento si sposta con lei.
     rectOf: (key, at) => {
       const parts = splitSequenceKey(key)
       const seq = parts && diagram().model.sequences[parts.sequence]

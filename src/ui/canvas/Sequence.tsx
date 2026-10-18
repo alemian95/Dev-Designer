@@ -5,7 +5,7 @@ import { qualify } from "@/editor/families"
 import type { Point, Rect } from "@/editor/geometry"
 import { notePath } from "@/editor/note/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
-import { sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
+import { SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
 import { sequenceDiagram } from "@/editor/sequence-access"
 import type { BlockStep, Head, MessageStep, NoteStep, Participant, Sequence, Step } from "@/model/sequence/schema"
 import type { NodeView } from "@/model/shared"
@@ -97,8 +97,8 @@ function ParticipantHead({ id, p, l }: { id: string; p: Participant; l: Sequence
         <>
           <rect x={head.x} y={head.y} width={head.w} height={head.h} fill="transparent" />
           <g fill="none" stroke={LINE} strokeWidth={1.4}>
-            <circle cx={col.x} cy={12} r={4} />
-            <path d={`M${col.x} 16v9 M${col.x - 7} 19h14 M${col.x} 25l-6 6 M${col.x} 25l6 6`} />
+            <circle cx={col.x} cy={head.y + 6} r={4} />
+            <path d={`M${col.x} ${head.y + 10}v9 M${col.x - 7} ${head.y + 13}h14 M${col.x} ${head.y + 19}l-6 6 M${col.x} ${head.y + 19}l6 6`} />
           </g>
         </>
       ) : (
@@ -120,11 +120,12 @@ function Message({ id, step, l, number }: { id: string; step: MessageStep; l: Se
   const self = step.from === step.to
   const dir = self ? -1 : Math.sign(b.x - a.x)
   const end = { tip: { x: self ? a.x + 2 : b.x, y }, dir }
-  const start = { tip: { x: a.x, y: self ? y - SELF_LOOP_H : y }, dir: -dir }
+  // Nell'anello la partenza esce verso destra: la sua punta guarda a sinistra, verso la linea di vita.
+  const start = { tip: { x: a.x, y: self ? y - SELF_LOOP_H : y }, dir: self ? -1 : -dir }
   const line = self
     ? `M${a.x} ${y - SELF_LOOP_H} h${SELF_LOOP_W} v${SELF_LOOP_H} h${2 - SELF_LOOP_W}`
     : `M${a.x} ${y} L${b.x} ${y}`
-  const label = self ? { x: a.x + 8, y: y - SELF_LOOP_H - 6, anchor: "start" as const } : { x: (a.x + b.x) / 2, y: y - 7, anchor: "middle" as const }
+  const label = self ? { x: a.x + SELF_TEXT_DX, y: y - SELF_LOOP_H - 6, anchor: "start" as const } : { x: (a.x + b.x) / 2, y: y - 7, anchor: "middle" as const }
   return (
     <g data-node-id={`${id}/${step.id}`}>
       <rect x={r.x} y={r.y} width={r.w} height={r.h} fill="transparent" />
@@ -167,8 +168,8 @@ function SequenceNote({ id, step, l }: { id: string; step: NoteStep; l: Sequence
   )
 }
 
-/** Il riquadro di un blocco, con le sezioni divise da linee tratteggiate; l'etichetta è il sotto-elemento. */
-function Block({ id, step, l }: { id: string; step: BlockStep; l: SequenceLayout }) {
+/** Il riquadro di un blocco, con le sezioni divise da linee tratteggiate e le condizioni. */
+function Block({ step, l }: { step: BlockStep; l: SequenceLayout }) {
   const b = l.blocks[step.id]
   if (!b) return null
   return (
@@ -180,25 +181,30 @@ function Block({ id, step, l }: { id: string; step: BlockStep; l: SequenceLayout
         return (
           <g key={section.id}>
             {j > 0 && <line x1={s.x} x2={s.x + s.w} y1={s.y} y2={s.y} stroke={BORDER} strokeDasharray="5 4" />}
-            {section.condition !== "" && (
-              <text
-                data-sequence-text={section.id}
-                x={j === 0 ? b.label.x + b.label.w + 8 : s.x + 8}
-                y={s.y + b.label.h / 2}
-                dominantBaseline="central"
-                fontSize={SMALL}
-                fill="var(--muted-foreground)"
-                xmlSpace="preserve"
-              >
-                [{section.condition}]
-              </text>
-            )}
+            <text
+              x={j === 0 ? b.label.x + b.label.w + 8 : s.x + 8}
+              y={s.y + b.label.h / 2}
+              dominantBaseline="central"
+              fontSize={SMALL}
+              fill="var(--muted-foreground)"
+              xmlSpace="preserve"
+            >
+              [<tspan data-sequence-text={section.id}>{section.condition}</tspan>]
+            </text>
           </g>
         )
       })}
-      <g data-node-id={`${id}/${step.id}`}>
-        <Tab r={b.label} text={step.operator} />
-      </g>
+    </g>
+  )
+}
+
+/** L'etichetta di un blocco: è il sotto-elemento, e si disegna dopo le linee di vita perché le loro fasce di presa non la coprano. */
+function BlockLabel({ id, step, l }: { id: string; step: BlockStep; l: SequenceLayout }) {
+  const b = l.blocks[step.id]
+  if (!b) return null
+  return (
+    <g data-node-id={`${id}/${step.id}`}>
+      <Tab r={b.label} text={step.operator} />
     </g>
   )
 }
@@ -206,13 +212,13 @@ function Block({ id, step, l }: { id: string; step: BlockStep; l: SequenceLayout
 /**
  * Vista pura e memoizzata di una sequenza (spec §4.1): tutto viene da `sequenceLayout`. L'ordine nel
  * DOM è l'ordine di disegno, e `hitTest` prende il `data-node-id` più interno sotto il cursore:
- * l'intestazione «sd» viene prima delle teste che copre, i blocchi prima delle righe che contengono.
+ * l'intestazione «sd» viene prima delle teste che copre, i riquadri dei blocchi prima delle linee di vita,
+ * le etichette dei blocchi dopo, e le righe per ultime.
  */
 export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, view, selected }: Props) {
   const l = sequenceLayout(sequence)
   const steps = flatten(sequence.steps)
-  const numbers = new Map<string, number>()
-  if (sequence.autonumber) steps.forEach((s) => s.kind === "message" && numbers.set(s.id, numbers.size + 1))
+  const numbers = sequence.autonumber ? messageNumbers(sequence) : new Map<string, number>()
   return (
     <g
       data-node-id={id}
@@ -226,7 +232,7 @@ export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, v
       <g data-sequence-header>
         <Tab r={l.header} text={sequence.title === "" ? "sd" : `sd ${sequence.title}`} />
       </g>
-      {steps.map((s) => s.kind === "block" && <Block key={s.id} id={id} step={s} l={l} />)}
+      {steps.map((s) => s.kind === "block" && <Block key={s.id} step={s} l={l} />)}
       {sequence.participants.map((p) => {
         const col = l.columns[p.id]
         if (!col) return null
@@ -240,6 +246,7 @@ export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, v
           </g>
         )
       })}
+      {steps.map((s) => s.kind === "block" && <BlockLabel key={s.id} id={id} step={s} l={l} />)}
       {steps.map((s) =>
         s.kind === "message" ? (
           <Message key={s.id} id={id} step={s} l={l} number={numbers.get(s.id) ?? null} />

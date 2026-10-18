@@ -208,9 +208,9 @@ describe("emitFlowMermaid: escaping", () => {
     expect(text).not.toContain("|")
   })
 
-  it("un'etichetta vuota esce come stringa vuota fra virgolette, non rompe il nodo", () => {
+  it("un'etichetta vuota esce come uno spazio scritto come entità, perché Mermaid rifiuta `[\"\"]`", () => {
     const m = model({ nodes: { a: n("", "process") }, edges: {} })
-    expect(emitFlowMermaid(m).text).toContain('n1[""]')
+    expect(emitFlowMermaid(m).text).toContain('n1["#32;"]')
   })
 
   it("un nome di corsia con virgolette e a capo è scappato come le etichette dei nodi", () => {

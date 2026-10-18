@@ -118,6 +118,7 @@ function stick(re: RegExp, s: string, pos: number): RegExpExecArray | null {
 }
 
 const BR = /<br\s*\/?>/gi
+const SURROUNDING_SPACES = /^[^\S\n]+|[^\S\n]+$/g
 
 /** Entità e `<br>` di un testo (spec §4.3). */
 const decode = (raw: string): string => decodeEntities(raw).replace(BR, "\n")
@@ -256,7 +257,8 @@ export function parseFlow(input: string): FlowParseResult {
         .sort((a, b) => a[1] - b[1])[0]
       if (!found) throw new MermaidSyntaxError(`Forma «${o}» senza chiusura`, base + i)
       const [closer, at] = found
-      mention.text = q ? q.text : { text: decode(s.slice(from, at).trim()), markdown: false }
+      // flowDb toglie gli spazi attorno al testo; qui anche quelli scritti come entità (`#32;`), non gli a capo.
+      mention.text = q ? { ...q.text, text: q.text.text.replace(SURROUNDING_SPACES, "") } : { text: decode(s.slice(from, at).trim()), markdown: false }
       mention.shape = closers[closer]!
       i = at + closer.length
     }

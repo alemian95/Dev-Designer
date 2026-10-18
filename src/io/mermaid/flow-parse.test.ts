@@ -34,6 +34,12 @@ describe("parseFlow: nodi", () => {
     expect(node('A["x; y"]').text?.text).toBe("x; y")
   })
 
+  it("toglie gli spazi in testa e in coda al testo di un nodo, anche fra virgolette e come entità, come flowDb", () => {
+    expect(node('A[" x "]').text?.text).toBe("x")
+    expect(node('A{"#32;"}').text?.text).toBe("")
+    expect(node('A["<br>x<br>"]').text?.text).toBe("\nx\n")
+  })
+
   it("legge @{ shape, label } e scarta gli altri attributi con un avviso", () => {
     expect(node('A@{ shape: diam, label: "Va?" }')).toMatchObject({ shape: "diam", text: { text: "Va?" } })
     const { warnings } = flow("A@{ shape: rect, icon: fa:car, pos: t }")

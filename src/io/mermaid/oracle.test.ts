@@ -73,7 +73,7 @@ describe("oracolo Mermaid: classDiagram", () => {
 
 /** Il db di Mermaid per un flowchart: API interna e deprecata, che qui serve solo da confronto (spec §3.1). */
 interface FlowDb {
-  getVertices(): Map<string, { id: string }>
+  getVertices(): Map<string, { id: string; text: string }>
   getEdges(): { start: string; end: string; text: string }[]
   getSubGraphs(): { id: string; nodes: string[] }[]
 }
@@ -109,6 +109,18 @@ describe("oracolo Mermaid: flowchart", () => {
     const { text } = emitFlowMermaid(model)
     expect(await mermaidAccepts(text)).toBe(true)
     expect(mapFlow(parseFlow(text).ast, text).model.edges["0"]!.label).toBe("a | b")
+  })
+
+  it("toglie gli spazi attorno al testo di un nodo, come il nostro parser", async () => {
+    const db = await flowDb('flowchart LR\n  A[" x "]\n')
+    expect(db.getVertices().get("A")!.text).toBe("x")
+    expect(parseFlow('flowchart LR\n  A[" x "]\n').ast.nodes[0]!.text?.text).toBe("x")
+  })
+
+  it("l'export di un'etichetta vuota è Mermaid valido, in ogni forma", async () => {
+    const shapes = ["terminal", "process", "decision", "io", "subprocess"] as const
+    const model: FlowModel = { pools: {}, nodes: Object.fromEntries(shapes.map((shape) => [shape, { label: "", shape, lane: null }])), edges: {} }
+    expect(await mermaidAccepts(emitFlowMermaid(model).text)).toBe(true)
   })
 
   it("l'export del flowchart è Mermaid valido, con pool, corsie, entità e a capo", async () => {

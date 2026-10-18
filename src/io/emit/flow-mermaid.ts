@@ -71,7 +71,9 @@ export function emitFlowMermaid(model: FlowModel, notes: Readonly<Record<string,
     const nodeId = `n${nextNodeId}`
     nextNodeId += 1
     nodeIdByKey.set(key, nodeId)
-    out.push(`${indent}${SHAPE_TEMPLATE[node.shape](nodeId, escapeLabel(node.label))}`)
+    // `[""]` Mermaid lo rifiuta: lo spazio come entità passa, e l'import lo toglie come flowDb.
+    const label = node.label === "" ? "#32;" : escapeLabel(node.label)
+    out.push(`${indent}${SHAPE_TEMPLATE[node.shape](nodeId, label)}`)
   }
 
   for (const key of emittable(null)) emitNode(key, "  ")

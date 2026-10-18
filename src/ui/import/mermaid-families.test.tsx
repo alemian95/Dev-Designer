@@ -4,8 +4,6 @@ import { documentStore } from "@/editor/document-store"
 import { createDocument } from "@/model/document"
 import type { LayoutGraph } from "@/model/layout"
 import { analyseMermaid, type MermaidReady } from "@/io/mermaid/analyse"
-import { mapState } from "@/io/mermaid/state-map"
-import { parseState } from "@/io/mermaid/state-parse"
 import { bindImport } from "./mermaid-families"
 
 function ready(text: string): MermaidReady {
@@ -18,8 +16,7 @@ const ER = ready("erDiagram\n  A ||--o{ B : has")
 const CLASS = ready('classDiagram\n  class A\n  class B\n  A --> B\n  note "libera"')
 const FLOW = ready("flowchart TD\n  subgraph P\n    a --> b\n  end\n  b --> c")
 const STATE_TEXT = "stateDiagram-v2\n  state P {\n    a --> b\n  }\n  b --> c\n  note right of a : n\n"
-// Lo state non è ancora nel registro dei formati: il frammento si costruisce a mano.
-const STATE: MermaidReady = { ok: true, kind: "flow", fragment: mapState(parseState(STATE_TEXT).ast, STATE_TEXT) }
+const STATE = ready(STATE_TEXT)
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<>{node}</>)
 

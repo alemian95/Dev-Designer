@@ -117,12 +117,6 @@ describe("oracolo Mermaid: flowchart", () => {
     expect(mapFlow(parseFlow(text).ast, text).model.edges["0"]!.label).toBe("a | b")
   })
 
-  it("toglie gli spazi attorno al testo di un nodo, come il nostro parser", async () => {
-    const db = await flowDb('flowchart LR\n  A[" x "]\n')
-    expect(db.getVertices().get("A")!.text).toBe("x")
-    expect(parseFlow('flowchart LR\n  A[" x "]\n').ast.nodes[0]!.text?.text).toBe("x")
-  })
-
   it("l'export di un'etichetta vuota è Mermaid valido, in ogni forma", async () => {
     const shapes = ["terminal", "process", "decision", "io", "subprocess"] as const
     const model: FlowModel = { pools: {}, nodes: Object.fromEntries(shapes.map((shape) => [shape, { label: "", shape, lane: null }])), edges: {} }

@@ -46,7 +46,7 @@ export function deleteSequences(keys: readonly string[]): Recipe {
 }
 
 /** La copia di una sequenza con uuid nuovi per partecipanti, passi e sezioni, e i riferimenti rimappati. */
-function copySequence(seq: Sequence): Sequence {
+export function copySequence(seq: Sequence): Sequence {
   const pids = new Map(seq.participants.map((p) => [p.id, crypto.randomUUID()] as const))
   const pid = (id: string): string => pids.get(id) ?? id
   const copyStep = (step: Step): Step => {

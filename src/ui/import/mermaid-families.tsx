@@ -1,22 +1,29 @@
 import type { ReactNode } from "react"
 import { classDiagram } from "@/editor/class-access"
 import {
-  classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
-  placeFlowImport, rekeyFlowKeys, rekeyFlowNotes, selectClassFragment, selectErFragment, type ImportFate,
+  classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, importMermaidSequence, originBelow,
+  placeClassImport, placeErImport, placeFlowImport, rekeyFlowKeys, rekeyFlowNotes, rekeySequence, selectClassFragment,
+  selectErFragment, type ImportFate,
 } from "@/editor/commands/import-mermaid"
 import type { Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
 import { flowDiagram } from "@/editor/flow-access"
+import { nodeRects } from "@/editor/kinds/canvas-ops"
 import { noteDiagram } from "@/editor/note-access"
+import { sequenceDiagram } from "@/editor/sequence-access"
+import { allSteps } from "@/editor/sequence/tree"
 import type { MermaidReadyOf } from "@/io/mermaid/analyse"
 import type { FragmentByFamily, ImportFamily } from "@/io/mermaid/formats"
 import type { DevDocument } from "@/model/document"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
+import type { Step } from "@/model/sequence/schema"
 
 /** Relazioni (o archi), note e pool presenti nella famiglia: la differenza prima/dopo il dispatch dice quanti ne sono entrati davvero. */
 export interface Tally { relations: number; notes: number; pools: number }
 
 type Layout = (g: LayoutGraph) => Promise<LayoutPositions>
+
+const countOf = (steps: readonly Step[], kind: Step["kind"]): number => allSteps(steps).filter((s) => s.kind === kind).length
 
 /** Tutto ciò che il dialog sa di una famiglia di import: una famiglia nuova è una voce di `FAMILY_IMPORTS`. */
 export interface FamilyImport<F extends ImportFamily> {
@@ -95,6 +102,33 @@ export const FAMILY_IMPORTS: { [F in ImportFamily]: FamilyImport<F> } = {
     report: (elements, { relations, pools, notes }) => notes > 0
       ? <>Importati <strong>{elements}</strong> nodi e <strong>{relations}</strong> archi, con <strong>{pools}</strong> pool e <strong>{notes}</strong> note.</>
       : <>Importati <strong>{elements}</strong> nodi e <strong>{relations}</strong> archi, con <strong>{pools}</strong> pool.</>,
+  },
+  sequence: {
+    noun: "sequenza",
+    // Una sequenza non ha caselle: si aggiunge sempre, intera (spec §7).
+    fates: () => ({}),
+    importable: (fr) => (fr.sequence.participants.length > 0 ? 1 : 0),
+    async prepare(doc, fr) {
+      const { recipe } = importMermaidSequence(rekeySequence(fr.sequence), originBelow(nodeRects(doc)))
+      return { recipe, elements: 1, fallback: null }
+    },
+    summary({ sequence: { participants, steps } }) {
+      const notes = countOf(steps, "note")
+      return `${participants.length} partecipanti, ${countOf(steps, "message")} messaggi, ${countOf(steps, "block")} blocchi` +
+        (notes > 0 ? `, ${notes} note` : "")
+    },
+    // `pools` porta i partecipanti: `Tally` è il conteggio prima/dopo che il dialog sottrae campo per campo.
+    tally(doc) {
+      const sequences = Object.values(sequenceDiagram(doc).model.sequences)
+      return {
+        relations: sequences.reduce((n, s) => n + countOf(s.steps, "message"), 0),
+        notes: 0,
+        pools: sequences.reduce((n, s) => n + s.participants.length, 0),
+      }
+    },
+    report: (_elements, { relations, pools }) => (
+      <>Importata <strong>1</strong> sequenza con <strong>{pools}</strong> partecipanti e <strong>{relations}</strong> messaggi.</>
+    ),
   },
 }
 

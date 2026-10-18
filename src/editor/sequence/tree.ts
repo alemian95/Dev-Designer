@@ -46,3 +46,8 @@ export function descendants(step: Step): string[] {
   if (step.kind !== "block") return []
   return step.sections.flatMap((section) => [section.id, ...section.steps.flatMap((s) => [s.id, ...descendants(s)])])
 }
+
+/** Tutti i passi, a ogni profondità, in ordine di testo. */
+export function allSteps(steps: readonly Step[]): Step[] {
+  return steps.flatMap((step) => [step, ...(step.kind === "block" ? step.sections.flatMap((s) => allSteps(s.steps)) : [])])
+}

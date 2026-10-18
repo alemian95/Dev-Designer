@@ -12,11 +12,11 @@ const msg = (text: string, line: Line = "solid", head: Head = "filled"): Step =>
 const emit = (s: Sequence) => emitSequenceMermaid(s, "s1", {})
 
 describe("emitSequenceMermaid", () => {
-  it("le 10 frecce", () => {
-    const expected = ["->", "->>", "-x", "-)", "<<->>", "-->", "-->>", "--x", "--)", "<<-->>"]
-    const cases = (["solid", "dashed"] as const).flatMap((line) => (["none", "filled", "cross", "open", "double"] as const).map((head) => [line, head] as const))
-    const arrows = cases.map(([line, head]) => emit(seq({ steps: [msg("x", line, head)] })).text.split("\n").at(-2)!.trim())
-    expect(arrows.sort()).toEqual(expected.map((a) => `A${a}B: x`).sort())
+  it.each([
+    ["solid", "none", "->"], ["solid", "filled", "->>"], ["solid", "cross", "-x"], ["solid", "open", "-)"], ["solid", "double", "<<->>"],
+    ["dashed", "none", "-->"], ["dashed", "filled", "-->>"], ["dashed", "cross", "--x"], ["dashed", "open", "--)"], ["dashed", "double", "<<-->>"],
+  ] as const)("la freccia %s/%s esce come %s", (line, head, arrow) => {
+    expect(emit(seq({ steps: [msg("x", line, head)] })).text.split("\n").at(-2)).toBe(`  A${arrow}B: x`)
   })
 
   it("dichiara i partecipanti con actor e as, con title e autonumber", () => {
@@ -69,7 +69,19 @@ describe("emitSequenceMermaid", () => {
     expect(text).toContain("participant p3 as End")
     expect(text).toContain("participant p1\n")
     expect(text).toContain("p2->>p3: x")
-    expect(warnings).toEqual(["2 nomi di partecipante non validi per Mermaid sono usciti come id sicuri (p1, p2…), con il nome come etichetta."])
+    expect(warnings).toEqual(["2 nomi di partecipante non validi per Mermaid sono usciti come id sicuri (p1, p2…), con l'etichetta che c'era o, in mancanza, il nome."])
+  })
+
+  it("una parola chiave in testa al nome, seguita da un carattere non di parola, è un nome non valido; in mezzo no", () => {
+    const names = ["end-user", "opt-in", "Note Service", "loop 1", "Break Room", "link x", "par_over", "user-x", "Backend", "end_x", "link", "a end"]
+    const participants = names.map((name, i) => ({ id: `i${i}`, name, label: null, kind: "participant" as const }))
+    const { text, warnings } = emit(seq({ participants }))
+    const declared = text.split("\n").slice(1, -1).map((l) => l.trim().replace("participant ", ""))
+    expect(declared).toEqual([
+      "p1 as end-user", "p2 as opt-in", "p3 as Note Service", "p4 as loop 1", "p5 as Break Room", "p6 as link x", "p7 as par_over", "p8 as user-x",
+      "Backend", "end_x", "link", "a end",
+    ])
+    expect(warnings[0]).toMatch(/^8 nomi/)
   })
 
   it("le Note ancorate a quella sequenza non escono, con avviso (singolare e plurale)", () => {

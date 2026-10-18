@@ -99,16 +99,39 @@ describe("TextExportDialog (F2)", () => {
     expect(dialog.querySelector("[data-export-preview]")!.textContent).toContain("sequenceDiagram")
   })
 
+  it("con un'altra famiglia e nessuna sequenza il formato delle sequenze non compare", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.er.model.entities["a"] = { name: "a", attributes: [] }
+    doc.diagram.er.view.nodes["a"] = { x: 0, y: 0, collapsed: false }
+    documentStore.getState().load(doc)
+    render()
+    expect(document.querySelector("[data-text-export-dialog]")!.textContent).not.toContain("Mermaid sequenze")
+  })
+
+  /** Scarica il file e restituisce il nome che il browser vedrebbe. */
+  const downloadedName = (): string | undefined => {
+    let name: string | undefined
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      name = this.download
+    })
+    try {
+      const scarica = [...document.querySelectorAll("button")].find((b) => b.textContent === "Scarica")!
+      act(() => scarica.click())
+    } finally {
+      click.mockRestore()
+    }
+    return name
+  }
+
+  it("con una sola sequenza l'estensione resta .mmd", () => {
+    documentStore.getState().load(withSequences(1))
+    render()
+    expect(downloadedName()).toMatch(/\.mmd$/)
+  })
+
   it("con due sequenze scarica un file .md", () => {
     documentStore.getState().load(withSequences(2))
     render()
-    const downloaded = vi.fn()
-    const create = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
-      downloaded(this.download)
-    })
-    const scarica = [...document.querySelectorAll("button")].find((b) => b.textContent === "Scarica")!
-    act(() => scarica.click())
-    create.mockRestore()
-    expect(downloaded).toHaveBeenCalledWith(expect.stringMatching(/\.md$/))
+    expect(downloadedName()).toMatch(/\.md$/)
   })
 })

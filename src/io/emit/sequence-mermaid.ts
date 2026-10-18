@@ -13,15 +13,18 @@ const ARROWS: Record<Line, Record<Head, string>> = {
 const SECTION_KEYWORD: Partial<Record<Operator, string>> = { alt: "else", par: "and", critical: "option" }
 
 /**
- * Le parole chiave che Mermaid 12.2.0 rifiuta come nome di partecipante, senza distinguere maiuscole
- * (sonda su `mermaid.parse`; `link`, `links`, `properties` e `details` invece passano).
+ * Mermaid 12.2.0 (sonda su `mermaid.parse`) rifiuta un nome che comincia con una di queste parole,
+ * senza distinguere maiuscole, quando la parola non è seguita da un carattere di parola: `end`, `end-user`
+ * e `Note Service` no, `Backend` e `end_x` sì.
  */
-const RESERVED = new Set([
-  "end", "loop", "alt", "else", "opt", "par", "and", "critical", "option", "break", "rect", "box", "note",
-  "participant", "actor", "activate", "deactivate", "create", "destroy", "autonumber", "title",
-])
+const KEYWORD_START = /^(?:end|loop|alt|else|opt|par_over|par|and|critical|option|break|rect|box|note|participant|actor|activate|deactivate|create|destroy|autonumber|title)(?!\w)/i
+/** Queste quattro sono nomi ammessi da sole, ma non seguite da un carattere che non è di parola (`link x`). */
+const SOFT_KEYWORD_START = /^(?:links?|properties|details)\W/i
+/** `-x`, `-)`, `->` e `--` dentro un nome si leggono come l'inizio di una freccia (`user-x`). */
+const ARROW_LIKE = /-[x)>-]/i
 
-const isValidName = (name: string): boolean => name !== "" && !INVALID_NAME.test(name) && !RESERVED.has(name.toLowerCase())
+const isValidName = (name: string): boolean =>
+  name !== "" && !INVALID_NAME.test(name) && !KEYWORD_START.test(name) && !SOFT_KEYWORD_START.test(name) && !ARROW_LIKE.test(name)
 
 /**
  * `#` e `;` in un solo passaggio: in sequenza `#35;` perderebbe il suo `;` (`#35#59;`). Poi gli a capo.
@@ -93,8 +96,8 @@ function render(seq: Sequence): { text: string; renamed: number } {
 const renamedWarning = (n: number): string[] =>
   n === 0 ? [] : [
     n === 1
-      ? "1 nome di partecipante non valido per Mermaid è uscito come id sicuro (p1, p2…), con il nome come etichetta."
-      : `${n} nomi di partecipante non validi per Mermaid sono usciti come id sicuri (p1, p2…), con il nome come etichetta.`,
+      ? "1 nome di partecipante non valido per Mermaid è uscito come id sicuro (p1, p2…), con l'etichetta che c'era o, in mancanza, il nome."
+      : `${n} nomi di partecipante non validi per Mermaid sono usciti come id sicuri (p1, p2…), con l'etichetta che c'era o, in mancanza, il nome.`,
   ]
 
 const droppedNotesWarning = (n: number): string[] =>

@@ -5,6 +5,7 @@ import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
 import { familyOps } from "@/editor/kinds/ops"
 import type { Sequence } from "@/model/sequence/schema"
+import { SequenceProperties } from "@/ui/panels/SequenceProperties"
 import { SequenceNode, SequenceNodeView } from "../Sequence"
 import type { DiagramView, NodeViewProps } from "./registry"
 
@@ -23,15 +24,15 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
   return <SequenceNodeView id={qualify("sequence", nodeKey)} sequence={node as Sequence} view={view} selected={selected} />
 }
 
-/** Niente archi né pannello, per ora: i messaggi si disegnano dentro la sequenza. */
+/** Niente archi: i messaggi si disegnano dentro la sequenza. */
 const Nothing = () => null
 
-/** `DiagramView` per le sequenze: lo strumento Sequenza, nessun pannello ancora. */
+/** `DiagramView` per le sequenze: lo strumento Sequenza e il pannello delle proprietà. */
 export const sequenceView: DiagramView = {
   NodesLayer,
   EdgesLayer: Nothing,
   NodeView,
   EdgeView: Nothing,
-  Properties: Nothing,
+  Properties: SequenceProperties,
   tools: [{ label: "Sequenza", key: "s", Icon: ArrowRightLeft, tool: "node", family: "sequence" }],
 }

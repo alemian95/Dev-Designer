@@ -31,8 +31,8 @@ const CLASSIC: Readonly<Record<string, { line: Line; head: Head }>> = {
 
 /**
  * Traduce lo `SequenceAst` in una sequenza (spec §6). Le perdite del testo le segnala già il parser;
- * qui resta solo la mezza freccia, che diventa la piena con la stessa linea. Passi e sezioni prendono
- * un id progressivo, provvisorio come i nomi.
+ * qui resta solo la mezza freccia, che diventa la piena con la stessa linea e verso la sua punta.
+ * Passi e sezioni prendono un id progressivo, provvisorio come i nomi.
  */
 export function mapSequence(ast: SequenceAst, text: string): SequenceFragment {
   const findings: Finding<SequenceMapCategory>[] = []
@@ -45,7 +45,9 @@ export function mapSequence(ast: SequenceAst, text: string): SequenceFragment {
         const classic = CLASSIC[s.arrow.toLowerCase()]
         if (!classic) findings.push({ category: "halfArrow", at: s.at })
         const { line, head }: { line: Line; head: Head } = classic ?? { line: s.arrow.includes("--") ? "dashed" : "solid", head: "filled" }
-        return { kind: "message", id: id(), from: s.from, to: s.to, text: s.text, line, head }
+        // `A/|-B`: il db di Mermaid tiene A → B, ma il renderer mette la punta su A (`marker-start`).
+        const reversed = /^[/\\]/.test(s.arrow)
+        return { kind: "message", id: id(), from: reversed ? s.to : s.from, to: reversed ? s.from : s.to, text: s.text, line, head }
       }
       case "note": {
         const [first, second] = s.participants

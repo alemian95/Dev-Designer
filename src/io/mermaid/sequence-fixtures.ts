@@ -1,3 +1,5 @@
+import type { Participant, Sequence, Step } from "@/model/sequence/schema"
+
 /**
  * Testi `sequenceDiagram` che Mermaid accetta: li leggono i test del parser e la suite oracolo
  * (spec §10). Chi aggiunge un caso valido lo aggiunge qui, così l'oracolo lo vede.
@@ -76,6 +78,24 @@ sequenceDiagram
     A->>B: u
   end
 `,
+  editor: `sequenceDiagram
+    autonumber
+    actor Redattore
+    participant Orchestrator as Redazione Orchestrator
+    participant Storage as Database / Knowledge Base
+    participant LLM as LLM Engine (Prompting)
+    Redattore->>Orchestrator: Richiesta generazione articolo (es. Formato: Newsletter, Topic: Ultimi 3 giorni)
+    Orchestrator->>Storage: Query NewsCluster (ImpactScore >= 4, Stato: Unprocessed)
+    Storage-->>Orchestrator: Ritorna lista cluster con rispettivi RawItems e fonti
+    Orchestrator->>Orchestrator: Compone contesto & prompt con linee guida editoriali e fonti
+    Orchestrator->>LLM: Invia prompt (Sintesi, Analisi comparativa, TL#59;DR, Richiesta citazioni)
+    LLM-->>Orchestrator: Ritorna testo strutturato (Headline, TL#59;DR, Sezioni, Fonti referenziate)
+    Orchestrator->>Orchestrator: Valida link e integra metadati citazioni
+    Orchestrator->>Storage: Salva ArticleDraft (Stato: DRAFT)
+    Orchestrator-->>Redattore: Presenta bozza formattata in Markdown per revisione
+    Redattore->>Orchestrator: Approva / Modifica bozza
+    Orchestrator->>Storage: Aggiorna stato in APPROVED
+`,
   lost: `---
 title: Front-matter
 ---
@@ -107,4 +127,69 @@ sequenceDiagram
     lunga
   }
 `,
+}
+
+const participant = (id: string, name: string, label: string | null = null): Participant => ({ id, name, label, kind: "participant" })
+const send = (id: string, from: string, to: string, text: string): Step => ({ kind: "message", id, from, to, text, line: "solid", head: "filled" })
+
+/**
+ * Modelli costruiti a mano per il round-trip (spec §8.4, Review Focus 3 e 4): testi che il formato
+ * deve scappare, e i due casi che l'export riscrive (nomi non validi, spazi ai bordi).
+ */
+export const SEQUENCE_MODELS: Readonly<Record<string, Sequence>> = {
+  escapes: {
+    title: "Titolo; con # e #35; letterale",
+    autonumber: true,
+    participants: [participant("u", "Utente", "Lei; #1\nsotto"), { id: "s", name: "Server", label: null, kind: "actor" }],
+    steps: [
+      send("m1", "u", "s", "a; b # c\nd"),
+      send("m2", "s", "u", "#59; e #quot; letterali, TL;DR"),
+      { kind: "note", id: "n1", placement: "over", participants: ["u", "s"], text: "nota; con # e\na capo" },
+      {
+        kind: "block", id: "b1", operator: "alt", sections: [
+          { id: "c1", condition: "se; #ok", steps: [send("m3", "u", "u", "a sé")] },
+          { id: "c2", condition: "", steps: [] },
+        ],
+      },
+    ],
+  },
+  wrap: {
+    title: "",
+    autonumber: false,
+    participants: [participant("a", "A"), participant("b", "B")],
+    steps: [
+      send("m1", "a", "b", "wrap: non è un comando"),
+      send("m2", "a", "b", "nowrap: nemmeno"),
+      send("m3", "a", "b", ":wrap: due punti"),
+      { kind: "note", id: "n1", placement: "left", participants: ["a"], text: "wrap: anche qui" },
+      { kind: "block", id: "b1", operator: "loop", sections: [{ id: "c1", condition: "nowrap: condizione", steps: [] }] },
+    ],
+  },
+  silent: {
+    title: "",
+    autonumber: false,
+    participants: [participant("a", "A"), participant("b", "B", "Mai chiamato"), participant("c", "C")],
+    steps: [send("m1", "a", "c", "x")],
+  },
+  empty: { title: "", autonumber: false, participants: [participant("a", "A"), participant("b", "B")], steps: [] },
+}
+
+/** I due casi che l'export riscrive (spec §8.1, §8.4): li leggono a parte il round-trip e l'oracolo. */
+export const SEQUENCE_REWRITTEN: Readonly<Record<string, Sequence>> = {
+  keywordName: {
+    title: "",
+    autonumber: false,
+    participants: [participant("a", "A"), participant("e", "end"), participant("u", "end-user", "Cliente")],
+    steps: [send("m1", "a", "e", "x"), send("m2", "e", "u", "y")],
+  },
+  edgeSpaces: {
+    title: "  titolo  ",
+    autonumber: false,
+    participants: [participant("a", "A", "  Alice  "), participant("b", "B")],
+    steps: [
+      send("m1", "a", "b", "  attorno  "),
+      { kind: "note", id: "n1", placement: "right", participants: ["b"], text: " nota " },
+      { kind: "block", id: "b1", operator: "opt", sections: [{ id: "c1", condition: "  se  ", steps: [] }] },
+    ],
+  },
 }

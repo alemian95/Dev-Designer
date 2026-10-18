@@ -299,3 +299,16 @@ describe("parseSequence: fixture valide", () => {
     expect(() => parseSequence(text)).not.toThrow()
   })
 })
+
+describe("parseSequence: linearità", () => {
+  it("resta lineare su un testo grande", () => {
+    const lines = ["sequenceDiagram", "  loop Ogni passo"]
+    for (let i = 0; i < 5000; i++) lines.push(`    Utente ${i % 50}->>Servizio ${(i + 1) % 50}: Passo ${i}#59; con #35; e testo`)
+    lines.push("  end")
+    const started = performance.now()
+    const { ast } = parseSequence(lines.join("\n"))
+    expect(ast.steps[0]).toMatchObject({ kind: "block" })
+    expect(ast.steps[0]!.kind === "block" && ast.steps[0]!.sections[0]!.steps).toHaveLength(5000)
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+})

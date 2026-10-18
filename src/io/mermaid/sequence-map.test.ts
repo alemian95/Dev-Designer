@@ -58,6 +58,13 @@ describe("mapSequence: messaggi", () => {
     expect(warnings).toEqual([{ message: "Mezze frecce lette come frecce piene, con la stessa linea (righe 2, 3, 4, 5)", at: 18 }])
   })
 
+  it("una mezza freccia che comincia dalla punta va dal destinatario scritto al mittente, come la disegna Mermaid", () => {
+    const { sequence } = map("A/|-B: a\n  A\\|--B: b\n  A//-B: c\n  A\\\\--B: d\n  A-|/B: e")
+    expect(sequence.steps.map((s) => s.kind === "message" && [s.from, s.to, s.line])).toEqual([
+      ["B", "A", "solid"], ["B", "A", "dashed"], ["B", "A", "solid"], ["B", "A", "dashed"], ["A", "B", "solid"],
+    ])
+  })
+
   it("tiene il messaggio senza connessione centrale né wrap:", () => {
     expect(map("A->>()B: x\n  A->>B: wrap: y").sequence.steps.map((s) => s.kind === "message" && s.text)).toEqual(["x", "y"])
   })

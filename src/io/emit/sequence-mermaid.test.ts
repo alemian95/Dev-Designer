@@ -59,6 +59,11 @@ describe("emitSequenceMermaid", () => {
     expect(sequence.steps[0]).toMatchObject({ text: original })
   })
 
+  it("un testo che comincia con wrap: o nowrap: ne scappa i due punti, perché non diventi un comando", () => {
+    const lines = emit(seq({ steps: [msg("wrap: a"), msg("nowrap: b"), msg(":wrap: c"), msg("a wrap: d")] })).text.split("\n").slice(3, -1)
+    expect(lines).toEqual(["  A->>B: wrap#58; a", "  A->>B: nowrap#58; b", "  A->>B: :wrap#58; c", "  A->>B: a wrap: d"])
+  })
+
   it("un nome non valido o riservato esce come id sicuro, con avviso aggregato", () => {
     const s = seq({
       participants: [{ ...A, name: "A;B" }, { ...B, name: "End" }, { id: "c", name: "p1", label: null, kind: "participant" }],

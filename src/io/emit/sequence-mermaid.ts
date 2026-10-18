@@ -13,10 +13,11 @@ const ARROWS: Record<Line, Record<Head, string>> = {
 const SECTION_KEYWORD: Partial<Record<Operator, string>> = { alt: "else", par: "and", critical: "option" }
 
 /**
- * `#` e `;` in un solo passaggio: in sequenza `#35;` perderebbe il suo `;` (`#35#59;`). Poi gli a capo.
- * Niente virgolette (spec §8.1).
+ * `#` e `;` in un solo passaggio: in sequenza `#35;` perderebbe il suo `;` (`#35#59;`). Poi gli a capo,
+ * e i due punti di un `wrap:`/`nowrap:` in testa, che Mermaid toglierebbe come comando. Niente virgolette (spec §8.1).
  */
-const escapeText = (text: string): string => text.replace(/[#;]/g, (c) => (c === "#" ? "#35;" : "#59;")).replaceAll("\n", "<br>")
+const escapeText = (text: string): string =>
+  text.replace(/[#;]/g, (c) => (c === "#" ? "#35;" : "#59;")).replaceAll("\n", "<br>").replace(/^(:?(?:no)?wrap):/, "$1#58;")
 
 /** `keyword testo`, o la sola parola chiave se il testo è vuoto. */
 const withText = (keyword: string, text: string): string => (text === "" ? keyword : `${keyword} ${escapeText(text)}`)

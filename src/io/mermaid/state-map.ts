@@ -26,24 +26,36 @@ export function mapState(ast: StateAst, text: string): FlowFragment {
   // Senza prototipo: gli id vengono dal testo.
   const nodes: Record<string, FlowNode> = Object.create(null)
   const descriptions = new Map<string, string[]>()
+  // L'ultimo genere dato vale per forma, etichetta e avviso; `at` è la menzione che lo fissa.
+  const kinds = new Map<string, { kind: "choice" | "fork" | "join"; at: number }>()
   for (const m of ast.mentions) {
-    const node = (nodes[m.id] ??= { label: m.id, shape: "process", lane: null })
-    if (m.description !== null) descriptions.set(m.id, [...(descriptions.get(m.id) ?? []), m.description])
-    if (m.kind === null) continue
-    node.shape = m.kind === "choice" ? "decision" : "process"
-    if (m.kind !== "choice") findings.push({ category: "forkJoin", at: m.at, subject: m.id })
+    nodes[m.id] ??= { label: m.id, shape: "process", lane: null }
+    if (m.description !== null) {
+      const lines = descriptions.get(m.id) ?? []
+      lines.push(m.description)
+      descriptions.set(m.id, lines)
+    }
+    if (m.kind !== null) kinds.set(m.id, { kind: m.kind, at: m.at })
   }
-  for (const [id, lines] of descriptions) nodes[id]!.label = lines.join("\n")
-  for (const m of ast.mentions) if (m.kind === "choice" && !descriptions.has(m.id)) nodes[m.id]!.label = ""
+  for (const [id, node] of Object.entries(nodes)) {
+    const lines = descriptions.get(id)
+    if (lines) node.label = lines.join("\n")
+    const given = kinds.get(id)
+    if (!given) continue
+    if (given.kind === "choice") {
+      node.shape = "decision"
+      if (!lines) node.label = ""
+    } else findings.push({ category: "forkJoin", at: given.at, subject: id })
+  }
 
   const key = (end: StateAstEnd, terminal: string): string => {
     if (end === null) nodes[terminal] ??= { label: terminal === START ? "Inizio" : "Fine", shape: "terminal", lane: null }
     return end ?? terminal
   }
   const edges: Record<string, FlowEdge> = {}
-  for (const t of ast.transitions) {
-    edges[String(Object.keys(edges).length)] = { source: key(t.source, START), target: key(t.target, END), label: t.label }
-  }
+  ast.transitions.forEach((t, i) => {
+    edges[String(i)] = { source: key(t.source, START), target: key(t.target, END), label: t.label }
+  })
 
   return { model: { pools: Object.create(null), nodes, edges }, warnings: aggregate(findings, text, MESSAGES) }
 }

@@ -50,7 +50,12 @@ describe("mapState: stati", () => {
   })
 
   it("tiene l'ultimo genere dato, e id come __proto__ non sporcano il prototipo", () => {
-    expect(map("state a <<choice>>\n  state a <<join>>").model.nodes.a!.shape).toBe("process")
+    const choiceThenJoin = map("state a <<choice>>\n  state a <<join>>")
+    expect(choiceThenJoin.model.nodes.a).toEqual({ label: "a", shape: "process", lane: null })
+    expect(choiceThenJoin.warnings.map((w) => w.message)).toEqual(["Fork e join letti come processo: a (riga 3)"])
+    const joinThenChoice = map("state a <<join>>\n  state a <<choice>>")
+    expect(joinThenChoice.model.nodes.a).toEqual({ label: "", shape: "decision", lane: null })
+    expect(joinThenChoice.warnings).toEqual([])
     expect(map("__proto__ --> constructor").model.nodes.constructor).toBeDefined()
     expect(({} as Record<string, unknown>).label).toBeUndefined()
   })

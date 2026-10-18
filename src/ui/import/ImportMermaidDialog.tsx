@@ -1,36 +1,24 @@
-import { useRef, useState, type ChangeEvent, type ClipboardEvent } from "react"
+import { useRef, useState, type ChangeEvent, type ClipboardEvent, type ReactNode } from "react"
 import { useStore } from "zustand"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { classDiagram } from "@/editor/class-access"
-import {
-  classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
-  placeFlowImport, rekeyFlow, selectClassFragment, selectErFragment, type ImportFate,
-} from "@/editor/commands/import-mermaid"
-import { documentStore, type Recipe } from "@/editor/document-store"
-import { erDiagram } from "@/editor/er-access"
-import { flowDiagram } from "@/editor/flow-access"
-import { noteDiagram } from "@/editor/note-access"
+import type { ImportFate } from "@/editor/commands/import-mermaid"
+import { documentStore } from "@/editor/document-store"
 import { layoutEngine } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
 import { analyseMermaid, type MermaidAnalysis } from "@/io/mermaid/analyse"
 import { blocks, lineOf, type MermaidBlock } from "@/io/mermaid/common"
 import { detectFormat, formatList, MERMAID_FORMATS } from "@/io/mermaid/formats"
-import type { DevDocument } from "@/model/document"
 import type { LayoutGraph } from "@/model/layout"
+import { bindImport, type BoundImport } from "./mermaid-families"
 
 type Stage =
   | { kind: "vuoto" }
-  | { kind: "analizzato"; block: MermaidBlock; result: MermaidAnalysis }
+  | { kind: "analizzato"; block: MermaidBlock; result: MermaidAnalysis; bound: BoundImport | null }
   | { kind: "importa" }
-  | { kind: "fatto"; family: Family; elements: number; relations: number; notes: number; pools: number; warnings: string[] }
-
-type Ready = Extract<MermaidAnalysis, { ok: true }>
-type Family = Ready["kind"]
-
-const NOUN: Record<Family, string> = { er: "entità", class: "classi", flow: "nodi" }
+  | { kind: "fatto"; report: ReactNode; warnings: string[] }
 
 const FATE_LABEL: Record<ImportFate, string> = { nuovo: "nuova", sostituisce: "già presente, verrà sostituita", identico: "identica, saltata" }
 
@@ -39,63 +27,6 @@ function blockLabel(block: MermaidBlock, index: number): string {
   const format = detectFormat(block.text)
   const name = format === null ? "vuoto" : typeof format === "object" ? format.unknown : MERMAID_FORMATS[format].label
   return `Blocco ${index + 1} · ${name}`
-}
-
-/** L'esito di ogni elemento con la casella. Il flowchart non ne ha: si aggiunge sempre, intero (spec §7). */
-function importFates(doc: DevDocument, ready: Ready): Record<string, ImportFate> {
-  if (ready.kind === "flow") return {}
-  const referenced = new Set(ready.fragment.referenced)
-  return ready.kind === "er"
-    ? erImportFates(doc, ready.fragment.entities, referenced)
-    : classImportFates(doc, ready.fragment.classes, referenced)
-}
-
-/** Quanti elementi entrano col pulsante: quelli scelti, o i nodi del flowchart. Un flowchart di soli subgraph vuoti non si importa. */
-function importable(ready: Ready, chosen: ReadonlySet<string>): number {
-  return ready.kind === "flow" ? Object.keys(ready.fragment.model.nodes).length : chosen.size
-}
-
-/** Relazioni (o archi), note e pool presenti nella famiglia: la differenza prima/dopo il dispatch dice quanti ne sono entrati davvero. */
-function counts(doc: DevDocument, family: Family): { relations: number; notes: number; pools: number } {
-  if (family === "er") return { relations: Object.keys(erDiagram(doc).model.relationships).length, notes: 0, pools: 0 }
-  if (family === "flow") {
-    const { model } = flowDiagram(doc)
-    return { relations: Object.keys(model.edges).length, notes: 0, pools: Object.keys(model.pools).length }
-  }
-  return { relations: Object.keys(classDiagram(doc).model.relations).length, notes: Object.keys(noteDiagram(doc).model.notes).length, pools: 0 }
-}
-
-/** Selezione, disposizione e comando della famiglia: ciò che resta da fare è il dispatch. */
-async function prepareImport(
-  ready: Ready, doc: DevDocument, chosen: ReadonlySet<string>,
-): Promise<{ recipe: Recipe; elements: number; fallback: string | null }> {
-  const layout = (g: LayoutGraph) => layoutEngine.layout(g)
-  if (ready.kind === "er") {
-    const present = new Set(Object.keys(erDiagram(doc).model.entities))
-    const { entities, relationships } = selectErFragment(ready.fragment.entities, ready.fragment.relationships, chosen, present)
-    const { positions, fallback } = await placeErImport(doc, entities, relationships, layout)
-    return { recipe: importMermaidEr(entities, relationships, positions), elements: Object.keys(entities).length, fallback }
-  }
-  if (ready.kind === "flow") {
-    const model = rekeyFlow(ready.fragment.model)
-    const placement = await placeFlowImport(doc, model, layout)
-    return { recipe: importMermaidFlow(model, placement), elements: Object.keys(model.nodes).length, fallback: placement.fallback }
-  }
-  const present = new Set(Object.keys(classDiagram(doc).model.classes))
-  const fragment = selectClassFragment(ready.fragment.classes, ready.fragment.relations, ready.fragment.notes, chosen, present)
-  const placement = await placeClassImport(doc, fragment, layout)
-  return { recipe: importMermaidClass(fragment, placement), elements: Object.keys(fragment.classes).length, fallback: placement.fallback }
-}
-
-/** I conteggi del riepilogo, prima dell'import. */
-function summary(ready: Ready): string {
-  if (ready.kind === "er") return `${Object.keys(ready.fragment.entities).length} entità, ${ready.fragment.relationships.length} relazioni`
-  if (ready.kind === "flow") {
-    const { nodes, edges, pools } = ready.fragment.model
-    return `${Object.keys(nodes).length} nodi, ${Object.keys(edges).length} archi, ${Object.keys(pools).length} pool`
-  }
-  const { classes, relations, notes } = ready.fragment
-  return `${Object.keys(classes).length} classi, ${relations.length} relazioni, ${notes.length} note`
 }
 
 /**
@@ -118,11 +49,12 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
     const all = blocks(source)
     const block = all[Math.min(index, all.length - 1)]!
     const result = analyseMermaid(block.text)
-    if (result.ok) {
-      const fates = importFates(documentStore.getState().doc, result)
+    const bound = result.ok ? bindImport(result) : null
+    if (bound) {
+      const fates = bound.fates(documentStore.getState().doc)
       setChosen(new Set(Object.keys(fates).filter((key) => fates[key] !== "identico")))
     }
-    setStage({ kind: "analizzato", block, result })
+    setStage({ kind: "analizzato", block, result, bound })
   }
 
   /** Il testo incollato o caricato si analizza da sé, a partire dal primo blocco; quello digitato col pulsante. */
@@ -147,22 +79,19 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
 
   const onImport = async () => {
     // Stessa guardia del DDL: la sola lettura può sopravvenire fra il render e il click.
-    if (stage.kind !== "analizzato" || !stage.result.ok || documentSession.getState().readOnly) return
+    if (stage.kind !== "analizzato" || !stage.result.ok || !stage.bound || documentSession.getState().readOnly) return
     const gen = ++generation.current
-    const ready = stage.result
+    const { result: ready, bound } = stage
     setStage({ kind: "importa" })
-    const { recipe, elements, fallback } = await prepareImport(ready, documentStore.getState().doc, chosen)
+    const { recipe, elements, fallback } = await bound.prepare(documentStore.getState().doc, chosen, (g: LayoutGraph) => layoutEngine.layout(g))
     if (generation.current !== gen || documentSession.getState().readOnly) return
-    const before = counts(documentStore.getState().doc, ready.kind)
+    const before = bound.tally(documentStore.getState().doc)
     documentStore.getState().dispatch(recipe)
-    const after = counts(documentStore.getState().doc, ready.kind)
+    const after = bound.tally(documentStore.getState().doc)
+    const delta = { relations: after.relations - before.relations, notes: after.notes - before.notes, pools: after.pools - before.pools }
     setStage({
       kind: "fatto",
-      family: ready.kind,
-      elements,
-      relations: after.relations - before.relations,
-      notes: after.notes - before.notes,
-      pools: after.pools - before.pools,
+      report: bound.report(elements, delta),
       warnings: [...ready.fragment.warnings.map((w) => w.message), ...(fallback ? [fallback] : [])],
     })
   }
@@ -188,7 +117,8 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
   }
 
   const ready = stage.kind === "analizzato" && stage.result.ok ? stage.result : null
-  const fates = ready ? importFates(doc, ready) : {}
+  const bound = stage.kind === "analizzato" ? stage.bound : null
+  const fates = bound ? bound.fates(doc) : {}
   /** La riga nel testo intero, non nel blocco: è quella che l'utente vede nel textarea. */
   const lineInText = (block: MermaidBlock, at: number) => lineOf(text, block.offset + at)
 
@@ -205,17 +135,7 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
 
         {stage.kind === "fatto" ? (
           <div className="min-h-0 flex-1 space-y-3 overflow-auto text-sm">
-            {stage.family === "flow" ? (
-              <p>
-                Importati <strong>{stage.elements}</strong> nodi e <strong>{stage.relations}</strong> archi, con{" "}
-                <strong>{stage.pools}</strong> pool.
-              </p>
-            ) : (
-              <p>
-                Importate <strong>{stage.elements}</strong> {NOUN[stage.family]} e <strong>{stage.relations}</strong> relazioni
-                {stage.family === "class" && <>, con <strong>{stage.notes}</strong> note</>}.
-              </p>
-            )}
+            <p>{stage.report}</p>
             {stage.warnings.length > 0 && (
               <details open data-import-warnings>
                 <summary className="cursor-pointer text-muted-foreground">{stage.warnings.length} avvisi</summary>
@@ -268,7 +188,7 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
             {stage.kind === "analizzato" && ready && (
               <>
                 <p className="text-sm text-muted-foreground" data-import-summary>
-                  {summary(ready)}
+                  {bound?.summary()}
                 </p>
                 {ready.fragment.warnings.length > 0 && (
                   <details data-import-warnings>
@@ -293,15 +213,15 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
         )}
 
         <DialogFooter>
-          {ready && stage.kind === "analizzato" && (
+          {ready && bound && stage.kind === "analizzato" && (
             <>
               {readOnly && (
                 <p className="mr-auto self-center text-xs text-muted-foreground" data-import-readonly>
                   Questo documento è aperto in un&apos;altra scheda: qui è in sola lettura.
                 </p>
               )}
-              <Button onClick={() => void onImport()} disabled={importable(ready, chosen) === 0 || readOnly}>
-                Importa {importable(ready, chosen)} {NOUN[ready.kind]}
+              <Button onClick={() => void onImport()} disabled={bound.importable(chosen) === 0 || readOnly}>
+                Importa {bound.importable(chosen)} {bound.noun}
               </Button>
             </>
           )}

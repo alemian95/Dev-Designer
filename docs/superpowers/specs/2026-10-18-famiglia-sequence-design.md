@@ -82,15 +82,20 @@ d'ancoraggio parte dal rettangolo della sua intestazione (§4.1).
 ### 3.3 Invarianti
 
 Ognuna è un `IssueCode` nuovo, come nelle altre famiglie: si segnala, ma non rende illeggibile il file.
+`sequence-invalid-name` è un warning, le altre invarianti sono errori. Una nota con zero partecipanti, o
+con più di due, è rifiutata dallo schema: il file non si apre.
 
 - Un messaggio o una nota di sequenza che punta a un partecipante inesistente.
-- Una nota di sequenza con zero partecipanti, o con più di due; con due partecipanti quando
-  `placement` non è `over`; con due partecipanti uguali.
+- Una nota di sequenza con due partecipanti quando `placement` non è `over`; con due partecipanti uguali.
 - Sezioni per operatore: `loop`, `opt` e `break` ne hanno esattamente una; `alt`, `par` e `critical`
   almeno una.
 - `name` ripetuto nella sequenza.
-- `name` vuoto, oppure con un carattere fra `< > : , ; + ( ) \ /`, che Mermaid non accetta in un nome
-  (§8.1).
+- `name` che non passa `isValidParticipantName` (`src/model/sequence/schema.ts`): vuoto; con un carattere
+  fra `< > : , ; + ( ) \ /`; che inizia con una parola chiave di Mermaid (`end`, `loop`, `alt`, `note`,
+  `participant`, `actor`, `title`…, senza distinguere maiuscole, quando non è seguita da un carattere di
+  parola); che inizia con `link`, `links`, `properties` o `details` seguiti da un carattere che non è di
+  parola; o che contiene `-x`, `-)`, `->`, `--`, o un `-` in coda, che Mermaid legge come inizio di una
+  freccia (§8.1).
 - Id ripetuto fra partecipanti, passi e sezioni della stessa sequenza.
 
 ### 3.4 Migrazione 8 → 9
@@ -130,21 +135,21 @@ inserimento. La usano il disegno, l'hit-test, l'SVG e il calcolo della dimension
 | trascinare la cornice o l'etichetta «sd» | sposta la sequenza (`view.nodes`) |
 | trascinare l'intestazione di un partecipante | lo riordina |
 | trascinare un passo o l'etichetta di un blocco | lo riordina, anche dentro o fuori da un blocco o da una sezione; una linea mostra dove cade |
-| trascinare da una linea di vita a un'altra | crea un messaggio (`solid`, `filled`, testo vuoto) nel punto di rilascio |
-| trascinare da una linea di vita alla stessa | crea un messaggio a sé stesso |
+| Collega da un'intestazione a un'altra della stessa sequenza, o alla stessa | messaggio `solid`/`filled` con testo vuoto, in fondo ai passi della radice; il messaggio resta selezionato come arco |
 | clic | seleziona un partecipante, un passo o un blocco; la sequenza intera si seleziona dalla cornice |
 | doppio clic su un testo | lo modifica sul posto: nome o etichetta, testo di messaggio o nota, condizione |
 
 Il **pannello delle proprietà** cambia con la selezione:
 
-- **sequenza**: titolo, `autonumber`, «+ partecipante»;
+- **sequenza**: titolo, `autonumber`, «+ partecipante», che aggiunge `P<n>` in coda;
 - **partecipante**: nome (rifiuta i nomi del §3.3), etichetta, genere;
 - **messaggio**: testo, linea, punta, mittente, destinatario;
 - **nota di sequenza**: testo, lato, uno o due partecipanti;
-- **blocco**: operatore, condizioni, «+ sezione»/«− sezione» dove l'operatore lo permette.
+- **blocco**: operatore, condizioni, «+ sezione»/«− sezione» dove l'operatore lo permette; «− sezione» fonde i passi nella sezione precedente, o nella successiva se si toglie la prima.
 
-In più ci sono le azioni «+ messaggio dopo», «+ nota dopo», «Avvolgi in blocco» ed «Elimina».
-Eliminare un partecipante elimina anche i passi che lo coinvolgono e stacca le Note ancorate. Cambiare
+In più ci sono le azioni «+ messaggio dopo», «+ nota dopo», «Avvolgi in blocco» (crea un `loop` sul solo
+passo selezionato) ed «Elimina» per i passi. Il pannello del partecipante non ha un pulsante di
+eliminazione: il partecipante si elimina con Canc dalla selezione. Eliminare un partecipante elimina anche i passi che lo coinvolgono e stacca le Note ancorate. Cambiare
 l'operatore di un blocco con più sezioni verso `loop`, `opt` o `break` fonde le sezioni nella prima.
 Questa è una mia scelta: la mappa non lo prevede.
 
@@ -155,8 +160,9 @@ Ogni gesto è un solo comando annullabile.
 - **Disponi**: ogni sequenza è un blocco della fila, come le altre famiglie. L'interno non passa da
   ELK e non cambia. `layoutGraph` dà nodi senza archi, con le dimensioni ricavate.
 - **Strumento** nella sidebar: «Sequenza». Crea una sequenza con due partecipanti, `A` e `B`, e un
-  messaggio. La scorciatoia è unica nella sidebar (spec del canvas §6); va scelta nel piano.
-- **Collega** non vale per le sequenze, salvo che per ancorare una Nota.
+  messaggio. La scorciatoia è `S`, unica nella sidebar (spec del canvas §6).
+- **Collega** non vale fra una sequenza e le altre famiglie; vale per ancorare una Nota e, dentro una
+  sequenza, fra due intestazioni per creare un messaggio.
 
 ## 5. Parser (ricerca §2)
 
@@ -173,8 +179,9 @@ Fatti della grammatica di `mermaid@12.2.0` che il parser deve rispettare:
   Dentro il testo restano `%`, `%%`, gli altri `:`, `<br>`, `<`, `>` e `"`. Il testo si ripulisce dagli
   spazi in testa e in coda. Un `:` senza testo dopo è valido (testo vuoto); un messaggio senza `:` è
   un errore.
-- **Nomi**: ammettono spazi interni, `-` e Unicode; sono vietati `< > : , ; + ( ) \ /`. Gli spazi
-  attorno a frecce e `:` si ignorano.
+- **Nomi**: ammettono spazi interni, `-` e Unicode; sono vietati i caratteri del §3.3. Gli spazi
+  attorno a frecce e `:` si ignorano. Il parser accetta come nome anche una parola chiave che Mermaid
+  rifiuta (`isValidParticipantName` la dichiara non valida): l'export la riscrive come `pN`.
 - **Alias** (`participant A as Nome`): le virgolette restano letterali, come in Mermaid; `#` tronca.
 - **Ridichiarazione**: vince l'ultima dichiarazione, mentre la posizione resta quella della prima.
   Un partecipante non dichiarato nasce `participant` dove compare la prima volta.
@@ -201,7 +208,7 @@ id. Gli id li assegna `prepare` (§7). Gli avvisi sono aggregati per categoria.
 |---|---|
 | `participant` / `actor`, `as` | partecipante con `kind` e `label` (l'alias) |
 | messaggio con una delle 10 frecce classiche | `line` × `head`, con la tabella del §8.1 |
-| mezze frecce (type 41–58) | la freccia classica `filled` con la stessa linea, con avviso. È una mia scelta di «classica più vicina» |
+| mezze frecce (type 41–58) | la freccia classica `filled` con la stessa linea, con avviso. È una mia scelta di «classica più vicina». Le inverse (`/|-`, `\|-`, `//-`, `\\-` e le tratteggiate) scambiano mittente e destinatario, perché Mermaid disegna la punta sul primo nome |
 | connessione centrale `()`, prefisso `wrap:`/`nowrap:` | tolti, il messaggio resta, con avviso |
 | `Note left of / right of / over A[,B]` | nota di sequenza |
 | `loop`/`alt`/`opt`/`par`/`critical`/`break` | blocco; `else`/`and`/`option` aprono le sezioni |
@@ -240,7 +247,7 @@ id. Gli id li assegna `prepare` (§7). Gli avvisi sono aggregati per categoria.
 
 ### 8.1 Testo
 
-`emitSequenceMermaid(seq, notes): EmitResult` restituisce il testo e gli avvisi, nell'ordine:
+`emitSequenceMermaid(seq, seqKey, notes): EmitResult` restituisce il testo e gli avvisi; `emitSequences(model, notes)` emette tutte le sequenze e dà anche `extension`. Il testo, nell'ordine:
 
 1. `sequenceDiagram`;
 2. `title <testo>` se il titolo non è vuoto, `autonumber` se vale `true`;
@@ -266,7 +273,9 @@ id. Gli id li assegna `prepare` (§7). Gli avvisi sono aggregati per categoria.
   - una condizione vuota lascia solo la parola chiave.
 - **Testi** (etichette, messaggi, note, condizioni, titolo):
   - `;` diventa `#59;`, `#` diventa `#35;` e un a capo diventa `<br>`;
-  - niente virgolette, perché Mermaid le terrebbe come testo.
+  - niente virgolette, perché Mermaid le terrebbe come testo;
+  - un `wrap:` o `nowrap:` iniziale, anche dopo spazi, esce con il `:` scappato (`wrap#58;`), perché
+    Mermaid lo toglierebbe come comando.
 - **Nome non valido** (§3.3), raggiungibile solo da un JSON modificato a mano: esce come id sicuro
   `p1`, `p2`…, con il nome come etichetta e un avviso.
 - **Note della famiglia note** ancorate a una sequenza o a un partecipante: non escono, e c'è un avviso,
@@ -351,7 +360,7 @@ Il precedente da seguire è l'aggiunta di `shape` (commit `8286102`). La famigli
 - **Linearità**: 5.000 messaggi restano entro un tempo proporzionale, come per gli altri parser.
 - **Retrocompatibilità**: tutti i test esistenti restano verdi e l'e2e esistente passa senza modifiche.
 - **E2E**: uno scenario `sequence` in `scripts/e2e/`:
-  - crea una sequenza con lo strumento, aggiunge un messaggio, riordina un partecipante e annulla;
+  - crea una sequenza con lo strumento, aggiunge un messaggio con Collega, riordina un partecipante e annulla;
   - importa la sequenza del redattore della mappa ed esportala in testo;
   - fa il round-trip in un documento con più sequenze.
 
@@ -391,12 +400,11 @@ Ordine di consegna, con ogni passo verde e committabile da solo:
 
 ## 13. Da verificare nel piano
 
-- Le metriche del layout, prese dal prototipo e aggiornate allo stile del canvas.
-- La scorciatoia dello strumento, unica nella sidebar.
+- Decise: le metriche del layout, prese dal prototipo e aggiornate allo stile del canvas.
+- Deciso: la scorciatoia dello strumento è `S`.
 - Per ogni `if` non esaustivo del §9: diventa una voce di registro o resta con un test.
-- Come `rectOf`, `outlineOf` e le porte espongono il rettangolo di un partecipante per le àncore.
-- Il trascinamento con la linea d'inserimento: con quale meccanismo dell'interazione del canvas si
-  innesta, cioè come `commitDrag` o come un drag interno al nodo.
+- Deciso: il rettangolo di un partecipante si espone con `rectOf(sub, at)`.
+- Deciso: il trascinamento con la linea d'inserimento si innesta con `commitDrag` e `dragOffset` (DT-36).
 - L'elenco esatto degli avvisi aggregati e dei loro testi, sul modello di `FlowMapCategory`.
 - Le mie scelte segnate qui sopra:
   - le mezze frecce importate come `filled`;

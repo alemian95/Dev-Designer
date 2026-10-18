@@ -86,6 +86,9 @@ export async function run(browser, base) {
       await page.keyboard.press("r")
       await drag(page, center(await boxOf(head(page, "B"))), center(await boxOf(head(page, "A"))))
       await page.waitForFunction((sel) => document.querySelectorAll(`${sel}:has(> path)`).length === 2, SEQUENCE)
+      // Il messaggio nuovo va da B ad A (si trascina da B): lo dice l'export, non il disegno.
+      const text = await exportText(page)
+      if (!/^\s*B->>A:/m.test(text)) throw new Error(`atteso un messaggio B->>A, export:\n${text}`)
     })
 
     await step("trascinare l'intestazione di «B» prima di «A» riordina le colonne, e ⌘Z le ripristina", async () => {
@@ -94,20 +97,19 @@ export async function run(browser, base) {
       const a = await boxOf(head(page, "A"))
       const b = await boxOf(head(page, "B"))
       await drag(page, center(b), { x: a.x - 10, y: center(b).y })
-      await page.waitForFunction(() => document.querySelector("[data-lifeline]") !== null)
       await expectColumns(page, "B,A")
       await page.keyboard.press("ControlOrMeta+z")
       await expectColumns(page, "A,B")
     })
 
-    await step("il pannello cambia la punta del messaggio", async () => {
+    await step("il pannello cambia la punta del messaggio in «cross»", async () => {
       await page.keyboard.press("Escape")
-      const row = page.locator(`${SEQUENCE}:has(> path)`).first()
-      const before = await row.innerHTML()
-      const r = await boxOf(row)
+      const r = await boxOf(page.locator(`${SEQUENCE}:has(> path)`).first())
       await page.mouse.click(r.x + 20, r.y + 4)
       await page.selectOption("#message-head", "cross")
-      await page.waitForFunction(([sel, html]) => document.querySelector(`${sel}:has(> path)`)?.innerHTML !== html, [SEQUENCE, before])
+      if ((await page.locator("#message-head").inputValue()) !== "cross") throw new Error("la punta del pannello non è «cross»")
+      const text = await exportText(page)
+      if (!/-x/.test(text)) throw new Error(`l'export non ha la freccia -x:\n${text}`)
     })
 
     await step("una Nota ancorata a un partecipante si stacca quando lo si elimina", async () => {
@@ -140,20 +142,20 @@ export async function run(browser, base) {
       await openExport(page)
       await expectText(page, "[data-export-preview]", "sequenceDiagram")
       if (!(await downloadName(page)).endsWith(".mmd")) throw new Error("con una sequenza attesa l'estensione .mmd")
-      await page.keyboard.press("Escape")
-      await page.waitForSelector("[data-text-export-dialog]", { state: "detached" })
+      await closeExport(page)
       await page.keyboard.press("s")
       await page.mouse.click(canvas.x + 500, canvas.y + 80)
       await page.waitForFunction((sel) => new Set([...document.querySelectorAll(sel)].map((e) => e.getAttribute("data-node-id").split("/")[1])).size === 2, SEQUENCE)
       await page.keyboard.press("Escape")
       await openExport(page)
+      await expectText(page, "[data-export-preview]", "sequenceDiagram")
       if (!(await downloadName(page)).endsWith(".md")) throw new Error("con due sequenze attesa l'estensione .md")
     })
-
-    await context.close()
   } catch (e) {
     failed = true
     console.error("\nFALLITO (sequenza):", e)
+  } finally {
+    await context.close()
   }
   console.log(failed ? "\ne2e sequenza: FAIL" : "\ne2e sequenza: PASS")
   return !failed
@@ -171,13 +173,32 @@ async function expectColumns(page, expected) {
   )
 }
 
-/** Apre «Esporta testo…» sul formato delle sequenze (l'unico, o il primo con questo nome). */
+/** Apre «Esporta testo…» e sceglie «Mermaid sequenze» (il gruppo di formati c'è solo con più di uno). */
 async function openExport(page) {
   await expectMenu(page, "closed")
   await page.locator("[data-document-menu]").click()
   await expectMenu(page, "open")
   await page.getByRole("menuitem", { name: "Esporta testo…" }).click()
   await page.waitForSelector("[data-text-export-dialog]")
+  const format = page.getByRole("radio", { name: "Mermaid sequenze" })
+  if ((await format.count()) > 0) await format.click()
+}
+
+async function closeExport(page) {
+  await page.keyboard.press("Escape")
+  await page.waitForSelector("[data-text-export-dialog]", { state: "detached" })
+  // Radix sblocca body solo a fine animazione: prima i clic sul canvas vanno persi.
+  await expectMenu(page, "closed")
+  // Il dialog restituisce il focus al menu: senza toglierlo i tasti degli strumenti non arrivano al canvas.
+  await page.evaluate(() => document.activeElement?.blur())
+}
+
+/** Il Mermaid delle sequenze com'è ora; il dialog si richiude. */
+async function exportText(page) {
+  await openExport(page)
+  const text = await page.locator("[data-export-preview]").textContent()
+  await closeExport(page)
+  return text
 }
 
 /** Il nome del file che «Scarica» propone. */

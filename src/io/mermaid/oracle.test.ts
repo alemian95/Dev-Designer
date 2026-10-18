@@ -281,7 +281,8 @@ const dbSteps = (db: SequenceDb): unknown[] => {
     else if (ends.has(m.type)) open.pop()
     else if (m.type === T.NOTE) current().push({ note: [placements[m.placement!], m.from === m.to ? [m.from] : [m.from, m.to], text] })
     else {
-      // Le mezze frecce: la piena con la stessa linea; quelle che cominciano dalla punta la mettono sul `from`.
+      // Le mezze frecce: la piena con la stessa linea. Per i tipi `*_REVERSE*` il renderer di Mermaid mette
+      // la punta con `marker-start` sul mittente scritto, quindi il messaggio va da `to` a `from`.
       const name = Object.entries(T).find(([, v]) => v === m.type)![0]
       const [line, head] = arrows[m.type] ?? [name.includes("DOTTED") ? "dashed" : "solid", "filled"]
       const [from, to] = name.includes("REVERSE") ? [m.to, m.from] : [m.from, m.to]

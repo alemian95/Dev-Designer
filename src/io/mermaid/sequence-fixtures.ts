@@ -156,7 +156,7 @@ export const SEQUENCE_MODELS: Readonly<Record<string, Sequence>> = {
   wrap: {
     title: "",
     autonumber: false,
-    participants: [participant("a", "A"), participant("b", "B")],
+    participants: [participant("a", "A", "wrap: lei"), participant("b", "B")],
     steps: [
       send("m1", "a", "b", "wrap: non è un comando"),
       send("m2", "a", "b", "nowrap: nemmeno"),
@@ -188,6 +188,7 @@ export const SEQUENCE_REWRITTEN: Readonly<Record<string, Sequence>> = {
     participants: [participant("a", "A", "  Alice  "), participant("b", "B")],
     steps: [
       send("m1", "a", "b", "  attorno  "),
+      send("m2", "a", "b", "  wrap: x"),
       { kind: "note", id: "n1", placement: "right", participants: ["b"], text: " nota " },
       { kind: "block", id: "b1", operator: "opt", sections: [{ id: "c1", condition: "  se  ", steps: [] }] },
     ],

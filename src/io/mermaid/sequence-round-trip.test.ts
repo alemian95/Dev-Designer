@@ -51,6 +51,7 @@ describe("round-trip sequenceDiagram", () => {
     expect(back.participants[0]!.label).toBe("Alice")
     expect(back.steps).toEqual([
       expect.objectContaining({ text: "attorno" }),
+      expect.objectContaining({ text: "wrap: x" }),
       expect.objectContaining({ text: "nota" }),
       expect.objectContaining({ sections: [{ condition: "se", steps: [] }] }),
     ])

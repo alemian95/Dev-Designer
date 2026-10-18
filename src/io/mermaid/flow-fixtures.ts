@@ -105,4 +105,8 @@ export const FLOW_VALID: Readonly<Record<string, string>> = {
   A["\`**grassetto**\`"] --> B["fa:fa-car Auto"]
   B -->|"a | b"| C["x; y"]; C --> D
 `,
+  semicolonLabels: `flowchart TD
+  A -->|TL;DR| B; B -- a;b --> C
+  C -. c;d .-> D; D == e;f ==> E
+`,
 }

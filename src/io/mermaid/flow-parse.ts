@@ -139,7 +139,8 @@ function readQuoted(s: string, pos: number, base: number): { text: FlowAstText; 
 
 /**
  * Le dichiarazioni del testo: una per riga o separate da `;`, ma un `;` o un a capo fra virgolette o
- * dentro parentesi non separano (`A["x; y"]`, un `@{ … }` su più righe).
+ * dentro parentesi non separano (`A["x; y"]`, un `@{ … }` su più righe), e un `;` nel testo di una
+ * freccia nemmeno (`A -->|TL;DR| B`, `A -- a;b --> B`): lì il lexer di Mermaid è in modalità testo.
  */
 function statements(text: string): { s: string; at: number }[] {
   const out: { s: string; at: number }[] = []
@@ -148,24 +149,48 @@ function statements(text: string): { s: string; at: number }[] {
   let brackets = 0
   let braces = 0
   let quote = false
+  // Il testo di freccia aperto: fin dove arriva (`|` o la coda della freccia), `null` se non c'è.
+  let label: RegExp | "|" | null = null
   const push = (end: number) => {
     const raw = text.slice(start, end)
     const lead = raw.length - raw.trimStart().length
     if (raw.trim() !== "") out.push({ s: raw.trim(), at: start + lead })
     start = end + 1
   }
+  // Fino all'ultimo carattere della freccia: il `\s*` in coda non deve mangiare l'a capo.
+  const skip = (m: RegExpExecArray): number => m.index + m[0].trimEnd().length - 1
   for (let i = 0; i < text.length; i++) {
     const c = text[i]!
     if (c === '"') quote = !quote
     else if (quote) continue
-    else if (c === "[" || c === "(") brackets++
+    else if (c === "\n" && braces === 0) {
+      brackets = 0
+      label = null
+      push(i)
+    } else if (label === "|") {
+      if (c === "|") label = null
+    } else if (label) {
+      const close = stick(label, text, i)
+      if (close) {
+        i = skip(close)
+        label = null
+      }
+    } else if (braces === 0 && brackets === 0 && (c === "|" || c === "-" || c === "=" || c === "<" || c === "x" || c === "o")) {
+      if (c === "|") label = "|"
+      else {
+        let open: RegExpExecArray | null = null
+        const arrow = LINKS.find((l) => stick(l.full, text, i)) ?? LINKS.find((l) => l.start && (open = stick(l.start, text, i)))
+        if (arrow && !open) i = skip(stick(arrow.full, text, i)!)
+        else if (arrow && open) {
+          i = skip(open)
+          label = arrow.end
+        }
+      }
+    } else if (c === "[" || c === "(") brackets++
     else if ((c === "]" || c === ")") && brackets > 0) brackets--
     else if (c === "{") braces++
     else if (c === "}" && braces > 0) braces--
-    else if (c === "\n" && braces === 0) {
-      brackets = 0
-      push(i)
-    } else if (c === ";" && braces === 0 && brackets === 0) push(i)
+    else if (c === ";" && braces === 0 && brackets === 0) push(i)
   }
   if (quote) throw new MermaidSyntaxError("Virgolette senza chiusura", text.lastIndexOf('"'))
   push(text.length)

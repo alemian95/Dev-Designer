@@ -134,6 +134,16 @@ describe("parseFlow: il resto", () => {
     expect(parseFlow("flowchart LR\n  subgraph s\n    direction LR\n  end\n").warnings).toEqual([])
   })
 
+  it("non separa sul ; nel testo di una freccia, fra «|» o in mezzo, come il lexer di Mermaid", () => {
+    const { ast } = parseFlow(FLOW_VALID.semicolonLabels!)
+    expect(ast.edges.map((e) => [e.source, e.target, e.label?.text])).toEqual([
+      ["A", "B", "TL;DR"],
+      ["B", "C", "a;b"],
+      ["C", "D", "c;d"],
+      ["D", "E", "e;f"],
+    ])
+  })
+
   it("non fa assorbire le righe dopo a una parentesi aperta nel testo", () => {
     const { ast } = flow("A[Costo (euro] --> B\n  B --> C")
     expect(ast.edges.map((e) => `${e.source}${e.target}`)).toEqual(["AB", "BC"])

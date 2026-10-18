@@ -1,13 +1,22 @@
 import type { DevDocument } from "../document"
 import { splitKey } from "../family"
 import type { Issue } from "../issue"
+import type { SequenceModel } from "../sequence/schema"
+
+/** `<seq>` esiste se c'è la sequenza; `<seq>/<pid>` se c'è quel partecipante nella sequenza (spec sequence §3.2). */
+function sequenceAnchorExists(model: SequenceModel, key: string): boolean {
+  const [seq = "", participant] = key.split("/", 2)
+  const sequence = model.sequences[seq]
+  if (!sequence) return false
+  return participant === undefined || sequence.participants.some((p) => p.id === participant)
+}
 
 /**
- * `true` se l'àncora nomina un elemento che c'è: un'entità, una classe, un nodo di flusso, un pool o
- * una forma (spec 3a §2, spec 3b §3). È la sola definizione: la usano la validazione qui sotto, il
- * gesto Collega (`editor/note/anchor.ts`) e Disponi, che tratta come libera una nota con l'àncora
- * pendente. `anchor` ha già il prefisso di una famiglia: lo garantisce `NoteSchema`, quindi
- * `splitKey` non lancia.
+ * `true` se l'àncora nomina un elemento che c'è: un'entità, una classe, un nodo di flusso, un pool,
+ * una forma, una sequenza o un suo partecipante (spec 3a §2, spec 3b §3, spec sequence §3.2). È la
+ * sola definizione: la usano la validazione qui sotto, il gesto Collega (`editor/note/anchor.ts`) e
+ * Disponi, che tratta come libera una nota con l'àncora pendente. `anchor` ha già il prefisso di una
+ * famiglia: lo garantisce `NoteSchema`, quindi `splitKey` non lancia.
  */
 export function anchorExists(doc: DevDocument, anchor: string): boolean {
   const { family, key } = splitKey(anchor)
@@ -21,6 +30,8 @@ export function anchorExists(doc: DevDocument, anchor: string): boolean {
       return d.flow.model.nodes[key] !== undefined || d.flow.model.pools[key] !== undefined
     case "shape":
       return d.shape.model.shapes[key] !== undefined
+    case "sequence":
+      return sequenceAnchorExists(d.sequence.model, key)
     case "note":
       return false
   }

@@ -229,6 +229,16 @@ const addShapes: Migration = (raw) => {
 }
 
 /**
+ * 8 → 9: il documento guadagna la parte delle sequenze, vuota (spec sequence §3.4). Il letterale, per
+ * la stessa ragione di `addShapes`.
+ */
+const addSequences: Migration = (raw) => {
+  const diagram = raw.diagram
+  if (!isObj(diagram)) return raw
+  return { ...raw, diagram: { ...diagram, sequence: { model: { sequences: {} }, view: { nodes: {} } } } }
+}
+
+/**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
  */
@@ -240,6 +250,7 @@ const migrations: ReadonlyMap<number, Migration> = new Map([
   [5, lanesIntoPool],
   [6, notesIntoFamily],
   [7, addShapes],
+  [8, addSequences],
 ])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }

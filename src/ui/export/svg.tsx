@@ -8,6 +8,7 @@ import { FONT_SIZE, rectsBounds, type Rect } from "@/editor/geometry"
 import { canvasPorts } from "@/editor/kinds/canvas-ops"
 import { familyOps } from "@/editor/kinds/ops"
 import { noteDiagram } from "@/editor/note-access"
+import { sequenceDiagram } from "@/editor/sequence-access"
 import { shapeDiagram } from "@/editor/shape-access"
 import type { DevDocument } from "@/model/document"
 import { FAMILIES, type Family } from "@/model/family"
@@ -44,6 +45,8 @@ function nodeModelsOf(doc: DevDocument, family: Family): Record<string, unknown>
       return flowDiagram(doc).model.nodes
     case "note":
       return noteDiagram(doc).model.notes
+    case "sequence":
+      return sequenceDiagram(doc).model.sequences
   }
 }
 
@@ -61,6 +64,9 @@ function edgeModelsOf(doc: DevDocument, family: Family): Record<string, unknown>
     // Le linee di ancoraggio hanno l'altro capo in un'altra famiglia: le disegna il loro layer, qui sotto.
     case "note":
       return {}
+    // Una sequenza disegna i suoi messaggi dentro il nodo: archi fra nodi non ne ha.
+    case "sequence":
+      return {}
   }
 }
 
@@ -77,6 +83,8 @@ function viewNodesOf(doc: DevDocument, family: Family): Record<string, NodeViewM
       return flowDiagram(doc).view.nodes
     case "note":
       return noteDiagram(doc).view.nodes
+    case "sequence":
+      return sequenceDiagram(doc).view.nodes
   }
 }
 

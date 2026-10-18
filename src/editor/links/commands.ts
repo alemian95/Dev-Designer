@@ -16,7 +16,7 @@ export type ConnectResult =
   | { type: "rejected"; notice: string }
 
 /** Come si nomina un nodo di ogni famiglia nell'avviso di rifiuto. */
-const FAMILY_NOUN: Record<Family, string> = { shape: "una forma", er: "un'entità", class: "una classe", flow: "un nodo di flusso", note: "una nota" }
+const FAMILY_NOUN: Record<Family, string> = { shape: "una forma", er: "un'entità", class: "una classe", flow: "un nodo di flusso", note: "una nota", sequence: "una sequenza" }
 
 /**
  * Il motivo per cui gli estremi non ammettono il tipo, o `null` se lo ammettono. `source` e `target`

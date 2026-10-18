@@ -30,9 +30,9 @@ type Format = Dialect | "mermaid" | "class-mermaid" | "flow-mermaid"
 
 /**
  * Le famiglie che hanno un formato di testo: le note escono dentro quello delle classi, o in nessuno
- * (spec 3a §8); le forme in nessuno (spec 3b §8).
+ * (spec 3a §8); le forme in nessuno (spec 3b §8). Le sequenze, finché non arriva il loro formato.
  */
-type ExportFamily = Exclude<Family, "note" | "shape">
+type ExportFamily = Exclude<Family, "note" | "shape" | "sequence">
 
 /** La famiglia di ogni formato: un formato si offre solo se la sua famiglia ha contenuto. */
 const FORMAT_FAMILY: Record<Format, ExportFamily> = {

@@ -23,6 +23,16 @@ function oneLine(label: string, empty: string): string {
   return line === "" ? empty : line
 }
 
+/** Una sequenza si nomina col titolo; un suo partecipante (`<seq>/<pid>`) con l'etichetta o il nome. */
+function sequenceEndName(doc: DevDocument, key: string): string {
+  const [seq = "", participantId] = key.split("/", 2)
+  const sequence = doc.diagram.sequence.model.sequences[seq]
+  if (!sequence) return "(sequenza eliminata)"
+  if (participantId === undefined) return sequence.title === "" ? "(sequenza senza titolo)" : sequence.title
+  const participant = sequence.participants.find((p) => p.id === participantId)
+  return participant ? (participant.label ?? participant.name) : "(partecipante eliminato)"
+}
+
 /**
  * Il nome leggibile di un estremo o di un'àncora, per i messaggi e per i pannelli. Entità e classi
  * hanno per chiave il nome; un nodo di flusso e una forma hanno per chiave un uuid, quindi si mostra
@@ -34,6 +44,7 @@ export function endName(doc: DevDocument, key: string): string {
     const shape = doc.diagram.shape.model.shapes[bare]
     return shape ? oneLine(shape.label, "(senza testo)") : "(forma eliminata)"
   }
+  if (family === "sequence") return sequenceEndName(doc, bare)
   if (family !== "flow") return bare
   const pool = doc.diagram.flow.model.pools[bare]
   if (pool) return pool.name === "" ? "(senza nome)" : pool.name

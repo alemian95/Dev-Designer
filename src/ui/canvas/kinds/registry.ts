@@ -8,6 +8,7 @@ import { classView } from "./class"
 import { erView } from "./er"
 import { flowView } from "./flow"
 import { noteView } from "./note"
+import { sequenceView } from "./sequence"
 import { shapeView } from "./shape"
 
 /**
@@ -65,7 +66,7 @@ export function toolId(def: Pick<ToolDef, "tool" | "family" | "variant">): strin
 export const LINK_TOOL: ToolDef = { label: "Collega", key: "r", Icon: Spline, tool: "edge", family: null }
 
 /** Nome del gruppo della sidebar: è anche il nome accessibile del `role="group"`. */
-export const FAMILY_LABEL: Record<Family, string> = { shape: "Forme", er: "ER", class: "Classi", flow: "Flusso", note: "Note" }
+export const FAMILY_LABEL: Record<Family, string> = { shape: "Forme", er: "ER", class: "Classi", flow: "Flusso", note: "Note", sequence: "Sequenze" }
 
 /** Gli strumenti del canvas nell'ordine della sidebar: famiglia per famiglia, poi Collega. «Seleziona» non è qui: non crea niente. */
 export function canvasTools(families: readonly Family[]): ToolDef[] {
@@ -107,6 +108,8 @@ export function viewFor(family: Family): DiagramView {
       return flowView
     case "note":
       return noteView
+    case "sequence":
+      return sequenceView
   }
 }
 

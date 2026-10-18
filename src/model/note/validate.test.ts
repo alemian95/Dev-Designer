@@ -48,3 +48,15 @@ describe("validateNotes", () => {
     ])
   })
 })
+
+describe("anchorExists sulle sequenze", () => {
+  it("un'àncora alla sequenza o a un suo partecipante esiste finché c'è", () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.sequence.model.sequences["s1"] = { title: "", autonumber: false, participants: [{ id: "p1", name: "A", label: null, kind: "participant" }], steps: [] }
+    expect(anchorExists(doc, "sequence/s1")).toBe(true)
+    expect(anchorExists(doc, "sequence/s1/p1")).toBe(true)
+    expect(anchorExists(doc, "sequence/s1/p9")).toBe(false)
+    expect(anchorExists(doc, "sequence/s9")).toBe(false)
+    expect(anchorExists(doc, "sequence/s9/p1")).toBe(false)
+  })
+})

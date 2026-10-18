@@ -15,6 +15,9 @@ export type IssueCode =
   | "note-dangling-anchor"
   // forme
   | "shape-dangling-arrow"
+  // sequenze
+  | "sequence-dangling-participant" | "sequence-note-participants" | "sequence-block-sections"
+  | "sequence-duplicate-name" | "sequence-invalid-name" | "sequence-duplicate-id"
 
 export type IssueSeverity = "error" | "warning"
 

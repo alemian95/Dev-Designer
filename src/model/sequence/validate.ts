@@ -1,10 +1,5 @@
 import type { Issue } from "../issue"
-import { isValidParticipantName, SINGLE_SECTION, type Sequence, type SequenceModel, type Step } from "./schema"
-
-/** Ogni passo della sequenza, in ordine, compresi quelli dentro i blocchi. */
-function allSteps(steps: readonly Step[]): Step[] {
-  return steps.flatMap((step) => (step.kind === "block" ? [step, ...step.sections.flatMap((s) => allSteps(s.steps))] : [step]))
-}
+import { allSteps, isValidParticipantName, SINGLE_SECTION, type Sequence, type SequenceModel } from "./schema"
 
 /** I valori che compaiono più di una volta, ciascuno una volta sola, nell'ordine della seconda comparsa. */
 function repeated(values: readonly string[]): string[] {

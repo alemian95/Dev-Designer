@@ -145,3 +145,8 @@ export type SequenceDiagram = z.infer<typeof SequenceDiagramSchema>
 export function emptySequenceDiagram(): SequenceDiagram {
   return { model: { sequences: {} }, view: { nodes: {} } }
 }
+
+/** Tutti i passi, a ogni profondità, in ordine di testo: ogni blocco prima dei passi delle sue sezioni. */
+export function allSteps(steps: readonly Step[]): Step[] {
+  return steps.flatMap((step) => [step, ...(step.kind === "block" ? step.sections.flatMap((s) => allSteps(s.steps)) : [])])
+}

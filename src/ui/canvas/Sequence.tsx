@@ -10,7 +10,7 @@ import { stepDrop } from "@/editor/sequence/commands"
 import { subRect } from "@/editor/sequence/geometry"
 import { ROOT, ROW_GAP, SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
 import { sequenceDiagram } from "@/editor/sequence-access"
-import type { BlockStep, Head, MessageStep, NoteStep, Participant, Sequence, Step } from "@/model/sequence/schema"
+import { allSteps, type BlockStep, type Head, type MessageStep, type NoteStep, type Participant, type Sequence } from "@/model/sequence/schema"
 import type { NodeView } from "@/model/shared"
 import { registerNode } from "./dom-registry"
 
@@ -35,11 +35,6 @@ const HEAD_LEN = 10
 const HEAD_HALF = 5
 const NOTE_INSET = 4
 const TAB_CUT = 8
-
-/** I passi in ordine di lettura, con quelli dei blocchi subito dopo il loro blocco. */
-function flatten(steps: Step[]): Step[] {
-  return steps.flatMap((s) => (s.kind === "block" ? [s, ...s.sections.flatMap((x) => flatten(x.steps))] : [s]))
-}
 
 /** Una punta di messaggio che arriva in `tip` andando nel verso `dir` (1 verso destra, -1 verso sinistra). */
 function HeadMark({ head, tip, dir }: { head: Exclude<Head, "none" | "double">; tip: Point; dir: number }) {
@@ -225,7 +220,7 @@ function BlockLabel({ id, step, l }: { id: string; step: BlockStep; l: SequenceL
  */
 export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, view, selected, selectedSubs = [] }: Props) {
   const l = sequenceLayout(sequence)
-  const steps = flatten(sequence.steps)
+  const steps = allSteps(sequence.steps)
   const numbers = sequence.autonumber ? messageNumbers(sequence) : new Map<string, number>()
   return (
     <g

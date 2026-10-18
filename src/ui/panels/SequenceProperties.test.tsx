@@ -141,6 +141,8 @@ describe("pannello della nota di sequenza", () => {
     change(field("note-step-placement"), "over")
     change(field("note-step-second"), "b")
     expect(seq().steps[1]).toMatchObject({ placement: "over", participants: ["a", "b"] })
+    change(field("note-step-first"), "b")
+    expect(seq().steps[1]).toMatchObject({ participants: ["b"] })
   })
 })
 

@@ -192,7 +192,7 @@ function NoteStepBody({ seqKey, seq, step }: { seqKey: string; seq: Sequence; st
         id="note-step-placement" label="Posizione" value={step.placement} options={PlacementSchema.options} labels={PLACEMENT_LABEL}
         parse={PlacementSchema.parse} onChange={(placement) => patch(placement === "over" ? { placement } : { placement, participants: [first] })}
       />
-      <ParticipantSelect id="note-step-first" label="Partecipante" value={first} participants={seq.participants} onChange={(pid) => patch({ participants: second === undefined ? [pid] : [pid, second] })} />
+      <ParticipantSelect id="note-step-first" label="Partecipante" value={first} participants={seq.participants} onChange={(pid) => patch({ participants: second === undefined || pid === second ? [pid] : [pid, second] })} />
       {step.placement === "over" && (
         <ParticipantSelect
           id="note-step-second" label="Secondo partecipante" value={second ?? null} none="Nessuno"

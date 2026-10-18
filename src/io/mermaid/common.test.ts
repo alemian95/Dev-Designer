@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { aggregate, blocks, decodeEntities, detect, lineOf, stripNoise } from "./common"
+import { aggregate, blocks, decodeEntities, lineOf, stripNoise } from "./common"
 
 describe("blocks", () => {
   it("restituisce il testo intero quando non ci sono blocchi mermaid", () => {
@@ -27,20 +27,6 @@ describe("stripNoise", () => {
 
   it("lascia stare un %% dentro le virgolette", () => {
     expect(stripNoise('A ||--o{ B : "50%% sconto"')).toContain("50%% sconto")
-  })
-})
-
-describe("detect", () => {
-  it("riconosce le tre famiglie dalla prima parola utile", () => {
-    expect(detect("%% c\nerDiagram")).toBe("er")
-    expect(detect("---\na: b\n---\nclassDiagram")).toBe("class")
-    expect(detect("graph TD")).toBe("flow")
-    expect(detect("flowchart LR")).toBe("flow")
-  })
-
-  it("restituisce la parola sconosciuta, o null sul testo vuoto", () => {
-    expect(detect("sequenceDiagram\n  A->>B: x")).toEqual({ unknown: "sequenceDiagram" })
-    expect(detect("  \n %% solo commento")).toBeNull()
   })
 })
 

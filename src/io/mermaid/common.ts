@@ -1,8 +1,5 @@
 import type { ParseWarning } from "@/io/ddl/schema"
 
-/** Le famiglie che l'import sa leggere, col nome che ha la prima parola del testo Mermaid. */
-export type MermaidKind = "er" | "class" | "flow"
-
 /** Un blocco da importare e il punto del testo originale in cui comincia: serve a dire la riga giusta. */
 export interface MermaidBlock {
   text: string
@@ -34,26 +31,18 @@ export function blocks(text: string): MermaidBlock[] {
 /** Sostituisce ogni carattere che non è un a capo con uno spazio: gli offset restano quelli del testo originale. */
 const blank = (s: string): string => s.replace(/[^\n]/g, " ")
 
+/** Toglie il front-matter (`---` … `---` in testa) senza spostare nessun offset. Si ignora senza avviso. */
+export function stripFrontMatter(text: string): string {
+  return text.replace(/^---\n[\s\S]*?\n---[^\n]*/, blank)
+}
+
 /**
  * Toglie front-matter (`---` … `---` in testa) e commenti `%%` fino a fine riga, direttive `%%{…}%%`
  * comprese, senza spostare nessun offset (stessa garanzia di `stripPsqlMeta` nel DDL). Si ignorano
  * senza avviso (spec §3.3). Un `%%` dentro una stringa fra virgolette non è un commento.
  */
 export function stripNoise(text: string): string {
-  let out = text.replace(/^---\n[\s\S]*?\n---[^\n]*/, blank)
-  out = out.replace(/"[^"\n]*"|%%[^\n]*/g, (m) => (m.startsWith("%%") ? blank(m) : m))
-  return out
-}
-
-/** La famiglia del testo, dalla prima parola utile; la parola stessa se non è una delle tre; `null` se il testo è vuoto. */
-export function detect(text: string): MermaidKind | { unknown: string } | null {
-  const word = stripNoise(text).match(/\S+/)?.[0]
-  if (word === undefined) return null
-  const lower = word.toLowerCase()
-  if (lower === "erdiagram") return "er"
-  if (lower === "classdiagram") return "class"
-  if (lower === "flowchart" || lower === "graph") return "flow"
-  return { unknown: word }
+  return stripFrontMatter(text).replace(/"[^"\n]*"|%%[^\n]*/g, (m) => (m.startsWith("%%") ? blank(m) : m))
 }
 
 /** Riga 1-based dell'offset `at`. */

@@ -1,7 +1,7 @@
 import type { ClassDiagram, ClassNode, ClassRelation } from "@/model/class/schema"
 import type { DevDocument } from "@/model/document"
 import type { Entity, ErDiagram, Relationship } from "@/model/er/schema"
-import { splitKey } from "@/model/family"
+import { qualify, splitKey } from "@/model/family"
 import { POOL_MIN_W, type FlowDiagram, type FlowModel, type LaneView, type PoolView } from "@/model/flow/schema"
 import type { LayoutGraph, LayoutPositions } from "@/model/layout"
 import type { Note } from "@/model/note/schema"
@@ -10,8 +10,9 @@ import { classDiagram } from "../class-access"
 import type { Recipe } from "../document-store"
 import { erDiagram } from "../er-access"
 import { flowDiagram } from "../flow-access"
+import { flowNodeRect, poolRect } from "../flow/geometry"
 import { flowLayoutGraph, placedBounds, placeInLanes } from "../flow/layout"
-import { rectsBounds, snap, type Point, type Rect } from "../geometry"
+import { rectsBounds, snap, type Point, type Rect, type Size } from "../geometry"
 import { nodeRects } from "../kinds/canvas-ops"
 import { nodesBounds } from "../layout-pack"
 import { noteDiagram } from "../note-access"
@@ -331,28 +332,43 @@ export function importMermaidClass(fragment: ClassImport, placement: Pick<ClassP
  * resta quello del testo.
  */
 export function rekeyFlow(model: FlowModel): FlowModel {
-  const renamer = () => {
-    const seen = new Map<string, string>()
-    return (old: string): string => {
-      if (!seen.has(old)) seen.set(old, crypto.randomUUID())
-      return seen.get(old)!
-    }
+  return rekeyFlowKeys(model).model
+}
+
+/** Come `rekeyFlow`, con la mappa vecchia → nuova delle chiavi di nodi e pool: serve alle àncore delle note. */
+export function rekeyFlowKeys(model: FlowModel): { model: FlowModel; keys: ReadonlyMap<string, string> } {
+  const renamer = (seen = new Map<string, string>()) => (old: string): string => {
+    if (!seen.has(old)) seen.set(old, crypto.randomUUID())
+    return seen.get(old)!
   }
-  const node = renamer()
+  const keys = new Map<string, string>()
+  const key = renamer(keys)
   const lane = renamer()
   return {
-    pools: Object.fromEntries(
-      Object.values(model.pools).map((p) => [crypto.randomUUID(), { name: p.name, lanes: p.lanes.map((l) => ({ id: lane(l.id), name: l.name })) }]),
-    ),
-    nodes: Object.fromEntries(Object.entries(model.nodes).map(([key, n]) => [node(key), { ...n, lane: n.lane === null ? null : lane(n.lane) }])),
-    edges: Object.fromEntries(Object.values(model.edges).map((e) => [crypto.randomUUID(), { ...e, source: node(e.source), target: node(e.target) }])),
+    model: {
+      pools: Object.fromEntries(
+        Object.entries(model.pools).map(([old, p]) => [key(old), { name: p.name, lanes: p.lanes.map((l) => ({ id: lane(l.id), name: l.name })) }]),
+      ),
+      nodes: Object.fromEntries(Object.entries(model.nodes).map(([old, n]) => [key(old), { ...n, lane: n.lane === null ? null : lane(n.lane) }])),
+      edges: Object.fromEntries(Object.values(model.edges).map((e) => [crypto.randomUUID(), { ...e, source: key(e.source), target: key(e.target) }])),
+    },
+    keys,
   }
+}
+
+/** Le note del frammento con un uuid ciascuna, come in `selectClassFragment`, e l'àncora sulle chiavi nuove. */
+export function rekeyFlowNotes(notes: readonly Note[], keys: ReadonlyMap<string, string>): Record<string, Note> {
+  return Object.fromEntries(notes.map((n) => {
+    const key = n.anchor === null ? undefined : keys.get(splitKey(n.anchor).key)
+    return [crypto.randomUUID(), { text: n.text, anchor: key === undefined ? null : qualify("flow", key) }]
+  }))
 }
 
 export interface FlowPlacement {
   nodes: Record<string, Point>
   pools: Record<string, PoolView>
   lanes: Record<string, LaneView>
+  notes: Record<string, Point>
   /** Il messaggio del ripiego sulla griglia, se c'è stato. */
   fallback: string | null
 }
@@ -364,10 +380,13 @@ export interface FlowPlacement {
  * Il temporaneo dà a ogni nodo una vista (`flowLayoutGraph` salta chi non ce l'ha) e ai pool la `y`
  * del loro ordine nel testo, che `placeInLanes` usa per impilarli. Se il motore fallisce, la griglia
  * di `placeInGrid` fa da posizioni grezze: corsie e pool restano coerenti, perché passano comunque
- * per `placeInLanes`.
+ * per `placeInLanes`. Le note ancorate vanno in una colonna a destra del blocco, ognuna alla `y` della
+ * sua àncora (nodo o pool) ma impilata sotto la precedente; le libere sotto il blocco, nella griglia
+ * di `placeInGrid`.
  */
 export async function placeFlowImport(
   doc: DevDocument, model: FlowModel, layout: (g: LayoutGraph) => Promise<LayoutPositions>,
+  notes: Readonly<Record<string, Note>> = {},
 ): Promise<FlowPlacement> {
   const temporary: FlowDiagram = {
     model,
@@ -383,23 +402,56 @@ export async function placeFlowImport(
   const fallback = engine === null ? "La disposizione automatica non è riuscita: i nodi nuovi sono in griglia." : null
   const placed = placeInLanes(temporary, raw)
   const block = placedBounds(temporary, raw)
-  if (block === null) return { nodes: {}, pools: {}, lanes: {}, fallback }
-  const origin = originBelow(nodeRects(doc))
+  if (block === null) return { nodes: {}, pools: {}, lanes: {}, notes: {}, fallback }
+  const occupied = nodeRects(doc)
+  const origin = originBelow(occupied)
   const dx = snap(origin.x - block.x)
   const dy = snap(origin.y - block.y)
-  return {
-    nodes: Object.fromEntries(Object.entries(placed.positions).map(([key, p]) => [key, { x: p.x + dx, y: p.y + dy }])),
-    pools: Object.fromEntries(Object.entries(placed.pools).map(([key, v]) => [key, { ...v, x: v.x + dx, y: v.y + dy }])),
-    lanes: placed.lanes,
-    fallback,
+  const nodes = Object.fromEntries(Object.entries(placed.positions).map(([key, p]) => [key, { x: p.x + dx, y: p.y + dy }]))
+  const pools = Object.fromEntries(Object.entries(placed.pools).map(([key, v]) => [key, { ...v, x: v.x + dx, y: v.y + dy }]))
+
+  const part = { model, view: { pools, lanes: placed.lanes } }
+  const placedRects: Rect[] = [
+    ...Object.entries(nodes).map(([key, p]) => flowNodeRect(model.nodes[key]!, { ...p, collapsed: false })),
+    ...Object.keys(pools).map((key) => poolRect(part, key)!),
+  ]
+  const rects: Rect[] = [...occupied, ...placedRects]
+  const anchorRect = (anchor: string | null): Rect | null => {
+    if (anchor === null) return null
+    const { key } = splitKey(anchor)
+    const p = Object.hasOwn(nodes, key) ? nodes[key] : undefined
+    return p ? flowNodeRect(model.nodes[key]!, { ...p, collapsed: false }) : poolRect(part, key)
   }
+  const notePositions: Record<string, Point> = {}
+  const free: [string, Size][] = []
+  const anchored: { key: string; size: Size; y: number }[] = []
+  for (const [key, note] of Object.entries(notes)) {
+    const r = anchorRect(note.anchor)
+    if (r === null) free.push([key, noteSize(note)])
+    else anchored.push({ key, size: noteSize(note), y: r.y })
+  }
+  // Una colonna fuori dal blocco: fra i livelli di ELK una nota coprirebbe nodi e archi.
+  const bounds = rectsBounds(placedRects)!
+  const columnX = bounds.x + bounds.w + GUTTER
+  let bottom = -Infinity
+  for (const { key, size, y } of anchored.sort((a, b) => a.y - b.y)) {
+    const at = { x: columnX, y: Math.max(y, bottom + GUTTER) }
+    notePositions[key] = at
+    rects.push({ ...at, ...size })
+    bottom = at.y + size.h
+  }
+  Object.assign(notePositions, placeInGrid(free, rects))
+  return { nodes, pools, lanes: placed.lanes, notes: notePositions, fallback }
 }
 
 /**
  * Innesta un flowchart letto da Mermaid (spec §5), in un solo comando: si aggiunge sempre, con le
- * chiavi che gli ha dato `rekeyFlow`, e non tocca niente di ciò che c'era.
+ * chiavi che gli ha dato `rekeyFlow`, e non tocca niente di ciò che c'era. Una nota con lo stesso
+ * testo e la stessa àncora di una presente si salta, come in `importMermaidClass`.
  */
-export function importMermaidFlow(model: FlowModel, placement: Pick<FlowPlacement, "nodes" | "pools" | "lanes">): Recipe {
+export function importMermaidFlow(
+  model: FlowModel, placement: Pick<FlowPlacement, "nodes" | "pools" | "lanes" | "notes">, notes: Readonly<Record<string, Note>> = {},
+): Recipe {
   return (draft) => {
     const d = flowDiagram(draft)
     Object.assign(d.model.pools, model.pools)
@@ -408,5 +460,12 @@ export function importMermaidFlow(model: FlowModel, placement: Pick<FlowPlacemen
     for (const [key, p] of Object.entries(placement.nodes)) d.view.nodes[key] = { ...p, collapsed: false }
     Object.assign(d.view.pools, placement.pools)
     Object.assign(d.view.lanes, placement.lanes)
+    const n = noteDiagram(draft)
+    for (const [key, note] of Object.entries(notes)) {
+      const pos = placement.notes[key]
+      if (!pos || Object.values(n.model.notes).some((old) => sameNote(old, note))) continue
+      n.model.notes[key] = note
+      n.view.nodes[key] = { ...pos, collapsed: false }
+    }
   }
 }

@@ -120,3 +120,9 @@ describe("mapFlow: subgraph", () => {
     expect(closed.model.nodes.x!.lane).toBe("subGraph1")
   })
 })
+
+describe("mapFlow: note", () => {
+  it("non dà note: il flowchart non ne ha", () => {
+    expect(map(FLOW_VALID.shapes!).notes).toEqual([])
+  })
+})

@@ -37,4 +37,10 @@ describe("round-trip flowchart", () => {
     expect(fragment.warnings).toEqual([])
     expect(fragment.model).toEqual(MODEL)
   })
+  it("un'etichetta vuota torna vuota, in ogni forma", () => {
+    const shapes = ["terminal", "process", "decision", "io", "subprocess"] as const
+    const model: FlowModel = { pools: {}, nodes: Object.fromEntries(shapes.map((shape, i) => [`n${i + 1}`, { label: "", shape, lane: null }])), edges: {} }
+    const { text } = emitFlowMermaid(model)
+    expect(mapFlow(parseFlow(text).ast, text).model).toEqual(model)
+  })
 })

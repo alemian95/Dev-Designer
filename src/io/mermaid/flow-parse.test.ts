@@ -34,6 +34,16 @@ describe("parseFlow: nodi", () => {
     expect(node('A["x; y"]').text?.text).toBe("x; y")
   })
 
+  it("il testo fra virgolette tiene spazi ed entità in testa e in coda", () => {
+    expect(node('A["#160;x"]').text?.text).toBe("\u00a0x")
+    expect(node('A[" x "]').text?.text).toBe(" x ")
+    expect(node('A["<br>x<br>"]').text?.text).toBe("\nx\n")
+  })
+
+  it("un testo di soli spazi, anche come entità, è vuoto con o senza virgolette", () => {
+    for (const src of ['A["#32;"]', "A[#32;]", 'A["  "]']) expect(node(src).text?.text).toBe("")
+  })
+
   it("legge @{ shape, label } e scarta gli altri attributi con un avviso", () => {
     expect(node('A@{ shape: diam, label: "Va?" }')).toMatchObject({ shape: "diam", text: { text: "Va?" } })
     const { warnings } = flow("A@{ shape: rect, icon: fa:car, pos: t }")

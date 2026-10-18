@@ -118,6 +118,7 @@ function stick(re: RegExp, s: string, pos: number): RegExpExecArray | null {
 }
 
 const BR = /<br\s*\/?>/gi
+const ONLY_SPACES = /^[^\S\n]+$/
 
 /** Entità e `<br>` di un testo (spec §4.3). */
 const decode = (raw: string): string => decodeEntities(raw).replace(BR, "\n")
@@ -256,7 +257,9 @@ export function parseFlow(input: string): FlowParseResult {
         .sort((a, b) => a[1] - b[1])[0]
       if (!found) throw new MermaidSyntaxError(`Forma «${o}» senza chiusura`, base + i)
       const [closer, at] = found
-      mention.text = q ? q.text : { text: decode(s.slice(from, at).trim()), markdown: false }
+      // Un testo di soli spazi (anche come entità, `#32;`) è vuoto, in entrambe le forme; il resto resta com'è.
+      const text = q ? q.text : { text: decode(s.slice(from, at).trim()), markdown: false }
+      mention.text = ONLY_SPACES.test(text.text) ? { ...text, text: "" } : text
       mention.shape = closers[closer]!
       i = at + closer.length
     }

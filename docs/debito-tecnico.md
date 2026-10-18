@@ -58,6 +58,11 @@ tipizzati fra famiglie (`.superpowers/sdd/2026-09-24-collegamenti-tipizzati/`):
 un limite noto della tabella dei tipi, lasciato aperto perché il caso che lo
 tocca non si è ancora presentato.
 
+DT-31..DT-35 sono del 2026-10-18, dalla review finale di
+`feat/import-state-registro` (import di stateDiagram e registro dei formati):
+limiti noti dell'import dello state, lasciati aperti perché il caso che li
+tocca è raro e nessuno è stato ancora visto in un diagramma reale.
+
 ### DT-30 · `char`/`character` danno solo la categoria string: un uuid MySQL può produrre un falso `link-type-mismatch`
 
 La tabella dei tipi SQL di
@@ -75,6 +80,49 @@ rischierebbe l'errore opposto, un vero mismatch fra un `char` generico e un
 `uuid` che passa silenzioso. Si corregge dando a `char`/`character`
 `["string", "uuid"]` — la stessa forma di `json`/`jsonb`, poco sopra nella
 stessa mappa — quando un caso reale lo chiede.
+
+### DT-31 · le chiavi sintetiche dello state possono collidere con gli stati dell'utente
+
+[state-map.ts](../src/io/mermaid/state-map.ts:22) dà ai nodi sintetici le
+stesse chiavi di `getData()` di Mermaid: `root_start`/`root_end`,
+`<C>_start`/`<C>_end` per un composto `C`, `<pool>#<n>` per le regioni. Uno
+stato scritto dall'utente con lo stesso nome (`state root_start`) prende la
+stessa chiave e i due nodi si fondono. Si interviene se capita in un diagramma
+vero: la chiave va resa non esprimibile come nome di stato, ma scostarsi da
+`getData()` toglie il confronto diretto dell'oracolo.
+
+### DT-32 · `rekeyFlowKeys` ha una sola mappa per nodi e pool: uuid ambiguo
+
+`rekeyFlowKeys` in
+[import-mermaid.ts](../src/editor/commands/import-mermaid.ts) usa un'unica
+mappa chiave→uuid per nodi e pool. Un pool `X_start` e il nodo terminale
+`X_start` di un composto `X` prendono lo stesso uuid, e `flow/<uuid>` diventa
+ambiguo. Lo può innescare solo lo state, perché `mapFlow` esclude gli id dei
+subgraph dai nodi. Rimedio: due mappe, o prefisso per tipo. Si interviene
+insieme a DT-31, che ne è la causa.
+
+### DT-33 · pool o corsia con nome vuoto: l'export scrive `subgraph p1[""]`
+
+[flow-mermaid.ts](../src/io/emit/flow-mermaid.ts:91) scrive il nome così com'è
+fra virgolette. Mermaid quasi certamente rifiuta `""`, come fa per i nodi
+(lì si emette `#32;`). Il problema c'era già, ma ora ci si arriva con
+`state "" as C {`. **Non verificato** con Mermaid. Rimedio: la stessa uscita
+`#32;` dei nodi, dopo averla provata nell'oracolo.
+
+### DT-34 · `IGNORED_LINE` consuma la riga intera: una transizione dopo `scale` sparisce
+
+`IGNORED_LINE` in [state-parse.ts](../src/io/mermaid/state-parse.ts:83) salta
+fino a fine riga: `scale 350 width A --> B` perde la transizione senza alcun
+avviso. Rimedio: consumare solo la direttiva, o avvisare di ciò che si scarta.
+Si interviene al primo diagramma in cui il caso compare.
+
+### DT-35 · l'oracolo dello state non confronta le etichette dei nodi
+
+L'oracolo dello state in
+[oracle.test.ts](../src/io/mermaid/oracle.test.ts:141) confronta con
+`getData()` struttura e archi, non le etichette dei nodi. Costo-se-sbagliato:
+una divergenza di testo (entità, a capo) passa inosservata. Rimedio:
+estendere il confronto, con le etichette normalizzate come per gli archi.
 
 ---
 

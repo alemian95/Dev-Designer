@@ -7,7 +7,7 @@ import { sequenceDiagram } from "../sequence-access"
 import {
   addMessage, addNoteStep, addParticipant, addSection, addSequence, deleteParticipant, deleteSequences, deleteSteps, dropTarget,
   duplicateSequences, moveParticipant, moveStep, removeSection, renameParticipant, setAutonumber, setCondition, setOperator,
-  setParticipantKind, setParticipantLabel, setSequenceTitle, setStep, wrapInBlock,
+  setMessage, setNoteStep, setParticipantKind, setParticipantLabel, setSequenceTitle, wrapInBlock,
 } from "./commands"
 import { ROOT, sequenceLayout } from "./layout"
 import { descendants, locate, sectionsOf, stepAt } from "./tree"
@@ -167,6 +167,15 @@ describe("comandi dei passi", () => {
     expect(section("s4").steps).toEqual([{ kind: "message", id: key, from: "b", to: "a", text: "", line: "solid", head: "filled" }])
   })
 
+  it("addMessage non scrive con un partecipante che non c'è, e tiene l'indice fra 0 e la lunghezza", () => {
+    expect(state().dispatch(addMessage("s", "a", "x", { container: ROOT, index: 0 }).recipe)).toBe(false)
+    const before = addMessage("s", "a", "b", { container: ROOT, index: -5 })
+    state().dispatch(before.recipe)
+    const after = addMessage("s", "a", "b", { container: ROOT, index: 99 })
+    state().dispatch(after.recipe)
+    expect(ids(s().steps)).toEqual([before.key, "m1", "k", "m3", after.key])
+  })
+
   it("addNoteStep mette una nota sul mittente dopo il passo, o sul primo partecipante dopo un blocco", () => {
     const afterMessage = addNoteStep("s", "m2")
     state().dispatch(afterMessage.recipe)
@@ -176,13 +185,22 @@ describe("comandi dei passi", () => {
     expect(s().steps[2]).toMatchObject({ id: afterBlock.key, participants: ["a"] })
   })
 
-  it("setStep applica la patch e, se non cambia niente, non scrive", () => {
-    expect(state().dispatch(setStep("s", "m1", { text: "" }))).toBe(false)
-    expect(state().dispatch(setStep("s", "m1", { text: "login", line: "dashed" }))).toBe(true)
+  it("setMessage e setNoteStep applicano la patch e, se non cambia niente, non scrivono", () => {
+    expect(state().dispatch(setMessage("s", "m1", { text: "" }))).toBe(false)
+    expect(state().dispatch(setMessage("s", "m1", { text: "login", line: "dashed" }))).toBe(true)
     expect(s().steps[0]).toMatchObject({ text: "login", line: "dashed", head: "filled" })
-    expect(state().dispatch(setStep("s", "n1", { participants: ["c"] }))).toBe(false)
-    state().dispatch(setStep("s", "n1", { participants: ["b", "c"] }))
+    expect(state().dispatch(setNoteStep("s", "n1", { participants: ["c"] }))).toBe(false)
+    state().dispatch(setNoteStep("s", "n1", { participants: ["b", "c"] }))
     expect(section("s3").steps[0]).toMatchObject({ participants: ["b", "c"] })
+  })
+
+  it("una patch sul passo del tipo sbagliato, con un campo undefined o con l'id non scrive niente", () => {
+    expect(state().dispatch(setMessage("s", "n1", { text: "x" }))).toBe(false)
+    expect(state().dispatch(setNoteStep("s", "m1", { text: "x" }))).toBe(false)
+    expect(state().dispatch(setMessage("s", "m1", { text: undefined }))).toBe(false)
+    // @ts-expect-error: l'id non fa parte della patch
+    expect(state().dispatch(setMessage("s", "m1", { id: "altro" }))).toBe(false)
+    expect(s().steps[0]).toEqual(msg("m1", "a", "b"))
   })
 
   it("moveStep porta un passo dentro una sezione vuota", () => {
@@ -220,11 +238,17 @@ describe("comandi dei passi", () => {
 
   it("dropTarget prende lo slot più vicino a y, fuori dal passo escluso e dai suoi discendenti", () => {
     const layout = sequenceLayout(s())
-    const inner = layout.slots.find((x) => x.container === "s3" && x.index === 0)!
-    expect(dropTarget(s(), layout, inner.y, "m1")).toEqual({ container: "s3", index: 0 })
-    const target = dropTarget(s(), layout, inner.y, "k")
-    expect(descendants(stepAt(s(), "k")!)).not.toContain(target.container)
-    expect(target.container).toBe(ROOT)
+    const slotY = (container: string, index: number) => layout.slots.find((x) => x.container === container && x.index === index)!.y
+    const inner = slotY("s3", 0)
+    expect(dropTarget(s(), layout, inner, "m1")).toEqual({ container: "s3", index: 0 })
+    // Escluso `k`, gli slot dentro le sue sezioni non contano: vince quello della radice sopra `k`.
+    expect(dropTarget(s(), layout, inner, "k")).toEqual({ container: ROOT, index: 1 })
+  })
+
+  it("dropTarget porta in una sezione vuota una y vicina al suo slot", () => {
+    const layout = sequenceLayout(s())
+    const empty = layout.slots.find((x) => x.container === "s4")!
+    expect(dropTarget(s(), layout, empty.y + 3, "m1")).toEqual({ container: "s4", index: 0 })
   })
 })
 
@@ -262,7 +286,13 @@ describe("comandi dei blocchi", () => {
     expect(block.kind === "block" && block.sections.length).toBe(4)
     state().dispatch(removeSection(model(), "s", "s2")!)
     expect([...sectionsOf(s()).keys()].includes("s2")).toBe(false)
-    expect(locate(s(), "m4")).toBeNull()
+    expect(locate(s(), "m4")).toEqual({ container: "s1", index: 2 })
+  })
+
+  it("removeSection fonde i passi nella sezione precedente, o nella successiva se è la prima", () => {
+    state().dispatch(removeSection(model(), "s", "s1")!)
+    expect(ids(section("s2").steps)).toEqual(["m2", "k2", "m4"])
+    expect(section("s2").condition).toBe("ko")
   })
 
   it("removeSection restituisce null sull'ultima sezione di un blocco a più sezioni", () => {
@@ -294,7 +324,8 @@ describe("un gesto, un annulla", () => {
     ["deleteParticipant", () => deleteParticipant("s", "c")],
     ["addMessage", () => addMessage("s", "a", "b", { container: "s3", index: 1 }).recipe],
     ["addNoteStep", () => addNoteStep("s", "m1").recipe],
-    ["setStep", () => setStep("s", "m2", { text: "x" })],
+    ["setMessage", () => setMessage("s", "m2", { text: "x" })],
+    ["setNoteStep", () => setNoteStep("s", "n1", { placement: "left" })],
     ["moveStep", () => moveStep(model(), "s", "n1", { container: ROOT, index: 0 })!],
     ["deleteSteps", () => deleteSteps("s", ["k"])],
     ["wrapInBlock", () => wrapInBlock("s", ["m2", "k2"], "loop").recipe],

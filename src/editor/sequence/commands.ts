@@ -6,13 +6,7 @@ import type { Recipe } from "../document-store"
 import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
 import { sequenceDiagram } from "../sequence-access"
 import { ROOT, type SequenceLayout } from "./layout"
-import { descendants, locate, sectionsOf, stepAt, stepsIn } from "./tree"
-
-/** Un punto d'inserimento: il contenitore (`ROOT` o una sezione) e l'indice fra i suoi passi. */
-export interface Slot {
-  container: string
-  index: number
-}
+import { descendants, locate, sectionsOf, stepAt, stepsIn, type Slot } from "./tree"
 
 const sequenceIn = (draft: DevDocument, seq: string): Sequence | undefined => sequenceDiagram(draft).model.sequences[seq]
 
@@ -186,7 +180,9 @@ export function addMessage(seq: string, from: string, to: string, where: Slot): 
     recipe: (draft) => {
       const s = sequenceIn(draft, seq)
       const steps = s && stepsIn(s, where.container)
-      steps?.splice(Math.min(where.index, steps.length), 0, message(key, from, to))
+      const known = (pid: string): boolean => s?.participants.some((p) => p.id === pid) ?? false
+      if (!steps || !known(from) || !known(to)) return
+      steps.splice(Math.max(0, Math.min(where.index, steps.length)), 0, message(key, from, to))
     },
   }
 }
@@ -209,16 +205,31 @@ export function addNoteStep(seq: string, after: string): { key: string; recipe: 
   }
 }
 
-/** Applica la patch a un messaggio o a una nota, campo per campo, e solo i campi che cambiano. */
-export function setStep(seq: string, stepId: string, patch: Partial<MessageStep> | Partial<NoteStep>): Recipe {
+type MessagePatch = Partial<Omit<MessageStep, "id" | "kind">>
+type NotePatch = Partial<Omit<NoteStep, "id" | "kind">>
+const MESSAGE_FIELDS = ["from", "to", "text", "line", "head"] as const
+const NOTE_FIELDS = ["placement", "participants", "text"] as const
+
+/** Scrive il campo solo se la patch lo porta e il valore cambia; JSON confronta per valore anche la coppia di una nota. */
+function write<S, K extends keyof S>(step: S, field: K, value: S[K] | undefined): void {
+  if (value !== undefined && JSON.stringify(step[field]) !== JSON.stringify(value)) step[field] = value
+}
+
+/** Applica la patch a un messaggio; su un passo di altro tipo non fa niente. */
+export function setMessage(seq: string, stepId: string, patch: MessagePatch): Recipe {
   return (draft) => {
     const s = sequenceIn(draft, seq)
     const step = s && stepAt(s, stepId)
-    if (!step || step.kind === "block" || ("kind" in patch && patch.kind !== step.kind)) return
-    for (const [field, value] of Object.entries(patch)) {
-      // JSON confronta anche la coppia di partecipanti di una nota per valore.
-      if (JSON.stringify(Reflect.get(step, field)) !== JSON.stringify(value)) Reflect.set(step, field, value)
-    }
+    if (step?.kind === "message") for (const field of MESSAGE_FIELDS) write(step, field, patch[field])
+  }
+}
+
+/** Applica la patch a una nota di sequenza; su un passo di altro tipo non fa niente. */
+export function setNoteStep(seq: string, stepId: string, patch: NotePatch): Recipe {
+  return (draft) => {
+    const s = sequenceIn(draft, seq)
+    const step = s && stepAt(s, stepId)
+    if (step?.kind === "note") for (const field of NOTE_FIELDS) write(step, field, patch[field])
   }
 }
 
@@ -307,7 +318,10 @@ export function addSection(model: SequenceModel, seq: string, blockId: string): 
   }
 }
 
-/** Toglie la sezione con i suoi passi; `null` se l'operatore ne ammette una sola o se è l'ultima. */
+/**
+ * Toglie la sezione e ne fonde i passi nella precedente, o nella successiva se è la prima, come fa
+ * `setOperator`. `null` se l'operatore ne ammette una sola o se è l'ultima.
+ */
 export function removeSection(model: SequenceModel, seq: string, sectionId: string): Recipe | null {
   const original = model.sequences[seq]
   const owner = original && sectionsOf(original).get(sectionId)?.block
@@ -316,7 +330,12 @@ export function removeSection(model: SequenceModel, seq: string, sectionId: stri
     const s = sequenceIn(draft, seq)
     const block = s && sectionsOf(s).get(sectionId)?.block
     if (!block || block.sections.length <= 1) return
-    block.sections.splice(block.sections.findIndex((x) => x.id === sectionId), 1)
+    const index = block.sections.findIndex((x) => x.id === sectionId)
+    const [removed] = block.sections.splice(index, 1)
+    if (!removed) return
+    const previous = block.sections[index - 1]
+    if (previous) previous.steps.push(...removed.steps)
+    else block.sections[0]?.steps.unshift(...removed.steps)
   }
 }
 

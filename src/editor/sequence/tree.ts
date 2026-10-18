@@ -1,6 +1,12 @@
 import type { BlockStep, Section, Sequence, Step } from "@/model/sequence/schema"
 import { ROOT } from "./layout"
 
+/** Un punto d'inserimento: il contenitore (`ROOT` o una sezione) e l'indice fra i suoi passi. */
+export interface Slot {
+  container: string
+  index: number
+}
+
 /** Ogni sezione della sequenza, anche annidata, col blocco che la contiene. */
 export function sectionsOf(seq: Sequence): Map<string, { section: Section; block: BlockStep }> {
   const sections = new Map<string, { section: Section; block: BlockStep }>()
@@ -21,7 +27,7 @@ export function stepsIn(seq: Sequence, container: string): Step[] | null {
   return container === ROOT ? seq.steps : (sectionsOf(seq).get(container)?.section.steps ?? null)
 }
 
-export function locate(seq: Sequence, stepId: string): { container: string; index: number } | null {
+export function locate(seq: Sequence, stepId: string): Slot | null {
   const containers: [string, Step[]][] = [[ROOT, seq.steps], ...[...sectionsOf(seq)].map(([id, { section }]): [string, Step[]] => [id, section.steps])]
   for (const [container, steps] of containers) {
     const index = steps.findIndex((s) => s.id === stepId)

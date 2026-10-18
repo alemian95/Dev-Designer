@@ -1,8 +1,5 @@
 import type { ParseWarning } from "@/io/ddl/schema"
 
-/** Le famiglie che l'import sa leggere, col nome che ha la prima parola del testo Mermaid. */
-export type MermaidKind = "er" | "class" | "flow"
-
 /** Un blocco da importare e il punto del testo originale in cui comincia: serve a dire la riga giusta. */
 export interface MermaidBlock {
   text: string
@@ -43,17 +40,6 @@ export function stripNoise(text: string): string {
   let out = text.replace(/^---\n[\s\S]*?\n---[^\n]*/, blank)
   out = out.replace(/"[^"\n]*"|%%[^\n]*/g, (m) => (m.startsWith("%%") ? blank(m) : m))
   return out
-}
-
-/** La famiglia del testo, dalla prima parola utile; la parola stessa se non è una delle tre; `null` se il testo è vuoto. */
-export function detect(text: string): MermaidKind | { unknown: string } | null {
-  const word = stripNoise(text).match(/\S+/)?.[0]
-  if (word === undefined) return null
-  const lower = word.toLowerCase()
-  if (lower === "erdiagram") return "er"
-  if (lower === "classdiagram") return "class"
-  if (lower === "flowchart" || lower === "graph") return "flow"
-  return { unknown: word }
 }
 
 /** Riga 1-based dell'offset `at`. */

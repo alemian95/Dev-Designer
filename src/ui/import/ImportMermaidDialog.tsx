@@ -16,7 +16,8 @@ import { noteDiagram } from "@/editor/note-access"
 import { layoutEngine } from "@/io/app-io"
 import { documentSession } from "@/io/document-session"
 import { analyseMermaid, type MermaidAnalysis } from "@/io/mermaid/analyse"
-import { blocks, detect, lineOf, type MermaidBlock } from "@/io/mermaid/common"
+import { blocks, lineOf, type MermaidBlock } from "@/io/mermaid/common"
+import { detectFormat, formatList, MERMAID_FORMATS } from "@/io/mermaid/formats"
 import type { DevDocument } from "@/model/document"
 import type { LayoutGraph } from "@/model/layout"
 
@@ -35,8 +36,8 @@ const FATE_LABEL: Record<ImportFate, string> = { nuovo: "nuova", sostituisce: "g
 
 /** Il nome della famiglia di un blocco, per il selettore dei blocchi di un `.md`. */
 function blockLabel(block: MermaidBlock, index: number): string {
-  const kind = detect(block.text)
-  const name = kind === null ? "vuoto" : typeof kind === "object" ? kind.unknown : { er: "ER", class: "classi", flow: "flowchart" }[kind]
+  const format = detectFormat(block.text)
+  const name = format === null ? "vuoto" : typeof format === "object" ? format.unknown : MERMAID_FORMATS[format].label
   return `Blocco ${index + 1} · ${name}`
 }
 
@@ -197,7 +198,7 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
         <DialogHeader>
           <DialogTitle>Importa Mermaid</DialogTitle>
           <DialogDescription>
-            Incolla o carica un erDiagram, un classDiagram o un flowchart, anche dentro un file Markdown: gli elementi scelti, o
+            Incolla o carica {formatList("o", (f) => MERMAID_FORMATS[f].named)}, anche dentro un file Markdown: gli elementi scelti, o
             il flowchart intero, entrano nel diagramma aperto, in un solo passo annullabile.
           </DialogDescription>
         </DialogHeader>
@@ -231,7 +232,7 @@ export function ImportMermaidDialog({ open, onOpenChange }: { open: boolean; onO
               value={text}
               onChange={(e) => setText(e.target.value)}
               onPaste={onPaste}
-              placeholder="erDiagram, classDiagram o flowchart …"
+              placeholder={`${formatList("o", (f) => f)} …`}
               className="h-32 w-full resize-y rounded-md border bg-transparent px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
             <div className="flex items-center gap-2">

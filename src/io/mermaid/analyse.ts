@@ -1,33 +1,28 @@
-import { mapClass, type ClassFragment } from "./class-map"
-import { parseClass } from "./class-parse"
-import { detect, MermaidSyntaxError, type MermaidKind } from "./common"
-import { mapEr, type ErFragment } from "./er-map"
-import { parseEr } from "./er-parse"
-import { mapFlow, type FlowFragment } from "./flow-map"
-import { parseFlow } from "./flow-parse"
+import { MermaidSyntaxError } from "./common"
+import { detectFormat, formatList, MERMAID_FORMATS, type FragmentByFamily, type ImportFamily, type MermaidFormatEntry } from "./formats"
+
+/** Un esito riuscito della famiglia `F`: il suo frammento, e nessun altro. */
+export type MermaidReadyOf<F extends ImportFamily> = { ok: true; kind: F; fragment: FragmentByFamily[F] }
+
+export type MermaidReady = { [F in ImportFamily]: MermaidReadyOf<F> }[ImportFamily]
 
 export type MermaidAnalysis =
-  | { ok: true; kind: "er"; fragment: ErFragment }
-  | { ok: true; kind: "class"; fragment: ClassFragment }
-  | { ok: true; kind: "flow"; fragment: FlowFragment }
+  | MermaidReady
   /** `at` è l'offset nel testo analizzato, quando l'errore ne ha uno. */
   | { ok: false; message: string; at: number | null }
 
-/** Parse e map della famiglia: gli avvisi del parser precedono quelli del map. */
-function analyseKind(kind: MermaidKind, text: string): MermaidAnalysis {
-  if (kind === "er") {
-    const { ast, warnings } = parseEr(text)
-    const fragment = mapEr(ast, text)
-    return { ok: true, kind, fragment: { ...fragment, warnings: [...warnings, ...fragment.warnings] } }
+const ready = <F extends ImportFamily>(entry: MermaidFormatEntry<F>, text: string): MermaidReadyOf<F> =>
+  ({ ok: true, kind: entry.family, fragment: entry.analyse(text) })
+
+/** Ogni voce del registro, con la sua famiglia: `ready` si applica a una voce alla volta, non all'unione. */
+type AnyFormatEntry = { [F in ImportFamily]: MermaidFormatEntry<F> }[ImportFamily]
+
+function readyOf(entry: AnyFormatEntry, text: string): MermaidReady {
+  switch (entry.family) {
+    case "er": return ready(entry, text)
+    case "class": return ready(entry, text)
+    case "flow": return ready(entry, text)
   }
-  if (kind === "class") {
-    const { ast, warnings } = parseClass(text)
-    const fragment = mapClass(ast, text)
-    return { ok: true, kind, fragment: { ...fragment, warnings: [...warnings, ...fragment.warnings] } }
-  }
-  const { ast, warnings } = parseFlow(text)
-  const fragment = mapFlow(ast, text)
-  return { ok: true, kind, fragment: { ...fragment, warnings: [...warnings, ...fragment.warnings] } }
 }
 
 /**
@@ -35,11 +30,11 @@ function analyseKind(kind: MermaidKind, text: string): MermaidAnalysis {
  * Un errore strutturale non lancia: torna come esito.
  */
 export function analyseMermaid(text: string): MermaidAnalysis {
-  const kind = detect(text)
-  if (kind === null) return { ok: false, message: "Il testo è vuoto.", at: null }
-  if (typeof kind === "object") return { ok: false, message: `«${kind.unknown}» non si importa: solo erDiagram, classDiagram e flowchart.`, at: null }
+  const format = detectFormat(text)
+  if (format === null) return { ok: false, message: "Il testo è vuoto.", at: null }
+  if (typeof format === "object") return { ok: false, message: `«${format.unknown}» non si importa: solo ${formatList("e", (f) => f)}.`, at: null }
   try {
-    return analyseKind(kind, text)
+    return readyOf(MERMAID_FORMATS[format], text)
   } catch (e) {
     if (e instanceof MermaidSyntaxError) return { ok: false, message: e.message, at: e.at }
     throw e

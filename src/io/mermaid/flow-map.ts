@@ -1,15 +1,18 @@
 import type { ParseWarning } from "@/io/ddl/schema"
 import type { FlowEdge, FlowModel, FlowNode, FlowShape, Lane, Pool } from "@/model/flow/schema"
+import type { Note } from "@/model/note/schema"
 import { aggregate, type Finding } from "./common"
 import type { FlowAst, FlowAstNode, FlowAstSubgraph, FlowAstText } from "./flow-parse"
 
 /**
  * Un flowchart letto da Mermaid, con le chiavi del testo: id dei nodi e dei subgraph, indici per gli
  * archi. Il comando di import le sostituisce con uuid (spec §5): qui servono solo a tenere insieme i
- * pezzi. La corsia implicita di un pool ha l'id del pool.
+ * pezzi. La corsia implicita di un pool ha l'id del pool. Le note si ancorano a `flow/<chiave>` del
+ * frammento, o a `null`: il flowchart non ne ha, lo state sì (spec state §6.1).
  */
 export interface FlowFragment {
   model: FlowModel
+  notes: Note[]
   warnings: ParseWarning[]
 }
 
@@ -123,5 +126,5 @@ export function mapFlow(ast: FlowAst, text: string): FlowFragment {
     edges[String(Object.keys(edges).length)] = { source: e.source, target: e.target, label: e.label === null ? "" : label(e.label, e.at) }
   }
 
-  return { model: { pools, nodes, edges }, warnings: aggregate(findings, text, MESSAGES) }
+  return { model: { pools, nodes, edges }, notes: [], warnings: aggregate(findings, text, MESSAGES) }
 }

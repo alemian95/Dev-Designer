@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 import { classDiagram } from "@/editor/class-access"
 import {
   classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
-  placeFlowImport, rekeyFlow, selectClassFragment, selectErFragment, type ImportFate,
+  placeFlowImport, rekeyFlowKeys, rekeyFlowNotes, selectClassFragment, selectErFragment, type ImportFate,
 } from "@/editor/commands/import-mermaid"
 import type { Recipe } from "@/editor/document-store"
 import { erDiagram } from "@/editor/er-access"
@@ -79,19 +79,22 @@ export const FAMILY_IMPORTS: { [F in ImportFamily]: FamilyImport<F> } = {
     // Un flowchart di soli subgraph vuoti non si importa.
     importable: (fr) => Object.keys(fr.model.nodes).length,
     async prepare(doc, fr, _chosen, layout) {
-      const model = rekeyFlow(fr.model)
-      const placement = await placeFlowImport(doc, model, layout)
-      return { recipe: importMermaidFlow(model, placement), elements: Object.keys(model.nodes).length, fallback: placement.fallback }
+      const { model, keys } = rekeyFlowKeys(fr.model)
+      const notes = rekeyFlowNotes(fr.notes, keys)
+      const placement = await placeFlowImport(doc, model, layout, notes)
+      return { recipe: importMermaidFlow(model, placement, notes), elements: Object.keys(model.nodes).length, fallback: placement.fallback }
     },
-    summary: ({ model: { nodes, edges, pools } }) =>
-      `${Object.keys(nodes).length} nodi, ${Object.keys(edges).length} archi, ${Object.keys(pools).length} pool`,
+    // Le note solo se ci sono: i testi del flowchart restano quelli di prima.
+    summary: ({ model: { nodes, edges, pools }, notes }) =>
+      `${Object.keys(nodes).length} nodi, ${Object.keys(edges).length} archi, ${Object.keys(pools).length} pool` +
+      (notes.length > 0 ? `, ${notes.length} note` : ""),
     tally(doc) {
       const { model } = flowDiagram(doc)
-      return { relations: Object.keys(model.edges).length, notes: 0, pools: Object.keys(model.pools).length }
+      return { relations: Object.keys(model.edges).length, notes: Object.keys(noteDiagram(doc).model.notes).length, pools: Object.keys(model.pools).length }
     },
-    report: (elements, { relations, pools }) => (
-      <>Importati <strong>{elements}</strong> nodi e <strong>{relations}</strong> archi, con <strong>{pools}</strong> pool.</>
-    ),
+    report: (elements, { relations, pools, notes }) => notes > 0
+      ? <>Importati <strong>{elements}</strong> nodi e <strong>{relations}</strong> archi, con <strong>{pools}</strong> pool e <strong>{notes}</strong> note.</>
+      : <>Importati <strong>{elements}</strong> nodi e <strong>{relations}</strong> archi, con <strong>{pools}</strong> pool.</>,
   },
 }
 

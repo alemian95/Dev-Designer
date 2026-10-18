@@ -217,6 +217,34 @@ describe("parseState: stati composti", () => {
   })
 })
 
+describe("parseState: note", () => {
+  const notes = (body: string) => state(body).ast.notes.map(({ target, text }) => ({ target, text }))
+
+  it("legge la nota inline a destra e a sinistra, ; compreso, e nomina lo stato", () => {
+    expect(notes("note right of A : t")).toEqual([{ target: "A", text: "t" }])
+    expect(notes("note left of A : t")).toEqual([{ target: "A", text: "t" }])
+    expect(notes("Note right of A : uno; #quot;due#quot;<br>tre")).toEqual([{ target: "A", text: 'uno; "due"\ntre' }])
+    expect(mentions("note right of A : t")).toEqual([{ id: "A", description: null, kind: null }])
+  })
+
+  it("legge la nota a blocco con l'indentazione interna e il ;", () => {
+    const text = "stateDiagram-v2\n  note left of A\n    riga 1\n      riga 2; z\n  end note\n  A --> B\n"
+    const { ast } = parseState(text)
+    expect(ast.notes).toEqual([{ target: "A", text: "riga 1\n      riga 2; z", at: text.indexOf("note") }])
+    expect(ast.transitions).toHaveLength(1)
+  })
+
+  it("dà una nota flottante senza àncora", () => {
+    expect(notes('note "libera" as N1')).toEqual([{ target: null, text: "libera" }])
+  })
+
+  it("dà gli errori di una nota incompleta", () => {
+    const open = "stateDiagram-v2\n  note left of A\n    testo\n"
+    expect(syntaxError(open)).toEqual({ message: 'Nota senza "end note"', at: open.indexOf("note") })
+    expect(syntaxError("stateDiagram-v2\n  note over A : t\n").message).toBe("«left of», «right of» o testo fra virgolette attesi dopo «note»")
+  })
+})
+
 describe("parseState: fixture valide", () => {
   it.each(Object.entries(STATE_VALID))("analizza %s senza errori", (_, text) => {
     expect(() => parseState(text)).not.toThrow()

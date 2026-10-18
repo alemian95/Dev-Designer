@@ -112,4 +112,17 @@ stateDiagram-v2
   }
   Y --> Z
 `,
+  notes: `stateDiagram-v2
+  A --> B
+  note right of A : inline
+  note left of B
+    riga 1
+      riga 2; z
+  end note
+  note "libera" as N1
+  state P {
+    C
+  }
+  note right of P : sul composto
+`,
 }

@@ -1,4 +1,6 @@
+import { qualify } from "@/model/family"
 import type { FlowEdge, FlowNode, Lane, Pool } from "@/model/flow/schema"
+import type { Note } from "@/model/note/schema"
 import { aggregate, type Finding } from "./common"
 import type { FlowFragment } from "./flow-map"
 import type { StateAst, StateAstComposite, StateAstEnd, StateAstPlace } from "./state-parse"
@@ -15,7 +17,8 @@ const MESSAGES: Record<StateMapCategory, string> = {
 
 /**
  * Traduce lo `StateAst` in un frammento di `FlowModel` (spec §5): un composto di primo livello è un pool,
- * i suoi figli sono corsie, come i subgraph in `mapFlow`. Le note arrivano dopo. Chiavi come in
+ * i suoi figli sono corsie, come i subgraph in `mapFlow`. Una nota si ancora al suo stato, o al pool
+ * che contiene il composto su cui sta; la flottante si scarta. Chiavi come in
  * `getData()` di Mermaid: id dello stato, `<composto>_start`/`_end` (`root_` alla radice), indice per
  * gli archi; la corsia implicita ha l'id del pool, quella di una regione `<pool>#<n>`.
  */
@@ -115,5 +118,20 @@ export function mapState(ast: StateAst, text: string): FlowFragment {
     pools[root.id] = { name: name(root), lanes }
   }
 
-  return { model: { pools, nodes, edges }, warnings: aggregate(findings, text, MESSAGES) }
+  const notes: Note[] = []
+  for (const n of ast.notes) {
+    if (n.target === null) {
+      findings.push({ category: "floatingNote", at: n.at })
+      continue
+    }
+    let anchor = n.target
+    if (composites.has(anchor)) {
+      const path = chain(anchor)
+      if (path.length > 2) findings.push({ category: "deep", at: n.at, subject: anchor })
+      anchor = path[0]!
+    }
+    notes.push({ text: n.text, anchor: qualify("flow", anchor) })
+  }
+
+  return { model: { pools, nodes, edges }, notes, warnings: aggregate(findings, text, MESSAGES) }
 }

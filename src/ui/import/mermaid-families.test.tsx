@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
+import { documentStore } from "@/editor/document-store"
 import { createDocument } from "@/model/document"
+import type { LayoutGraph } from "@/model/layout"
 import { analyseMermaid, type MermaidReady } from "@/io/mermaid/analyse"
+import { mapState } from "@/io/mermaid/state-map"
+import { parseState } from "@/io/mermaid/state-parse"
 import { bindImport } from "./mermaid-families"
 
 function ready(text: string): MermaidReady {
@@ -13,6 +17,9 @@ function ready(text: string): MermaidReady {
 const ER = ready("erDiagram\n  A ||--o{ B : has")
 const CLASS = ready('classDiagram\n  class A\n  class B\n  A --> B\n  note "libera"')
 const FLOW = ready("flowchart TD\n  subgraph P\n    a --> b\n  end\n  b --> c")
+const STATE_TEXT = "stateDiagram-v2\n  state P {\n    a --> b\n  }\n  b --> c\n  note right of a : n\n"
+// Lo state non è ancora nel registro dei formati: il frammento si costruisce a mano.
+const STATE: MermaidReady = { ok: true, kind: "flow", fragment: mapState(parseState(STATE_TEXT).ast, STATE_TEXT) }
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<>{node}</>)
 
@@ -39,5 +46,23 @@ describe("bindImport", () => {
     const flow = bindImport(FLOW)
     expect(flow.fates(createDocument("t"))).toEqual({})
     expect(flow.importable(new Set())).toBe(3)
+  })
+})
+
+describe("bindImport: flusso con note", () => {
+  it("conta le note nel riepilogo e nel resoconto solo se ci sono", () => {
+    expect(bindImport(STATE).summary()).toBe("3 nodi, 2 archi, 1 pool, 1 note")
+    expect(html(bindImport(STATE).report(3, { relations: 2, notes: 1, pools: 1 })))
+      .toBe("Importati <strong>3</strong> nodi e <strong>2</strong> archi, con <strong>1</strong> pool e <strong>1</strong> note.")
+  })
+
+  it("innesta le note e le conta nel documento", async () => {
+    documentStore.getState().load(createDocument("t"))
+    const state = bindImport(STATE)
+    expect(state.tally(documentStore.getState().doc).notes).toBe(0)
+    const fakeLayout = async (g: LayoutGraph) => Object.fromEntries(g.nodes.map((n, i) => [n.id, { x: i * 300, y: 0 }]))
+    const { recipe } = await state.prepare(documentStore.getState().doc, new Set(), fakeLayout)
+    documentStore.getState().dispatch(recipe)
+    expect(state.tally(documentStore.getState().doc)).toEqual({ relations: 2, notes: 1, pools: 1 })
   })
 })

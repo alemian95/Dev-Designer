@@ -4,17 +4,20 @@ import { createDocument } from "@/model/document"
 import type { Entity, Relationship } from "@/model/er/schema"
 import { FlowDiagramSchema, LANE_MIN_H, POOL_MIN_W, type FlowModel } from "@/model/flow/schema"
 import type { LayoutGraph } from "@/model/layout"
+import type { Note } from "@/model/note/schema"
 import { classDiagram } from "../class-access"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import { flowDiagram } from "../flow-access"
+import { flowNodeRect, poolRect } from "../flow/geometry"
 import { expectLaneInvariant } from "../flow/lane-invariant"
 import { withPool } from "../flow/pool-fixture"
 import { noteDiagram } from "../note-access"
-import { importEr } from "./import"
+import { GUTTER, importEr } from "./import"
 import {
   classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
-  placeFlowImport, rekeyFlow, sameClassRelation, selectClassFragment, selectErFragment, type ClassImport,
+  placeFlowImport, rekeyFlow, rekeyFlowKeys, rekeyFlowNotes, sameClassRelation, selectClassFragment, selectErFragment,
+  type ClassImport,
 } from "./import-mermaid"
 
 const entity = (name: string, attributes: string[] = ["id"]): Entity => ({
@@ -366,5 +369,83 @@ describe("placeFlowImport e importMermaidFlow", () => {
     documentStore.getState().undo()
     expect(flow().model).toEqual({ pools: {}, nodes: {}, edges: {} })
     expect(flow().view).toEqual({ nodes: {}, pools: {}, lanes: {} })
+  })
+})
+
+/** Note come le produce `mapState`, sulle chiavi di `FLOW`: su un nodo, sul pool e libera. */
+const FLOW_NOTES: Note[] = [
+  { text: "sul nodo", anchor: "flow/b" },
+  { text: "sul pool", anchor: "flow/p" },
+  { text: "libera", anchor: null },
+]
+
+/** Come `importFlow`, con le note. */
+async function importFlowWithNotes(model: FlowModel, notes: readonly Note[], layout = fakeLayout) {
+  const { model: fresh, keys } = rekeyFlowKeys(model)
+  const keyed = rekeyFlowNotes(notes, keys)
+  const placement = await placeFlowImport(doc(), fresh, layout, keyed)
+  documentStore.getState().dispatch(importMermaidFlow(fresh, placement, keyed))
+  return { fresh, keys, keyed, placement }
+}
+
+describe("rekeyFlowKeys e rekeyFlowNotes", () => {
+  it("dà uuid nuovi e la mappa vecchia → nuova di nodi e pool", () => {
+    const { model, keys } = rekeyFlowKeys(FLOW)
+    expect(Object.keys(model.nodes).sort()).toEqual(["a", "b", "c"].map((k) => keys.get(k)).sort())
+    expect(Object.keys(model.pools)).toEqual([keys.get("p")])
+    expect(Object.keys(model.nodes).some((k) => k in FLOW.nodes)).toBe(false)
+    expect(model.nodes[keys.get("b")!]!.label).toBe("Passo")
+  })
+
+  it("dà a ogni nota un uuid e riscrive l'àncora di nodo e di pool", () => {
+    const { keys } = rekeyFlowKeys(FLOW)
+    const keyed = rekeyFlowNotes(FLOW_NOTES, keys)
+    expect(Object.keys(keyed)).toHaveLength(3)
+    expect(Object.values(keyed)).toEqual([
+      { text: "sul nodo", anchor: `flow/${keys.get("b")}` },
+      { text: "sul pool", anchor: `flow/${keys.get("p")}` },
+      { text: "libera", anchor: null },
+    ])
+  })
+})
+
+describe("placeFlowImport e importMermaidFlow con le note", () => {
+  const where = (keyed: Record<string, Note>, text: string) => Object.entries(keyed).find(([, n]) => n.text === text)![0]
+
+  it.each([
+    ["con il motore", fakeLayout],
+    ["sulla griglia di ripiego", async () => Promise.reject(new Error("x"))],
+  ])("mette la nota a destra del nodo o del pool, e quella libera sotto il blocco, %s", async (_, layout) => {
+    documentStore.getState().load(withPool(createDocument("prova", "doc-1")))
+    const { fresh, keys, keyed, placement } = await importFlowWithNotes(FLOW, FLOW_NOTES, layout)
+    const b = keys.get("b")!
+    const node = flowNodeRect(fresh.nodes[b]!, { ...placement.nodes[b]!, collapsed: false })
+    expect(placement.notes[where(keyed, "sul nodo")]).toEqual({ x: node.x + node.w + GUTTER, y: node.y })
+    const pool = poolRect(flow(), keys.get("p")!)!
+    expect(placement.notes[where(keyed, "sul pool")]).toEqual({ x: pool.x + pool.w + GUTTER, y: pool.y })
+    const bottom = Math.max(...Object.entries(placement.nodes).map(([key, p]) => p.y + flowNodeRect(fresh.nodes[key]!, { ...p, collapsed: false }).h), pool.y + pool.h)
+    expect(placement.notes[where(keyed, "libera")]!.y).toBeGreaterThanOrEqual(bottom + GUTTER)
+    expect(notes()).toHaveLength(3)
+  })
+
+  it("re-importare lo stesso state con una nota dà due note, ognuna sul nodo del proprio import", async () => {
+    const first = await importFlowWithNotes(FLOW, [FLOW_NOTES[0]!])
+    const second = await importFlowWithNotes(FLOW, [FLOW_NOTES[0]!])
+    expect(notes().map((n) => n.anchor)).toEqual([`flow/${first.keys.get("b")}`, `flow/${second.keys.get("b")}`])
+    expect(Object.keys(flow().model.nodes)).toHaveLength(6)
+  })
+
+  it("salta una nota libera uguale a una presente", async () => {
+    await importFlowWithNotes(FLOW, [FLOW_NOTES[2]!])
+    await importFlowWithNotes(FLOW, [FLOW_NOTES[2]!])
+    expect(notes()).toHaveLength(1)
+  })
+
+  it("si annulla con un solo undo, note comprese", async () => {
+    await importFlowWithNotes(FLOW, FLOW_NOTES)
+    documentStore.getState().undo()
+    expect(flow().model).toEqual({ pools: {}, nodes: {}, edges: {} })
+    expect(flow().view).toEqual({ nodes: {}, pools: {}, lanes: {} })
+    expect(noteDiagram(doc())).toEqual({ model: { notes: {} }, view: { nodes: {} } })
   })
 })

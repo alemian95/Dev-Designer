@@ -87,6 +87,12 @@ const OPEN = /[ \t]*\{/y
 const MORE_WORDS = /[^\n:{}]*\{/y
 /** `--` separa le regioni; `-->` a inizio istruzione resta un errore. */
 const DIVIDER = /--(?!>)/y
+const NOTE = /note\s+/iy
+const NOTE_SIDE = /(?:left|right) of\s*/iy
+/** `note "testo" as N`: l'id va fino a fine riga, come nel lexer. */
+const FLOATING_NOTE = /"([^"]*)"\s*as\s*[^\n]*/iy
+/** Il testo di una nota a blocco: il `;` resta, come in Mermaid. */
+const BLOCK_NOTE = /([\s\S]*?)end note/iy
 
 const toKind = (s: string | undefined): StateAstMention["kind"] => (s === "choice" || s === "fork" || s === "join" ? s : null)
 
@@ -205,6 +211,29 @@ export function parseState(input: string): StateParseResult {
     ast.transitions.push({ ...place, source: source.id, target: target.id, label: colon() ?? "", at: source.at })
   }
 
+  /** `note left of|right of A : t`, la nota a blocco fino a `end note`, o la nota flottante. */
+  const noteStatement = (at: number) => {
+    const floating = take(FLOATING_NOTE)
+    if (floating) {
+      ast.notes.push({ target: null, text: decode(floating[1]!), at })
+      return
+    }
+    if (!take(NOTE_SIDE)) throw new MermaidSyntaxError("«left of», «right of» o testo fra virgolette attesi dopo «note»", pos)
+    const targetAt = pos
+    const id = take(ID)
+    if (!id) throw new MermaidSyntaxError("Stato atteso dopo «note … of»", pos)
+    // Per Mermaid la nota è un'istruzione `state`: crea lo stato dove sta.
+    mention(id[0], targetAt)
+    const inline = colon()
+    if (inline !== null) {
+      ast.notes.push({ target: id[0], text: inline, at })
+      return
+    }
+    const block = take(BLOCK_NOTE)
+    if (!block) throw new MermaidSyntaxError('Nota senza "end note"', at)
+    ast.notes.push({ target: id[0], text: decode(block[1]!.trim()), at })
+  }
+
   take(GAP)
   let directionAt = pos
   if (!take(HEADER)) throw new MermaidSyntaxError("Il testo non comincia con stateDiagram", pos)
@@ -229,6 +258,7 @@ export function parseState(input: string): StateParseResult {
     else if (take(ACC_LINE) || take(ACC_BLOCK)) findings.push({ category: "accessibility", at })
     else if (/accDescr\s*\{/iy.test(text.slice(at))) throw new MermaidSyntaxError("«accDescr {» senza «}»", at)
     else if (take(IGNORED_LINE)) continue
+    else if (take(NOTE)) noteStatement(at)
     else if (take(STATE)) stateStatement(at)
     else transitionOrMention()
   }

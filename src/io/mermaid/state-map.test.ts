@@ -158,3 +158,29 @@ describe("mapState: composti", () => {
     expect(lanes("state P {\n    state Q { X }\n    X --> W\n  }")).toEqual({ X: "P", W: "P" })
   })
 })
+
+describe("mapState: note", () => {
+  it("ancora una nota allo stato, e a sinistra come a destra", () => {
+    const { model, notes, warnings } = map("A --> B\n  note right of A : uno\n  note left of B\n    due\n  end note")
+    expect(notes).toEqual([{ text: "uno", anchor: "flow/A" }, { text: "due", anchor: "flow/B" }])
+    expect(Object.keys(model.nodes)).toEqual(["A", "B"])
+    expect(warnings).toEqual([])
+  })
+
+  it("crea lo stato di una nota che nessun altro cita", () => {
+    expect(map("note right of A : t").model.nodes.A).toEqual({ label: "A", shape: "process", lane: null })
+  })
+
+  it("ancora la nota su un composto al pool che lo contiene, con l'avviso deep dal terzo livello", () => {
+    const body = "state P {\n    state Q {\n      state S { X }\n    }\n  }\n  note right of P : p\n  note right of Q : q\n  note right of S : s"
+    const { notes, warnings } = map(body)
+    expect(notes.map((n) => n.anchor)).toEqual(["flow/P", "flow/P", "flow/P"])
+    expect(warnings.map((w) => w.message)).toEqual(["Stati composti oltre il secondo livello: gli stati vanno nella corsia antenata: X, S (righe 4, 9)"])
+  })
+
+  it("scarta le note flottanti, con avviso", () => {
+    const { notes, warnings } = map('A\n  note "t" as N\n  note "u" as M')
+    expect(notes).toEqual([])
+    expect(warnings.map((w) => w.message)).toEqual(["Note flottanti scartate (righe 3, 4)"])
+  })
+})

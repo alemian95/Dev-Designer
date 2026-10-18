@@ -67,3 +67,84 @@ describe("mapState: stati", () => {
     expect(all).toEqual(["Direzione ignorata: il flusso si dispone da sinistra a destra (riga 2)", "Fork e join letti come processo: f (riga 3)"])
   })
 })
+
+describe("mapState: composti", () => {
+  const lanes = (body: string) => Object.fromEntries(Object.entries(map(body).model.nodes).map(([id, n]) => [id, n.lane]))
+  const messages = (body: string) => map(body).warnings.map((w) => w.message)
+
+  it("fa di un composto di primo livello un pool, con il nome dell'alias o dell'id e la corsia implicita", () => {
+    const { model } = map('state "Ufficio" as U {\n    A\n  }\n  state V {\n    B\n  }\n  C')
+    expect(model.pools.U).toEqual({ name: "Ufficio", lanes: [{ id: "U", name: "Ufficio" }] })
+    expect(model.pools.V).toEqual({ name: "V", lanes: [{ id: "V", name: "V" }] })
+    expect(Object.keys(model.nodes)).toEqual(["A", "B", "C"])
+    expect(lanes("state U {\n    A\n  }\n  C")).toEqual({ A: "U", C: null })
+  })
+
+  it("fa di un composto figlio di un pool una corsia, nell'ordine del testo, e la corsia implicita solo se serve", () => {
+    const { model } = map('state P {\n    state "Uno" as Q { A }\n    state R { B }\n  }')
+    expect(model.pools.P!.lanes).toEqual([{ id: "Q", name: "Uno" }, { id: "R", name: "R" }])
+    expect(lanes("state P {\n    state Q { A }\n    state R { B }\n  }")).toEqual({ A: "Q", B: "R" })
+    expect(map("state P {\n    C\n    state Q { A }\n  }").model.pools.P!.lanes).toEqual([{ id: "P", name: "P" }, { id: "Q", name: "Q" }])
+  })
+
+  it("dal terzo livello mette gli stati nella corsia antenata, con avviso", () => {
+    const body = "state P {\n    state Q {\n      state S {\n        X --> Y\n      }\n    }\n  }"
+    expect(lanes(body)).toEqual({ X: "Q", Y: "Q" })
+    expect(messages(body)).toEqual(["Stati composti oltre il secondo livello: gli stati vanno nella corsia antenata: X, Y (riga 4)"])
+  })
+
+  it("mette [*] di un composto in C_start e C_end, nella corsia del composto", () => {
+    const { model } = map("state P {\n    [*] --> A\n    state Q {\n      [*] --> B\n      B --> [*]\n    }\n  }")
+    expect(model.nodes.P_start).toEqual({ label: "Inizio", shape: "terminal", lane: "P" })
+    expect(model.nodes.Q_start).toEqual({ label: "Inizio", shape: "terminal", lane: "Q" })
+    expect(model.nodes.Q_end).toEqual({ label: "Fine", shape: "terminal", lane: "Q" })
+    expect(model.nodes.root_start).toBeUndefined()
+    expect(model.pools.P!.lanes.map((l) => l.id)).toEqual(["P", "Q"])
+  })
+
+  it("porta le transizioni verso un composto sul suo inizio e quelle da un composto dalla sua fine", () => {
+    const { model, warnings } = map("A --> C\n  state C {\n    [*] --> X\n    X --> [*]\n  }\n  C --> B")
+    expect(Object.values(model.edges)).toEqual([
+      { source: "A", target: "C_start", label: "" },
+      { source: "C_start", target: "X", label: "" },
+      { source: "X", target: "C_end", label: "" },
+      { source: "C_end", target: "B", label: "" },
+    ])
+    expect(model.nodes.C).toBeUndefined()
+    expect(warnings).toEqual([])
+  })
+
+  it("scarta le transizioni verso o da un composto senza il terminale interno, con avviso", () => {
+    const { model, warnings } = map("A --> C\n  state C {\n    X\n  }\n  C --> [*]")
+    expect(Object.values(model.edges)).toEqual([])
+    expect(model.nodes.root_end).toBeDefined()
+    expect(warnings.map((w) => w.message)).toEqual([
+      "Transizioni verso o da uno stato composto senza inizio o fine interni, scartate: A → C, C → [*] (righe 2, 6)",
+    ])
+  })
+
+  it("fa una corsia per regione di un pool, con i composti figli subito dopo la loro regione", () => {
+    const { model } = map("state P {\n    A\n    state Q { B }\n    --\n    C\n    --\n    state R { D }\n  }")
+    expect(model.pools.P!.lanes).toEqual([
+      { id: "P#1", name: "Regione 1" },
+      { id: "Q", name: "Q" },
+      { id: "P#2", name: "Regione 2" },
+      { id: "P#3", name: "Regione 3" },
+      { id: "R", name: "R" },
+    ])
+    expect(lanes("state P {\n    A\n    --\n    [*] --> C\n  }")).toEqual({ A: "P#1", C: "P#2", P_start: "P#2" })
+  })
+
+  it("fonde le regioni di un composto che è già una corsia, con avviso", () => {
+    const body = "state P {\n    state Q {\n      A\n      --\n      B\n    }\n  }"
+    expect(lanes(body)).toEqual({ A: "Q", B: "Q" })
+    expect(map(body).model.pools.P!.lanes).toEqual([{ id: "Q", name: "Q" }])
+    expect(messages(body)).toEqual(["Regioni concorrenti dentro un composto di secondo livello, fuse nella sua corsia: Q (riga 3)"])
+  })
+
+  it("fa un nodo solo di uno stato citato alla radice e in un composto, nell'ultimo composto che lo cita, come Mermaid", () => {
+    expect(lanes("A --> X\n  state P {\n    X --> Y\n  }\n  Y --> Z")).toEqual({ A: null, X: "P", Y: "P", Z: null })
+    expect(lanes("state P {\n    X\n  }\n  state Q {\n    X\n  }")).toEqual({ X: "Q" })
+    expect(lanes("state P {\n    state Q { X }\n    X --> W\n  }")).toEqual({ X: "P", W: "P" })
+  })
+})

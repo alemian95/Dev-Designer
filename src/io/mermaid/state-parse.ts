@@ -82,6 +82,11 @@ const ACC_BLOCK = /accDescr\s*\{[^}]*\}/iy
 /** Righe che non cambiano il db di Mermaid: si saltano senza avviso. */
 const IGNORED_LINE = /(?:hide empty description|scale\s)[^\n]*/iy
 const STATE = /state\s+/iy
+const OPEN = /[ \t]*\{/y
+/** Altro testo fra l'id e una `{` sulla stessa riga: un nome di composto con più parole. */
+const MORE_WORDS = /[^\n:{}]*\{/y
+/** `--` separa le regioni; `-->` a inizio istruzione resta un errore. */
+const DIVIDER = /--(?!>)/y
 
 const toKind = (s: string | undefined): StateAstMention["kind"] => (s === "choice" || s === "fork" || s === "join" ? s : null)
 
@@ -100,6 +105,8 @@ export function parseState(input: string): StateParseResult {
   const findings: Finding<StateSyntaxCategory>[] = []
   const ast: StateAst = { direction: "TB", mentions: [], transitions: [], composites: [], notes: [] }
   const place: StateAstPlace = { container: null, region: 0 }
+  /** I composti aperti, ciascuno con il posto da riprendere alla sua `}`. */
+  const open: { composite: StateAstComposite; outer: StateAstPlace }[] = []
   let pos = 0
 
   /** Consuma `re` a `pos`: il match, o `null` senza muoversi. */
@@ -117,6 +124,8 @@ export function parseState(input: string): StateParseResult {
   /** `[*]`, o un id con l'eventuale `:::classe`; `undefined` se a `pos` non c'è nessuno dei due. */
   const end = (): { id: StateAstEnd; at: number } | undefined => {
     const at = pos
+    // Dentro un composto una `}` a inizio token lo chiude, come `STRUCT_STOP` nel lexer.
+    if (open.length > 0 && text[pos] === "}") return undefined
     if (take(END)) return { id: null, at }
     const id = take(ID)
     if (!id) return undefined
@@ -134,13 +143,22 @@ export function parseState(input: string): StateParseResult {
     return decode(m[1]!.trim())
   }
 
-  /** `state "X" as L [: d]` o `state L [<<genere>>] [: d]`. */
-  const stateStatement = () => {
+  /** `state "X" as L [: d]`, `state L [<<genere>>] [: d]`, o l'apertura di un composto `state [ "X" as ] C {`. */
+  const stateStatement = (statementAt: number) => {
     const alias = take(ALIAS)
     if (!alias && text[pos] === '"') throw new MermaidSyntaxError("Virgolette senza chiusura o senza «as»", pos)
     const at = pos
     const id = take(STATE_ID)
     if (!id) throw new MermaidSyntaxError("Stato atteso dopo «state»", pos)
+    if (take(OPEN)) {
+      const composite: StateAstComposite = { ...place, id: id[0], alias: alias ? decode(alias[1]!) : null, regions: 1, at: statementAt }
+      ast.composites.push(composite)
+      open.push({ composite, outer: { ...place } })
+      Object.assign(place, { container: id[0], region: 0 })
+      return
+    }
+    MORE_WORDS.lastIndex = pos
+    if (MORE_WORDS.test(text)) throw new MermaidSyntaxError("Il nome di uno stato composto è una parola sola", at)
     const kind = take(KIND)
     const description = colon()
     if (alias) {
@@ -173,16 +191,28 @@ export function parseState(input: string): StateParseResult {
   for (take(GAP); pos < text.length; take(GAP)) {
     const at = pos
     let m: RegExpExecArray | null
-    if ((m = take(DIRECTION))) {
-      ast.direction = m[1]!.toUpperCase()
-      directionAt = at
+    if (open.length > 0 && text[pos] === "}") {
+      pos++
+      Object.assign(place, open.pop()!.outer)
+    } else if (take(DIVIDER)) {
+      const top = open[open.length - 1]
+      if (!top) throw new MermaidSyntaxError('"--" fuori da uno stato composto', at)
+      top.composite.regions++
+      place.region++
+    } else if ((m = take(DIRECTION))) {
+      // Dentro un composto la `direction` non cambia quella globale, come in Mermaid.
+      if (place.container === null) {
+        ast.direction = m[1]!.toUpperCase()
+        directionAt = at
+      }
     } else if (take(STYLE_LINE)) findings.push({ category: "style", at })
     else if (take(ACC_LINE) || take(ACC_BLOCK)) findings.push({ category: "accessibility", at })
     else if (/accDescr\s*\{/iy.test(text.slice(at))) throw new MermaidSyntaxError("«accDescr {» senza «}»", at)
     else if (take(IGNORED_LINE)) continue
-    else if (take(STATE)) stateStatement()
+    else if (take(STATE)) stateStatement(at)
     else transitionOrMention()
   }
+  if (open.length > 0) throw new MermaidSyntaxError('Stato composto senza "}"', open[open.length - 1]!.composite.at)
   if (ast.direction !== "LR") findings.push({ category: "direction", at: directionAt })
   return { ast, warnings: aggregate(findings, text, MESSAGES) }
 }

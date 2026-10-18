@@ -64,4 +64,52 @@ stateDiagram-v2
     lunga
   }
 `,
+  composite: `stateDiagram-v2
+  [*] --> Attivo
+  state "In lavorazione" as Attivo {
+    [*] --> Bozza
+    Bozza --> Revisione
+    Revisione --> [*]
+  }
+  Attivo --> [*]
+`,
+  nested: `stateDiagram-v2
+  state Ufficio {
+    A --> B
+    state Reparto {
+      C --> D
+      state Squadra { E --> F }
+    }
+  }
+`,
+  regions: `stateDiagram-v2
+  state Attivo {
+    [*] --> Lettura
+    Lettura --> Scrittura
+    --
+    Rete --> Disco
+    state Cache {
+      Calda --> Fredda
+    }
+  }
+`,
+  compositeEdges: `stateDiagram-v2
+  A --> C
+  state C {
+    [*] --> X
+    X --> [*]
+  }
+  C --> B
+  B --> D
+  state D {
+    Y
+  }
+`,
+  crossReference: `stateDiagram-v2
+  A --> X
+  state P {
+    X --> Y
+  }
+  Y --> Z
+`,
 }

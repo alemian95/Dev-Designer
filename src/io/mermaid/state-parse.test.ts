@@ -144,6 +144,69 @@ describe("parseState: righe ignorate e avvisi", () => {
   })
 })
 
+describe("parseState: stati composti", () => {
+  const places = (body: string) => state(body).ast.mentions.map(({ id, container, region }) => ({ id, container, region }))
+
+  it("apre un composto con state C { … }, alias compreso, e ci mette le menzioni", () => {
+    const text = 'stateDiagram-v2\n  state C {\n    A\n  }\n  state "Alias" as D {\n    B\n  }\n  E\n'
+    const { ast } = parseState(text)
+    expect(ast.composites).toEqual([
+      { id: "C", alias: null, regions: 1, container: null, region: 0, at: text.indexOf("state C") },
+      { id: "D", alias: "Alias", regions: 1, container: null, region: 0, at: text.indexOf('state "Alias"') },
+    ])
+    expect(ast.mentions.map(({ id, container }) => ({ id, container }))).toEqual([
+      { id: "A", container: "C" },
+      { id: "B", container: "D" },
+      { id: "E", container: null },
+    ])
+  })
+
+  it("legge i composti su una riga e annidati, con il genitore come container", () => {
+    const { ast } = state("state P { state Q { X --> Y } }\n  state R{\n  Z\n  }")
+    expect(ast.composites.map(({ id, container, region }) => ({ id, container, region }))).toEqual([
+      { id: "P", container: null, region: 0 },
+      { id: "Q", container: "P", region: 0 },
+      { id: "R", container: null, region: 0 },
+    ])
+    expect(ast.transitions[0]).toMatchObject({ source: "X", target: "Y", container: "Q", region: 0 })
+    expect(places("state P { state Q { X } }").map((m) => m.container)).toEqual(["Q"])
+  })
+
+  it("conta le regioni separate da --, e alla chiusura torna al posto di prima", () => {
+    const { ast } = state("state P {\n    A\n    --\n    B\n    --\n    state Q { C }\n  }\n  D")
+    expect(ast.composites.map(({ id, regions, container, region }) => ({ id, regions, container, region }))).toEqual([
+      { id: "P", regions: 3, container: null, region: 0 },
+      { id: "Q", regions: 1, container: "P", region: 2 },
+    ])
+    expect(ast.mentions.map(({ id, container, region }) => ({ id, container, region }))).toEqual([
+      { id: "A", container: "P", region: 0 },
+      { id: "B", container: "P", region: 1 },
+      { id: "C", container: "Q", region: 0 },
+      { id: "D", container: null, region: 0 },
+    ])
+  })
+
+  it("non cambia la direzione della radice con una direction dentro un composto", () => {
+    const text = "stateDiagram-v2\n  direction LR\n  state C {\n    direction TB\n    A\n  }\n"
+    expect(parseState(text).ast.direction).toBe("LR")
+    expect(messages(text)).toEqual([])
+  })
+
+  it("dà gli errori di Mermaid: -- alla radice, nome di più parole, graffa non chiusa", () => {
+    const dash = "stateDiagram-v2\n  A\n  --\n  B\n"
+    expect(syntaxError(dash)).toEqual({ message: '"--" fuori da uno stato composto', at: dash.indexOf("--") })
+    const words = "stateDiagram-v2\n  state Due parole {\n  }\n"
+    expect(syntaxError(words)).toEqual({ message: "Il nome di uno stato composto è una parola sola", at: words.indexOf("Due") })
+    const open = "stateDiagram-v2\n  state P {\n    state Q {\n      A\n    }\n"
+    expect(syntaxError(open)).toEqual({ message: 'Stato composto senza "}"', at: open.indexOf("state P") })
+  })
+
+  it("legge } come uno stato fuori dai composti, e come chiusura dentro", () => {
+    expect(transitions("A --> }")).toEqual([{ source: "A", target: "}", label: "" }])
+    expect(syntaxError("stateDiagram-v2\n  state C {\n    A --> }\n  }\n").message).toBe("Stato atteso dopo «-->»")
+  })
+})
+
 describe("parseState: fixture valide", () => {
   it.each(Object.entries(STATE_VALID))("analizza %s senza errori", (_, text) => {
     expect(() => parseState(text)).not.toThrow()

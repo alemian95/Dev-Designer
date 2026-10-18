@@ -20,8 +20,8 @@ const SECTION_KEYWORD: Partial<Record<Operator, string>> = { alt: "else", par: "
 const KEYWORD_START = /^(?:end|loop|alt|else|opt|par_over|par|and|critical|option|break|rect|box|note|participant|actor|activate|deactivate|create|destroy|autonumber|title)(?!\w)/i
 /** Queste quattro sono nomi ammessi da sole, ma non seguite da un carattere che non è di parola (`link x`). */
 const SOFT_KEYWORD_START = /^(?:links?|properties|details)\W/i
-/** `-x`, `-)`, `->` e `--` dentro un nome si leggono come l'inizio di una freccia (`user-x`). */
-const ARROW_LIKE = /-[x)>-]/i
+/** `-x`, `-)`, `->`, `--` dentro un nome, o un `-` in coda, si leggono come l'inizio di una freccia (`user-x`, `a-xylophone`: sonda). */
+const ARROW_LIKE = /-(?:[x)>-]|$)/i
 
 const isValidName = (name: string): boolean =>
   name !== "" && !INVALID_NAME.test(name) && !KEYWORD_START.test(name) && !SOFT_KEYWORD_START.test(name) && !ARROW_LIKE.test(name)

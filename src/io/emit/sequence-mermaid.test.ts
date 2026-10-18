@@ -73,15 +73,16 @@ describe("emitSequenceMermaid", () => {
   })
 
   it("una parola chiave in testa al nome, seguita da un carattere non di parola, è un nome non valido; in mezzo no", () => {
-    const names = ["end-user", "opt-in", "Note Service", "loop 1", "Break Room", "link x", "par_over", "user-x", "Backend", "end_x", "link", "a end"]
+    const names = ["end-user", "opt-in", "Note Service", "loop 1", "Break Room", "link x", "par_over", "user-x", "a->b", "a-)b", "a--b", "a-xylophone", "a-", "Backend", "end_x", "link", "a end", "a-b", "a-1", "a-b-c", "a-_b"]
     const participants = names.map((name, i) => ({ id: `i${i}`, name, label: null, kind: "participant" as const }))
     const { text, warnings } = emit(seq({ participants }))
     const declared = text.split("\n").slice(1, -1).map((l) => l.trim().replace("participant ", ""))
     expect(declared).toEqual([
       "p1 as end-user", "p2 as opt-in", "p3 as Note Service", "p4 as loop 1", "p5 as Break Room", "p6 as link x", "p7 as par_over", "p8 as user-x",
-      "Backend", "end_x", "link", "a end",
+      "p9 as a->b", "p10 as a-)b", "p11 as a--b", "p12 as a-xylophone", "p13 as a-",
+      "Backend", "end_x", "link", "a end", "a-b", "a-1", "a-b-c", "a-_b",
     ])
-    expect(warnings[0]).toMatch(/^8 nomi/)
+    expect(warnings[0]).toMatch(/^13 nomi/)
   })
 
   it("le Note ancorate a quella sequenza non escono, con avviso (singolare e plurale)", () => {

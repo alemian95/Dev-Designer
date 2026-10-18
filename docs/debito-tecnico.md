@@ -67,6 +67,10 @@ DT-36 è del 2026-10-18, dalla review del Task 5 di `feat/famiglia-sequence`
 (sequenze sul canvas): un costo accettato per la linea d'inserimento, da
 misurare prima di toccarlo.
 
+DT-37..DT-44 sono del 2026-10-18, dalla review finale di
+`feat/famiglia-sequence`: limiti noti della famiglia sequence, lasciati aperti
+perché toccano casi rari o rifiniture del disegno.
+
 ### DT-30 · `char`/`character` danno solo la categoria string: un uuid MySQL può produrre un falso `link-type-mismatch`
 
 La tabella dei tipi SQL di
@@ -141,6 +145,53 @@ niente altro, ma la rivalutazione si paga. Non misurato. Rimedio: scrivere lo
 scarto solo quando si trascina un sotto-elemento di sequenza, oppure passarlo
 alla linea dal `dom-registry` come fanno nodi e archi, senza passare dallo
 store. Si interviene se il drag rallenta su documenti grandi.
+
+### DT-37 · gli a capo di messaggi e note si disegnano su una riga; una nota left/right lunga esce dal foglio
+
+Il testo di messaggi e note si disegna su una sola riga, a capo compresi, e il
+testo lungo di una nota `left`/`right` esce dal foglio. L'omino della prima
+colonna è vicino alla linguetta «sd». Rimedio: righe multiple nel layout,
+margine a sinistra. Costo-se-sbagliato: disegno brutto, nessun dato perso.
+
+### DT-38 · gli agganci compaiono anche su messaggi e blocchi, ma Collega da lì non fa niente
+
+Rimedio: una voce opzionale di `DiagramOps` che dica se un elemento ha agganci,
+non un `if` in canvas-ops. Costo-se-sbagliato: un gesto che sembra offerto e
+non produce nulla.
+
+### DT-39 · il riordino di un partecipante non ha anteprima durante il drag
+
+Per i passi c'è la linea d'inserimento, per i partecipanti no: la colonna si
+sposta solo al rilascio. Costo-se-sbagliato: si trascina alla cieca.
+
+### DT-40 · la fascia di presa trasparente delle linee di vita è un residuo senza gesto
+
+La fascia in [Sequence.tsx](../src/ui/canvas/Sequence.tsx:249) non ha più un
+gesto che la usi (il messaggio si crea con Collega fra intestazioni). Rimedio:
+toglierla. Costo-se-sbagliato: una zona che cattura clic per niente.
+
+### DT-41 · il messaggio creato con Collega va sempre in fondo alla radice
+
+Non nel punto di rilascio. Costo-se-sbagliato:
+un passo di riordino in più dopo ogni messaggio.
+
+### DT-42 · un blocco non valido dà un export Mermaid rotto
+
+Un blocco con 0 sezioni, o un `loop` con 2 sezioni, è raggiungibile solo da un
+JSON fatto a mano e dà un export Mermaid che Mermaid rifiuta. Rimedio: un
+errore di validazione. Costo-se-sbagliato: testo rotto per un file modificato
+a mano.
+
+### DT-43 · una selezione mista riordina il partecipante con il dx dell'entità
+
+Con un'entità più un'intestazione selezionate, il riordino del partecipante
+usa lo scarto dell'entità. Costo-se-sbagliato: un riordino inatteso.
+
+### DT-44 · `Tally.pools` porta i partecipanti per la voce sequence
+
+Il campo `pools` del conteggio dell'import serve alla voce sequence per i
+partecipanti: nome fuorviante. Rimedio: un campo proprio quando una seconda
+famiglia lo richiede.
 
 ---
 

@@ -124,12 +124,7 @@ export function mapState(ast: StateAst, text: string): FlowFragment {
       findings.push({ category: "floatingNote", at: n.at })
       continue
     }
-    let anchor = n.target
-    if (composites.has(anchor)) {
-      const path = chain(anchor)
-      if (path.length > 2) findings.push({ category: "deep", at: n.at, subject: anchor })
-      anchor = path[0]!
-    }
+    const anchor = composites.has(n.target) ? chain(n.target)[0]! : n.target
     notes.push({ text: n.text, anchor: qualify("flow", anchor) })
   }
 

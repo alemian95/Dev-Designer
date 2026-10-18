@@ -171,11 +171,11 @@ describe("mapState: note", () => {
     expect(map("note right of A : t").model.nodes.A).toEqual({ label: "A", shape: "process", lane: null })
   })
 
-  it("ancora la nota su un composto al pool che lo contiene, con l'avviso deep dal terzo livello", () => {
+  it("ancora la nota su un composto al pool che lo contiene, a ogni livello e senza avvisi suoi", () => {
     const body = "state P {\n    state Q {\n      state S { X }\n    }\n  }\n  note right of P : p\n  note right of Q : q\n  note right of S : s"
     const { notes, warnings } = map(body)
     expect(notes.map((n) => n.anchor)).toEqual(["flow/P", "flow/P", "flow/P"])
-    expect(warnings.map((w) => w.message)).toEqual(["Stati composti oltre il secondo livello: gli stati vanno nella corsia antenata: X, S (righe 4, 9)"])
+    expect(warnings.map((w) => w.message)).toEqual(["Stati composti oltre il secondo livello: gli stati vanno nella corsia antenata: X (riga 4)"])
   })
 
   it("scarta le note flottanti, con avviso", () => {

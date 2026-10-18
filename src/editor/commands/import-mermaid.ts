@@ -380,8 +380,9 @@ export interface FlowPlacement {
  * Il temporaneo dà a ogni nodo una vista (`flowLayoutGraph` salta chi non ce l'ha) e ai pool la `y`
  * del loro ordine nel testo, che `placeInLanes` usa per impilarli. Se il motore fallisce, la griglia
  * di `placeInGrid` fa da posizioni grezze: corsie e pool restano coerenti, perché passano comunque
- * per `placeInLanes`. Una nota ancorata va a destra della sua àncora, nodo o pool, già al suo posto;
- * una libera sotto il blocco, nella griglia di `placeInGrid`.
+ * per `placeInLanes`. Le note ancorate vanno in una colonna a destra del blocco, ognuna alla `y` della
+ * sua àncora (nodo o pool) ma impilata sotto la precedente; le libere sotto il blocco, nella griglia
+ * di `placeInGrid`.
  */
 export async function placeFlowImport(
   doc: DevDocument, model: FlowModel, layout: (g: LayoutGraph) => Promise<LayoutPositions>,
@@ -410,11 +411,11 @@ export async function placeFlowImport(
   const pools = Object.fromEntries(Object.entries(placed.pools).map(([key, v]) => [key, { ...v, x: v.x + dx, y: v.y + dy }]))
 
   const part = { model, view: { pools, lanes: placed.lanes } }
-  const rects: Rect[] = [
-    ...occupied,
+  const placedRects: Rect[] = [
     ...Object.entries(nodes).map(([key, p]) => flowNodeRect(model.nodes[key]!, { ...p, collapsed: false })),
     ...Object.keys(pools).map((key) => poolRect(part, key)!),
   ]
+  const rects: Rect[] = [...occupied, ...placedRects]
   const anchorRect = (anchor: string | null): Rect | null => {
     if (anchor === null) return null
     const { key } = splitKey(anchor)
@@ -423,14 +424,21 @@ export async function placeFlowImport(
   }
   const notePositions: Record<string, Point> = {}
   const free: [string, Size][] = []
+  const anchored: { key: string; size: Size; y: number }[] = []
   for (const [key, note] of Object.entries(notes)) {
     const r = anchorRect(note.anchor)
-    if (r === null) {
-      free.push([key, noteSize(note)])
-      continue
-    }
-    notePositions[key] = { x: r.x + r.w + GUTTER, y: r.y }
-    rects.push({ ...notePositions[key], ...noteSize(note) })
+    if (r === null) free.push([key, noteSize(note)])
+    else anchored.push({ key, size: noteSize(note), y: r.y })
+  }
+  // Una colonna fuori dal blocco: fra i livelli di ELK una nota coprirebbe nodi e archi.
+  const bounds = rectsBounds(placedRects)!
+  const columnX = bounds.x + bounds.w + GUTTER
+  let bottom = -Infinity
+  for (const { key, size, y } of anchored.sort((a, b) => a.y - b.y)) {
+    const at = { x: columnX, y: Math.max(y, bottom + GUTTER) }
+    notePositions[key] = at
+    rects.push({ ...at, ...size })
+    bottom = at.y + size.h
   }
   Object.assign(notePositions, placeInGrid(free, rects))
   return { nodes, pools, lanes: placed.lanes, notes: notePositions, fallback }

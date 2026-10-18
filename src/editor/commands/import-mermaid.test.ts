@@ -11,13 +11,15 @@ import { erDiagram } from "../er-access"
 import { flowDiagram } from "../flow-access"
 import { flowNodeRect, poolRect } from "../flow/geometry"
 import { expectLaneInvariant } from "../flow/lane-invariant"
+import { rectsBounds, rectsIntersect } from "../geometry"
 import { withPool } from "../flow/pool-fixture"
 import { noteDiagram } from "../note-access"
+import { noteSize } from "../note/geometry"
 import { GUTTER, importEr } from "./import"
 import {
   classImportFates, erImportFates, importMermaidClass, importMermaidEr, importMermaidFlow, placeClassImport, placeErImport,
   placeFlowImport, rekeyFlow, rekeyFlowKeys, rekeyFlowNotes, sameClassRelation, selectClassFragment, selectErFragment,
-  type ClassImport,
+  type ClassImport, type FlowPlacement,
 } from "./import-mermaid"
 
 const entity = (name: string, attributes: string[] = ["id"]): Entity => ({
@@ -412,20 +414,46 @@ describe("rekeyFlowKeys e rekeyFlowNotes", () => {
 describe("placeFlowImport e importMermaidFlow con le note", () => {
   const where = (keyed: Record<string, Note>, text: string) => Object.entries(keyed).find(([, n]) => n.text === text)![0]
 
+  /** I rettangoli di nodi e pool del frammento piazzato, e quelli delle note. */
+  const blockRects = (fresh: FlowModel, placement: FlowPlacement) => [
+    ...Object.entries(placement.nodes).map(([key, p]) => flowNodeRect(fresh.nodes[key]!, { ...p, collapsed: false })),
+    ...Object.keys(placement.pools).map((key) => poolRect({ model: fresh, view: placement }, key)!),
+  ]
+  const noteRects = (keyed: Record<string, Note>, placement: FlowPlacement) =>
+    Object.entries(placement.notes).map(([key, p]) => ({ ...p, ...noteSize(keyed[key]!) }))
+
   it.each([
     ["con il motore", fakeLayout],
     ["sulla griglia di ripiego", async () => Promise.reject(new Error("x"))],
-  ])("mette la nota a destra del nodo o del pool, e quella libera sotto il blocco, %s", async (_, layout) => {
+  ])("mette le note ancorate in colonna a destra del blocco, alla y dell'àncora, e quella libera sotto, %s", async (_, layout) => {
     documentStore.getState().load(withPool(createDocument("prova", "doc-1")))
     const { fresh, keys, keyed, placement } = await importFlowWithNotes(FLOW, FLOW_NOTES, layout)
+    const bounds = rectsBounds(blockRects(fresh, placement))!
+    const pool = poolRect(flow(), keys.get("p")!)!
     const b = keys.get("b")!
     const node = flowNodeRect(fresh.nodes[b]!, { ...placement.nodes[b]!, collapsed: false })
-    expect(placement.notes[where(keyed, "sul nodo")]).toEqual({ x: node.x + node.w + GUTTER, y: node.y })
-    const pool = poolRect(flow(), keys.get("p")!)!
-    expect(placement.notes[where(keyed, "sul pool")]).toEqual({ x: pool.x + pool.w + GUTTER, y: pool.y })
-    const bottom = Math.max(...Object.entries(placement.nodes).map(([key, p]) => p.y + flowNodeRect(fresh.nodes[key]!, { ...p, collapsed: false }).h), pool.y + pool.h)
-    expect(placement.notes[where(keyed, "libera")]!.y).toBeGreaterThanOrEqual(bottom + GUTTER)
+    const onPool = placement.notes[where(keyed, "sul pool")]!
+    const onNode = placement.notes[where(keyed, "sul nodo")]!
+    expect(onPool).toEqual({ x: bounds.x + bounds.w + GUTTER, y: pool.y })
+    expect(onNode.x).toBe(bounds.x + bounds.w + GUTTER)
+    expect(onNode.y).toBe(Math.max(node.y, pool.y + noteSize({ text: "sul pool" }).h + GUTTER))
+    expect(placement.notes[where(keyed, "libera")]!.y).toBeGreaterThanOrEqual(bounds.y + bounds.h + GUTTER)
     expect(notes()).toHaveLength(3)
+  })
+
+  it.each([
+    ["con il motore", fakeLayout],
+    ["sulla griglia di ripiego", async () => Promise.reject(new Error("x"))],
+  ])("impila le note sulla stessa àncora e non copre nodi né pool, %s", async (_, layout) => {
+    const many: Note[] = [
+      { text: "prima", anchor: "flow/b" }, { text: "seconda\nsu due righe", anchor: "flow/b" },
+      { text: "p1", anchor: "flow/p" }, { text: "p2", anchor: "flow/p" }, { text: "su a", anchor: "flow/a" },
+    ]
+    const { fresh, keyed, placement } = await importFlowWithNotes(FLOW, many, layout)
+    const placedNotes = noteRects(keyed, placement)
+    expect(placedNotes).toHaveLength(5)
+    placedNotes.forEach((r, i) => placedNotes.slice(i + 1).forEach((o) => expect(rectsIntersect(r, o)).toBe(false)))
+    for (const r of placedNotes) for (const o of blockRects(fresh, placement)) expect(rectsIntersect(r, o)).toBe(false)
   })
 
   it("re-importare lo stesso state con una nota dà due note, ognuna sul nodo del proprio import", async () => {

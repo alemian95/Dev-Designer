@@ -26,6 +26,16 @@ export type ParticipantKind = z.infer<typeof ParticipantKindSchema>
 export const INVALID_NAME = /[<>:,;+()\\/]/
 
 /**
+ * La chiave senza prefisso di una sequenza (`<seq>`) o di un suo partecipante (`<seq>/<pid>`), come la
+ * usano le àncore delle Note (spec §3.2). `null` per più di due segmenti, o per un segmento vuoto.
+ */
+export function splitSequenceKey(key: string): { sequence: string; participant: string | null } | null {
+  const [sequence = "", participant, ...rest] = key.split("/")
+  if (sequence === "" || participant === "" || rest.length > 0) return null
+  return { sequence, participant: participant ?? null }
+}
+
+/**
  * Un partecipante (spec §3.1): `id` stabile, a cui puntano passi e àncore; `name` è il nome Mermaid,
  * unico nella sequenza, e rinominare cambia solo lui. `label` è l'alias mostrato, se c'è.
  */

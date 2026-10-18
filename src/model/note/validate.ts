@@ -1,14 +1,14 @@
 import type { DevDocument } from "../document"
 import { splitKey } from "../family"
 import type { Issue } from "../issue"
-import type { SequenceModel } from "../sequence/schema"
+import { splitSequenceKey, type SequenceModel } from "../sequence/schema"
 
 /** `<seq>` esiste se c'è la sequenza; `<seq>/<pid>` se c'è quel partecipante nella sequenza (spec sequence §3.2). */
 function sequenceAnchorExists(model: SequenceModel, key: string): boolean {
-  const [seq = "", participant] = key.split("/", 2)
-  const sequence = model.sequences[seq]
-  if (!sequence) return false
-  return participant === undefined || sequence.participants.some((p) => p.id === participant)
+  const parts = splitSequenceKey(key)
+  const sequence = parts && model.sequences[parts.sequence]
+  if (!parts || !sequence) return false
+  return parts.participant === null || sequence.participants.some((p) => p.id === parts.participant)
 }
 
 /**

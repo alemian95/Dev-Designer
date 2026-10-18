@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createDocument } from "../document"
-import { NoteStepSchema, SequenceDiagramSchema, SequenceSchema, StepSchema } from "./schema"
+import { NoteStepSchema, SequenceDiagramSchema, SequenceSchema, splitSequenceKey, StepSchema } from "./schema"
 
 const anna = { id: "p1", name: "Anna", label: null, kind: "actor" }
 const api = { id: "p2", name: "API", label: "Server API", kind: "participant" }
@@ -48,5 +48,13 @@ describe("schema delle sequenze", () => {
 
   it("un documento nuovo ha la parte delle sequenze, vuota", () => {
     expect(createDocument("t", "t").diagram.sequence).toEqual({ model: { sequences: {} }, view: { nodes: {} } })
+  })
+})
+
+describe("splitSequenceKey", () => {
+  it("dà la sequenza e, se c'è, il partecipante; più di due segmenti o uno vuoto non sono una chiave", () => {
+    expect(splitSequenceKey("s1")).toEqual({ sequence: "s1", participant: null })
+    expect(splitSequenceKey("s1/p1")).toEqual({ sequence: "s1", participant: "p1" })
+    for (const key of ["s1/p1/xyz", "", "s1/", "/p1"]) expect(splitSequenceKey(key)).toBeNull()
   })
 })

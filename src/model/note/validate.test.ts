@@ -58,5 +58,6 @@ describe("anchorExists sulle sequenze", () => {
     expect(anchorExists(doc, "sequence/s1/p9")).toBe(false)
     expect(anchorExists(doc, "sequence/s9")).toBe(false)
     expect(anchorExists(doc, "sequence/s9/p1")).toBe(false)
+    expect(anchorExists(doc, "sequence/s1/p1/xyz")).toBe(false)
   })
 })

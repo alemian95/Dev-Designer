@@ -218,6 +218,17 @@ describe("openFile", () => {
     expect(d.confirm).not.toHaveBeenCalled()
     expect(documentSession.getState().dirty).toBe(false)
   })
+
+  it("un file v8 si apre alla versione 9, e un undo subito dopo non riporta indietro la migrazione", async () => {
+    const v8 = JSON.parse(toJson(withEntity("vecchio", "v8doc"))) as { diagram: Record<string, unknown> }
+    delete v8.diagram.sequence
+    await createDocumentIo(deps()).openFile({ name: "vecchio.dd.json", text: JSON.stringify({ ...v8, schemaVersion: 8 }), handle: null })
+    expect(documentStore.getState().past).toEqual([])
+    documentStore.getState().undo()
+    const doc = documentStore.getState().doc
+    expect(doc.schemaVersion).toBe(9)
+    expect(doc.diagram.sequence).toEqual({ model: { sequences: {} }, view: { nodes: {} } })
+  })
 })
 
 describe("save", () => {
@@ -336,7 +347,7 @@ describe("openRecent e newDocument", () => {
     expect(documentSession.getState()).toMatchObject({ docId: "r1", fileName: "r.dd.json", dirty: false })
   })
 
-  it("newDocument crea un documento con le cinque famiglie e i collegamenti vuoti", async () => {
+  it("newDocument crea un documento con le sei famiglie e i collegamenti vuoti", async () => {
     const d = deps()
     const io = createDocumentIo(d)
     await io.newDocument()

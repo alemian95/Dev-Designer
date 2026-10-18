@@ -1,5 +1,6 @@
 import type { DevDocument } from "../document"
 import { splitKey } from "../family"
+import { splitSequenceKey } from "../sequence/schema"
 import type { AccessMode, Link, LinkKind } from "./schema"
 
 /**
@@ -25,12 +26,12 @@ function oneLine(label: string, empty: string): string {
 
 /** Una sequenza si nomina col titolo; un suo partecipante (`<seq>/<pid>`) con l'etichetta o il nome. */
 function sequenceEndName(doc: DevDocument, key: string): string {
-  const [seq = "", participantId] = key.split("/", 2)
-  const sequence = doc.diagram.sequence.model.sequences[seq]
-  if (!sequence) return "(sequenza eliminata)"
-  if (participantId === undefined) return sequence.title === "" ? "(sequenza senza titolo)" : sequence.title
-  const participant = sequence.participants.find((p) => p.id === participantId)
-  return participant ? (participant.label ?? participant.name) : "(partecipante eliminato)"
+  const parts = splitSequenceKey(key)
+  const sequence = parts && doc.diagram.sequence.model.sequences[parts.sequence]
+  if (!parts || !sequence) return "(sequenza eliminata)"
+  if (parts.participant === null) return oneLine(sequence.title, "(sequenza senza titolo)")
+  const participant = sequence.participants.find((p) => p.id === parts.participant)
+  return participant ? oneLine(participant.label ?? "", participant.name) : "(partecipante eliminato)"
 }
 
 /**

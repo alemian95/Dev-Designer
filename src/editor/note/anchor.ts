@@ -52,14 +52,22 @@ export function anchorsTouching(doc: DevDocument, keys: ReadonlySet<string>): Ed
   })
 }
 
+/** Le note con un'àncora che esiste: le sole che un'eliminazione può staccare. */
+export function liveAnchored(doc: DevDocument): Set<string> {
+  return new Set(Object.entries(noteDiagram(doc).model.notes).flatMap(([key, note]) => (note.anchor !== null && anchorExists(doc, note.anchor) ? [key] : [])))
+}
+
 /**
- * Stacca le note la cui àncora non esiste più (`anchorExists`). Va dopo le recipe di
- * un'eliminazione, sullo stesso draft (spec 3a §5): così vale per ogni elemento e sotto-elemento
- * tolto (il partecipante di una sequenza, o la sequenza con i suoi partecipanti) senza una regola per famiglia.
+ * Stacca, fra le note `live` (`liveAnchored` prima dell'eliminazione), quelle la cui àncora non
+ * esiste più. Va dopo le recipe di un'eliminazione, sullo stesso draft (spec 3a §5): vale per ogni
+ * elemento e sotto-elemento tolto senza una regola per famiglia, e un'àncora già pendente resta
+ * com'era, col suo `note-dangling-anchor`.
  */
-export const detachDangling: Recipe = (draft) => {
-  for (const note of Object.values(noteDiagram(draft).model.notes)) {
-    if (note.anchor !== null && !anchorExists(draft, note.anchor)) note.anchor = null
+export function detachDangling(live: ReadonlySet<string>): Recipe {
+  return (draft) => {
+    for (const [key, note] of Object.entries(noteDiagram(draft).model.notes)) {
+      if (live.has(key) && note.anchor !== null && !anchorExists(draft, note.anchor)) note.anchor = null
+    }
   }
 }
 

@@ -82,4 +82,9 @@ describe("SequenceEditor", () => {
     expect(seq().title).toBe("Ordine di prova")
     expect(seq().participants[0]!.name).toBe("Cli ente")
   })
+
+  it("un'etichetta fatta solo di a capo torna al nome", () => {
+    edit("sequence/s/b", "\n\n")
+    expect(seq().participants[1]!.label).toBeNull()
+  })
 })

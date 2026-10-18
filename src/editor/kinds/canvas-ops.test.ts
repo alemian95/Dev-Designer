@@ -397,6 +397,16 @@ describe("canvasOps e le note (spec 3a §5)", () => {
     expect(anchorOf(onXY)).toBe("er/X/Y")
   })
 
+  it("una nota con l'àncora già pendente resta com'è quando si elimina altro", () => {
+    const entity = add({ x: 0, y: 0 }, "er")
+    const note = add({ x: 0, y: 300 }, "note")
+    state().dispatch((draft) => {
+      noteDiagram(draft).model.notes[splitKey(note).key]!.anchor = "er/fantasma"
+    })
+    state().dispatch(canvasOps(state().doc).deleteItems([entity], [])!)
+    expect(anchorOf(note)).toBe("er/fantasma")
+  })
+
   it("eliminare un pool ancorato stacca la nota", () => {
     // Review Focus 2.
     state().load(withPool(createDocument("t", "t")))

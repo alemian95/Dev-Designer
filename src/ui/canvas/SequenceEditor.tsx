@@ -34,7 +34,7 @@ function targetOf(model: SequenceModel, seqKey: string, seq: Sequence, view: Poi
   const head = l.columns[sub]?.head
   if (p && head) {
     // Il testo mostrato è l'etichetta, se c'è: si modifica quello. Un'etichetta svuotata torna al nome.
-    if (p.label !== null) return { label: "Etichetta del partecipante", rect: offset(head, view), value: p.label, commit: (v) => setParticipantLabel(seqKey, sub, v === "" ? null : oneLine(v)) }
+    if (p.label !== null) return { label: "Etichetta del partecipante", rect: offset(head, view), value: p.label, commit: (v) => setParticipantLabel(seqKey, sub, oneLine(v).trim() === "" ? null : oneLine(v)) }
     return { label: "Nome del partecipante", rect: offset(head, view), value: p.name, commit: (v) => renameParticipant(model, seqKey, sub, oneLine(v)) }
   }
   const step = stepAt(seq, sub)

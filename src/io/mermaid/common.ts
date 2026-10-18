@@ -31,15 +31,18 @@ export function blocks(text: string): MermaidBlock[] {
 /** Sostituisce ogni carattere che non è un a capo con uno spazio: gli offset restano quelli del testo originale. */
 const blank = (s: string): string => s.replace(/[^\n]/g, " ")
 
+/** Toglie il front-matter (`---` … `---` in testa) senza spostare nessun offset. Si ignora senza avviso. */
+export function stripFrontMatter(text: string): string {
+  return text.replace(/^---\n[\s\S]*?\n---[^\n]*/, blank)
+}
+
 /**
  * Toglie front-matter (`---` … `---` in testa) e commenti `%%` fino a fine riga, direttive `%%{…}%%`
  * comprese, senza spostare nessun offset (stessa garanzia di `stripPsqlMeta` nel DDL). Si ignorano
  * senza avviso (spec §3.3). Un `%%` dentro una stringa fra virgolette non è un commento.
  */
 export function stripNoise(text: string): string {
-  let out = text.replace(/^---\n[\s\S]*?\n---[^\n]*/, blank)
-  out = out.replace(/"[^"\n]*"|%%[^\n]*/g, (m) => (m.startsWith("%%") ? blank(m) : m))
-  return out
+  return stripFrontMatter(text).replace(/"[^"\n]*"|%%[^\n]*/g, (m) => (m.startsWith("%%") ? blank(m) : m))
 }
 
 /** Riga 1-based dell'offset `at`. */

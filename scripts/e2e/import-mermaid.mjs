@@ -66,6 +66,25 @@ const STATE = `stateDiagram-v2
     note right of Drafted : Revisione umana obbligatoria
 `
 
+const SEQUENCE = `sequenceDiagram
+    autonumber
+    actor Redattore
+    participant Orchestrator as Redazione Orchestrator
+    participant Storage as Database / Knowledge Base
+    participant LLM as LLM Engine (Prompting)
+    Redattore->>Orchestrator: Richiesta generazione articolo (es. Formato: Newsletter, Topic: Ultimi 3 giorni)
+    Orchestrator->>Storage: Query NewsCluster (ImpactScore >= 4, Stato: Unprocessed)
+    Storage-->>Orchestrator: Ritorna lista cluster con rispettivi RawItems e fonti
+    Orchestrator->>Orchestrator: Compone contesto & prompt con linee guida editoriali e fonti
+    Orchestrator->>LLM: Invia prompt (Sintesi, Analisi comparativa, TL#59;DR, Richiesta citazioni)
+    LLM-->>Orchestrator: Ritorna testo strutturato (Headline, TL#59;DR, Sezioni, Fonti referenziate)
+    Orchestrator->>Orchestrator: Valida link e integra metadati citazioni
+    Orchestrator->>Storage: Salva ArticleDraft (Stato: DRAFT)
+    Orchestrator-->>Redattore: Presenta bozza formattata in Markdown per revisione
+    Redattore->>Orchestrator: Approva / Modifica bozza
+    Orchestrator->>Storage: Aggiorna stato in APPROVED
+`
+
 const MARKDOWN = "# Note\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\n" + ER + "```\n"
 const MARKDOWN_STATE = "```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\n" + STATE + "```\n"
 
@@ -282,6 +301,26 @@ export async function run(browser, base) {
       await page.locator("[data-import-blocks]").getByText("Blocco 2 · state").click()
       await expectText(page, "[data-import-summary]", "15 nodi, 17 archi, 1 pool, 1 note")
       await closeDialog(page)
+    })
+
+    await step("analizza la sequenza del redattore incollata, senza caselle", async () => {
+      await openDialog(page)
+      await paste(page, SEQUENCE)
+      await expectText(page, "[data-import-summary]", "4 partecipanti, 11 messaggi, 0 blocchi")
+      const boxes = await page.getByRole("checkbox").count()
+      if (boxes !== 0) throw new Error(`la sequenza non ha caselle, trovate ${boxes}`)
+    })
+
+    await step("importa la sequenza con i suoi partecipanti, e ⌘Z la toglie", async () => {
+      await page.getByRole("button", { name: /^Importa 1 sequenza$/ }).click()
+      await page.waitForSelector("[data-import-mermaid-dialog] strong")
+      await expectText(page, "[data-import-mermaid-dialog]", "4 partecipanti e 11 messaggi")
+      await closeDialog(page)
+      await page.waitForSelector('[data-node-id^="sequence/"]')
+      const lifelines = await page.locator("[data-lifeline]").count()
+      if (lifelines !== 4) throw new Error(`attese 4 linee di vita, trovate ${lifelines}`)
+      await page.keyboard.press("ControlOrMeta+z")
+      await page.waitForSelector('[data-node-id^="sequence/"]', { state: "detached" })
     })
   } catch (e) {
     failed = true

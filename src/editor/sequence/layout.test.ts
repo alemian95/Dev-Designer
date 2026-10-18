@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Sequence, Step } from "@/model/sequence/schema"
 import type { Rect } from "../geometry"
-import { sequenceLayout } from "./layout"
+import { COLUMN_MIN_W, NOTE_H, PAD, SELF_MESSAGE_H, TOP, sequenceLayout } from "./layout"
 
 const part = (id: string) => ({ id, name: id, label: null, kind: "participant" as const })
 const msg = (id: string, from: string, to: string): Step => ({ kind: "message", id, from, to, text: "", line: "solid", head: "filled" })
@@ -66,5 +66,43 @@ describe("sequenceLayout", () => {
     const l = sequenceLayout(seq([], []))
     expect(l.width).toBeGreaterThan(0)
     expect(l.height).toBeGreaterThan(0)
+  })
+
+  describe("metriche", () => {
+    it("dà alla colonna la larghezza minima e l'asse a metà", () => {
+      const l = sequenceLayout(seq(["a", "b"], []), () => 0)
+      expect(l.columns.a!.w).toBe(96)
+      expect(l.columns.a!.x).toBe(PAD + 48)
+      expect(l.columns.b!.x).toBe(PAD + 96 + 36 + 48)
+    })
+
+    it("allarga la colonna con un'etichetta lunga, che conta più del nome", () => {
+      const p = { ...part("a"), label: "x".repeat(20) }
+      const l = sequenceLayout({ ...seq([], []), participants: [p] }, (t) => t.length * 10)
+      expect(l.columns.a!.w).toBe(20 * 10 + 28)
+      expect(l.columns.a!.w).toBeGreaterThan(COLUMN_MIN_W)
+    })
+
+    it("dà ai tre tipi di riga 40, 58 e 44, a passo 6", () => {
+      const l = sequenceLayout(seq(["a", "b"], [msg("m", "a", "b"), msg("s", "a", "a"), note("n", "a")]), () => 0)
+      expect([l.rows.m!.h, l.rows.s!.h, l.rows.n!.h]).toEqual([40, SELF_MESSAGE_H, NOTE_H])
+      expect([l.rows.m!.y, l.rows.s!.y, l.rows.n!.y]).toEqual([TOP, TOP + 46, TOP + 46 + 64])
+    })
+
+    it("allinea gli slot di primo livello alle righe", () => {
+      const steps = [msg("m", "a", "b"), msg("s", "a", "a"), note("n", "a")]
+      const l = sequenceLayout(seq(["a", "b"], steps), () => 0)
+      const root = l.slots.filter((s) => s.container === "root")
+      steps.forEach((step, i) => expect(root[i]!.y).toBe(l.rows[step.id]!.y))
+    })
+
+    it("dà intestazione 30, separatore 24 e sezione vuota 18 a un blocco", () => {
+      const l = sequenceLayout(seq(["a"], [block("k", { id: "s1", steps: [] }, { id: "s2", steps: [] })]), () => 0)
+      const b = l.blocks.k!
+      expect(b.sections.s1).toMatchObject({ y: TOP, h: 30 + 18 })
+      expect(b.sections.s2!.y).toBe(TOP + 30 + 18)
+      expect(b.sections.s2!.h).toBe(24 + 18 + 8)
+      expect(b.rect.h).toBe(30 + 18 + 24 + 18 + 8)
+    })
   })
 })

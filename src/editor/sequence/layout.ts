@@ -59,11 +59,12 @@ export function sequenceLayout(seq: Sequence, measure: (text: string) => number 
     left += w + COLUMN_GAP
   }
   const width = seq.participants.length === 0 ? MIN_WIDTH : left - COLUMN_GAP + PAD
-  const spanOf = (step: Step, inset: number): { x0: number; x1: number } => {
+  // `margin` allarga (o, se negativo, stringe) l'estensione, anche quando nessun partecipante si risolve.
+  const spanOf = (step: Step, margin: number): { x0: number; x1: number } => {
     const cols = stepParticipants(step).flatMap((id) => columns[id] ?? [])
-    const x0 = cols.length ? Math.min(...cols.map((c) => c.x - c.w / 2)) - inset : PAD
-    const x1 = cols.length ? Math.max(...cols.map((c) => c.x + c.w / 2)) + inset : width - PAD
-    return { x0, x1 }
+    const x0 = cols.length ? Math.min(...cols.map((c) => c.x - c.w / 2)) : PAD
+    const x1 = cols.length ? Math.max(...cols.map((c) => c.x + c.w / 2)) : width - PAD
+    return { x0: x0 - margin, x1: x1 + margin }
   }
 
   const rows: SequenceLayout["rows"] = {}
@@ -92,8 +93,7 @@ export function sequenceLayout(seq: Sequence, measure: (text: string) => number 
         if (section.steps.length === 0) y += EMPTY_SECTION_H
       })
       y += BLOCK_END
-      const inset = DEPTH_INSET * depth - BLOCK_INSET
-      const { x0, x1 } = spanOf(step, -inset)
+      const { x0, x1 } = spanOf(step, BLOCK_INSET - DEPTH_INSET * depth)
       const w = x1 - x0
       const sections: Record<string, Rect> = {}
       step.sections.forEach((section, j) => {

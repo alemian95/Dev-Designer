@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { createDocument } from "@/model/document"
+import type { LayoutGraph } from "@/model/layout"
+import type { Sequence, Step } from "@/model/sequence/schema"
 import { anchorsOf } from "@/model/shared"
 import { addEntity, addRelationship, removeAttribute, renameEntity } from "../commands/er"
 import { documentStore } from "../document-store"
@@ -7,7 +9,9 @@ import { erDiagram } from "../er-access"
 import { linkId, qualify, splitKey } from "../families"
 import { flowDiagram } from "../flow-access"
 import { withPool } from "../flow/pool-fixture"
+import { layoutAll } from "../layout-pack"
 import { noteDiagram } from "../note-access"
+import { sequenceLayout } from "../sequence/layout"
 import { shapeDiagram } from "../shape-access"
 import { autoPorts } from "../ports"
 import { canvasOps, canvasPorts, familyHasContent } from "./canvas-ops"
@@ -575,5 +579,179 @@ describe("gli agganci (spec agganci §3)", () => {
     state().dispatch(first.recipe)
     expect(canvasOps(state().doc).addEdge(node, entity, { source: "n1", target: "s1" })).toEqual({ type: "existing", key: first.key })
     expect(state().doc.diagram.links[linkId(first.key)!]!.anchors).toBeUndefined()
+  })
+})
+
+describe("canvasOps e le sequenze", () => {
+  const msg = (id: string, from: string, to: string): Step => ({ kind: "message", id, from, to, text: id, line: "solid", head: "filled" })
+  /** Tre partecipanti; `m1`, un blocco `k` con `m2` nella sezione `s1`, e `m3`. */
+  const fixture = (): Sequence => ({
+    title: "",
+    autonumber: false,
+    participants: ["a", "b", "c"].map((id) => ({ id, name: id.toUpperCase(), label: null, kind: "participant" as const })),
+    steps: [msg("m1", "a", "b"), { kind: "block", id: "k", operator: "alt", sections: [{ id: "s1", condition: "", steps: [msg("m2", "b", "c")] }] }, msg("m3", "c", "a")],
+  })
+  const load = () => {
+    const doc = createDocument("t", "t")
+    doc.diagram.sequence.model.sequences["s"] = fixture()
+    doc.diagram.sequence.view.nodes["s"] = { x: 100, y: 40, collapsed: false }
+    state().load(doc)
+  }
+  const seqNow = () => state().doc.diagram.sequence.model.sequences["s"]!
+  const add = (family: "er" | "note" | "sequence", at: { x: number; y: number }) => {
+    const { key, recipe } = canvasOps(state().doc).addNode(at, family)
+    state().dispatch(recipe)
+    return key
+  }
+  const anchorOf = (note: string) => noteDiagram(state().doc).model.notes[splitKey(note).key]!.anchor
+  const connect = (from: string, to: string) => {
+    const r = canvasOps(state().doc).addEdge(from, to)
+    if (r?.type === "created") state().dispatch(r.recipe)
+    return r
+  }
+
+  it("lo strumento crea una sequenza senza aprire un editor; Disponi la mette in fila senza cambiarne l'interno", async () => {
+    add("er", { x: 0, y: 0 })
+    const created = canvasOps(state().doc).addNode({ x: 500, y: 500 }, "sequence")
+    expect(created.edit).toBeNull()
+    state().dispatch(created.recipe)
+    const before = state().doc.diagram.sequence.model.sequences[splitKey(created.key).key]
+    expect(before?.participants.map((p) => p.name)).toEqual(["A", "B"])
+    const fila = async (g: LayoutGraph) => Object.fromEntries(g.nodes.map((n, i) => [n.id, { x: i * 200, y: 0 }]))
+    state().dispatch((await layoutAll(state().doc, fila))!)
+    expect(state().doc.diagram.sequence.model.sequences[splitKey(created.key).key]).toEqual(before)
+    const ops = canvasOps(state().doc)
+    expect(ops.rectOf(created.key)!.x).toBeGreaterThan(ops.rectOf(ops.nodeKeys().find((k) => k.startsWith("er/"))!)!.x)
+  })
+
+  it("i sotto-elementi non sono in nodeKeys", () => {
+    load()
+    expect(canvasOps(state().doc).nodeKeys()).toEqual(["sequence/s"])
+  })
+
+  it("Collega fra due intestazioni aggiunge un messaggio in fondo; dalla stessa intestazione, a sé stesso", () => {
+    load()
+    const r = connect("sequence/s/a", "sequence/s/c")
+    expect(r?.type === "created" && r.key).toBe(`sequence/s/${seqNow().steps[3]!.id}`)
+    expect(seqNow().steps[3]).toMatchObject({ kind: "message", from: "a", to: "c", text: "", line: "solid", head: "filled" })
+    connect("sequence/s/b", "sequence/s/b")
+    expect(seqNow().steps[4]).toMatchObject({ kind: "message", from: "b", to: "b" })
+  })
+
+  it("Collega fra un partecipante e un passo, o fra due sequenze, non crea niente", () => {
+    load()
+    const other = add("sequence", { x: 900, y: 0 })
+    expect(canvasOps(state().doc).addEdge("sequence/s/a", "sequence/s/m1")).toBeNull()
+    expect(canvasOps(state().doc).addEdge("sequence/s", other)).toBeNull()
+  })
+
+  it("Collega fra una sequenza e un'entità è rifiutato con l'avviso", () => {
+    load()
+    const e = add("er", { x: 900, y: 0 })
+    expect(canvasOps(state().doc).addEdge("sequence/s", e)).toEqual({ type: "rejected", notice: "Non esiste un collegamento fra una sequenza e un'entità." })
+  })
+
+  it("una Nota si ancora a un partecipante, e la linea parte dalla sua intestazione", () => {
+    load()
+    const note = add("note", { x: 0, y: 600 })
+    expect(connect(note, "sequence/s/b")?.type).toBe("created")
+    expect(anchorOf(note)).toBe("sequence/s/b")
+    const ops = canvasOps(state().doc)
+    const head = ops.rectOf("sequence/s/b")!
+    const l = sequenceLayout(seqNow())
+    expect(head).toEqual({ ...l.columns.b!.head, x: 100 + l.columns.b!.head.x, y: 40 + l.columns.b!.head.y })
+    const line = ops.allEdges().find((e) => e.key === note)!
+    expect(line.target).toBe("sequence/s/b")
+    const end = ops.portsOf([line], (k) => ops.rectOf(k)).get(note)!.target.point
+    expect(end.x).toBeGreaterThanOrEqual(head.x)
+    expect(end.x).toBeLessThanOrEqual(head.x + head.w)
+    expect(end.y).toBeGreaterThanOrEqual(head.y)
+    expect(end.y).toBeLessThanOrEqual(head.y + head.h)
+  })
+
+  it("eliminare il partecipante stacca la Nota e toglie i suoi messaggi; un annulla riporta tutto", () => {
+    // Review Focus 1.
+    load()
+    const note = add("note", { x: 0, y: 600 })
+    connect(note, "sequence/s/a")
+    state().dispatch(canvasOps(state().doc).deleteItems(["sequence/s/a"], [])!)
+    expect(anchorOf(note)).toBeNull()
+    expect(seqNow().participants.map((p) => p.id)).toEqual(["b", "c"])
+    expect(seqNow().steps.map((s) => s.id)).toEqual(["k"])
+    state().undo()
+    expect(anchorOf(note)).toBe("sequence/s/a")
+    expect(seqNow()).toEqual(fixture())
+  })
+
+  it("eliminare la sequenza stacca le Note ancorate a lei e ai suoi partecipanti; un annulla riporta tutto", () => {
+    // Review Focus 1.
+    load()
+    const onSeq = add("note", { x: 0, y: 600 })
+    const onPart = add("note", { x: 300, y: 600 })
+    connect(onSeq, "sequence/s")
+    connect(onPart, "sequence/s/c")
+    state().dispatch(canvasOps(state().doc).deleteItems(["sequence/s"], [])!)
+    expect(canvasOps(state().doc).nodeKeys()).not.toContain("sequence/s")
+    expect([anchorOf(onSeq), anchorOf(onPart)]).toEqual([null, null])
+    state().undo()
+    expect([anchorOf(onSeq), anchorOf(onPart)]).toEqual(["sequence/s", "sequence/s/c"])
+    expect(seqNow()).toEqual(fixture())
+  })
+
+  it("eliminare passi e partecipanti insieme è un solo annulla", () => {
+    load()
+    const past = state().past.length
+    state().dispatch(canvasOps(state().doc).deleteItems(["sequence/s/m1", "sequence/s/k", "sequence/s/c"], [])!)
+    expect(seqNow().steps).toEqual([])
+    expect(seqNow().participants.map((p) => p.id)).toEqual(["a", "b"])
+    expect(state().past.length).toBe(past + 1)
+  })
+
+  it("commitDrag di un passo lo porta nel blocco, nello slot più vicino al rilascio", () => {
+    // Review Focus 2.
+    load()
+    const l = sequenceLayout(seqNow())
+    const row = l.rows.m3!
+    const slot = l.slots.find((x) => x.container === "s1" && x.index === 1)!
+    const dy = slot.y - (row.y + row.h / 2)
+    state().dispatch(canvasOps(state().doc).commitDrag(["sequence/s/m3"], 0, dy)!)
+    const block = seqNow().steps[1]
+    expect(block?.kind === "block" && block.sections[0]!.steps.map((s) => s.id)).toEqual(["m2", "m3"])
+    expect(seqNow().steps.map((s) => s.id)).toEqual(["m1", "k"])
+  })
+
+  it("commitDrag di un blocco non lo mette mai dentro sé stesso", () => {
+    // Review Focus 2.
+    load()
+    const l = sequenceLayout(seqNow())
+    const label = l.blocks.k!.label
+    const dy = l.rows.m2!.y + l.rows.m2!.h - (label.y + label.h / 2)
+    const recipe = canvasOps(state().doc).commitDrag(["sequence/s/k"], 0, dy)
+    if (recipe) state().dispatch(recipe)
+    expect(seqNow().steps.map((s) => s.id)).toContain("k")
+  })
+
+  it("commitDrag di un'intestazione riordina verso la colonna più vicina", () => {
+    load()
+    const l = sequenceLayout(seqNow())
+    const dx = l.columns.c!.x - l.columns.a!.x - 10
+    state().dispatch(canvasOps(state().doc).commitDrag(["sequence/s/a"], dx, 5)!)
+    expect(seqNow().participants.map((p) => p.id)).toEqual(["b", "c", "a"])
+    expect(state().doc.diagram.sequence.view.nodes["s"]).toEqual({ x: 100, y: 40, collapsed: false })
+  })
+
+  it("commitDrag della sola sequenza la sposta; con un sotto-elemento insieme, sposta solo la sequenza", () => {
+    load()
+    state().dispatch(canvasOps(state().doc).commitDrag(["sequence/s", "sequence/s/a"], 40, 20)!)
+    expect(state().doc.diagram.sequence.view.nodes["s"]).toEqual({ x: 140, y: 60, collapsed: false })
+    expect(seqNow()).toEqual(fixture())
+  })
+
+  it("duplicateNodes copia la sequenza e ignora i sotto-elementi", () => {
+    load()
+    const dup = canvasOps(state().doc).duplicateNodes(["sequence/s", "sequence/s/a"])
+    expect(dup.keys).toHaveLength(1)
+    state().dispatch(dup.recipe)
+    expect(canvasOps(state().doc).nodeKeys()).toContain(dup.keys[0])
   })
 })

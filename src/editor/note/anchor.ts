@@ -53,10 +53,14 @@ export function anchorsTouching(doc: DevDocument, keys: ReadonlySet<string>): Ed
   })
 }
 
-/** Stacca le note ancorate a uno degli elementi `keys`, per l'eliminazione (spec 3a §5). `null` se non ce n'è nessuna. */
+/**
+ * Stacca le note ancorate a uno degli elementi `keys`, o a un loro sotto-elemento (`<chiave>/…`,
+ * come il partecipante di una sequenza), per l'eliminazione (spec 3a §5). `null` se non ce n'è nessuna.
+ */
 export function detachAnchoredTo(doc: DevDocument, keys: ReadonlySet<string>): Recipe | null {
+  const inside = (anchor: string): boolean => keys.has(anchor) || [...keys].some((key) => anchor.startsWith(`${key}/`))
   const hit = Object.entries(noteDiagram(doc).model.notes)
-    .filter(([, note]) => note.anchor !== null && keys.has(note.anchor))
+    .filter(([, note]) => note.anchor !== null && inside(note.anchor))
     .map(([key]) => key)
   return hit.length === 0 ? null : detachNotes(hit)
 }

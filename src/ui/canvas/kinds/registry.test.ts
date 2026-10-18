@@ -1,4 +1,4 @@
-import { Box, Circle, ListOrdered, RectangleHorizontal, Square, SquareDashed, StickyNote, Type } from "lucide-react"
+import { ArrowRightLeft, Box, Circle, ListOrdered, RectangleHorizontal, Square, SquareDashed, StickyNote, Type } from "lucide-react"
 import { describe, expect, it } from "vitest"
 import { FAMILIES } from "@/model/family"
 import { FlowShapeSchema } from "@/model/flow/schema"
@@ -135,6 +135,12 @@ describe("forme", () => {
     expect(hidden({ kind: "text", label: "" })).toBe(true)
     expect(hidden({ kind: "text", label: "titolo" })).toBe(false)
     expect(hidden({ kind: "rect", label: "" })).toBe(false)
+  })
+})
+
+describe("sequenze", () => {
+  it("le sequenze dichiarano lo strumento Sequenza", () => {
+    expect(viewFor("sequence").tools).toEqual([{ label: "Sequenza", key: "s", Icon: ArrowRightLeft, tool: "node", family: "sequence" }])
   })
 })
 

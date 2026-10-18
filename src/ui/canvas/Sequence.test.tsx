@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import type { Sequence, Step } from "@/model/sequence/schema"
 import { sequenceLayout } from "@/editor/sequence/layout"
-import { SequenceNodeView } from "./Sequence"
+import { SequenceDropLine, SequenceNodeView } from "./Sequence"
 import { hitTest } from "./use-canvas-interaction"
 
 const view = { x: 0, y: 0, collapsed: false }
@@ -42,9 +42,17 @@ describe("SequenceNodeView", () => {
     expect(out).toMatch(/>\[<tspan data-sequence-text="s1">ok<\/tspan>\]</)
   })
 
-  it("una condizione vuota lascia il suo tspan, vuoto", () => {
+  it("una condizione vuota lascia il suo tspan, vuoto, senza parentesi", () => {
     const s = seq({ steps: [{ kind: "block", id: "k", operator: "loop", sections: [{ id: "s1", condition: "", steps: [] }] }] })
-    expect(html(s)).toContain('<tspan data-sequence-text="s1"></tspan>')
+    expect(html(s)).toMatch(/>\s*<tspan data-sequence-text="s1"><\/tspan><\/text>/)
+    expect(html(s)).not.toContain("[")
+  })
+
+  it("un sotto-elemento selezionato ha il contorno sul suo rettangolo", () => {
+    const head = sequenceLayout(seq()).columns.api!.head
+    const out = renderToStaticMarkup(<SequenceNodeView id="sequence/s" sequence={seq()} view={view} selected={false} selectedSubs={["api"]} />)
+    expect(out).toContain(`<rect x="${head.x}" y="${head.y}" width="${head.w}" height="${head.h}" fill="none" stroke="var(--primary)"`)
+    expect(html()).not.toContain('stroke="var(--primary)"')
   })
 
   it("un messaggio a sé stesso `double` ha la punta di partenza rivolta verso la linea di vita", () => {
@@ -97,5 +105,28 @@ describe("SequenceNodeView", () => {
   it("l'omino segue la y della testa", () => {
     const head = sequenceLayout(seq()).columns.u!.head
     expect(html()).toContain(`<circle cx="${sequenceLayout(seq()).columns.u!.x}" cy="${head.y + 6}"`)
+  })
+})
+
+describe("SequenceDropLine", () => {
+  const line = (stepId: string, dy: number) =>
+    renderToStaticMarkup(<SequenceDropLine sequence={seq()} view={{ x: 100, y: 50 }} stepId={stepId} dy={dy} />)
+
+  it("disegna lo slot di dropTarget, largo quanto la sezione che lo contiene", () => {
+    const l = sequenceLayout(seq())
+    const m1 = l.rows.m1!
+    const slot = l.slots.find((x) => x.container === "s2" && x.index === 0)!
+    const sec = l.blocks.k!.sections.s2!
+    const y = 50 + slot.y - 3
+    expect(line("m1", slot.y - (m1.y + m1.h / 2))).toContain(`x1="${100 + sec.x}" x2="${100 + sec.x + sec.w}" y1="${y}" y2="${y}"`)
+  })
+
+  it("in cima alla sequenza è larga quanto la sequenza", () => {
+    const l = sequenceLayout(seq())
+    expect(line("m2", -1000)).toContain(`x1="100" x2="${100 + l.width}"`)
+  })
+
+  it("niente per un partecipante", () => {
+    expect(line("api", 0)).toBe("")
   })
 })

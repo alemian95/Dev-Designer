@@ -1,11 +1,14 @@
 import { memo } from "react"
 import { useStore } from "zustand"
+import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
 import type { Point, Rect } from "@/editor/geometry"
 import { notePath } from "@/editor/note/geometry"
-import { selId, sessionStore } from "@/editor/session-store"
-import { SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
+import { selId, selectedKeys, sessionStore } from "@/editor/session-store"
+import { stepDrop } from "@/editor/sequence/commands"
+import { subRect } from "@/editor/sequence/geometry"
+import { ROOT, ROW_GAP, SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
 import { sequenceDiagram } from "@/editor/sequence-access"
 import type { BlockStep, Head, MessageStep, NoteStep, Participant, Sequence, Step } from "@/model/sequence/schema"
 import type { NodeView } from "@/model/shared"
@@ -17,6 +20,8 @@ interface Props {
   sequence: Sequence
   view: NodeView
   selected: boolean
+  /** Gli id dei sotto-elementi selezionati, senza prefisso: si contornano come la cornice selezionata. */
+  selectedSubs?: readonly string[]
 }
 
 const LINE = "var(--muted-foreground)"
@@ -189,7 +194,10 @@ function Block({ step, l }: { step: BlockStep; l: SequenceLayout }) {
               fill="var(--muted-foreground)"
               xmlSpace="preserve"
             >
-              [<tspan data-sequence-text={section.id}>{section.condition}</tspan>]
+              {/* Il tspan resta anche vuoto, per la modifica sul posto; le parentesi solo con una condizione. */}
+              {section.condition !== "" && "["}
+              <tspan data-sequence-text={section.id}>{section.condition}</tspan>
+              {section.condition !== "" && "]"}
             </text>
           </g>
         )
@@ -215,7 +223,7 @@ function BlockLabel({ id, step, l }: { id: string; step: BlockStep; l: SequenceL
  * l'intestazione «sd» viene prima delle teste che copre, i riquadri dei blocchi prima delle linee di vita,
  * le etichette dei blocchi dopo, e le righe per ultime.
  */
-export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, view, selected }: Props) {
+export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, view, selected, selectedSubs = [] }: Props) {
   const l = sequenceLayout(sequence)
   const steps = flatten(sequence.steps)
   const numbers = sequence.autonumber ? messageNumbers(sequence) : new Map<string, number>()
@@ -254,9 +262,29 @@ export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, v
           <SequenceNote key={s.id} id={id} step={s} l={l} />
         ) : null,
       )}
+      {selectedSubs.map((sub) => {
+        const r = subRect(sequence, { x: 0, y: 0 }, sub)
+        return r && <rect key={sub} x={r.x} y={r.y} width={r.w} height={r.h} fill="none" stroke="var(--primary)" strokeWidth={2} pointerEvents="none" />
+      })}
     </g>
   )
 })
+
+/**
+ * La linea che mostra dove cade il passo `stepId` trascinato di `dy` (spec §4.2): lo slot di
+ * `stepDrop`, la stessa regola del rilascio. Larga quanto la sezione che lo contiene, o quanto la
+ * sequenza. Niente per un sotto-elemento che non è un passo.
+ */
+export function SequenceDropLine({ sequence, view, stepId, dy }: { sequence: Sequence; view: Point; stepId: string; dy: number }) {
+  const slot = stepDrop(sequence, stepId, dy)
+  if (!slot) return null
+  const l = sequenceLayout(sequence)
+  const y = l.slots.find((s) => s.container === slot.container && s.index === slot.index)?.y
+  const span = slot.container === ROOT ? { x: 0, w: l.width } : Object.values(l.blocks).find((b) => b.sections[slot.container])?.sections[slot.container]
+  if (y === undefined || !span) return null
+  const at = view.y + y - ROW_GAP / 2
+  return <line data-sequence-drop x1={view.x + span.x} x2={view.x + span.x + span.w} y1={at} y2={at} stroke="var(--primary)" strokeWidth={2} pointerEvents="none" />
+}
 
 /** Componente connesso: un selettore per sequenza, così un cambiamento altrove non la tocca. */
 export function SequenceNode({ nodeKey }: { nodeKey: string }) {
@@ -264,6 +292,18 @@ export function SequenceNode({ nodeKey }: { nodeKey: string }) {
   const sequence = useStore(documentStore, (s) => sequenceDiagram(s.doc).model.sequences[nodeKey])
   const view = useStore(documentStore, (s) => sequenceDiagram(s.doc).view.nodes[nodeKey])
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", id)))
+  const selectedSubs = useStore(
+    sessionStore,
+    useShallow((s) => selectedKeys(s.selection, "node").flatMap((k) => (k.startsWith(`${id}/`) ? [k.slice(id.length + 1)] : []))),
+  )
+  // Lo scarto verticale solo quando si trascina, da solo, un sotto-elemento di questa sequenza: le altre non ridisegnano.
+  const dragDy = useStore(sessionStore, (s) => (s.dragOffset && selectedSubs.length === 1 && s.selection.size === 1 ? s.dragOffset.y : null))
   if (!sequence || !view) return null
-  return <SequenceNodeView id={id} sequence={sequence} view={view} selected={selected} />
+  const [dragged] = selectedSubs
+  return (
+    <>
+      <SequenceNodeView id={id} sequence={sequence} view={view} selected={selected} selectedSubs={selectedSubs} />
+      {dragDy !== null && dragged !== undefined && <SequenceDropLine sequence={sequence} view={view} stepId={dragged} dy={dragDy} />}
+    </>
+  )
 }

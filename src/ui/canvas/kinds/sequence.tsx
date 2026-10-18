@@ -1,3 +1,4 @@
+import { ArrowRightLeft } from "lucide-react"
 import { useStore } from "zustand"
 import { useShallow } from "zustand/react/shallow"
 import { documentStore } from "@/editor/document-store"
@@ -25,12 +26,12 @@ function NodeView({ nodeKey, node, view, selected }: NodeViewProps) {
 /** Niente archi né pannello, per ora: i messaggi si disegnano dentro la sequenza. */
 const Nothing = () => null
 
-/** `DiagramView` per le sequenze: disegno di sola lettura, nessuno strumento né pannello ancora. */
+/** `DiagramView` per le sequenze: lo strumento Sequenza, nessun pannello ancora. */
 export const sequenceView: DiagramView = {
   NodesLayer,
   EdgesLayer: Nothing,
   NodeView,
   EdgeView: Nothing,
   Properties: Nothing,
-  tools: [],
+  tools: [{ label: "Sequenza", key: "s", Icon: ArrowRightLeft, tool: "node", family: "sequence" }],
 }

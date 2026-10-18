@@ -5,7 +5,7 @@ import {
 import type { Recipe } from "../document-store"
 import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
 import { sequenceDiagram } from "../sequence-access"
-import { ROOT, type SequenceLayout } from "./layout"
+import { ROOT, sequenceLayout, type SequenceLayout } from "./layout"
 import { descendants, locate, sectionsOf, stepAt, stepsIn, type Slot } from "./tree"
 
 const sequenceIn = (draft: DevDocument, seq: string): Sequence | undefined => sequenceDiagram(draft).model.sequences[seq]
@@ -356,4 +356,15 @@ export function dropTarget(seq: Sequence, layout: SequenceLayout, y: number, exc
     .filter((slot) => !inside.has(slot.container))
     .reduce((a, b) => (Math.abs(b.y - y) < Math.abs(a.y - y) ? b : a), end)
   return { container: best.container, index: best.index }
+}
+
+/**
+ * Dove cade il passo `stepId` trascinato di `dy`: lo slot più vicino al centro del suo rettangolo
+ * spostato (la riga, o l'etichetta di un blocco). La stessa regola per la linea d'inserimento e per
+ * il rilascio, così la linea mostra il risultato. `null` se il passo non c'è.
+ */
+export function stepDrop(seq: Sequence, stepId: string, dy: number): Slot | null {
+  const l = sequenceLayout(seq)
+  const r = l.rows[stepId] ?? l.blocks[stepId]?.label
+  return r ? dropTarget(seq, l, r.y + r.h / 2 + dy, stepId) : null
 }

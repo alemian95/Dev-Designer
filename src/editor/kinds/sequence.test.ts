@@ -26,7 +26,7 @@ function docDueSequenze(): DevDocument {
   return doc
 }
 
-// Il sottoinsieme di `verificaContrattoOps` che vale per una famiglia senza archi e, per ora, senza comandi.
+// Il sottoinsieme di `verificaContrattoOps` che vale per una famiglia senza archi; i comandi sul canvas sono in `canvas-ops.test.ts`.
 describe("DiagramOps: sequence", () => {
   const ops = () => familyOps(docDueSequenze(), "sequence")
 

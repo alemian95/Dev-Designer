@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla"
 import type { Family } from "@/model/family"
-import type { Size } from "./geometry"
+import type { Point, Size } from "./geometry"
 import type { EditTarget } from "./kinds/ops"
 import { IDENTITY, type Viewport } from "./viewport"
 
@@ -49,6 +49,9 @@ export interface SessionState {
    */
   dragging: boolean
   setDragging: (dragging: boolean) => void
+  /** Lo scarto dell'anteprima del drag in corso, in unità di mondo; `null` fuori dal drag. Lo legge la linea d'inserimento delle sequenze. */
+  dragOffset: Point | null
+  setDragOffset: (offset: Point | null) => void
   setViewport: (viewport: Viewport) => void
   setSelection: (ids: Iterable<string>) => void
   setTool: (tool: Tool, family?: Family | null, variant?: string | null) => void
@@ -68,6 +71,8 @@ export const sessionStore = createStore<SessionState>()((set) => ({
   setAnchorsFor: (anchorsFor) => set({ anchorsFor }),
   dragging: false,
   setDragging: (dragging) => set({ dragging }),
+  dragOffset: null,
+  setDragOffset: (dragOffset) => set({ dragOffset }),
   setViewport: (viewport) => set({ viewport }),
   setSelection: (ids) => set({ selection: new Set(ids) }),
   setTool: (tool, family = null, variant = null) => set({ tool, family, variant }),

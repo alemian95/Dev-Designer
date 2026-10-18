@@ -12,7 +12,7 @@ import {
 import { locate, stepAt } from "@/editor/sequence/tree"
 import { sessionStore } from "@/editor/session-store"
 import {
-  HeadSchema, INVALID_NAME, LineSchema, OperatorSchema, ParticipantKindSchema, PlacementSchema, splitSequenceKey, type BlockStep, type MessageStep,
+  HeadSchema, isValidParticipantName, LineSchema, OperatorSchema, ParticipantKindSchema, PlacementSchema, splitSequenceKey, type BlockStep, type MessageStep,
   type NoteStep, type Participant, type Sequence,
 } from "@/model/sequence/schema"
 import { BodyTextField } from "./BodyTextField"
@@ -93,11 +93,11 @@ function SequenceBody({ seqKey, seq }: { seqKey: string; seq: Sequence }) {
   )
 }
 
-/** Perché un nome è rifiutato: le stesse regole di `renameParticipant`, che dice solo «no». */
+/** Perché un nome è rifiutato: `renameParticipant` dice solo «no»; la regola dei nomi validi è una sola, nel modello. */
 function nameError(seq: Sequence, pid: string, name: string): string {
   const clean = name.trim()
   if (clean === "") return "Il nome non può essere vuoto."
-  if (INVALID_NAME.test(clean)) return "Il nome non può contenere < > : , ; + ( ) \\ /."
+  if (!isValidParticipantName(clean)) return "Mermaid non accetta questo nome per un partecipante."
   return seq.participants.some((p) => p.id !== pid && p.name === clean) ? "C'è già un partecipante con questo nome." : ""
 }
 

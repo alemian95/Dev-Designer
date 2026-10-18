@@ -94,12 +94,14 @@ describe("pannello del partecipante", () => {
     expect(field<HTMLInputElement>("participant-name").value).toBe("A")
   })
 
-  it("un nome vuoto o con caratteri non ammessi è rifiutato", () => {
+  it("un nome vuoto o che Mermaid non accetta è rifiutato", () => {
     select("node", "s/a")
     type(field("participant-name"), "  ")
     expect(container.textContent).toContain("Il nome non può essere vuoto.")
     type(field("participant-name"), "a:b")
-    expect(container.textContent).toContain("Il nome non può contenere")
+    expect(container.textContent).toContain("Mermaid non accetta questo nome per un partecipante.")
+    type(field("participant-name"), "Note Service")
+    expect(container.textContent).toContain("Mermaid non accetta questo nome per un partecipante.")
     expect(seq().participants[0]?.name).toBe("A")
   })
 })

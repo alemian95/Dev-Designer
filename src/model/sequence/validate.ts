@@ -1,5 +1,5 @@
 import type { Issue } from "../issue"
-import { INVALID_NAME, SINGLE_SECTION, type Sequence, type SequenceModel, type Step } from "./schema"
+import { isValidParticipantName, SINGLE_SECTION, type Sequence, type SequenceModel, type Step } from "./schema"
 
 /** Ogni passo della sequenza, in ordine, compresi quelli dentro i blocchi. */
 function allSteps(steps: readonly Step[]): Step[] {
@@ -36,12 +36,8 @@ function sequenceIssues(sequence: Sequence): Issue[] {
   for (const name of repeated(names)) {
     issues.push({ code: "sequence-duplicate-name", severity: "error", message: `Il nome «${name}» è usato da più partecipanti.` })
   }
-  for (const name of names.filter((n) => n === "" || INVALID_NAME.test(n))) {
-    issues.push({
-      code: "sequence-invalid-name",
-      severity: "warning",
-      message: `Il nome «${name}» non è valido in Mermaid: non può essere vuoto né contenere < > : , ; + ( ) \\ /.`,
-    })
+  for (const name of names.filter((n) => !isValidParticipantName(n))) {
+    issues.push({ code: "sequence-invalid-name", severity: "warning", message: `Il nome «${name}» non è valido in Mermaid.` })
   }
 
   const sections = steps.flatMap((s) => (s.kind === "block" ? s.sections.map((section) => section.id) : []))

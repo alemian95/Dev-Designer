@@ -23,7 +23,21 @@ export const ParticipantKindSchema = z.enum(["participant", "actor"])
 export type ParticipantKind = z.infer<typeof ParticipantKindSchema>
 
 /** I caratteri che Mermaid non accetta in un nome di partecipante (spec §3.3, §8.1). */
-export const INVALID_NAME = /[<>:,;+()\\/]/
+const INVALID_NAME = /[<>:,;+()\\/]/
+/**
+ * Mermaid 12.2.0 (sonda su `mermaid.parse`) rifiuta un nome che comincia con una di queste parole,
+ * senza distinguere maiuscole, quando la parola non è seguita da un carattere di parola: `end`, `end-user`
+ * e `Note Service` no, `Backend` e `end_x` sì.
+ */
+const KEYWORD_START = /^(?:end|loop|alt|else|opt|par_over|par|and|critical|option|break|rect|box|note|participant|actor|activate|deactivate|create|destroy|autonumber|title)(?!\w)/i
+/** Queste quattro sono nomi ammessi da sole, ma non seguite da un carattere che non è di parola (`link x`). */
+const SOFT_KEYWORD_START = /^(?:links?|properties|details)\W/i
+/** `-x`, `-)`, `->`, `--` dentro un nome, o un `-` in coda, si leggono come l'inizio di una freccia (`user-x`, `a-xylophone`: sonda). */
+const ARROW_LIKE = /-(?:[x)>-]|$)/i
+
+/** Un nome che Mermaid accetta per un partecipante, così com'è: il modello, il pannello e l'export usano questa sola regola. */
+export const isValidParticipantName = (name: string): boolean =>
+  name !== "" && !INVALID_NAME.test(name) && !KEYWORD_START.test(name) && !SOFT_KEYWORD_START.test(name) && !ARROW_LIKE.test(name)
 
 /**
  * La chiave senza prefisso di una sequenza (`<seq>`) o di un suo partecipante (`<seq>/<pid>`), come la

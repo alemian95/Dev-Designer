@@ -1,6 +1,6 @@
 import type { DevDocument } from "@/model/document"
 import {
-  INVALID_NAME, SINGLE_SECTION, type MessageStep, type NoteStep, type Operator, type ParticipantKind, type Sequence, type SequenceModel, type Step,
+  isValidParticipantName, SINGLE_SECTION, type MessageStep, type NoteStep, type Operator, type ParticipantKind, type Sequence, type SequenceModel, type Step,
 } from "@/model/sequence/schema"
 import type { Recipe } from "../document-store"
 import { DUPLICATE_OFFSET, snap, type Point } from "../geometry"
@@ -113,11 +113,11 @@ export function addParticipant(seq: string, after: string | null): { key: string
   }
 }
 
-/** `null` se il nome, ripulito dagli spazi in testa e in coda, è vuoto, già usato da un altro o con INVALID_NAME. */
+/** `null` se il nome, ripulito dagli spazi in testa e in coda, è vuoto, già usato da un altro o che Mermaid non accetta. */
 export function renameParticipant(model: SequenceModel, seq: string, pid: string, name: string): Recipe | null {
   const clean = name.trim()
   const taken = model.sequences[seq]?.participants.some((p) => p.id !== pid && p.name === clean) ?? false
-  if (clean === "" || INVALID_NAME.test(clean) || taken) return null
+  if (!isValidParticipantName(clean) || taken) return null
   return (draft) => {
     const p = sequenceIn(draft, seq)?.participants.find((x) => x.id === pid)
     if (p && p.name !== clean) p.name = clean

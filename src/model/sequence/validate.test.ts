@@ -40,10 +40,11 @@ describe("validazione delle sequenze", () => {
     ])
   })
 
-  it("un nome vuoto o con un carattere che Mermaid non accetta è sequence-invalid-name", () => {
-    expect(issues(seq([p("a", ""), p("b", "A;B")], []))).toEqual([
-      { code: "sequence-invalid-name", severity: "warning", node: "s1", message: "Il nome «» non è valido in Mermaid: non può essere vuoto né contenere < > : , ; + ( ) \\ /." },
-      { code: "sequence-invalid-name", severity: "warning", node: "s1", message: "Il nome «A;B» non è valido in Mermaid: non può essere vuoto né contenere < > : , ; + ( ) \\ /." },
+  it("un nome vuoto, con un carattere che Mermaid non accetta o che comincia con una parola chiave è sequence-invalid-name", () => {
+    expect(issues(seq([p("a", ""), p("b", "A;B"), p("c", "end-user"), p("d", "Backend")], []))).toEqual([
+      { code: "sequence-invalid-name", severity: "warning", node: "s1", message: "Il nome «» non è valido in Mermaid." },
+      { code: "sequence-invalid-name", severity: "warning", node: "s1", message: "Il nome «A;B» non è valido in Mermaid." },
+      { code: "sequence-invalid-name", severity: "warning", node: "s1", message: "Il nome «end-user» non è valido in Mermaid." },
     ])
   })
 

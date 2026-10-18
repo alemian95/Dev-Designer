@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createDocument } from "../document"
-import { NoteStepSchema, SequenceDiagramSchema, SequenceSchema, splitSequenceKey, StepSchema } from "./schema"
+import { NoteStepSchema, SequenceDiagramSchema, SequenceSchema, isValidParticipantName, splitSequenceKey, StepSchema } from "./schema"
 
 const anna = { id: "p1", name: "Anna", label: null, kind: "actor" }
 const api = { id: "p2", name: "API", label: "Server API", kind: "participant" }
@@ -56,5 +56,12 @@ describe("splitSequenceKey", () => {
     expect(splitSequenceKey("s1")).toEqual({ sequence: "s1", participant: null })
     expect(splitSequenceKey("s1/p1")).toEqual({ sequence: "s1", participant: "p1" })
     for (const key of ["s1/p1/xyz", "", "s1/", "/p1"]) expect(splitSequenceKey(key)).toBeNull()
+  })
+})
+
+describe("isValidParticipantName", () => {
+  it("rifiuta il vuoto, i caratteri riservati, la parola chiave in testa e le frecce; i confini fini li copre l'export", () => {
+    expect(["", "a;b", "end", "end-user", "Note Service", "user-x", "a-"].filter(isValidParticipantName)).toEqual([])
+    expect(["Backend", "end_x", "a-b", "Utente web"].every(isValidParticipantName)).toBe(true)
   })
 })

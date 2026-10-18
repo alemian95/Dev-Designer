@@ -125,11 +125,13 @@ describe("comandi dei partecipanti", () => {
     expect(s().participants.map((p) => p.name).at(-1)).toBe("P5")
   })
 
-  it("renameParticipant rifiuta il vuoto, un duplicato e i caratteri di INVALID_NAME; altrimenti scrive il nome ripulito", () => {
+  it("renameParticipant rifiuta il vuoto, un duplicato e i nomi che Mermaid non accetta; altrimenti scrive il nome ripulito", () => {
     expect(renameParticipant(model(), "s", "a", "  ")).toBeNull()
     expect(renameParticipant(model(), "s", "a", "B")).toBeNull()
     expect(renameParticipant(model(), "s", "a", "x:y")).toBeNull()
     expect(renameParticipant(model(), "s", "a", "a(b)")).toBeNull()
+    expect(renameParticipant(model(), "s", "a", "end")).toBeNull()
+    expect(renameParticipant(model(), "s", "a", "user-x")).toBeNull()
     expect(state().dispatch(renameParticipant(model(), "s", "a", "A")!)).toBe(false)
     state().dispatch(renameParticipant(model(), "s", "a", " Utente web ")!)
     expect(s().participants[0]!.name).toBe("Utente web")

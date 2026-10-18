@@ -294,7 +294,10 @@ export function SequenceNode({ nodeKey }: { nodeKey: string }) {
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", id)))
   const selectedSubs = useStore(
     sessionStore,
-    useShallow((s) => selectedKeys(s.selection, "node").flatMap((k) => (k.startsWith(`${id}/`) ? [k.slice(id.length + 1)] : []))),
+    // Anche come arco: Collega seleziona così il messaggio che crea.
+    useShallow((s) =>
+      [...selectedKeys(s.selection, "node"), ...selectedKeys(s.selection, "edge")].flatMap((k) => (k.startsWith(`${id}/`) ? [k.slice(id.length + 1)] : [])),
+    ),
   )
   // Lo scarto verticale solo quando si trascina, da solo, un sotto-elemento di questa sequenza: le altre non ridisegnano.
   const dragDy = useStore(sessionStore, (s) => (s.dragOffset && selectedSubs.length === 1 && s.selection.size === 1 ? s.dragOffset.y : null))

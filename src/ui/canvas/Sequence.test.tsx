@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
+import { act } from "react"
+import { createRoot } from "react-dom/client"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
+import { documentStore } from "@/editor/document-store"
+import { selId, sessionStore } from "@/editor/session-store"
+import { createDocument } from "@/model/document"
 import type { Sequence, Step } from "@/model/sequence/schema"
 import { sequenceLayout } from "@/editor/sequence/layout"
-import { SequenceDropLine, SequenceNodeView } from "./Sequence"
+import { SequenceDropLine, SequenceNode, SequenceNodeView } from "./Sequence"
 import { hitTest } from "./use-canvas-interaction"
 
 const view = { x: 0, y: 0, collapsed: false }
@@ -112,13 +117,13 @@ describe("SequenceDropLine", () => {
   const line = (stepId: string, dy: number) =>
     renderToStaticMarkup(<SequenceDropLine sequence={seq()} view={{ x: 100, y: 50 }} stepId={stepId} dy={dy} />)
 
-  it("disegna lo slot di dropTarget, largo quanto la sezione che lo contiene", () => {
+  it("disegna lo slot di stepDrop (scendendo conta il bordo basso), largo quanto la sezione che lo contiene", () => {
     const l = sequenceLayout(seq())
     const m1 = l.rows.m1!
     const slot = l.slots.find((x) => x.container === "s2" && x.index === 0)!
     const sec = l.blocks.k!.sections.s2!
     const y = 50 + slot.y - 3
-    expect(line("m1", slot.y - (m1.y + m1.h / 2))).toContain(`x1="${100 + sec.x}" x2="${100 + sec.x + sec.w}" y1="${y}" y2="${y}"`)
+    expect(line("m1", slot.y - (m1.y + m1.h))).toContain(`x1="${100 + sec.x}" x2="${100 + sec.x + sec.w}" y1="${y}" y2="${y}"`)
   })
 
   it("in cima alla sequenza è larga quanto la sequenza", () => {
@@ -128,5 +133,25 @@ describe("SequenceDropLine", () => {
 
   it("niente per un partecipante", () => {
     expect(line("api", 0)).toBe("")
+  })
+})
+
+describe("SequenceNode", () => {
+  it("contorna un sotto-elemento selezionato come arco, come il messaggio appena creato con Collega", () => {
+    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const doc = createDocument("t", "t")
+    doc.diagram.sequence.model.sequences["s"] = seq()
+    doc.diagram.sequence.view.nodes["s"] = view
+    documentStore.getState().load(doc)
+    sessionStore.getState().setSelection([selId("edge", "sequence/s/m1")])
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    document.body.append(svg)
+    const root = createRoot(svg)
+    act(() => root.render(<SequenceNode nodeKey="s" />))
+    const row = sequenceLayout(seq()).rows.m1!
+    expect(svg.innerHTML).toContain(`<rect x="${row.x}" y="${row.y}" width="${row.w}" height="${row.h}" fill="none" stroke="var(--primary)"`)
+    act(() => root.unmount())
+    svg.remove()
+    sessionStore.getState().setSelection([])
   })
 })

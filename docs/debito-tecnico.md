@@ -63,6 +63,10 @@ DT-31..DT-35 sono del 2026-10-18, dalla review finale di
 limiti noti dell'import dello state, lasciati aperti perché il caso che li
 tocca è raro e nessuno è stato ancora visto in un diagramma reale.
 
+DT-36 è del 2026-10-18, dalla review del Task 5 di `feat/famiglia-sequence`
+(sequenze sul canvas): un costo accettato per la linea d'inserimento, da
+misurare prima di toccarlo.
+
 ### DT-30 · `char`/`character` danno solo la categoria string: un uuid MySQL può produrre un falso `link-type-mismatch`
 
 La tabella dei tipi SQL di
@@ -123,6 +127,20 @@ L'oracolo dello state in
 `getData()` struttura e archi, non le etichette dei nodi. Costo-se-sbagliato:
 una divergenza di testo (entità, a capo) passa inosservata. Rimedio:
 estendere il confronto, con le etichette normalizzate come per gli archi.
+
+### DT-36 · `setDragOffset` scrive nel session store a ogni `pointermove` di ogni drag
+
+L'anteprima del drag in
+[interaction-runner.ts](../src/ui/canvas/interaction-runner.ts:209) scrive
+`dragOffset` nella sessione a ogni `pointermove`, anche quando si trascina
+un'entità e nessuna sequenza è coinvolta: zustand rivaluta tutti i selettori
+iscritti al session store, a ogni evento. Lo scarto serve solo alla linea
+d'inserimento delle sequenze, e solo [SequenceNode](../src/ui/canvas/Sequence.tsx)
+lo legge; i selettori restituiscono un valore stabile, quindi non si ridisegna
+niente altro, ma la rivalutazione si paga. Non misurato. Rimedio: scrivere lo
+scarto solo quando si trascina un sotto-elemento di sequenza, oppure passarlo
+alla linea dal `dom-registry` come fanno nodi e archi, senza passare dallo
+store. Si interviene se il drag rallenta su documenti grandi.
 
 ---
 

@@ -19,6 +19,9 @@ interface Target {
 
 const offset = (r: Rect, view: Point): Rect => ({ ...r, x: r.x + view.x, y: r.y + view.y })
 
+/** Titolo, nome ed etichetta stanno su una riga (sono una riga di Mermaid): un a capo diventa uno spazio. */
+const oneLine = (text: string): string => text.replace(/\r?\n/g, " ")
+
 /**
  * Il testo che il sotto-elemento `sub` mostra, dove sta e il comando che lo scrive: il titolo per la
  * sequenza (`sub` `null`), nome o etichetta per un partecipante, il testo di un messaggio o di una
@@ -26,13 +29,13 @@ const offset = (r: Rect, view: Point): Rect => ({ ...r, x: r.x + view.x, y: r.y 
  */
 function targetOf(model: SequenceModel, seqKey: string, seq: Sequence, view: Point, sub: string | null): Target | null {
   const l = sequenceLayout(seq)
-  if (sub === null) return { label: "Titolo della sequenza", rect: offset(l.header, view), value: seq.title, commit: (v) => setSequenceTitle(seqKey, v) }
+  if (sub === null) return { label: "Titolo della sequenza", rect: offset(l.header, view), value: seq.title, commit: (v) => setSequenceTitle(seqKey, oneLine(v)) }
   const p = seq.participants.find((x) => x.id === sub)
   const head = l.columns[sub]?.head
   if (p && head) {
     // Il testo mostrato è l'etichetta, se c'è: si modifica quello. Un'etichetta svuotata torna al nome.
-    if (p.label !== null) return { label: "Etichetta del partecipante", rect: offset(head, view), value: p.label, commit: (v) => setParticipantLabel(seqKey, sub, v === "" ? null : v) }
-    return { label: "Nome del partecipante", rect: offset(head, view), value: p.name, commit: (v) => renameParticipant(model, seqKey, sub, v) }
+    if (p.label !== null) return { label: "Etichetta del partecipante", rect: offset(head, view), value: p.label, commit: (v) => setParticipantLabel(seqKey, sub, v === "" ? null : oneLine(v)) }
+    return { label: "Nome del partecipante", rect: offset(head, view), value: p.name, commit: (v) => renameParticipant(model, seqKey, sub, oneLine(v)) }
   }
   const step = stepAt(seq, sub)
   const row = l.rows[sub]

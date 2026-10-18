@@ -4,6 +4,7 @@ import type { LayoutGraph } from "@/model/layout"
 import type { Sequence, Step } from "@/model/sequence/schema"
 import { anchorsOf } from "@/model/shared"
 import { addEntity, addRelationship, removeAttribute, renameEntity } from "../commands/er"
+import { deleteSelection } from "../actions"
 import { documentStore } from "../document-store"
 import { erDiagram } from "../er-access"
 import { linkId, qualify, splitKey } from "../families"
@@ -11,7 +12,8 @@ import { flowDiagram } from "../flow-access"
 import { withPool } from "../flow/pool-fixture"
 import { layoutAll } from "../layout-pack"
 import { noteDiagram } from "../note-access"
-import { sequenceLayout } from "../sequence/layout"
+import { ROW_GAP, sequenceLayout } from "../sequence/layout"
+import { selId, sessionStore } from "../session-store"
 import { shapeDiagram } from "../shape-access"
 import { autoPorts } from "../ports"
 import { canvasOps, canvasPorts, familyHasContent } from "./canvas-ops"
@@ -378,6 +380,23 @@ describe("canvasOps e le note (spec 3a §5)", () => {
     expect(canvasOps(state().doc).nodeKeys()).toContain(entity)
   })
 
+  it("eliminare un'entità non stacca la nota di un'altra entità il cui nome comincia col suo e «/»", () => {
+    state().load(createDocument("t", "t"))
+    state().dispatch((draft) => {
+      erDiagram(draft).model.entities["X"] = { name: "X", attributes: [] }
+      erDiagram(draft).model.entities["X/Y"] = { name: "X/Y", attributes: [] }
+      erDiagram(draft).view.nodes["X"] = { x: 0, y: 0, collapsed: false }
+      erDiagram(draft).view.nodes["X/Y"] = { x: 400, y: 0, collapsed: false }
+    })
+    const onX = add({ x: 0, y: 300 }, "note")
+    const onXY = add({ x: 400, y: 300 }, "note")
+    connect(onX, "er/X")
+    connect(onXY, "er/X/Y")
+    state().dispatch(canvasOps(state().doc).deleteItems(["er/X"], [])!)
+    expect(anchorOf(onX)).toBeNull()
+    expect(anchorOf(onXY)).toBe("er/X/Y")
+  })
+
   it("eliminare un pool ancorato stacca la nota", () => {
     // Review Focus 2.
     state().load(withPool(createDocument("t", "t")))
@@ -698,6 +717,13 @@ describe("canvasOps e le sequenze", () => {
     expect(seqNow()).toEqual(fixture())
   })
 
+  it("Canc su un messaggio selezionato come arco, come dopo Collega, lo elimina", () => {
+    load()
+    sessionStore.getState().setSelection([selId("edge", "sequence/s/m1")])
+    deleteSelection()
+    expect(seqNow().steps.map((s) => s.id)).toEqual(["k", "m3"])
+  })
+
   it("eliminare passi e partecipanti insieme è un solo annulla", () => {
     load()
     const past = state().past.length
@@ -711,24 +737,41 @@ describe("canvasOps e le sequenze", () => {
     // Review Focus 2.
     load()
     const l = sequenceLayout(seqNow())
-    const row = l.rows.m3!
+    // In su conta il bordo alto del passo spostato.
     const slot = l.slots.find((x) => x.container === "s1" && x.index === 1)!
-    const dy = slot.y - (row.y + row.h / 2)
+    const dy = slot.y - l.rows.m3!.y
     state().dispatch(canvasOps(state().doc).commitDrag(["sequence/s/m3"], 0, dy)!)
     const block = seqNow().steps[1]
     expect(block?.kind === "block" && block.sections[0]!.steps.map((s) => s.id)).toEqual(["m2", "m3"])
     expect(seqNow().steps.map((s) => s.id)).toEqual(["m1", "k"])
   })
 
-  it("commitDrag di un blocco non lo mette mai dentro sé stesso", () => {
-    // Review Focus 2.
+  it("commitDrag di un blocco lo sposta intero, mai dentro sé stesso", () => {
+    // Review Focus 2: in giù conta il bordo basso del blocco, quindi gli slot interni non si raggiungono.
     load()
     const l = sequenceLayout(seqNow())
-    const label = l.blocks.k!.label
-    const dy = l.rows.m2!.y + l.rows.m2!.h - (label.y + label.h / 2)
-    const recipe = canvasOps(state().doc).commitDrag(["sequence/s/k"], 0, dy)
-    if (recipe) state().dispatch(recipe)
-    expect(seqNow().steps.map((s) => s.id)).toContain("k")
+    state().dispatch(canvasOps(state().doc).commitDrag(["sequence/s/k"], 0, l.rows.m3!.h + ROW_GAP)!)
+    expect(seqNow().steps.map((s) => s.id)).toEqual(["m1", "m3", "k"])
+    const block = seqNow().steps[2]
+    expect(block?.kind === "block" && block.sections[0]!.steps.map((s) => s.id)).toEqual(["m2"])
+  })
+
+  it("commitDrag di una riga esatta scambia il passo col vicino, in su come in giù", () => {
+    const tre = (): Sequence => ({ ...fixture(), steps: [msg("m1", "a", "b"), msg("m2", "b", "c"), msg("m3", "c", "a")] })
+    const drag = (dy: number) => {
+      const doc = createDocument("t", "t")
+      doc.diagram.sequence.model.sequences["s"] = tre()
+      doc.diagram.sequence.view.nodes["s"] = { x: 0, y: 0, collapsed: false }
+      state().load(doc)
+      state().dispatch(canvasOps(state().doc).commitDrag(["sequence/s/m2"], 0, dy)!)
+      return seqNow().steps.map((s) => s.id)
+    }
+    const riga = sequenceLayout(tre()).rows.m2!.h + ROW_GAP
+    expect(drag(riga)).toEqual(["m1", "m3", "m2"])
+    expect(drag(-riga)).toEqual(["m2", "m1", "m3"])
+    // Meno di mezza riga, nei due versi, non sposta niente.
+    expect(drag(riga / 2 - ROW_GAP)).toEqual(["m1", "m2", "m3"])
+    expect(drag(ROW_GAP - riga / 2)).toEqual(["m1", "m2", "m3"])
   })
 
   it("commitDrag di un'intestazione riordina verso la colonna più vicina", () => {

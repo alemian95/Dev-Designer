@@ -5,7 +5,6 @@ import type { EdgeEnds } from "../edge-routing"
 import { qualify, splitKey } from "../families"
 import type { ConnectResult } from "../links/commands"
 import { noteDiagram } from "../note-access"
-import { detachNotes } from "./commands"
 
 /**
  * Le funzioni della linea di ancoraggio che hanno bisogno di vedere più famiglie: l'altro capo di
@@ -54,15 +53,14 @@ export function anchorsTouching(doc: DevDocument, keys: ReadonlySet<string>): Ed
 }
 
 /**
- * Stacca le note ancorate a uno degli elementi `keys`, o a un loro sotto-elemento (`<chiave>/…`,
- * come il partecipante di una sequenza), per l'eliminazione (spec 3a §5). `null` se non ce n'è nessuna.
+ * Stacca le note la cui àncora non esiste più (`anchorExists`). Va dopo le recipe di
+ * un'eliminazione, sullo stesso draft (spec 3a §5): così vale per ogni elemento e sotto-elemento
+ * tolto (il partecipante di una sequenza, o la sequenza con i suoi partecipanti) senza una regola per famiglia.
  */
-export function detachAnchoredTo(doc: DevDocument, keys: ReadonlySet<string>): Recipe | null {
-  const inside = (anchor: string): boolean => keys.has(anchor) || [...keys].some((key) => anchor.startsWith(`${key}/`))
-  const hit = Object.entries(noteDiagram(doc).model.notes)
-    .filter(([, note]) => note.anchor !== null && inside(note.anchor))
-    .map(([key]) => key)
-  return hit.length === 0 ? null : detachNotes(hit)
+export const detachDangling: Recipe = (draft) => {
+  for (const note of Object.values(noteDiagram(draft).model.notes)) {
+    if (note.anchor !== null && !anchorExists(draft, note.anchor)) note.anchor = null
+  }
 }
 
 /** Le àncore che nominano `oldKey` passano a `newKey`: la rinomina di un'entità o di una classe ne cambia la chiave. */

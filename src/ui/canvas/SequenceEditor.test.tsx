@@ -75,4 +75,11 @@ describe("SequenceEditor", () => {
     edit("sequence/s/a", "B")
     expect(seq().participants[0]!.name).toBe("Cliente")
   })
+
+  it("nel titolo e nel nome un a capo diventa uno spazio", () => {
+    edit("sequence/s", "Ordine\ndi prova")
+    edit("sequence/s/a", "Cli\r\nente")
+    expect(seq().title).toBe("Ordine di prova")
+    expect(seq().participants[0]!.name).toBe("Cli ente")
+  })
 })

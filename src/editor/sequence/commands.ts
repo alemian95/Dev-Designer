@@ -359,12 +359,14 @@ export function dropTarget(seq: Sequence, layout: SequenceLayout, y: number, exc
 }
 
 /**
- * Dove cade il passo `stepId` trascinato di `dy`: lo slot più vicino al centro del suo rettangolo
- * spostato (la riga, o l'etichetta di un blocco). La stessa regola per la linea d'inserimento e per
- * il rilascio, così la linea mostra il risultato. `null` se il passo non c'è.
+ * Dove cade il passo `stepId` trascinato di `dy`: lo slot più vicino al bordo del passo spostato nel
+ * verso del movimento, l'alto salendo e il basso scendendo (la riga, o il riquadro intero di un
+ * blocco). Così una riga di scarto scambia il passo col vicino nei due versi, e gli slot dentro un
+ * blocco trascinato restano irraggiungibili. La stessa regola per la linea d'inserimento e per il
+ * rilascio. `null` se il passo non c'è.
  */
 export function stepDrop(seq: Sequence, stepId: string, dy: number): Slot | null {
   const l = sequenceLayout(seq)
-  const r = l.rows[stepId] ?? l.blocks[stepId]?.label
-  return r ? dropTarget(seq, l, r.y + r.h / 2 + dy, stepId) : null
+  const r = l.rows[stepId] ?? l.blocks[stepId]?.rect
+  return r ? dropTarget(seq, l, (dy > 0 ? r.y + r.h : r.y) + dy, stepId) : null
 }

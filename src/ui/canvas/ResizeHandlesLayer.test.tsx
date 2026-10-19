@@ -9,6 +9,7 @@ import { qualify } from "@/editor/families"
 import { withPool } from "@/editor/flow/pool-fixture"
 import { selId, sessionStore } from "@/editor/session-store"
 import { createDocument } from "@/model/document"
+import { noteSheet, sequenceLayout } from "@/editor/sequence/layout"
 import { ResizeHandlesLayer } from "./ResizeHandlesLayer"
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -29,7 +30,15 @@ beforeEach(() => {
   doc.diagram.er.view.nodes["clienti"] = { x: 100, y: 200, collapsed: false }
   doc.diagram.er.model.entities["ordini"] = { name: "ordini", attributes: [] }
   doc.diagram.er.view.nodes["ordini"] = { x: 400, y: 200, collapsed: false }
-  doc.diagram.sequence.model.sequences["s"] = { title: "", autonumber: false, participants: [], steps: [] }
+  doc.diagram.sequence.model.sequences["s"] = {
+    title: "",
+    autonumber: false,
+    participants: [{ id: "a", name: "A", label: null, kind: "participant" }],
+    steps: [
+      { kind: "note", id: "n", placement: "right", participants: ["a"], text: "nota" },
+      { kind: "block", id: "k", operator: "opt", sections: [{ id: "x", condition: "", steps: [] }] },
+    ],
+  }
   doc.diagram.sequence.view.nodes["s"] = { x: 0, y: 0, collapsed: false }
   documentStore.getState().load(doc)
   sessionStore.getState().setViewport({ x: 0, y: 0, scale: 1 })
@@ -55,12 +64,23 @@ describe("ResizeHandlesLayer", () => {
     expect(container.querySelector("[data-resize]")!.getAttribute("width")).toBe("4")
   })
 
-  it("niente maniglie con due nodi selezionati, per una sequenza o per un pool", () => {
+  it("niente maniglie con due nodi selezionati, per un pool o per un blocco di sequenza", () => {
     select(qualify("er", "clienti"), qualify("er", "ordini"))
-    expect(html()).toBe("<svg></svg>")
-    select(qualify("sequence", "s"))
     expect(html()).toBe("<svg></svg>")
     select(qualify("flow", "p1"))
     expect(html()).toBe("<svg></svg>")
+    select(qualify("sequence", "s/k"))
+    expect(html()).toBe("<svg></svg>")
+  })
+
+  it("una sequenza e il foglio di una sua nota hanno le loro maniglie", () => {
+    select(qualify("sequence", "s"))
+    expect(container.querySelectorAll('[data-resize="sequence/s"]')).toHaveLength(4)
+    select(qualify("sequence", "s/n"))
+    const se = container.querySelector('[data-resize="sequence/s/n"][data-resize-handle="se"]')!
+    const sheet = noteSheet(sequenceLayout(documentStore.getState().doc.diagram.sequence.model.sequences["s"]!), {
+      kind: "note", id: "n", placement: "right", participants: ["a"], text: "nota",
+    })!
+    expect(Number(se.getAttribute("x")) + 4).toBe(sheet.x + sheet.w)
   })
 })

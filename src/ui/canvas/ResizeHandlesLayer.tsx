@@ -1,9 +1,13 @@
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
-import { CORNERS, type Corner } from "@/editor/geometry"
+import { splitKey } from "@/editor/families"
+import { CORNERS, type Corner, type Rect } from "@/editor/geometry"
 import { canvasOps } from "@/editor/kinds/canvas-ops"
+import { subBox } from "@/editor/sequence/geometry"
+import { sequenceDiagram } from "@/editor/sequence-access"
 import { parseSelId, sessionStore } from "@/editor/session-store"
-import { inFamily } from "@/model/family"
+import type { DevDocument } from "@/model/document"
+import { splitSequenceKey } from "@/model/sequence/schema"
 
 /** Lato della maniglia, in pixel dello schermo come gli agganci: si divide per la scala. */
 const SIDE = 8
@@ -15,23 +19,37 @@ function singleNode(selection: ReadonlySet<string>): string | null {
   return kind === "node" ? key : null
 }
 
+/**
+ * Il riquadro su cui stanno le maniglie: quello del nodo, o per un sotto-elemento di sequenza quello
+ * che il ridimensionamento cambia (`subBox`). `null` per un pool, che ha le sue sui bordi
+ * (`PoolsLayer`), e per un blocco di sequenza, che segue il suo contenuto.
+ */
+function handlesRect(doc: DevDocument, key: string): Rect | null {
+  const ops = canvasOps(doc)
+  if (ops.isFrame(key)) return null
+  const { family, key: own } = splitKey(key)
+  const parts = family === "sequence" ? splitSequenceKey(own) : null
+  if (!parts?.participant) return ops.rectOf(key)
+  const d = sequenceDiagram(doc)
+  const seq = d.model.sequences[parts.sequence]
+  const view = d.view.nodes[parts.sequence]
+  return seq && view ? subBox(seq, view, parts.participant) : null
+}
+
 const CURSOR: Readonly<Record<Corner, string>> = { nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize" }
 
 /**
- * Le quattro maniglie di ridimensionamento del nodo selezionato da solo, una per spigolo. Sopra i
- * nodi, come gli agganci: `hitTest` le riconosce da `data-resize`, e `data-resize-handle` dice lo
- * spigolo. Niente maniglie per una sequenza, che si dispone da sola, né per un pool, che ha le sue
- * sui bordi (`PoolsLayer`).
+ * Le quattro maniglie di ridimensionamento del nodo selezionato da solo, una per spigolo: anche una
+ * sequenza, un suo partecipante, messaggio o nota. Sopra i nodi, come gli agganci: `hitTest` le
+ * riconosce da `data-resize`, e `data-resize-handle` dice lo spigolo.
  */
 export function ResizeHandlesLayer() {
   const key = useStore(sessionStore, (s) => singleNode(s.selection))
   const scale = useStore(sessionStore, (s) => s.viewport.scale)
   const dragging = useStore(sessionStore, (s) => s.dragging)
   const doc = useStore(documentStore, (s) => s.doc)
-  if (dragging || key === null || inFamily(key, "sequence")) return null
-  const ops = canvasOps(doc)
-  const rect = ops.isFrame(key) ? null : ops.rectOf(key)
-  if (!rect) return null
+  const rect = dragging || key === null ? null : handlesRect(doc, key)
+  if (key === null || !rect) return null
   const side = SIDE / scale
   return (
     <g data-layer="resize-handles">

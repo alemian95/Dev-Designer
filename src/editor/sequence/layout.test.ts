@@ -71,7 +71,7 @@ describe("sequenceLayout", () => {
 
   describe("metriche", () => {
     it("dà alla colonna la larghezza minima e l'asse a metà", () => {
-      const l = sequenceLayout(seq(["a", "b"], []), () => 0)
+      const l = sequenceLayout(seq(["a", "b"], []), {}, () => 0)
       expect(l.columns.a!.w).toBe(96)
       expect(l.columns.a!.x).toBe(PAD + 48)
       expect(l.columns.b!.x).toBe(PAD + 96 + 36 + 48)
@@ -79,26 +79,26 @@ describe("sequenceLayout", () => {
 
     it("allarga la colonna con un'etichetta lunga, che conta più del nome", () => {
       const p = { ...part("a"), label: "x".repeat(20) }
-      const l = sequenceLayout({ ...seq([], []), participants: [p] }, (t) => t.length * 10)
+      const l = sequenceLayout({ ...seq([], []), participants: [p] }, {}, (t) => t.length * 10)
       expect(l.columns.a!.w).toBe(20 * 10 + 28)
       expect(l.columns.a!.w).toBeGreaterThan(COLUMN_MIN_W)
     })
 
     it("dà ai tre tipi di riga 40, 58 e 44, a passo 6", () => {
-      const l = sequenceLayout(seq(["a", "b"], [msg("m", "a", "b"), msg("s", "a", "a"), note("n", "a")]), () => 0)
+      const l = sequenceLayout(seq(["a", "b"], [msg("m", "a", "b"), msg("s", "a", "a"), note("n", "a")]), {}, () => 0)
       expect([l.rows.m!.h, l.rows.s!.h, l.rows.n!.h]).toEqual([40, SELF_MESSAGE_H, NOTE_H])
       expect([l.rows.m!.y, l.rows.s!.y, l.rows.n!.y]).toEqual([TOP, TOP + 46, TOP + 46 + 64])
     })
 
     it("allinea gli slot di primo livello alle righe", () => {
       const steps = [msg("m", "a", "b"), msg("s", "a", "a"), note("n", "a")]
-      const l = sequenceLayout(seq(["a", "b"], steps), () => 0)
+      const l = sequenceLayout(seq(["a", "b"], steps), {}, () => 0)
       const root = l.slots.filter((s) => s.container === "root")
       steps.forEach((step, i) => expect(root[i]!.y).toBe(l.rows[step.id]!.y))
     })
 
     it("dà intestazione 30, separatore 24 e sezione vuota 18 a un blocco", () => {
-      const l = sequenceLayout(seq(["a"], [block("k", { id: "s1", steps: [] }, { id: "s2", steps: [] })]), () => 0)
+      const l = sequenceLayout(seq(["a"], [block("k", { id: "s1", steps: [] }, { id: "s2", steps: [] })]), {}, () => 0)
       const b = l.blocks.k!
       expect(b.sections.s1).toMatchObject({ y: TOP, h: 30 + 18 })
       expect(b.sections.s2!.y).toBe(TOP + 30 + 18)
@@ -195,5 +195,44 @@ describe("testi lunghi", () => {
   it("con testi corti le colonne restano dove erano", () => {
     const l = sequenceLayout(seq(["a", "b"], [msg("m1", "a", "b"), note("n", "a")]))
     expect(l.columns.a!.x).toBe(PAD + COLUMN_MIN_W / 2)
+  })
+})
+
+describe("misure scelte a mano", () => {
+  it("la colonna di un partecipante è larga almeno quanto scelto, e sposta quelle a destra", () => {
+    const base = sequenceLayout(seq(["a", "b"], []))
+    const s = seq(["a", "b"], [])
+    s.participants[0]!.w = 300
+    const l = sequenceLayout(s)
+    expect(l.columns.a!.w).toBe(300)
+    expect(l.columns.b!.x - base.columns.b!.x).toBe(300 - COLUMN_MIN_W)
+  })
+
+  it("una larghezza scelta sotto l'etichetta non la stringe", () => {
+    const s = seq(["a"], [])
+    s.participants[0]!.w = 10
+    expect(sequenceLayout(s).columns.a!.w).toBe(COLUMN_MIN_W)
+  })
+
+  it("la riga di un messaggio è alta almeno quanto scelto, e le righe sotto scendono", () => {
+    const base = sequenceLayout(seq(["a", "b"], [msg("m1", "a", "b"), msg("m2", "a", "b")]))
+    const l = sequenceLayout(seq(["a", "b"], [{ ...msg("m1", "a", "b"), h: 100 } as Step, msg("m2", "a", "b")]))
+    expect(l.rows.m1!.h).toBe(100)
+    expect(l.rows.m2!.y - base.rows.m2!.y).toBe(100 - base.rows.m1!.h)
+  })
+
+  it("il foglio di una nota è grande almeno quanto scelto, e allarga lo spazio attorno", () => {
+    const n = { ...note("n", "a"), w: 400, h: 120 } as Step
+    const l = sequenceLayout(seq(["a", "b"], [n]))
+    expect(l.rows.n!.w).toBe(400)
+    expect(l.rows.n!.h).toBe(120)
+    expect(l.rows.n!.x).toBeGreaterThanOrEqual(PAD)
+    expect(l.rows.n!.x + l.rows.n!.w).toBeLessThan(l.columns.b!.x)
+  })
+
+  it("la cornice è grande almeno quanto scelto", () => {
+    const base = sequenceLayout(seq(["a"], [msg("m", "a", "a")]))
+    expect(sequenceLayout(seq(["a"], [msg("m", "a", "a")]), { w: 600, h: 500 })).toMatchObject({ width: 600, height: 500 })
+    expect(sequenceLayout(seq(["a"], [msg("m", "a", "a")]), { w: 1, h: 1 })).toMatchObject({ width: base.width, height: base.height })
   })
 })

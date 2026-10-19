@@ -1,12 +1,13 @@
 import type { Sequence } from "@/model/sequence/schema"
+import type { ChosenSize } from "@/model/shared"
 import type { Point, Rect } from "../geometry"
 import { sequenceLayout } from "./layout"
 
 const at = (r: Rect, origin: Point): Rect => ({ ...r, x: r.x + origin.x, y: r.y + origin.y })
 
-/** Il rettangolo della sequenza sul canvas: la posizione è della view, la misura del contenuto. */
-export function sequenceRect(seq: Sequence, view: Point): Rect {
-  const { width, height } = sequenceLayout(seq)
+/** Il rettangolo della sequenza sul canvas: la posizione è della view, la misura del contenuto o quella scelta. */
+export function sequenceRect(seq: Sequence, view: Point & ChosenSize): Rect {
+  const { width, height } = sequenceLayout(seq, view)
   return { x: view.x, y: view.y, w: width, h: height }
 }
 

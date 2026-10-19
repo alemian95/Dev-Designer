@@ -11,14 +11,14 @@ import { subRect } from "@/editor/sequence/geometry"
 import { NOTE_INSET, ROOT, ROW_GAP, SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
 import { sequenceDiagram } from "@/editor/sequence-access"
 import { allSteps, type BlockStep, type Head, type MessageStep, type NoteStep, type Participant, type Sequence } from "@/model/sequence/schema"
-import type { NodeView } from "@/model/shared"
+import type { ChosenSize, SizedNodeView } from "@/model/shared"
 import { registerNode } from "./dom-registry"
 
 interface Props {
   /** La chiave con prefisso, `sequence/<seq>`: i sotto-elementi la estendono con `/<id>`. */
   id: string
   sequence: Sequence
-  view: NodeView
+  view: SizedNodeView
   selected: boolean
   /** Gli id dei sotto-elementi selezionati, senza prefisso: si contornano come la cornice selezionata. */
   selectedSubs?: readonly string[]
@@ -218,7 +218,7 @@ function BlockLabel({ id, step, l }: { id: string; step: BlockStep; l: SequenceL
  * le etichette dei blocchi dopo, e le righe per ultime.
  */
 export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, view, selected, selectedSubs = [] }: Props) {
-  const l = sequenceLayout(sequence)
+  const l = sequenceLayout(sequence, view)
   const steps = allSteps(sequence.steps)
   const numbers = sequence.autonumber ? messageNumbers(sequence) : new Map<string, number>()
   return (
@@ -269,10 +269,10 @@ export const SequenceNodeView = memo(function SequenceNodeView({ id, sequence, v
  * `stepDrop`, la stessa regola del rilascio. Larga quanto la sezione che lo contiene, o quanto la
  * sequenza. Niente per un sotto-elemento che non è un passo.
  */
-export function SequenceDropLine({ sequence, view, stepId, dy }: { sequence: Sequence; view: Point; stepId: string; dy: number }) {
+export function SequenceDropLine({ sequence, view, stepId, dy }: { sequence: Sequence; view: Point & ChosenSize; stepId: string; dy: number }) {
   const slot = stepDrop(sequence, stepId, dy)
   if (!slot) return null
-  const l = sequenceLayout(sequence)
+  const l = sequenceLayout(sequence, view)
   const y = l.slots.find((s) => s.container === slot.container && s.index === slot.index)?.y
   const span = slot.container === ROOT ? { x: 0, w: l.width } : Object.values(l.blocks).find((b) => b.sections[slot.container])?.sections[slot.container]
   if (y === undefined || !span) return null

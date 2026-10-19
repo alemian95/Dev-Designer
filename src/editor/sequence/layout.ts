@@ -1,4 +1,5 @@
 import { allSteps, type NoteStep, type Sequence, type Step } from "@/model/sequence/schema"
+import type { ChosenSize } from "@/model/shared"
 import { CHAR_W, type Rect } from "../geometry"
 
 // Le metriche del prototipo (spec §4.1): tutto il resto del disegno si ricava da queste.
@@ -121,16 +122,19 @@ function textDemands(seq: Sequence, widths: number[], measure: (text: string) =>
   return { spacings, selfText, lead, tail }
 }
 
-const noteWidth = (note: NoteStep, measure: (text: string) => number): number => measure(note.text) + NOTE_TEXT_PAD
+/** La larghezza del foglio di una nota: quella del testo, allargata a quella scelta a mano. */
+const noteWidth = (note: NoteStep, measure: (text: string) => number): number => Math.max(measure(note.text) + NOTE_TEXT_PAD, note.w ?? 0)
 
+/** L'altezza di una riga: quella del suo tipo, allargata a quella scelta a mano. */
 function rowHeight(step: Exclude<Step, { kind: "block" }>): number {
-  if (step.kind === "note") return NOTE_H
-  return step.from === step.to ? SELF_MESSAGE_H : MESSAGE_H
+  const auto = step.kind === "note" ? NOTE_H : step.from === step.to ? SELF_MESSAGE_H : MESSAGE_H
+  return Math.max(auto, step.h ?? 0)
 }
 
-export function sequenceLayout(seq: Sequence, measure: (text: string) => number = estimate): SequenceLayout {
+/** `frame` porta la misura della cornice scelta a mano: un minimo sopra quella del contenuto. */
+export function sequenceLayout(seq: Sequence, frame: ChosenSize = {}, measure: (text: string) => number = estimate): SequenceLayout {
   const columns: SequenceLayout["columns"] = {}
-  const widths = seq.participants.map((p) => Math.max(COLUMN_MIN_W, measure(p.label ?? p.name) + COLUMN_TEXT_PAD))
+  const widths = seq.participants.map((p) => Math.max(COLUMN_MIN_W, measure(p.label ?? p.name) + COLUMN_TEXT_PAD, p.w ?? 0))
   const { spacings, selfText, lead, tail } = textDemands(seq, widths, measure)
   // Quanto occupa una colonna a destra del suo asse: metà larghezza, o il testo di un messaggio a sé
   // stesso, che parte dalla linea di vita verso destra.
@@ -150,7 +154,7 @@ export function sequenceLayout(seq: Sequence, measure: (text: string) => number 
     columns[p.id] = { x, w, head: { x: x - w / 2, y: 6, w, h: HEAD_H - 4 } }
   })
   const last = xs.length - 1
-  const width = last < 0 ? MIN_WIDTH : xs[last]! + Math.max(reach(last), tail) + PAD
+  const width = Math.max(last < 0 ? MIN_WIDTH : xs[last]! + Math.max(reach(last), tail) + PAD, frame.w ?? 0)
   // `margin` allarga (o, se negativo, stringe) l'estensione, anche quando nessun partecipante si risolve.
   const spanOf = (step: Step, margin: number): { x0: number; x1: number } => {
     const cols = stepParticipants(step).flatMap((id) => columns[id] ?? [])
@@ -221,5 +225,5 @@ export function sequenceLayout(seq: Sequence, measure: (text: string) => number 
 
   const end = walk(seq.steps, ROOT, 0, TOP)
   const header: Rect = { x: 0, y: 0, w: measure(`sd ${seq.title}`) + HEADER_PAD, h: HEADER_H }
-  return { width, height: end + BOTTOM, header, columns, rows, blocks, slots }
+  return { width, height: Math.max(end + BOTTOM, frame.h ?? 0), header, columns, rows, blocks, slots }
 }

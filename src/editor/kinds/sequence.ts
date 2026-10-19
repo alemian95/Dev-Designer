@@ -60,7 +60,7 @@ export function sequenceOps(doc: DevDocument): DiagramOps {
       const view = parts && diagram().view.nodes[parts.sequence]
       if (!parts || !seq || !view) return null
       const origin = at ?? view
-      return parts.participant === null ? sequenceRect(seq, origin) : subRect(seq, origin, parts.participant)
+      return parts.participant === null ? sequenceRect(seq, { ...view, ...origin }) : subRect(seq, origin, parts.participant)
     },
 
     edgesTouching: () => [],
@@ -112,7 +112,7 @@ export function sequenceOps(doc: DevDocument): DiagramOps {
       nodes: nodeKeys().flatMap((id) => {
         const seq = diagram().model.sequences[id]
         if (!seq) return []
-        const { width, height } = sequenceLayout(seq)
+        const { width, height } = sequenceLayout(seq, diagram().view.nodes[id])
         return [{ id, w: width, h: height }]
       }),
       edges: [],

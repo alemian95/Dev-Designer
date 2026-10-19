@@ -13,7 +13,8 @@ export const ChosenSideSchema = z.number().positive().nullable()
 
 /**
  * La view di un nodo che si ridimensiona dagli spigoli: la misura scelta a mano è un minimo, sopra
- * quella che il contenuto chiede. Assente (i file fino alla versione 9) vale `null`.
+ * quella che il contenuto chiede. Assente (i file fino alla versione 9) vale `null`. La usano tutte
+ * le famiglie tranne le forme, che hanno `w`/`h` obbligatori dalla loro nascita.
  */
 export const SizedNodeViewSchema = NodeViewSchema.extend({ w: ChosenSideSchema.optional(), h: ChosenSideSchema.optional() })
 export type SizedNodeView = z.infer<typeof SizedNodeViewSchema>

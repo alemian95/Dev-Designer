@@ -239,9 +239,10 @@ const addSequences: Migration = (raw) => {
 }
 
 /**
- * 9 → 10: nessun cambiamento di forma. Entità, classi, nodi di flusso e note guadagnano `w`/`h`
- * facoltativi, la misura scelta a mano dagli spigoli: assenti seguono il contenuto, e un file v9 è
- * già un v10 valido. La versione sale per la stessa ragione della 4 → 5.
+ * 9 → 10: nessun cambiamento di forma. Entità, classi, nodi di flusso, note e sequenze guadagnano
+ * `w`/`h` facoltativi, la misura scelta a mano dagli spigoli; dentro una sequenza, la larghezza di un
+ * partecipante, il foglio di una nota e l'altezza della riga di un messaggio. Assenti seguono il
+ * contenuto, e un file v9 è già un v10 valido. La versione sale per la stessa ragione della 4 → 5.
  */
 const addChosenSizes: Migration = sameShape
 

@@ -65,3 +65,17 @@ describe("isValidParticipantName", () => {
     expect(["Backend", "end_x", "a-b", "Utente web"].every(isValidParticipantName)).toBe(true)
   })
 })
+
+describe("misure scelte a mano", () => {
+  it("partecipante, messaggio, nota e cornice accettano una misura positiva, e senza valgono come prima", () => {
+    expect(SequenceSchema.safeParse({ title: "", autonumber: false, participants: [{ ...anna, w: 200 }, api], steps: [{ ...msg("m"), h: 80 }] }).success).toBe(true)
+    expect(StepSchema.safeParse({ kind: "note", id: "n", placement: "over", participants: ["p1"], text: "", w: 300, h: null }).success).toBe(true)
+    const part = { model: { sequences: {} }, view: { nodes: { s: { x: 0, y: 0, collapsed: false, w: 500, h: 400 } } } }
+    expect(SequenceDiagramSchema.safeParse(part).success).toBe(true)
+  })
+
+  it("una misura non positiva non è valida", () => {
+    expect(SequenceSchema.safeParse({ title: "", autonumber: false, participants: [{ ...anna, w: 0 }], steps: [] }).success).toBe(false)
+    expect(StepSchema.safeParse({ ...msg("m"), h: -1 }).success).toBe(false)
+  })
+})

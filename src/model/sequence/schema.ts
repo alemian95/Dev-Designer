@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { Identifier, NodeViewSchema } from "../shared"
+import { ChosenSideSchema, Identifier, SizedNodeViewSchema } from "../shared"
 
 /** Il tratto di un messaggio: pieno (chiamata) o tratteggiato (risposta). */
 export const LineSchema = z.enum(["solid", "dashed"])
@@ -58,6 +58,8 @@ export const ParticipantSchema = z.object({
   name: z.string(),
   label: z.string().nullable(),
   kind: ParticipantKindSchema,
+  /** La larghezza della colonna scelta a mano: un minimo sopra quella dell'etichetta. */
+  w: ChosenSideSchema.optional(),
 })
 export type Participant = z.infer<typeof ParticipantSchema>
 
@@ -69,6 +71,8 @@ export const MessageStepSchema = z.object({
   text: z.string(),
   line: LineSchema,
   head: HeadSchema,
+  /** L'altezza della riga scelta a mano: un minimo sopra quella automatica. */
+  h: ChosenSideSchema.optional(),
 })
 export type MessageStep = z.infer<typeof MessageStepSchema>
 
@@ -82,6 +86,9 @@ export const NoteStepSchema = z.object({
   placement: PlacementSchema,
   participants: z.union([z.tuple([Identifier]), z.tuple([Identifier, Identifier])]),
   text: z.string(),
+  /** Il foglio scelto a mano: un minimo sopra quello che il testo chiede. */
+  w: ChosenSideSchema.optional(),
+  h: ChosenSideSchema.optional(),
 })
 export type NoteStep = z.infer<typeof NoteStepSchema>
 
@@ -134,10 +141,13 @@ export type Sequence = z.infer<typeof SequenceSchema>
 export const SequenceModelSchema = z.object({ sequences: z.record(z.string(), SequenceSchema) })
 export type SequenceModel = z.infer<typeof SequenceModelSchema>
 
-/** La view tiene solo la posizione: la misura si ricava dal contenuto, e `collapsed` resta `false`. */
+/**
+ * La view tiene la posizione e la misura scelta a mano della cornice, un minimo sopra quella che il
+ * contenuto chiede; `collapsed` resta `false`.
+ */
 export const SequenceDiagramSchema = z.object({
   model: SequenceModelSchema,
-  view: z.object({ nodes: z.record(z.string(), NodeViewSchema) }),
+  view: z.object({ nodes: z.record(z.string(), SizedNodeViewSchema) }),
 })
 export type SequenceDiagram = z.infer<typeof SequenceDiagramSchema>
 

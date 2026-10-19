@@ -17,7 +17,8 @@ modificano col doppio clic sul canvas. Ogni azione si annulla. Passando sopra un
 di aggancio, tre per lato: trascinando da un punto l'arco parte da lì, e selezionato un arco se ne
 spostano i capi. I capi lasciati automatici si distribuiscono lungo il lato. Un nodo selezionato da solo
 ha una maniglia quadrata per angolo: si allarga oltre il suo contenuto, mai sotto, e riportato al
-contenuto torna alla misura automatica. Le sequenze si dispongono da sole e non hanno maniglie.
+contenuto torna alla misura automatica. In una sequenza si allargano la cornice, la colonna di un
+partecipante, la riga di un messaggio e il foglio di una nota; il resto si ridispone da sé.
 
 - **ER**: entità con attributi tipizzati, chiavi e relazioni con cardinalità.
 - **Classi UML**: classi con stereotipo `class`, `interface`, `abstract` o `enum`. Attributi e metodi
@@ -40,6 +41,7 @@ contenuto torna alla misura automatica. Le sequenze si dispongono da sole e non 
   alla fine, a entrambi i capi o da nessuna parte, è continua o tratteggiata, e si inverte dal
   pannello.
 - **Sequenze**: lo strumento «Sequenza» (`S`) crea una sequenza con due partecipanti e un messaggio.
+  Le colonne si allargano da sole per i testi di messaggi e note.
   Una sequenza è un nodo unico: partecipanti (riquadro o attore), messaggi con linea e punta a
   scelta, note, blocchi (`loop`, `alt`, `opt`, `par`, `critical`, `break`) con le loro sezioni e
   `autonumber`. I messaggi si creano con Collega fra due intestazioni (o dalla stessa a sé stessa) e

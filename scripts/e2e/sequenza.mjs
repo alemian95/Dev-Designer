@@ -1,7 +1,8 @@
 /**
  * End-to-end della famiglia sequence (spec §10): lo strumento Sequenza (`S`) crea una sequenza con
  * «A», «B» e un messaggio; Collega fra le due intestazioni aggiunge un messaggio; il trascinamento
- * dell'intestazione di «B» prima di «A» riordina le colonne e ⌘Z lo ripristina; il pannello cambia
+ * dell'intestazione di «B» prima di «A» riordina le colonne e ⌘Z lo ripristina; la maniglia allarga la
+ * colonna di «A» e sposta «B», e ⌘Z la riporta; il pannello cambia
  * la punta del messaggio; una Nota ancorata a un partecipante si stacca quando questo è eliminato;
  * l'export testo «Mermaid sequenze» propone `.mmd`, e `.md` con due sequenze.
  * L'import Mermaid è in `import-mermaid.mjs`.
@@ -100,6 +101,24 @@ export async function run(browser, base) {
       await expectColumns(page, "B,A")
       await page.keyboard.press("ControlOrMeta+z")
       await expectColumns(page, "A,B")
+    })
+
+    await step("la maniglia allarga la colonna di «A», «B» si sposta a destra, e ⌘Z la riporta", async () => {
+      await page.keyboard.press("Escape")
+      await head(page, "A").click()
+      const handle = page.locator('[data-resize^="sequence/"][data-resize-handle="se"]')
+      await handle.waitFor()
+      const xB = (await boxOf(head(page, "B"))).x
+      await drag(page, center(await boxOf(handle)), { x: center(await boxOf(handle)).x + 120, y: center(await boxOf(handle)).y })
+      await page.waitForFunction(([x]) => {
+        const b = [...document.querySelectorAll('[data-node-id^="sequence/"] > text[data-sequence-text]')].find((t) => t.textContent === "B")
+        return b && b.parentElement.getBoundingClientRect().x > x + 100
+      }, [xB])
+      await page.keyboard.press("ControlOrMeta+z")
+      await page.waitForFunction(([x]) => {
+        const b = [...document.querySelectorAll('[data-node-id^="sequence/"] > text[data-sequence-text]')].find((t) => t.textContent === "B")
+        return b && Math.abs(b.parentElement.getBoundingClientRect().x - x) < 2
+      }, [xB])
     })
 
     await step("il pannello cambia la punta del messaggio in «cross»", async () => {

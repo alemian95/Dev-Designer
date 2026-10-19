@@ -203,9 +203,18 @@ nodo che esce dal suo pool finché non si allarga la corsia a mano.
 
 ### DT-46 · la misura scelta a mano si perde nell'export Mermaid
 
-`w`/`h` di entità, classi, nodi di flusso, note e forme non hanno un posto nel
+`w`/`h` di entità, classi, nodi di flusso, note, forme e sequenze, e le misure
+dei partecipanti, dei messaggi e delle note di sequenza, non hanno un posto nel
 testo Mermaid (ADR 0009): un round-trip torna alla misura automatica.
 Costo-se-sbagliato: il ridimensionamento va rifatto dopo un import.
+
+### DT-47 · dentro una sequenza la guida non mostra la nuova disposizione
+
+Trascinando una maniglia di un partecipante, un messaggio o una nota, la guida
+mostra il riquadro nuovo, ma colonne e righe vicine si spostano solo al
+rilascio; da `nw` la guida si sposta a sinistra anche se il layout poi tiene
+ferma la colonna. Rimedio: un'anteprima del layout durante il gesto, come la
+linea d'inserimento. Costo-se-sbagliato: il risultato al rilascio sorprende.
 
 ---
 

@@ -22,16 +22,22 @@ elementi.
 
 Le sequenze si dispongono da sole a partire dall'ordine (spec sequence §3.1,
 §4.1), e i pool hanno già le loro maniglie sul bordo destro e sulle corsie
-(spec 2b §5).
+(spec 2b §5). In un primo momento le sequenze erano escluse; provandole, il
+committente ha chiesto di ridimensionare anche dentro la sequenza.
 
 ## Decision
 
-Ogni nodo di entità, classe, flusso, nota e forma ha una misura scelta a mano,
-`w`/`h`, che è un minimo sopra quella del contenuto: la misura mostrata è la più
-grande fra le due, lato per lato, e un nodo collassato tiene l'altezza del
-contenuto. Nelle famiglie diverse dalle forme i due campi sono facoltativi, e
-assenti o `null` valgono "segue il contenuto". Riportare la maniglia fino al
-contenuto torna alla misura automatica. Le sequenze e i pool restano fuori.
+Ogni nodo di entità, classe, flusso, nota, forma e sequenza ha una misura
+scelta a mano, `w`/`h`, che è un minimo sopra quella del contenuto: la misura
+mostrata è la più grande fra le due, lato per lato, e un nodo collassato tiene
+l'altezza del contenuto. Nelle famiglie diverse dalle forme i due campi sono
+facoltativi, e assenti o `null` valgono "segue il contenuto". Riportare la
+maniglia fino al contenuto torna alla misura automatica. I pool restano fuori.
+
+Dentro una sequenza la misura scelta vale per la colonna di un partecipante
+(solo larghezza), la riga di un messaggio (solo altezza) e il foglio di una nota;
+la posizione resta del layout, che sposta colonne e righe vicine. I blocchi
+seguono il loro contenuto.
 
 Il nodo selezionato da solo mostra quattro maniglie, una per spigolo, con lo
 spigolo opposto fermo. Gli agganci offerti diventano i tre per lato; gli
@@ -52,5 +58,8 @@ più. La versione del formato sale da 9 a 10 senza cambiare forma ai dati.
   spigolo non c'è più un punto da afferrare.
 - Le maniglie agli spigoli hanno misura fissa sullo schermo, come gli agganci;
   quelle dei pool restano in unità di mondo.
-- Introdotto in `2f43691` (forme), `b27a181` (formato), `262f10d` (famiglie) e
-  `bae1d8d` (livello delle maniglie).
+- Dentro una sequenza la guida durante il gesto mostra il riquadro nuovo, ma
+  colonne e righe vicine si spostano solo al rilascio.
+- Introdotto in `2f43691` (forme), `b27a181` (formato), `262f10d` (famiglie),
+  `bae1d8d` (livello delle maniglie) e, per le sequenze, da `6644a5f` a
+  `ee29b56`.

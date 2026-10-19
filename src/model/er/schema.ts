@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
+import { EdgeAnchorsSchema, Identifier, SizedNodeViewSchema } from "../shared"
 
 export const CardinalitySchema = z.enum(["one", "zero-or-one", "many", "zero-or-many"])
 export type Cardinality = z.infer<typeof CardinalitySchema>
@@ -59,7 +59,7 @@ export const ErModelSchema = z
   })
 export type ErModel = z.infer<typeof ErModelSchema>
 
-export const ErViewSchema = z.object({ nodes: z.record(z.string(), NodeViewSchema) })
+export const ErViewSchema = z.object({ nodes: z.record(z.string(), SizedNodeViewSchema) })
 export type ErView = z.infer<typeof ErViewSchema>
 
 export const ErDiagramSchema = z.object({

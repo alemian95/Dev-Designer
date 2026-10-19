@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
+import { ChosenSideSchema, EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
 
 /** Le tre forme (spec 3b §3). `kind` non cambia dopo la creazione. */
 export const ShapeKindSchema = z.enum(["rect", "ellipse", "text"])
@@ -31,15 +31,12 @@ export const ArrowSchema = z
   .refine((a) => a.source !== a.target, { message: "una freccia non collega una forma a sé stessa" })
 export type Arrow = z.infer<typeof ArrowSchema>
 
-/** Un lato scelto a mano: positivo, o `null` finché la forma segue la misura del testo. */
-const ChosenSide = z.number().positive().nullable()
-
 /**
  * La view di una forma: la `NodeViewSchema` comune più la misura minima scelta a mano (spec 3b §3).
  * `collapsed` a una forma non si applica e resta `false`. Chi legge solo `x`/`y` (spostamento,
  * Disponi, export) la tratta come la view di ogni altra famiglia.
  */
-export const ShapeViewSchema = NodeViewSchema.extend({ w: ChosenSide, h: ChosenSide })
+export const ShapeViewSchema = NodeViewSchema.extend({ w: ChosenSideSchema, h: ChosenSideSchema })
 export type ShapeView = z.infer<typeof ShapeViewSchema>
 
 /** Chiavi = uuid, per le forme e per le frecce: l'etichetta cambia a ogni battitura. */

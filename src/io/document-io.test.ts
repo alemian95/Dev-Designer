@@ -226,7 +226,7 @@ describe("openFile", () => {
     expect(documentStore.getState().past).toEqual([])
     documentStore.getState().undo()
     const doc = documentStore.getState().doc
-    expect(doc.schemaVersion).toBe(9)
+    expect(doc.schemaVersion).toBe(10)
     expect(doc.diagram.sequence).toEqual({ model: { sequences: {} }, view: { nodes: {} } })
   })
 })

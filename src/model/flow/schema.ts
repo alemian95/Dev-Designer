@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
+import { EdgeAnchorsSchema, Identifier, SizedNodeViewSchema } from "../shared"
 
 /** Le cinque forme della notazione. La nota non è una forma: è la famiglia `note` (spec 3a). */
 export const FlowShapeSchema = z.enum(["terminal", "process", "decision", "io", "subprocess"])
@@ -77,7 +77,7 @@ export const LaneViewSchema = z.object({ h: z.number() })
 export type LaneView = z.infer<typeof LaneViewSchema>
 
 export const FlowViewSchema = z.object({
-  nodes: z.record(z.string(), NodeViewSchema),
+  nodes: z.record(z.string(), SizedNodeViewSchema),
   pools: z.record(z.string(), PoolViewSchema),
   lanes: z.record(z.string(), LaneViewSchema),
 })

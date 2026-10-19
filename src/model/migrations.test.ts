@@ -24,7 +24,7 @@ describe("migrazione 1 → 2", () => {
     const out = migrateDocument(v1Class)
     expect(out.ok).toBe(true)
     const doc = (out as { ok: true; value: Record<string, unknown> }).value
-    expect(doc.schemaVersion).toBe(9)
+    expect(doc.schemaVersion).toBe(10)
     expect((doc.diagram as { note: unknown }).note).toEqual({ model: { notes: {} }, view: { nodes: {} } })
     expect((doc.diagram as { class: { model: Record<string, unknown> } }).class.model).toEqual({ classes: {}, relations: {} })
   })
@@ -33,7 +33,7 @@ describe("migrazione 1 → 2", () => {
     const out = migrateDocument(v1Er)
     expect(out.ok).toBe(true)
     const doc = (out as { ok: true; value: Record<string, unknown> }).value
-    expect(doc.schemaVersion).toBe(9)
+    expect(doc.schemaVersion).toBe(10)
     expect((doc.diagram as { er: { model: Record<string, unknown> } }).er.model).toEqual({ entities: {}, relationships: {} })
   })
 
@@ -43,7 +43,7 @@ describe("migrazione 1 → 2", () => {
     expect(v1Class).toEqual(before)
   })
 
-  it("un documento già alla versione corrente (9) passa senza toccare niente", () => {
+  it("un documento già alla versione corrente (10) passa senza toccare niente", () => {
     const v3 = createDocument("Prova", "a")
     expect(migrateDocument(v3)).toEqual({ ok: true, value: v3 })
   })
@@ -57,7 +57,7 @@ describe("migrazione 2 → 3", () => {
     const r = parseDocument(v2({ type: "er", model: { entities: {}, relationships: {} }, view: { nodes: {} } }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(9)
+    expect(r.document.schemaVersion).toBe(10)
     expect(r.document.diagram.class.model.classes).toEqual({})
     expect(r.document.diagram.flow.model.pools).toEqual({})
   })
@@ -97,7 +97,7 @@ describe("migrazione 3 → 4", () => {
     const r = parseDocument(v3Text())
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(9)
+    expect(r.document.schemaVersion).toBe(10)
     expect(r.document.diagram.links).toEqual({})
   })
 
@@ -114,7 +114,7 @@ describe("migrazione 4 → 5", () => {
     const r = parseDocument(JSON.stringify({ ...doc, schemaVersion: 4 }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(9)
+    expect(r.document.schemaVersion).toBe(10)
     expect(r.document.diagram.links).toEqual({ l1: { kind: "maps-to", source: "class/Ordine", target: "er/ordini" } })
   })
 })
@@ -132,7 +132,7 @@ describe("migrazione 5 → 6", () => {
     const r = parseDocument(v5({ model: { lanes, nodes: {}, edges: {} }, view: { nodes: {}, lanes: bands } }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(9)
+    expect(r.document.schemaVersion).toBe(10)
     expect(r.document.diagram.flow.model.pools).toEqual({})
     expect(r.document.diagram.flow.view.pools).toEqual({})
     expect(r.document.diagram.flow.view.lanes).toEqual({})
@@ -329,7 +329,7 @@ describe("migrazione 7 → 8", () => {
     const r = parseDocument(JSON.stringify({ ...v7, schemaVersion: 7 }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(9)
+    expect(r.document.schemaVersion).toBe(10)
     expect(r.document.diagram.shape).toEqual({ model: { shapes: {}, arrows: {} }, view: { nodes: {} } })
     expect(r.document.diagram).toEqual(nuovo.diagram)
   })
@@ -350,10 +350,47 @@ describe("migrazione 8 → 9", () => {
     const r = parseDocument(JSON.stringify({ ...v8, schemaVersion: 8 }))
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.document.schemaVersion).toBe(9)
+    expect(r.document.schemaVersion).toBe(10)
     expect(r.document.diagram.sequence).toEqual({ model: { sequences: {} }, view: { nodes: {} } })
     const saved = JSON.parse(toJson(r.document)) as { diagram: Record<string, unknown> }
     delete saved.diagram.sequence
     expect(JSON.stringify(saved.diagram)).toBe(before)
+  })
+})
+
+describe("migrazione 9 → 10", () => {
+  it("un file v9 passa intatto: i nodi senza misura scelta seguono il contenuto", () => {
+    const doc = createDocument("Prova", "v9doc")
+    doc.diagram.er.model.entities["ordini"] = { name: "ordini", attributes: [] }
+    doc.diagram.er.view.nodes["ordini"] = { x: 10, y: 20, collapsed: false }
+    const v9 = JSON.parse(toJson(doc)) as { diagram: Record<string, unknown> }
+    const r = parseDocument(JSON.stringify({ ...v9, schemaVersion: 9 }))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.document.schemaVersion).toBe(10)
+    expect(r.document.diagram.er.view.nodes["ordini"]).toEqual({ x: 10, y: 20, collapsed: false })
+  })
+
+  it("entità, classi, nodi di flusso e note accettano una misura scelta, e la ritrovano dal file", () => {
+    const doc = createDocument("Prova", "v10doc")
+    doc.diagram.er.model.entities["e"] = { name: "e", attributes: [] }
+    doc.diagram.er.view.nodes["e"] = { x: 0, y: 0, collapsed: false, w: 300, h: null }
+    doc.diagram.class.model.classes["C"] = { name: "C", stereotype: "class", attributes: [], methods: [] }
+    doc.diagram.class.view.nodes["C"] = { x: 0, y: 0, collapsed: false, w: null, h: 200 }
+    doc.diagram.note.model.notes["n"] = { text: "", anchor: null }
+    doc.diagram.note.view.nodes["n"] = { x: 0, y: 0, collapsed: false, w: 240, h: 120 }
+    const r = parseDocument(toJson(doc))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.document.diagram.er.view.nodes["e"]).toMatchObject({ w: 300, h: null })
+    expect(r.document.diagram.class.view.nodes["C"]).toMatchObject({ w: null, h: 200 })
+    expect(r.document.diagram.note.view.nodes["n"]).toMatchObject({ w: 240, h: 120 })
+  })
+
+  it("una misura non positiva è un file non valido", () => {
+    const doc = createDocument("Prova", "neg")
+    doc.diagram.er.model.entities["e"] = { name: "e", attributes: [] }
+    doc.diagram.er.view.nodes["e"] = { x: 0, y: 0, collapsed: false, w: 0, h: null }
+    expect(parseDocument(toJson(doc)).ok).toBe(false)
   })
 })

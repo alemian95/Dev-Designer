@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { EdgeAnchorsSchema, Identifier, NodeViewSchema } from "../shared"
+import { EdgeAnchorsSchema, Identifier, SizedNodeViewSchema } from "../shared"
 
 export const VisibilitySchema = z.enum(["public", "private", "protected", "package"])
 export type Visibility = z.infer<typeof VisibilitySchema>
@@ -99,11 +99,11 @@ export const ClassModelSchema = z.object({
 })
 export type ClassModel = z.infer<typeof ClassModelSchema>
 
-// La `view` riusa `NodeViewSchema` così com'è: `{x, y, collapsed}`, dove
+// La `view` riusa `SizedNodeViewSchema`: `{x, y, collapsed, w?, h?}`, dove
 // `collapsed` mostra il solo header. Nessun terzo stato «solo attributi».
 export const ClassDiagramSchema = z.object({
   model: ClassModelSchema, // { classes: Record<string, ClassNode>, relations: Record<string, ClassRelation> }
-  view: z.object({ nodes: z.record(z.string(), NodeViewSchema) }),
+  view: z.object({ nodes: z.record(z.string(), SizedNodeViewSchema) }),
 })
 export type ClassDiagram = z.infer<typeof ClassDiagramSchema>
 

@@ -239,6 +239,13 @@ const addSequences: Migration = (raw) => {
 }
 
 /**
+ * 9 → 10: nessun cambiamento di forma. Entità, classi, nodi di flusso e note guadagnano `w`/`h`
+ * facoltativi, la misura scelta a mano dagli spigoli: assenti seguono il contenuto, e un file v9 è
+ * già un v10 valido. La versione sale per la stessa ragione della 4 → 5.
+ */
+const addChosenSizes: Migration = sameShape
+
+/**
  * Tabella delle migrazioni indicizzata per versione di partenza:
  * `migrations.get(v)` porta un documento dalla versione v alla v+1.
  */
@@ -251,6 +258,7 @@ const migrations: ReadonlyMap<number, Migration> = new Map([
   [6, notesIntoFamily],
   [7, addShapes],
   [8, addSequences],
+  [9, addChosenSizes],
 ])
 
 export type MigrateResult = { ok: true; value: unknown } | { ok: false; error: string }

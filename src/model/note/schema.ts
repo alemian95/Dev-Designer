@@ -1,6 +1,6 @@
 import * as z from "zod"
 import { FAMILIES, inFamily } from "../family"
-import { Identifier, NodeViewSchema } from "../shared"
+import { Identifier, SizedNodeViewSchema } from "../shared"
 
 /** `true` se `anchor` è la chiave con prefisso di un elemento di una famiglia che non è `note`. */
 const anchorsElsewhere = (anchor: string): boolean => FAMILIES.some((f) => f !== "note" && inFamily(anchor, f))
@@ -26,13 +26,13 @@ export const NoteModelSchema = z.object({ notes: z.record(z.string(), NoteSchema
 export type NoteModel = z.infer<typeof NoteModelSchema>
 
 /**
- * La `view` riusa `NodeViewSchema` come le altre famiglie: `collapsed` a una nota non si applica e
+ * La `view` riusa `SizedNodeViewSchema` come le altre famiglie: `collapsed` a una nota non si applica e
  * resta `false`, ma `moveNodes`, `applyLayout` e l'export leggono `view.nodes` con la stessa forma
  * in ogni famiglia, senza un ramo per le note.
  */
 export const NoteDiagramSchema = z.object({
   model: NoteModelSchema,
-  view: z.object({ nodes: z.record(z.string(), NodeViewSchema) }),
+  view: z.object({ nodes: z.record(z.string(), SizedNodeViewSchema) }),
 })
 export type NoteDiagram = z.infer<typeof NoteDiagramSchema>
 

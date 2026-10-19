@@ -1,12 +1,22 @@
 import * as z from "zod"
 
 /** Versione del formato su disco. Incrementare insieme a una migrazione in migrations.ts. */
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 
 export const Identifier = z.string().min(1)
 
 export const NodeViewSchema = z.object({ x: z.number(), y: z.number(), collapsed: z.boolean() })
 export type NodeView = z.infer<typeof NodeViewSchema>
+
+/** Un lato scelto a mano: positivo, o `null` finché il nodo segue la misura del suo contenuto. */
+export const ChosenSideSchema = z.number().positive().nullable()
+
+/**
+ * La view di un nodo che si ridimensiona dagli spigoli: la misura scelta a mano è un minimo, sopra
+ * quella che il contenuto chiede. Assente (i file fino alla versione 9) vale `null`.
+ */
+export const SizedNodeViewSchema = NodeViewSchema.extend({ w: ChosenSideSchema.optional(), h: ChosenSideSchema.optional() })
+export type SizedNodeView = z.infer<typeof SizedNodeViewSchema>
 
 /**
  * I 16 punti di aggancio di un nodo (spec agganci §3): tre per lato a ¼, ½ e ¾, contati in senso

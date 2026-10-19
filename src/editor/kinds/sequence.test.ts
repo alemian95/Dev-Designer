@@ -1,8 +1,10 @@
+import { produce } from "immer"
 import { describe, expect, it } from "vitest"
 import { createDocument, type DevDocument } from "@/model/document"
 import type { Sequence } from "@/model/sequence/schema"
+import { snap } from "../geometry"
 import { autoPorts } from "../ports"
-import { sequenceLayout } from "../sequence/layout"
+import { noteSheet, sequenceLayout } from "../sequence/layout"
 import { familyOps } from "./ops"
 
 const seq = (title: string): Sequence => ({
@@ -89,5 +91,69 @@ describe("DiagramOps: sequence", () => {
     const doc = docDueSequenze()
     doc.diagram.sequence.model.sequences["s1"]!.steps.push({ kind: "message", id: "x", from: "a", to: "fantasma", text: "", line: "solid", head: "filled" })
     expect(familyOps(doc, "sequence").validate().map((i) => i.code)).toContain("sequence-dangling-participant")
+  })
+})
+
+describe("sequenceOps.resize", () => {
+  const conNota = (placement: "over" | "right"): DevDocument => {
+    const doc = docDueSequenze()
+    doc.diagram.sequence.model.sequences["s1"]!.steps.push({ kind: "note", id: "n", placement, participants: ["a"], text: "nota" })
+    return doc
+  }
+  const stepOf = (doc: DevDocument) => {
+    const step = doc.diagram.sequence.model.sequences["s1"]!.steps.find((x) => x.id === "n")
+    if (step?.kind !== "note") throw new Error("nota mancante")
+    return step
+  }
+  const resize = (doc: DevDocument, key: string, handle: string | null, dx: number, dy: number) => {
+    const r = familyOps(doc, "sequence").resize?.(key, handle, dx, dy) ?? null
+    return r && { rect: r.rect, after: produce(doc, r.recipe) }
+  }
+
+  it("la cornice si allarga da uno spigolo, e torna automatica riportata al contenuto", () => {
+    const doc = docDueSequenze()
+    const { width, height } = sequenceLayout(doc.diagram.sequence.model.sequences["s1"]!)
+    const r = resize(doc, "s1", "se", 200, 100)!
+    expect(r.after.diagram.sequence.view.nodes["s1"]).toMatchObject({ w: snap(width + 200), h: snap(height + 100) })
+    const back = resize(r.after, "s1", "se", -500, -500)!
+    expect(back.after.diagram.sequence.view.nodes["s1"]).toMatchObject({ w: null, h: null })
+  })
+
+  it("un partecipante si allarga solo in larghezza, e la colonna dopo si sposta", () => {
+    const doc = docDueSequenze()
+    const before = sequenceLayout(doc.diagram.sequence.model.sequences["s1"]!)
+    const r = resize(doc, "s1/a", "se", 100, 300)!
+    const p = r.after.diagram.sequence.model.sequences["s1"]!.participants[0]!
+    expect(p.w).toBe(snap(before.columns.a!.w + 100))
+    expect(r.rect.h).toBe(before.columns.a!.head.h)
+    expect(sequenceLayout(r.after.diagram.sequence.model.sequences["s1"]!).columns.b!.x).toBe(before.columns.b!.x + snap(before.columns.a!.w + 100) - before.columns.a!.w)
+  })
+
+  it("un messaggio si allarga solo in altezza", () => {
+    const doc = docDueSequenze()
+    const before = sequenceLayout(doc.diagram.sequence.model.sequences["s1"]!)
+    const r = resize(doc, "s1/m", "se", 300, 40)!
+    const m = r.after.diagram.sequence.model.sequences["s1"]!.steps[0]!
+    expect(m).toMatchObject({ h: snap(before.rows.m!.h + 40) })
+    expect(m).not.toHaveProperty("w")
+  })
+
+  it("una nota si allarga in larghezza e in altezza, anche quella a destra della linea di vita", () => {
+    for (const placement of ["over", "right"] as const) {
+      const doc = conNota(placement)
+      const r = resize(doc, "s1/n", "se", 100, 40)!
+      const l = sequenceLayout(r.after.diagram.sequence.model.sequences["s1"]!)
+      const before = sequenceLayout(doc.diagram.sequence.model.sequences["s1"]!)
+      expect(l.rows.n!.h).toBe(snap(before.rows.n!.h + 40))
+      // Il foglio è largo quanto la maniglia lo ha portato, allineato alla griglia.
+      expect(noteSheet(l, stepOf(r.after))!.w).toBe(snap(noteSheet(before, stepOf(doc))!.w + 100))
+    }
+  })
+
+  it("un blocco, o una maniglia che non è uno spigolo, non si ridimensionano", () => {
+    const doc = docDueSequenze()
+    doc.diagram.sequence.model.sequences["s1"]!.steps.push({ kind: "block", id: "k", operator: "opt", sections: [{ id: "x", condition: "", steps: [] }] })
+    expect(resize(doc, "s1/k", "se", 10, 10)).toBeNull()
+    expect(resize(doc, "s1/a", null, 10, 10)).toBeNull()
   })
 })

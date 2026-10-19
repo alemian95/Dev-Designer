@@ -8,7 +8,7 @@ import { notePath } from "@/editor/note/geometry"
 import { selId, selectedKeys, sessionStore } from "@/editor/session-store"
 import { stepDrop } from "@/editor/sequence/commands"
 import { subRect } from "@/editor/sequence/geometry"
-import { NOTE_INSET, ROOT, ROW_GAP, SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
+import { NOTE_INSET, ROOT, ROW_GAP, SELF_TEXT_DX, messageNumbers, noteSheet, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
 import { sequenceDiagram } from "@/editor/sequence-access"
 import { allSteps, type BlockStep, type Head, type MessageStep, type NoteStep, type Participant, type Sequence } from "@/model/sequence/schema"
 import type { ChosenSize, SizedNodeView } from "@/model/shared"
@@ -148,16 +148,13 @@ function Message({ id, step, l, number }: { id: string; step: MessageStep; l: Se
  * quel lato della linea di vita, `over` tutta la riga.
  */
 function SequenceNote({ id, step, l }: { id: string; step: NoteStep; l: SequenceLayout }) {
-  const r = l.rows[step.id]
-  if (!r) return null
-  const col = step.placement === "over" ? undefined : l.columns[step.participants[0]]
-  const x0 = col && step.placement === "right" ? col.x + NOTE_INSET : r.x
-  const x1 = col && step.placement === "left" ? col.x - NOTE_INSET : r.x + r.w
-  const w = x1 - x0
-  const h = r.h - 2 * NOTE_INSET
+  const sheet = noteSheet(l, step)
+  if (!sheet) return null
+  const { w } = sheet
+  const h = sheet.h - 2 * NOTE_INSET
   const { body, fold } = notePath(w, h)
   return (
-    <g data-node-id={`${id}/${step.id}`} transform={`translate(${x0} ${r.y + NOTE_INSET})`}>
+    <g data-node-id={`${id}/${step.id}`} transform={`translate(${sheet.x} ${sheet.y + NOTE_INSET})`}>
       <path d={body} fill="var(--card)" stroke={BORDER} />
       <path d={fold} fill="var(--muted)" stroke={BORDER} />
       <text data-sequence-text={step.id} x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="central" fill="var(--foreground)" xmlSpace="preserve">

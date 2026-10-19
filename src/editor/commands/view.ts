@@ -23,11 +23,8 @@ export function moveNodes(family: Family, keys: readonly string[], dx: number, d
   }
 }
 
-/** Le famiglie i cui nodi si ridimensionano dagli spigoli: tutte tranne le sequenze, che si dispongono da sole. */
-export type SizedFamily = Exclude<Family, "sequence">
-
 /** Scrive origine e misura scelte a mano di un nodo: un solo passo di annulla, e niente se non cambia. */
-export function resizeNode(family: SizedFamily, key: string, next: { x: number; y: number; w: number | null; h: number | null }): Recipe {
+export function resizeNode(family: Family, key: string, next: { x: number; y: number; w: number | null; h: number | null }): Recipe {
   return (draft) => {
     const view: SizedNodeView | undefined = draft.diagram[family].view.nodes[key]
     if (!view) return

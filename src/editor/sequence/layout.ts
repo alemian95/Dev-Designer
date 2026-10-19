@@ -227,3 +227,17 @@ export function sequenceLayout(seq: Sequence, frame: ChosenSize = {}, measure: (
   const header: Rect = { x: 0, y: 0, w: measure(`sd ${seq.title}`) + HEADER_PAD, h: HEADER_H }
   return { width, height: Math.max(end + BOTTOM, frame.h ?? 0), header, columns, rows, blocks, slots }
 }
+
+/**
+ * Il foglio di una nota come si disegna: `over` occupa tutta la riga, `left`/`right` la parte della
+ * riga da quel lato della linea di vita, staccata di `NOTE_INSET`. L'altezza è quella della riga.
+ * `null` se la riga non c'è.
+ */
+export function noteSheet(l: SequenceLayout, step: NoteStep): Rect | null {
+  const r = l.rows[step.id]
+  if (!r) return null
+  const col = step.placement === "over" ? undefined : l.columns[step.participants[0]]
+  const x0 = col && step.placement === "right" ? col.x + NOTE_INSET : r.x
+  const x1 = col && step.placement === "left" ? col.x - NOTE_INSET : r.x + r.w
+  return { x: x0, y: r.y, w: x1 - x0, h: r.h }
+}

@@ -234,6 +234,26 @@ export function setNoteStep(seq: string, stepId: string, patch: NotePatch): Reci
 }
 
 /**
+ * Scrive la misura scelta a mano di un sotto-elemento: la larghezza di un partecipante, l'altezza
+ * della riga di un messaggio, il foglio di una nota. Un lato che il sotto-elemento non ha si ignora;
+ * `null` torna alla misura automatica.
+ */
+export function setSubSize(seq: string, subId: string, size: { w: number | null; h: number | null }): Recipe {
+  return (draft) => {
+    const s = sequenceIn(draft, seq)
+    if (!s) return
+    const p = s.participants.find((x) => x.id === subId)
+    if (p) {
+      if ((p.w ?? null) !== size.w) p.w = size.w
+      return
+    }
+    const step = stepAt(s, subId)
+    if (step?.kind === "note" && (step.w ?? null) !== size.w) step.w = size.w
+    if ((step?.kind === "note" || step?.kind === "message") && (step.h ?? null) !== size.h) step.h = size.h
+  }
+}
+
+/**
  * Sposta un passo nello slot `to`, con l'indice degli slot calcolati **prima** dello spostamento:
  * nello stesso contenitore, in avanti, l'indice scala di uno dopo aver tolto il passo.
  * `null` se `to` è dentro il passo stesso.

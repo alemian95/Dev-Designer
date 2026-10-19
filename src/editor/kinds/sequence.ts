@@ -1,12 +1,15 @@
 import type { DevDocument } from "@/model/document"
 import { splitSequenceKey, type Sequence } from "@/model/sequence/schema"
 import { validateSequences } from "@/model/sequence/validate"
-import { moveNodes } from "../commands/view"
+import { produce } from "immer"
+import { moveNodes, resizeNode } from "../commands/view"
 import type { Recipe } from "../document-store"
+import { cornerResize, type Point } from "../geometry"
 import {
-  addMessage, addSequence, deleteParticipant, deleteSequences, deleteSteps, duplicateSequences, moveParticipant, moveStep, stepDrop,
+  addMessage, addSequence, deleteParticipant, deleteSequences, deleteSteps, duplicateSequences, moveParticipant, moveStep, setSubSize, stepDrop,
 } from "../sequence/commands"
-import { sequenceRect, subRect } from "../sequence/geometry"
+import { sequenceRect, subBox, subRect } from "../sequence/geometry"
+import { stepAt } from "../sequence/tree"
 import { ROOT, sequenceLayout } from "../sequence/layout"
 import { sequenceDiagram } from "../sequence-access"
 import type { DiagramOps } from "./ops"
@@ -26,6 +29,29 @@ function nearestColumn(seq: Sequence, pid: string, dx: number): number | null {
   const x = from.x + dx
   const distances = seq.participants.map((p) => Math.abs((l.columns[p.id]?.x ?? Infinity) - x))
   return distances.indexOf(Math.min(...distances))
+}
+
+/**
+ * Il ridimensionamento di un sotto-elemento dal suo riquadro (`subBox`): la misura del contenuto è
+ * quella della stessa sequenza senza la misura scelta del sotto-elemento. Un partecipante cambia solo
+ * la larghezza, un messaggio solo l'altezza; la posizione la decide il layout.
+ */
+function resizeSub(seq: Sequence, seqKey: string, origin: Point, subId: string, handle: string | null, dx: number, dy: number) {
+  const participant = seq.participants.some((p) => p.id === subId)
+  const bare = produce(seq, (d) => {
+    const p = d.participants.find((x) => x.id === subId)
+    if (p) p.w = null
+    const step = stepAt(d, subId)
+    if (step?.kind === "note") step.w = null
+    if (step?.kind === "note" || step?.kind === "message") step.h = null
+  })
+  const now = subBox(seq, origin, subId)
+  const content = subBox(bare, origin, subId)
+  if (!now || !content) return null
+  const isMessage = stepAt(seq, subId)?.kind === "message"
+  const chosen = { x: now.x, y: now.y, w: now.w > content.w ? now.w : null, h: now.h > content.h ? now.h : null }
+  const r = cornerResize(content, chosen, handle, isMessage ? 0 : dx, participant ? 0 : dy)
+  return r && { rect: r.rect, recipe: setSubSize(seqKey, subId, { w: isMessage ? null : r.next.w, h: participant ? null : r.next.h }) }
 }
 
 /**
@@ -118,6 +144,18 @@ export function sequenceOps(doc: DevDocument): DiagramOps {
       edges: [],
       direction: "DOWN",
     }),
+
+    // La cornice da uno spigolo, come ogni nodo; un sotto-elemento dal suo riquadro (`resizeSub`).
+    resize: (key, handle, dx, dy) => {
+      const parts = splitSequenceKey(key)
+      const seq = parts && diagram().model.sequences[parts.sequence]
+      const view = parts && diagram().view.nodes[parts.sequence]
+      if (!parts || !seq || !view) return null
+      if (parts.participant !== null) return resizeSub(seq, parts.sequence, view, parts.participant, handle, dx, dy)
+      const { width, height } = sequenceLayout(seq)
+      const r = cornerResize({ w: width, h: height }, view, handle, dx, dy)
+      return r && { rect: r.rect, recipe: resizeNode("sequence", parts.sequence, r.next) }
+    },
 
     validate: () => validateSequences(diagram().model),
   }

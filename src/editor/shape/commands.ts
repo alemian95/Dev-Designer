@@ -139,12 +139,14 @@ export function setArrowAnchors(key: string, anchors: EdgeAnchors): Recipe {
   }
 }
 
-/** Scrive la misura scelta a mano di una forma: un solo passo di annulla, e niente se non cambia. */
-export function resizeShape(key: string, w: number | null, h: number | null): Recipe {
+/** Scrive origine e misura scelte a mano di una forma: un solo passo di annulla, e niente se non cambia. */
+export function resizeShape(key: string, next: { x: number; y: number; w: number | null; h: number | null }): Recipe {
   return (draft) => {
     const view = shapeDiagram(draft).view.nodes[key]
     if (!view) return
-    if (view.w !== w) view.w = w
-    if (view.h !== h) view.h = h
+    if (view.x !== next.x) view.x = next.x
+    if (view.y !== next.y) view.y = next.y
+    if (view.w !== next.w) view.w = next.w
+    if (view.h !== next.h) view.h = next.h
   }
 }

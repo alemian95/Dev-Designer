@@ -16,7 +16,8 @@ export type EdgeEnd = "source" | "target"
 export type Hit =
   | { kind: "node"; key: string; backdrop?: boolean }
   | { kind: "edge"; key: string }
-  | { kind: "resize"; key: string; lane: string | null }
+  /** `handle`: quale maniglia del nodo `key`, nel significato che le dà la sua famiglia (`DiagramOps.resize`). */
+  | { kind: "resize"; key: string; handle: string | null }
   /** Un punto di aggancio del nodo `node` (spec agganci §6). */
   | { kind: "anchor"; node: string; anchor: Anchor }
   /** La maniglia di un capo dell'arco selezionato; `node` è il nodo di quel capo. */
@@ -31,7 +32,7 @@ export type Mode =
   | { type: "marquee"; start: Point; additive: boolean }
   | { type: "connect"; source: string; sourceAnchor: Anchor | null }
   | { type: "reanchor"; edge: string; end: EdgeEnd; node: string }
-  | { type: "resize"; key: string; lane: string | null; start: Point; moved: boolean }
+  | { type: "resize"; key: string; handle: string | null; start: Point; moved: boolean }
 
 export const IDLE: Mode = { type: "idle" }
 
@@ -64,8 +65,8 @@ export type Effect =
   | { type: "preview-reanchor"; edge: string; end: EdgeEnd; to: Point | null }
   | { type: "commit-anchor"; edge: string; end: EdgeEnd; anchor: Anchor | null }
   | { type: "create-node"; at: Point; family: Family; variant?: string }
-  | { type: "preview-resize"; key: string; lane: string | null; dx: number; dy: number }
-  | { type: "commit-resize"; key: string; lane: string | null; dx: number; dy: number }
+  | { type: "preview-resize"; key: string; handle: string | null; dx: number; dy: number }
+  | { type: "commit-resize"; key: string; handle: string | null; dx: number; dy: number }
   | { type: "clear-resize" }
 
 export interface Context {
@@ -143,8 +144,8 @@ function onDown(info: PointerInfo, spaceHeld: boolean, ctx: Context): Step {
   // Una maniglia di ridimensionamento (spec 2b §5): seleziona il frame e apre il gesto. Sta prima
   // dello switch, che così resta sui soli nodi, archi e canvas.
   if (info.hit.kind === "resize") {
-    const { key, lane } = info.hit
-    return { mode: { type: "resize", key, lane, start: info.world, moved: false }, effects: [{ type: "select", ids: [selId("node", key)] }] }
+    const { key, handle } = info.hit
+    return { mode: { type: "resize", key, handle, start: info.world, moved: false }, effects: [{ type: "select", ids: [selId("node", key)] }] }
   }
 
   switch (info.hit.kind) {
@@ -210,7 +211,7 @@ function onMove(mode: Mode, info: PointerInfo): Step {
     case "resize": {
       const dx = info.world.x - mode.start.x
       const dy = info.world.y - mode.start.y
-      return { mode: { ...mode, moved: true }, effects: [{ type: "preview-resize", key: mode.key, lane: mode.lane, dx, dy }] }
+      return { mode: { ...mode, moved: true }, effects: [{ type: "preview-resize", key: mode.key, handle: mode.handle, dx, dy }] }
     }
   }
 }
@@ -262,7 +263,7 @@ function onUp(mode: Mode, info: PointerInfo): Step {
     case "resize": {
       const effects: Effect[] = [{ type: "clear-resize" }]
       if (mode.moved) {
-        effects.push({ type: "commit-resize", key: mode.key, lane: mode.lane, dx: info.world.x - mode.start.x, dy: info.world.y - mode.start.y })
+        effects.push({ type: "commit-resize", key: mode.key, handle: mode.handle, dx: info.world.x - mode.start.x, dy: info.world.y - mode.start.y })
       }
       return { mode: IDLE, effects }
     }

@@ -1,6 +1,6 @@
 import type { Arrow, Shape, ShapeDiagram, ShapeKind, ShapeView } from "@/model/shape/schema"
 import { filledArrowPath, pathFromPoints, routePorts, type EdgeGeometry } from "../edge-routing"
-import { CHAR_W, GRID, MIN_NODE_H, MIN_NODE_W, PAD_X, ROW_H, snap, type Rect, type Size } from "../geometry"
+import { CHAR_W, GRID, MIN_NODE_H, MIN_NODE_W, PAD_X, ROW_H, resizeFromCorner, type Corner, type Rect, type Size } from "../geometry"
 import type { EdgePorts, Outline } from "../ports"
 
 /** Quello che un testo vuoto mostra sul canvas (spec 3b §5): senza, sarebbe invisibile e impossibile da afferrare. */
@@ -93,20 +93,20 @@ export function shapeOutline(kind: ShapeKind): Outline {
 }
 
 /**
- * Il ridimensionamento dall'angolo (spec 3b §5): la misura vera più il trascinamento, allineata alla
- * griglia e mai sotto quella del testo. `w`/`h` sono le misure scelte da scrivere nella view: `null`
- * dove la misura nuova non supera quella del testo, così portare la maniglia fino al testo riporta la
- * forma alla misura automatica (scostamento 3 del piano). `size` è il rettangolo da mostrare come guida.
+ * Il ridimensionamento da uno spigolo (spec 3b §5): la misura vera più il trascinamento, allineata
+ * alla griglia e mai sotto quella del testo, con lo spigolo opposto fermo. `w`/`h` sono le misure
+ * scelte da scrivere nella view: `null` dove la misura nuova non supera quella del testo, così portare
+ * la maniglia fino al testo riporta la forma alla misura automatica (scostamento 3 del piano). `rect`
+ * è il riquadro nuovo, origine compresa: la guida durante il gesto e la view al rilascio.
  */
 export function resizedShape(
   shape: Pick<Shape, "kind" | "label">,
-  view: Pick<ShapeView, "w" | "h">,
+  view: Pick<ShapeView, "x" | "y" | "w" | "h">,
+  corner: Corner,
   dx: number,
   dy: number,
-): { size: Size; w: number | null; h: number | null } {
+): { rect: Rect; w: number | null; h: number | null } {
   const text = shapeTextSize(shape)
-  const now = shapeSize(shape, view)
-  const w = Math.max(text.w, snap(now.w + dx))
-  const h = Math.max(text.h, snap(now.h + dy))
-  return { size: { w, h }, w: w > text.w ? w : null, h: h > text.h ? h : null }
+  const rect = resizeFromCorner({ x: view.x, y: view.y, ...shapeSize(shape, view) }, text, corner, dx, dy)
+  return { rect, w: rect.w > text.w ? rect.w : null, h: rect.h > text.h ? rect.h : null }
 }

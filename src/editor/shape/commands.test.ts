@@ -137,10 +137,10 @@ describe("comandi delle frecce", () => {
 })
 
 describe("resizeShape", () => {
-  it("scrive la misura scelta, e la stessa misura non aggiunge una voce di annulla", () => {
+  it("scrive origine e misura scelta, e le stesse non aggiungono una voce di annulla", () => {
     tre()
-    expect(state().dispatch(resizeShape("b", 200, 120))).toBe(true)
-    expect(part().view.nodes["b"]).toMatchObject({ w: 200, h: 120 })
-    expect(state().dispatch(resizeShape("b", 200, 120))).toBe(false)
+    expect(state().dispatch(resizeShape("b", { x: 10, y: 20, w: 200, h: 120 }))).toBe(true)
+    expect(part().view.nodes["b"]).toMatchObject({ x: 10, y: 20, w: 200, h: 120 })
+    expect(state().dispatch(resizeShape("b", { x: 10, y: 20, w: 200, h: 120 }))).toBe(false)
   })
 })

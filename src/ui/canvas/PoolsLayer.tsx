@@ -77,7 +77,7 @@ function PoolFrame({ part, poolId, selected, handles }: { part: PoolsPart; poolI
             <rect
               key={`maniglia-${lane.id}`}
               data-resize={id}
-              data-resize-lane={lane.id}
+              data-resize-handle={lane.id}
               x={POOL_HEADER_W}
               y={lane.y - rect.y + lane.h - HANDLE / 2}
               width={lane.w}

@@ -288,10 +288,10 @@ export function createInteractionRunner(): InteractionRunner {
       }
       case "preview-resize":
         // Solo una guida sul DOM durante il gesto: il documento cambia una volta sola, al rilascio.
-        showGuide(canvasOps(documentStore.getState().doc).resize(fx.key, fx.lane, fx.dx, fx.dy)?.rect ?? null)
+        showGuide(canvasOps(documentStore.getState().doc).resize(fx.key, fx.handle, fx.dx, fx.dy)?.rect ?? null)
         break
       case "commit-resize": {
-        const result = canvasOps(documentStore.getState().doc).resize(fx.key, fx.lane, fx.dx, fx.dy)
+        const result = canvasOps(documentStore.getState().doc).resize(fx.key, fx.handle, fx.dx, fx.dy)
         if (result) documentStore.getState().dispatch(result.recipe)
         break
       }

@@ -478,15 +478,25 @@ describe("canvasOps e le forme (spec 3b)", () => {
   it("resize allarga la forma in un passo di annulla, e riportata al testo torna automatica", () => {
     const s = add("shape", { x: 0, y: 0 }, "rect")
     const view = () => shapeDiagram(state().doc).view.nodes[splitKey(s).key]!
-    const grande = canvasOps(state().doc).resize(s, null, 100, 60)!
+    const grande = canvasOps(state().doc).resize(s, "se", 100, 60)!
     expect(grande.rect).toEqual({ x: 0, y: 0, w: 160, h: 100 })
     state().dispatch(grande.recipe)
     expect(view()).toMatchObject({ w: 160, h: 100 })
-    const indietro = canvasOps(state().doc).resize(s, null, -100, -60)!
+    const indietro = canvasOps(state().doc).resize(s, "se", -100, -60)!
     state().dispatch(indietro.recipe)
     expect(view()).toMatchObject({ w: null, h: null })
     state().undo()
     expect(view()).toMatchObject({ w: 160, h: 100 })
+  })
+
+  it("resize da nw sposta l'origine della forma, e una maniglia che non è uno spigolo non fa niente", () => {
+    const s = add("shape", { x: 0, y: 0 }, "rect")
+    const prima = shapeDiagram(state().doc).view.nodes[splitKey(s).key]!
+    const r = canvasOps(state().doc).resize(s, "nw", -40, -20)!
+    expect(r.rect).toEqual({ x: prima.x - 40, y: prima.y - 20, w: 100, h: 60 })
+    state().dispatch(r.recipe)
+    expect(shapeDiagram(state().doc).view.nodes[splitKey(s).key]).toMatchObject({ x: prima.x - 40, y: prima.y - 20, w: 100, h: 60 })
+    expect(canvasOps(state().doc).resize(s, null, 10, 10)).toBeNull()
   })
 
   it("un resize via commit produce esattamente una voce di annulla", () => {
@@ -496,7 +506,7 @@ describe("canvasOps e le forme (spec 3b)", () => {
     state().load(doc)
     const key = qualify("shape", "s")
     const view = () => shapeDiagram(state().doc).view.nodes["s"]!
-    const r = canvasOps(state().doc).resize(key, null, 100, 60)!
+    const r = canvasOps(state().doc).resize(key, "se", 100, 60)!
     state().dispatch(r.recipe)
     expect(state().past.length).toBe(1)
     expect(view()).toMatchObject({ w: 160, h: 100 })

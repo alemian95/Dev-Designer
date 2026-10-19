@@ -1,4 +1,5 @@
 import type { DevDocument } from "@/model/document"
+import { CORNERS } from "../geometry"
 import { ShapeKindSchema } from "@/model/shape/schema"
 import { validateShapes } from "@/model/shape/validate"
 import { addArrow, addShape, deleteShapeItems, duplicateShapes, resizeShape, setArrowAnchors, shapeLayoutGraph } from "../shape/commands"
@@ -50,14 +51,15 @@ export function shapeOps(doc: DevDocument): DiagramOps {
 
     layoutGraph: () => shapeLayoutGraph(diagram()),
 
-    // Una forma ha una maniglia sola, nell'angolo in basso a destra: `lane` non si usa (spec 3b §5).
-    resize: (key, _lane, dx, dy) => {
+    // Una forma ha una maniglia per spigolo: `handle` dice quale (spec 3b §5).
+    resize: (key, handle, dx, dy) => {
       const d = diagram()
       const shape = d.model.shapes[key]
       const view = d.view.nodes[key]
-      if (!shape || !view) return null
-      const next = resizedShape(shape, view, dx, dy)
-      return { rect: { x: view.x, y: view.y, ...next.size }, recipe: resizeShape(key, next.w, next.h) }
+      const corner = CORNERS.find((c) => c === handle)
+      if (!shape || !view || !corner) return null
+      const { rect, w, h } = resizedShape(shape, view, corner, dx, dy)
+      return { rect, recipe: resizeShape(key, { x: rect.x, y: rect.y, w, h }) }
     },
 
     validate: () => validateShapes(diagram().model),

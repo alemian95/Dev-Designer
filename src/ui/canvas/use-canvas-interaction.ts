@@ -37,7 +37,7 @@ export function hitTest(el: Element | null): Hit {
   }
   // Le maniglie stanno dentro il gruppo del pool, che è un nodo: vanno guardate prima.
   const handle = el?.closest("[data-resize]")
-  if (handle) return { kind: "resize", key: handle.getAttribute("data-resize")!, lane: handle.getAttribute("data-resize-lane") }
+  if (handle) return { kind: "resize", key: handle.getAttribute("data-resize")!, handle: handle.getAttribute("data-resize-handle") }
   const node = el?.closest("[data-node-id]")
   if (node) return { kind: "node", key: node.getAttribute("data-node-id")!, backdrop: !!node.closest("[data-backdrop]") }
   const edge = el?.closest("[data-edge-id]")

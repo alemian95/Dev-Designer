@@ -92,13 +92,13 @@ export interface DiagramOps {
    */
   layoutRecipe?(positions: LayoutPositions, offset: Point): Recipe
   /**
-   * Il ridimensionamento da una maniglia: di un pool dal suo bordo destro (`lane` `null`) o di una sua
-   * corsia dal bordo inferiore (`lane` = id della corsia, spec 2b §5); di una forma dal suo angolo in
-   * basso a destra, con `lane` sempre `null` (spec 3b §5). Torna il rettangolo da mostrare come guida
+   * Il ridimensionamento da una maniglia `handle`: di un pool dal suo bordo destro (`null`) o di una
+   * sua corsia dal bordo inferiore (l'id della corsia, spec 2b §5); di un nodo da uno spigolo (un
+   * `Corner`). Torna il rettangolo da mostrare come guida
    * durante il gesto e la recipe da applicare al rilascio, calcolati con la stessa regola; `null` se
    * la maniglia non appartiene al frame. Assente: niente si ridimensiona.
    */
-  resize?(key: string, lane: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
+  resize?(key: string, handle: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
   validate(): Issue[]
 }
 

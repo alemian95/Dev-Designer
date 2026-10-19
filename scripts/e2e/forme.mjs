@@ -120,7 +120,7 @@ export async function run(browser, base) {
       await page.keyboard.press("Escape")
       const c = center(await boxOf(rettangolo))
       await page.mouse.click(c.x, c.y)
-      const handle = page.locator('[data-resize^="shape/"]')
+      const handle = page.locator('[data-resize^="shape/"][data-resize-handle="se"]')
       await handle.waitFor()
       const before = await boxOf(rettangolo)
       await drag(page, center(await boxOf(handle)), { x: before.x + before.w + 120, y: before.y + before.h + 60 })

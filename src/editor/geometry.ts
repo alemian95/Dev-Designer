@@ -18,6 +18,22 @@ export function snap(v: number): number {
   return Math.round(v / GRID) * GRID
 }
 
+/** I quattro spigoli di un riquadro: le maniglie di ridimensionamento di un nodo. */
+export type Corner = "nw" | "ne" | "se" | "sw"
+export const CORNERS: readonly Corner[] = ["nw", "ne", "se", "sw"]
+
+/**
+ * Il riquadro `r` trascinato dallo spigolo `corner` di (`dx`, `dy`): la misura si allinea alla griglia
+ * e non scende sotto `min`, e lo spigolo opposto resta fermo.
+ */
+export function resizeFromCorner(r: Rect, min: Size, corner: Corner, dx: number, dy: number): Rect {
+  const west = corner === "nw" || corner === "sw"
+  const north = corner === "nw" || corner === "ne"
+  const w = Math.max(min.w, snap(r.w + (west ? -dx : dx)))
+  const h = Math.max(min.h, snap(r.h + (north ? -dy : dy)))
+  return { x: west ? r.x + r.w - w : r.x, y: north ? r.y + r.h - h : r.y, w, h }
+}
+
 export function rectsBounds(rects: readonly Rect[]): Rect | null {
   if (rects.length === 0) return null
   const x1 = Math.min(...rects.map((r) => r.x))

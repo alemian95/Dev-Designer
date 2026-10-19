@@ -11,7 +11,7 @@ import type { Point, Rect } from "../geometry"
 import { connectAcross, deleteLinks, linksTouching, setLinkAnchors, type ConnectResult } from "../links/commands"
 import { linkGeometry } from "../links/geometry"
 import { anchorNote, anchorsTouching, detachDangling, liveAnchored } from "../note/anchor"
-import { anchorPort, assignPorts, autoPorts, offeredAnchors, samePorts, type EdgePorts, type Outline } from "../ports"
+import { anchorPort, assignPorts, autoPorts, OFFERED_ANCHORS, samePorts, type EdgePorts, type Outline } from "../ports"
 import { familyOps, type EdgeEnds, type EditTarget } from "./ops"
 
 export type { ConnectResult }
@@ -70,7 +70,7 @@ export interface CanvasOps {
   deleteItems(nodeKeys: readonly string[], edgeKeys: readonly string[]): Recipe | null
   duplicateNodes(keys: readonly string[]): { keys: string[]; recipe: Recipe }
   /** Il ridimensionamento di un frame o di una forma, sulla chiave con prefisso (vedi `DiagramOps.resize`). */
-  resize(key: string, lane: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
+  resize(key: string, handle: string | null, dx: number, dy: number): { rect: Rect; recipe: Recipe } | null
   /** Solo le famiglie con contenuto: una famiglia vuota non ha problemi da segnalare. Poi i collegamenti. */
   validate(): Issue[]
 }
@@ -197,7 +197,7 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       const r = rectOf(node)
       if (!r) return []
       const outline = outlineOf(node)
-      return offeredAnchors(outline).map((anchor) => ({ anchor, point: anchorPort(r, outline, anchor).point }))
+      return OFFERED_ANCHORS.map((anchor) => ({ anchor, point: anchorPort(r, outline, anchor).point }))
     },
 
     addNode: (at, family, variant) => {
@@ -254,9 +254,9 @@ export function canvasOps(doc: DevDocument): CanvasOps {
       return deletions && combine([deletions, detachDangling(liveAnchored(doc))])
     },
 
-    resize: (qualified, lane, dx, dy) => {
+    resize: (qualified, handle, dx, dy) => {
       const { family, key } = splitKey(qualified)
-      return ops(family).resize?.(key, lane, dx, dy) ?? null
+      return ops(family).resize?.(key, handle, dx, dy) ?? null
     },
 
     duplicateNodes: (keys) => {

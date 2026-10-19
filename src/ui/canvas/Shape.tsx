@@ -2,7 +2,7 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
-import { ROW_H } from "@/editor/geometry"
+import { CORNERS, ROW_H } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import { shapeSize, shapeText } from "@/editor/shape/geometry"
 import { shapeDiagram } from "@/editor/shape-access"
@@ -68,18 +68,21 @@ export const ShapeNodeView = memo(function ShapeNodeView({ id, shape, view, sele
           </text>
         </g>
       )}
-      {/* `data-resize` con la chiave della forma: `hitTest` la guarda prima del nodo, come per i pool (spec 3b §5). */}
-      {handle && (
-        <rect
-          data-resize={id}
-          x={w - HANDLE / 2}
-          y={h - HANDLE / 2}
-          width={HANDLE}
-          height={HANDLE}
-          fill="var(--primary)"
-          style={{ cursor: "nwse-resize" }}
-        />
-      )}
+      {/* `data-resize` con la chiave della forma e lo spigolo: `hitTest` la guarda prima del nodo, come per i pool (spec 3b §5). */}
+      {handle &&
+        CORNERS.map((corner) => (
+          <rect
+            key={corner}
+            data-resize={id}
+            data-resize-handle={corner}
+            x={(corner === "ne" || corner === "se" ? w : 0) - HANDLE / 2}
+            y={(corner === "sw" || corner === "se" ? h : 0) - HANDLE / 2}
+            width={HANDLE}
+            height={HANDLE}
+            fill="var(--primary)"
+            style={{ cursor: corner === "nw" || corner === "se" ? "nwse-resize" : "nesw-resize" }}
+          />
+        ))}
     </g>
   )
 })

@@ -1,6 +1,6 @@
 import { anchorsOf, type Anchor } from "@/model/shared"
 import { DOWN, LEFT, RIGHT, UP, type Dir, type EdgeEnds } from "./edge-routing"
-import type { Point, Rect } from "./geometry"
+import type { Corner, Point, Rect } from "./geometry"
 
 /**
  * Il contorno vero di un nodo (spec agganci §4): dove cade un aggancio che sul riquadro sarebbe nel
@@ -34,16 +34,13 @@ export type Side = "n" | "e" | "s" | "w"
 
 export const SIDE_DIR: Readonly<Record<Side, Dir>> = { n: UP, e: RIGHT, s: DOWN, w: LEFT }
 
-const SIDE_ANCHORS: readonly Anchor[] = ["n1", "n2", "n3", "e1", "e2", "e3", "s1", "s2", "s3", "w1", "w2", "w3"]
-const ALL_ANCHORS: readonly Anchor[] = [...SIDE_ANCHORS, "nw", "ne", "se", "sw"]
+/**
+ * Gli agganci che un nodo offre: i tre per lato. Gli spigoli sono delle maniglie di ridimensionamento;
+ * come agganci restano validi per gli archi già salvati, ma non si scelgono più.
+ */
+export const OFFERED_ANCHORS: readonly Anchor[] = ["n1", "n2", "n3", "e1", "e2", "e3", "s1", "s2", "s3", "w1", "w2", "w3"]
 
-type Corner = "nw" | "ne" | "se" | "sw"
 const isCorner = (a: Anchor): a is Corner => a === "nw" || a === "ne" || a === "se" || a === "sw"
-
-/** Gli agganci che un contorno mostra: gli spigoli solo dove esistono davvero (spec §4). */
-export function offeredAnchors(outline: Outline): readonly Anchor[] {
-  return outline === "rect" || typeof outline === "object" ? ALL_ANCHORS : SIDE_ANCHORS
-}
 
 /** Il lato che un versore d'uscita indica. */
 export function sideOf(dir: Dir): Side {

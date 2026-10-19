@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { DOWN, LEFT, RIGHT, UP, type EdgeEnds } from "./edge-routing"
 import type { Rect } from "./geometry"
-import { anchorPort, assignPorts, autoPorts, LOOP_GAP, offeredAnchors, type Outline, samePorts, SELF_LOOP_OFFSET, STUB } from "./ports"
+import { anchorPort, assignPorts, autoPorts, LOOP_GAP, type Outline, samePorts, SELF_LOOP_OFFSET, STUB } from "./ports"
 
 const R = { x: 0, y: 0, w: 100, h: 40 }
 const close = (p: { x: number; y: number }, x: number, y: number) => {
@@ -58,17 +58,6 @@ describe("anchorPort sui contorni non rettangolari", () => {
   it("uno spigolo su un rombo cade sul contorno, in diagonale verso il centro", () => {
     close(anchorPort(R, "diamond", "nw").point, 25, 10)
     close(anchorPort(R, "ellipse", "se").point, 50 + 50 * Math.SQRT1_2, 20 + 20 * Math.SQRT1_2)
-  })
-})
-
-describe("offeredAnchors", () => {
-  it("rettangolo e parallelogramma offrono 16 punti, le forme senza spigoli 12", () => {
-    expect(offeredAnchors("rect")).toHaveLength(16)
-    expect(offeredAnchors({ skew: 16 })).toHaveLength(16)
-    for (const o of ["diamond", "ellipse", "stadium"] as const) {
-      expect(offeredAnchors(o)).toHaveLength(12)
-      expect(offeredAnchors(o)).not.toContain("nw")
-    }
   })
 })
 

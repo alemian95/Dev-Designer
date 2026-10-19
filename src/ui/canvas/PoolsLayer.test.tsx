@@ -82,7 +82,7 @@ describe("PoolsLayer — connesso allo store", () => {
     documentStore.getState().load(withPool(createDocument("t"), ["l1", "l2"]))
     const { html, smonta } = monta()
     expect(html()).toContain('data-resize="flow/p1"')
-    expect(html()).toContain('data-resize-lane="l2"')
+    expect(html()).toContain('data-resize-handle="l2"')
     smonta()
     const part = documentStore.getState().doc.diagram.flow
     expect(renderToStaticMarkup(<PoolsLayerView part={part} />)).not.toContain("data-resize")

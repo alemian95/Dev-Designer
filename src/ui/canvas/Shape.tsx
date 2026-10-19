@@ -2,13 +2,12 @@ import { memo } from "react"
 import { useStore } from "zustand"
 import { documentStore } from "@/editor/document-store"
 import { qualify } from "@/editor/families"
-import { CORNERS, ROW_H } from "@/editor/geometry"
+import { ROW_H } from "@/editor/geometry"
 import { selId, sessionStore } from "@/editor/session-store"
 import { shapeSize, shapeText } from "@/editor/shape/geometry"
 import { shapeDiagram } from "@/editor/shape-access"
 import type { Shape, ShapeView } from "@/model/shape/schema"
 import { registerNode } from "./dom-registry"
-import { HANDLE } from "./resize-handle"
 
 interface Props {
   /** La chiave con prefisso: la forma si registra e si colpisce con quella. */
@@ -16,8 +15,6 @@ interface Props {
   shape: Shape
   view: ShapeView
   selected: boolean
-  /** Mostra la maniglia di ridimensionamento: solo per la forma selezionata da sola. */
-  handle?: boolean
 }
 
 /**
@@ -27,7 +24,7 @@ interface Props {
  * flusso: il centro è l'unico punto che sta dentro tutte e tre le forme. Un testo vuoto mostra il
  * segnaposto in grigio.
  */
-export const ShapeNodeView = memo(function ShapeNodeView({ id, shape, view, selected, handle = false }: Props) {
+export const ShapeNodeView = memo(function ShapeNodeView({ id, shape, view, selected }: Props) {
   const { w, h } = shapeSize(shape, view)
   const text = shapeText(shape)
   const lines = text === "" ? [] : text.split("\n")
@@ -68,21 +65,6 @@ export const ShapeNodeView = memo(function ShapeNodeView({ id, shape, view, sele
           </text>
         </g>
       )}
-      {/* `data-resize` con la chiave della forma e lo spigolo: `hitTest` la guarda prima del nodo, come per i pool (spec 3b §5). */}
-      {handle &&
-        CORNERS.map((corner) => (
-          <rect
-            key={corner}
-            data-resize={id}
-            data-resize-handle={corner}
-            x={(corner === "ne" || corner === "se" ? w : 0) - HANDLE / 2}
-            y={(corner === "sw" || corner === "se" ? h : 0) - HANDLE / 2}
-            width={HANDLE}
-            height={HANDLE}
-            fill="var(--primary)"
-            style={{ cursor: corner === "nw" || corner === "se" ? "nwse-resize" : "nesw-resize" }}
-          />
-        ))}
     </g>
   )
 })
@@ -93,7 +75,6 @@ export function ShapeNode({ nodeKey }: { nodeKey: string }) {
   const shape = useStore(documentStore, (s) => shapeDiagram(s.doc).model.shapes[nodeKey])
   const view = useStore(documentStore, (s) => shapeDiagram(s.doc).view.nodes[nodeKey])
   const selected = useStore(sessionStore, (s) => s.selection.has(selId("node", id)))
-  const alone = useStore(sessionStore, (s) => s.selection.size === 1 && s.selection.has(selId("node", id)))
   if (!shape || !view) return null
-  return <ShapeNodeView id={id} shape={shape} view={view} selected={selected} handle={alone} />
+  return <ShapeNodeView id={id} shape={shape} view={view} selected={selected} />
 }

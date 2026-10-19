@@ -22,12 +22,6 @@ describe("ShapeNodeView", () => {
     expect(out).not.toContain("<ellipse")
   })
 
-  it("le quattro maniglie ci sono solo quando le si chiede, con la chiave della forma e lo spigolo", () => {
-    const con = renderToStaticMarkup(<ShapeNodeView id="shape/a" shape={{ kind: "rect", label: "" }} view={view} selected={true} handle />)
-    expect(con.match(/data-resize="shape\/a"/g)).toHaveLength(4)
-    for (const c of ["nw", "ne", "se", "sw"]) expect(con).toContain(`data-resize-handle="${c}"`)
-    expect(html("rect", "")).not.toContain("data-resize")
-  })
 })
 
 describe("ArrowEdgeView", () => {

@@ -10,6 +10,7 @@ import { MembersEditor } from "./MembersEditor"
 import { NoteEditor } from "./NoteEditor"
 import { Overlay } from "./Overlay"
 import { PoolsLayer } from "./PoolsLayer"
+import { ResizeHandlesLayer } from "./ResizeHandlesLayer"
 import { SequenceEditor } from "./SequenceEditor"
 import { ShapeEditor } from "./ShapeEditor"
 import { useCanvasInteraction } from "./use-canvas-interaction"
@@ -59,6 +60,8 @@ export function Canvas({ children }: { children?: ReactNode }) {
           })}
           {/* Agganci e maniglie dei capi: sopra i nodi, perché si afferrano (spec agganci §6). */}
           <AnchorsLayer />
+          {/* Le maniglie di ridimensionamento agli spigoli del nodo selezionato: sopra anche gli agganci. */}
+          <ResizeHandlesLayer />
           {children}
           <Overlay />
         </ViewportGroup>

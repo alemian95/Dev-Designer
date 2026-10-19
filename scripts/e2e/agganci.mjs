@@ -1,7 +1,8 @@
 /**
  * End-to-end degli agganci degli archi: due archi da sorgenti diverse arrivano in due punti del
  * bersaglio; Collega parte da un aggancio e finisce su un aggancio; un capo trascinato sul corpo del
- * nodo torna automatico, e ⌘Z lo riporta al punto di prima.
+ * nodo torna automatico, e ⌘Z lo riporta al punto di prima; un'entità selezionata ha quattro maniglie
+ * agli spigoli e nessun aggancio lì, si allarga dallo spigolo in alto a sinistra e ⌘Z la riporta.
  *
  * Uso: `pnpm e2e`. Da solo (dopo `pnpm build`): `node scripts/e2e/agganci.mjs`. `HEADLESS=0` per vedere.
  */
@@ -145,6 +146,40 @@ export async function run(browser, base) {
       await page.waitForFunction(([sel, d]) => document.querySelectorAll(`${sel} [data-edge-line]`)[2]?.getAttribute("d") !== d, [ARROW, before])
       await page.keyboard.press("ControlOrMeta+z")
       await page.waitForFunction(([sel, d]) => document.querySelectorAll(`${sel} [data-edge-line]`)[2]?.getAttribute("d") === d, [ARROW, before])
+    })
+
+    await step("un'entità si allarga dallo spigolo in alto a sinistra, e ⌘Z la riporta", async () => {
+      await page.keyboard.press("Escape")
+      await page.keyboard.press("e")
+      await page.mouse.click(canvas.x + 650, canvas.y + 650)
+      await page.keyboard.press("Escape") // chiude l'editor del nome
+      const entity = page.locator('[data-node-id^="er/"]')
+      await entity.first().click()
+      await entity.first().hover()
+      await page.locator("[data-anchor]").first().waitFor()
+      const corners = await page.locator('[data-anchor="nw"], [data-anchor="ne"], [data-anchor="se"], [data-anchor="sw"]').count()
+      if (corners !== 0) throw new Error(`gli spigoli non devono offrire agganci, trovati ${corners}`)
+      const handle = page.locator('[data-resize^="er/"][data-resize-handle="nw"]')
+      await handle.waitFor()
+      if ((await page.locator('[data-resize^="er/"]').count()) !== 4) throw new Error("attese quattro maniglie sull'entità")
+      const before = await boxOf(entity)
+      await drag(page, center(await boxOf(handle)), { x: before.x - 80, y: before.y - 60 })
+      await page.waitForFunction(
+        ([sel, w]) => document.querySelector(sel).getBoundingClientRect().width > w + 50,
+        ['[data-node-id^="er/"]', before.w],
+      )
+      const after = await boxOf(entity)
+      // Lo spigolo opposto resta fermo.
+      if (Math.abs(after.x + after.w - (before.x + before.w)) > 1.5 || Math.abs(after.y + after.h - (before.y + before.h)) > 1.5) {
+        throw new Error(`lo spigolo in basso a destra si è mosso: prima ${JSON.stringify(before)}, dopo ${JSON.stringify(after)}`)
+      }
+      // Larghezza misurata come nelle attese di sopra: `boundingBox` conta anche il tratto del bordo.
+      const width = await page.evaluate((sel) => document.querySelector(sel).getBoundingClientRect().width, '[data-node-id^="er/"]')
+      await page.keyboard.press("ControlOrMeta+z")
+      await page.waitForFunction(
+        ([sel, w]) => document.querySelector(sel).getBoundingClientRect().width < w - 50,
+        ['[data-node-id^="er/"]', width],
+      )
     })
 
     await context.close()

@@ -14,8 +14,10 @@ Canvas SVG con pan, zoom, trascinamento di uno o più elementi, selezione a riqu
 nodi e collegamenti. In alto la barra con annulla, ripeti, zoom, «Disponi» e tema chiaro o scuro; a
 sinistra gli strumenti; a destra il pannello delle proprietà e quello dei problemi. I nomi si
 modificano col doppio clic sul canvas. Ogni azione si annulla. Passando sopra un nodo compaiono i punti
-di aggancio: trascinando da un punto l'arco parte da lì, e selezionato un arco se ne spostano i capi. I
-capi lasciati automatici si distribuiscono lungo il lato.
+di aggancio, tre per lato: trascinando da un punto l'arco parte da lì, e selezionato un arco se ne
+spostano i capi. I capi lasciati automatici si distribuiscono lungo il lato. Un nodo selezionato da solo
+ha una maniglia quadrata per angolo: si allarga oltre il suo contenuto, mai sotto, e riportato al
+contenuto torna alla misura automatica. Le sequenze si dispongono da sole e non hanno maniglie.
 
 - **ER**: entità con attributi tipizzati, chiavi e relazioni con cardinalità.
 - **Classi UML**: classi con stereotipo `class`, `interface`, `abstract` o `enum`. Attributi e metodi
@@ -34,7 +36,7 @@ capi lasciati automatici si distribuiscono lungo il lato.
   pannello staccano la nota; eliminare l'elemento la stacca.
 - **Forme**: rettangolo (`Q`), ellisse (`O`) e testo (`T`), collegati da frecce con Collega. Stanno
   sotto tutti gli altri elementi, e dentro una forma si può creare qualunque elemento. Una forma
-  nasce grande quanto il suo testo e si allarga dalla maniglia nell'angolo. La freccia ha la punta
+  nasce grande quanto il suo testo e si allarga dalle maniglie negli angoli. La freccia ha la punta
   alla fine, a entrambi i capi o da nessuna parte, è continua o tratteggiata, e si inverte dal
   pannello.
 - **Sequenze**: lo strumento «Sequenza» (`S`) crea una sequenza con due partecipanti e un messaggio.
@@ -210,7 +212,7 @@ ognuno in un contesto di browser separato:
 - **Forme**: freccia con punte, tratteggio e inversione, forma creata dentro un'altra,
   ridimensionamento e undo, nota ancorata, «Disponi», Collega rifiutato verso un'entità.
 - **Agganci**: due archi verso lo stesso nodo in punti diversi, Collega da un aggancio a un aggancio,
-  capo riportato in automatico e annullato.
+  capo riportato in automatico e annullato, entità allargata dall'angolo in alto a sinistra e annullata.
 - **Flowchart**: pool con due corsie, nodi e archi etichettati, «Disponi» dentro le corsie,
   spostamento fra corsie con un solo undo, nodo portato fuori dal pool, export Mermaid.
 - **Canvas misto**: entità, classe e nodo di flusso insieme, collegamenti fra famiglie,

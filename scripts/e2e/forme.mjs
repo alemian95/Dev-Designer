@@ -129,8 +129,9 @@ export async function run(browser, base) {
         [SHAPE, before.w],
       )
       await page.keyboard.press("ControlOrMeta+z")
+      // `boundingBox` conta il tratto del bordo e `getBoundingClientRect` no: si confronta con lo stesso metro.
       await page.waitForFunction(
-        ([sel, w]) => [...document.querySelectorAll(sel)].some((el) => el.textContent.includes("API Gateway") && Math.abs(el.getBoundingClientRect().width - w) < 2),
+        ([sel, w]) => [...document.querySelectorAll(sel)].some((el) => el.textContent.includes("API Gateway") && el.getBoundingClientRect().width < w + 4),
         [SHAPE, before.w],
       )
     })

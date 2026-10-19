@@ -193,6 +193,20 @@ Il campo `pools` del conteggio dell'import serve alla voce sequence per i
 partecipanti: nome fuorviante. Rimedio: un campo proprio quando una seconda
 famiglia lo richiede.
 
+### DT-45 · un nodo di flusso allargato non allarga la sua corsia
+
+Allargato dagli spigoli, un nodo in una corsia vi rientra (`keepInLane`), ma
+corsia e pool non crescono per contenerlo: un nodo più grande della corsia ne
+sporge. Durante il gesto la guida mostra il riquadro prima del rientro.
+Rimedio: allargare corsia e pool nella stessa recipe. Costo-se-sbagliato: un
+nodo che esce dal suo pool finché non si allarga la corsia a mano.
+
+### DT-46 · la misura scelta a mano si perde nell'export Mermaid
+
+`w`/`h` di entità, classi, nodi di flusso, note e forme non hanno un posto nel
+testo Mermaid (ADR 0009): un round-trip torna alla misura automatica.
+Costo-se-sbagliato: il ridimensionamento va rifatto dopo un import.
+
 ---
 
 ## Corretti

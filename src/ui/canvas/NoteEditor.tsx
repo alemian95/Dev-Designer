@@ -20,7 +20,7 @@ export function NoteEditor() {
   if (!own || own.target !== "body" || !note || !view) return null
 
   const close = () => sessionStore.getState().setEditing(null)
-  const { w, h } = noteSize(note)
+  const { w, h } = noteSize(note, view)
 
   return (
     <TextEditorOverlay

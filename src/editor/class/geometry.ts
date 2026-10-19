@@ -1,6 +1,6 @@
 import { memberLines } from "@/model/class/members"
 import type { ClassEnd, ClassNode, ClassRelation, RelationKind } from "@/model/class/schema"
-import type { NodeView } from "@/model/shared"
+import { chosenSize, type ChosenSize, type SizedNodeView } from "@/model/shared"
 import { pathFromPoints, routePorts, type Dir, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, HEADER_H, MIN_W, PAD_X, ROW_H, type Point, type Rect, type Size } from "../geometry"
 import type { EdgePorts } from "../ports"
@@ -18,7 +18,8 @@ function stereotypeText(node: ClassNode): string {
   return `«${node.stereotype}»`
 }
 
-export function classSize(node: ClassNode, collapsed: boolean): Size {
+export function classSize(node: ClassNode, view: ChosenSize): Size {
+  const collapsed = view.collapsed ?? false
   // Due chiamate separate a `memberLines`, una per scomparto — non una sola
   // sull'intera classe. È la stessa scelta di `ClassNodeView`
   // (ui/canvas/ClassNode.tsx): allineano i due punti dentro ciascun
@@ -43,11 +44,11 @@ export function classSize(node: ClassNode, collapsed: boolean): Size {
     (stereo ? STEREO_H : 0) +
     attrCount * ROW_H + (attrCount ? 6 : 0) +
     methodCount * ROW_H + (methodCount ? 6 : 0)
-  return { w, h }
+  return chosenSize({ w, h }, view)
 }
 
-export function classRect(node: ClassNode, view: NodeView): Rect {
-  return { x: view.x, y: view.y, ...classSize(node, view.collapsed) }
+export function classRect(node: ClassNode, view: SizedNodeView): Rect {
+  return { x: view.x, y: view.y, ...classSize(node, view) }
 }
 
 /** Lunghezza e semi-larghezza del triangolo vuoto (generalizzazione, realizzazione). */

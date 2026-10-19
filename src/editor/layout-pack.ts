@@ -80,7 +80,7 @@ function elementRect(ops: DiagramOps, graph: LayoutGraph, positions: LayoutPosit
 export async function layoutAll(doc: DevDocument, layout: (g: LayoutGraph) => Promise<LayoutPositions>): Promise<Recipe | null> {
   const families = FAMILIES.filter((f) => familyHasContent(doc, f))
   const plan = anchorPlan(doc)
-  const notes = noteDiagram(doc).model.notes
+  const { model: { notes }, view: noteViews } = noteDiagram(doc)
   const blocks = await Promise.all(
     families.map(async (family) => {
       const ops = familyOps(doc, family)
@@ -92,7 +92,7 @@ export async function layoutAll(doc: DevDocument, layout: (g: LayoutGraph) => Pr
         if (split.family !== family) return []
         const rect = elementRect(ops, graph, positions, split.key)
         const note = notes[key]
-        return rect && note ? [{ x: rect.x + dx, y: rect.y + dy, ...noteSize(note) }] : []
+        return rect && note ? [{ x: rect.x + dx, y: rect.y + dy, ...noteSize(note, noteViews.nodes[key]) }] : []
       })
       const bounds = rectsBounds([...(base ? [base] : []), ...anchored])
       return { family, ops, positions, bounds }

@@ -14,12 +14,12 @@ const vuota: ClassNode = { name: "Cliente", stereotype: "class", attributes: [],
 
 describe("classSize", () => {
   it("una classe senza membri è alta come il solo header", () => {
-    expect(classSize(vuota, false)).toEqual({ w: MIN_W, h: HEADER_H })
+    expect(classSize(vuota, {})).toEqual({ w: MIN_W, h: HEADER_H })
   })
 
   it("uno scomparto vuoto non occupa spazio", () => {
     const soloAttributi: ClassNode = { ...vuota, attributes: [{ name: "id", type: "int", visibility: "public", isStatic: false }] }
-    expect(classSize(soloAttributi, false).h).toBe(HEADER_H + ROW_H + 6)
+    expect(classSize(soloAttributi, {}).h).toBe(HEADER_H + ROW_H + 6)
   })
 
   it("due scomparti pieni sommano due volte il margine", () => {
@@ -29,21 +29,21 @@ describe("classSize", () => {
       methods: [{ name: "salva", type: "void", visibility: "public", isStatic: false, isAbstract: false, parameters: [] }],
     }
     // Il margine di 6 px sta sotto ogni scomparto che ha righe, quindi due volte.
-    expect(classSize(piena, false).h).toBe(HEADER_H + ROW_H + 6 + ROW_H + 6)
+    expect(classSize(piena, {}).h).toBe(HEADER_H + ROW_H + 6 + ROW_H + 6)
   })
 
   it("interface ed enum aggiungono la riga dello stereotipo, class e abstract no", () => {
     // Il titolo prometteva quattro casi e il corpo ne asseriva due: `enum` — che è l'altro
     // stereotipo con la riga — e `class`, che è il default, non erano provati.
-    expect(classSize({ ...vuota, stereotype: "interface" }, false).h).toBe(HEADER_H + STEREO_H)
-    expect(classSize({ ...vuota, stereotype: "enum" }, false).h).toBe(HEADER_H + STEREO_H)
-    expect(classSize({ ...vuota, stereotype: "class" }, false).h).toBe(HEADER_H)
-    expect(classSize({ ...vuota, stereotype: "abstract" }, false).h).toBe(HEADER_H)
+    expect(classSize({ ...vuota, stereotype: "interface" }, {}).h).toBe(HEADER_H + STEREO_H)
+    expect(classSize({ ...vuota, stereotype: "enum" }, {}).h).toBe(HEADER_H + STEREO_H)
+    expect(classSize({ ...vuota, stereotype: "class" }, {}).h).toBe(HEADER_H)
+    expect(classSize({ ...vuota, stereotype: "abstract" }, {}).h).toBe(HEADER_H)
   })
 
   it("collassata: solo header, e lo stereotipo resta perché è nell'header", () => {
     const piena: ClassNode = { ...vuota, stereotype: "interface", attributes: [{ name: "id", type: "int", visibility: "public", isStatic: false }] }
-    expect(classSize(piena, true).h).toBe(HEADER_H + STEREO_H)
+    expect(classSize(piena, { collapsed: true }).h).toBe(HEADER_H + STEREO_H)
   })
 
   it("la larghezza cresce col membro più lungo e resta multipla di GRID", () => {
@@ -51,11 +51,11 @@ describe("classSize", () => {
       ...vuota,
       attributes: [{ name: "unAttributoDalNomeMoltoLungo", type: "Dictionary<string, int>", visibility: "public", isStatic: false }],
     }
-    const w = classSize(lungo, false).w
+    const w = classSize(lungo, {}).w
     expect(w).toBeGreaterThan(MIN_W)
     expect(w % GRID).toBe(0)
     // Il nome della classe è corto: la larghezza viene dal membro, non dall'header.
-    expect(w).toBeGreaterThan(classSize(vuota, false).w)
+    expect(w).toBeGreaterThan(classSize(vuota, {}).w)
   })
 
   it("combacia con la riga più lunga che il renderer produce davvero: due scomparti allineati separatamente, non uno solo", () => {
@@ -77,7 +77,7 @@ describe("classSize", () => {
     const renderedChars = Math.max(node.name.length, ...attrLines.map((l) => l.text.length), ...methodLines.map((l) => l.text.length))
     const expectedW = Math.max(MIN_W, Math.ceil((renderedChars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
 
-    expect(classSize(node, false).w).toBe(expectedW)
+    expect(classSize(node, {}).w).toBe(expectedW)
 
     // La misura a passata unica (quella che il difetto usava) sovrastima:
     // la colonna dei due punti del metodo lungo si trascina anche sull'attributo,

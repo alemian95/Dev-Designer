@@ -36,7 +36,8 @@ export function keepInSpan(start: number, length: number, size: number, v: numbe
 export function flowLayoutGraph(diagram: FlowDiagram): LayoutGraph {
   const nodes: LayoutNode[] = []
   for (const [key, node] of Object.entries(diagram.model.nodes)) {
-    if (diagram.view.nodes[key]) nodes.push({ id: key, ...flowNodeSize(node) })
+    const view = diagram.view.nodes[key]
+    if (view) nodes.push({ id: key, ...flowNodeSize(node, view) })
   }
 
   const present = new Set(nodes.map((n) => n.id))
@@ -63,7 +64,7 @@ function membersOf(diagram: FlowDiagram, positions: LayoutPositions, lane: strin
   return Object.entries(diagram.model.nodes)
     .flatMap(([key, node]) => {
       const pos = positions[key]
-      return node.lane === lane && pos ? [{ key, pos, size: flowNodeSize(node), row: 0 }] : []
+      return node.lane === lane && pos ? [{ key, pos, size: flowNodeSize(node, diagram.view.nodes[key]), row: 0 }] : []
     })
     .sort((a, b) => a.pos.x - b.pos.x || a.pos.y - b.pos.y)
 }
@@ -111,7 +112,7 @@ function poolExtent(diagram: FlowDiagram, positions: LayoutPositions): { x: numb
     const p = positions[key]
     if (!p) continue
     minX = Math.min(minX, p.x)
-    maxX = Math.max(maxX, p.x + flowNodeSize(node).w)
+    maxX = Math.max(maxX, p.x + flowNodeSize(node, diagram.view.nodes[key]).w)
   }
   if (minX > maxX) return { x: 0, w: POOL_MIN_W }
   return { x: minX - LANE_MARGIN - POOL_HEADER_W, w: Math.max(POOL_MIN_W, maxX - minX + 2 * LANE_MARGIN + POOL_HEADER_W) }
@@ -168,7 +169,7 @@ export function placedBounds(diagram: FlowDiagram, positions: LayoutPositions): 
   return rectsBounds([
     ...Object.entries(placed.positions).flatMap(([key, p]) => {
       const node = diagram.model.nodes[key]
-      return node ? [{ ...p, ...flowNodeSize(node) }] : []
+      return node ? [{ ...p, ...flowNodeSize(node, diagram.view.nodes[key]) }] : []
     }),
     ...Object.keys(placed.pools).flatMap((id) => poolRect(part, id) ?? []),
   ])
@@ -185,7 +186,7 @@ export function placedRectOf(diagram: FlowDiagram, positions: LayoutPositions, k
   const node = diagram.model.nodes[key]
   if (node) {
     const p = placed.positions[key]
-    return p ? { ...p, ...flowNodeSize(node) } : null
+    return p ? { ...p, ...flowNodeSize(node, diagram.view.nodes[key]) } : null
   }
   if (key in diagram.model.pools) {
     const part = { model: diagram.model, view: placed }

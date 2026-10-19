@@ -499,6 +499,17 @@ describe("canvasOps e le forme (spec 3b)", () => {
     expect(canvasOps(state().doc).resize(s, null, 10, 10)).toBeNull()
   })
 
+  it("un'entità e una nota si allargano da uno spigolo, e rectOf dà la misura nuova", () => {
+    for (const family of ["er", "note"] as const) {
+      const k = add(family, { x: 0, y: 0 })
+      const before = canvasOps(state().doc).rectOf(k)!
+      const r = canvasOps(state().doc).resize(k, "se", 100, 60)!
+      expect(r.rect.w).toBeGreaterThan(before.w)
+      state().dispatch(r.recipe)
+      expect(canvasOps(state().doc).rectOf(k)).toEqual(r.rect)
+    }
+  })
+
   it("un resize via commit produce esattamente una voce di annulla", () => {
     const doc = createDocument("t", "t")
     doc.diagram.shape.model.shapes["s"] = { kind: "rect", label: "" }

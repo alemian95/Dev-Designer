@@ -1,6 +1,6 @@
 import { LANE_MIN_H, POOL_HEADER_W, type FlowDiagram, type FlowEdge, type FlowNode, type FlowShape, type LaneView, type Pool, type PoolView } from "@/model/flow/schema"
 import { flowNodeSize } from "@/model/flow/size"
-import type { NodeView } from "@/model/shared"
+import type { SizedNodeView } from "@/model/shared"
 import { filledArrowPath, pathFromPoints, routePorts, type EdgeGeometry } from "../edge-routing"
 import type { Point, Rect } from "../geometry"
 import type { EdgePorts, Outline } from "../ports"
@@ -8,8 +8,8 @@ import type { EdgePorts, Outline } from "../ports"
 // La misura dei nodi vive nel modello (spec 2b §3): qui si riesporta.
 export { DECISION_FACTOR, flowNodeSize } from "@/model/flow/size"
 
-export function flowNodeRect(node: FlowNode, view: NodeView): Rect {
-  return { x: view.x, y: view.y, ...flowNodeSize(node) }
+export function flowNodeRect(node: FlowNode, view: SizedNodeView): Rect {
+  return { x: view.x, y: view.y, ...flowNodeSize(node, view) }
 }
 
 /** Inclinazione fissa del parallelogramma dell'`io`: non proporzionale a `w`, altrimenti un nodo

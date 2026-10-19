@@ -138,4 +138,24 @@ describe("flowOps.resize", () => {
     const doc = withPool(createDocument("test", "id-1"))
     expect(familyOps(doc, "flow").resize?.("p9", "l1", 0, 100)).toBeNull()
   })
+
+  it("un nodo si allarga da uno spigolo, e la sua misura entra in rectOf", () => {
+    const doc = createDocument("test", "id-1")
+    const { key, recipe } = familyOps(doc, "flow").addNode({ x: 0, y: 0 })
+    const added = produce(doc, recipe)
+    const before = familyOps(added, "flow").rectOf(key)!
+    const r = familyOps(added, "flow").resize?.(key, "se", 100, 60)
+    expect(r?.rect).toMatchObject({ x: before.x, y: before.y, w: before.w + 100, h: before.h + 60 })
+    expect(familyOps(produce(added, r!.recipe), "flow").rectOf(key)).toEqual(r!.rect)
+  })
+
+  it("un nodo allargato oltre la sua corsia vi rientra", () => {
+    const doc = withPool(createDocument("test", "id-1"), ["l1", "l2"], 100)
+    const { key, recipe } = familyOps(doc, "flow").addNode({ x: 100, y: 150 })
+    const added = produce(doc, recipe)
+    const r = familyOps(added, "flow").resize?.(key, "se", 0, 40)
+    const after = produce(added, r!.recipe)
+    expect(after.diagram.flow.model.nodes[key]!.lane).toBe("l2")
+    expectLaneInvariant(after.diagram.flow)
+  })
 })

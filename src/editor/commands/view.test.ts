@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { createDocument } from "@/model/document"
 import type { LayoutPositions } from "@/model/layout"
 import { documentStore } from "../document-store"
-import { applyLayout, diagramView, moveNodes, setCollapsed } from "./view"
+import { applyLayout, diagramView, moveNodes, resizeNode, setCollapsed } from "./view"
 
 const state = () => documentStore.getState()
 const view = () => diagramView(state().doc, "er")
@@ -109,5 +109,19 @@ describe("applyLayout condiviso", () => {
     it("nessuna posizione applicabile: nessuna modifica", () => {
       expect(state().dispatch(applyLayout("er", { sparita: { x: 1, y: 2 } }))).toBe(false)
     })
+  })
+})
+
+describe("resizeNode", () => {
+  beforeEach(() => state().load(docConDueNodi()))
+
+  it("scrive origine e misura scelte, e le stesse non aggiungono una voce di annulla", () => {
+    expect(state().dispatch(resizeNode("er", "cliente", { x: 10, y: 20, w: 200, h: null }))).toBe(true)
+    expect(view().nodes["cliente"]).toEqual({ x: 10, y: 20, collapsed: false, w: 200 })
+    expect(state().dispatch(resizeNode("er", "cliente", { x: 10, y: 20, w: 200, h: null }))).toBe(false)
+  })
+
+  it("su un nodo senza misura, tornare alla misura automatica non cambia niente", () => {
+    expect(state().dispatch(resizeNode("er", "cliente", { x: 0, y: 0, w: null, h: null }))).toBe(false)
   })
 })

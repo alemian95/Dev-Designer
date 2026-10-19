@@ -56,7 +56,7 @@ export function MembersEditor() {
 
   const close = () => sessionStore.getState().setEditing(null)
   const initial = memberText({ attributes: cls.attributes, methods: cls.methods })
-  const { w, h } = classSize(cls, view.collapsed)
+  const { w, h } = classSize(cls, view)
   const tl = worldToScreen(viewport, { x: view.x, y: view.y })
 
   const commit = (text: string, field: HTMLTextAreaElement) => {

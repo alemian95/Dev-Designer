@@ -5,9 +5,11 @@ import type { LayoutGraph } from "@/model/layout"
 import { writeAnchors } from "@/model/shared"
 import { addEntity, addRelationship, deleteItems, duplicateEntities, updateRelationship } from "../commands/er"
 import { layoutGraph } from "../commands/layout"
+import { resizeNode } from "../commands/view"
 import { edgeGeometry } from "../edge-routing"
 import { erDiagram } from "../er-access"
-import { entityRect } from "../er/geometry"
+import { entityRect, entitySize } from "../er/geometry"
+import { cornerResize } from "../geometry"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
 /**
@@ -48,6 +50,13 @@ export function erOps(doc: DevDocument): DiagramOps {
     duplicateNodes: (keys) => duplicateEntities(diagram().model, keys),
 
     layoutGraph: (): LayoutGraph => layoutGraph(diagram()),
+
+    resize: (key, handle, dx, dy) => {
+      const entity = diagram().model.entities[key]
+      const view = diagram().view.nodes[key]
+      const r = entity && view ? cornerResize(entitySize(entity, { collapsed: view.collapsed }), view, handle, dx, dy) : null
+      return r && { rect: r.rect, recipe: resizeNode("er", key, r.next) }
+    },
 
     validate: (): Issue[] => validateEr(diagram().model),
   }

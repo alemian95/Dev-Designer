@@ -1,9 +1,10 @@
 import type { DevDocument } from "@/model/document"
-import { CORNERS } from "../geometry"
+import { resizeNode } from "../commands/view"
+import { cornerResize } from "../geometry"
 import { ShapeKindSchema } from "@/model/shape/schema"
 import { validateShapes } from "@/model/shape/validate"
-import { addArrow, addShape, deleteShapeItems, duplicateShapes, resizeShape, setArrowAnchors, shapeLayoutGraph } from "../shape/commands"
-import { arrowGeometry, resizedShape, shapeDrawOrder, shapeOutline, shapeRect } from "../shape/geometry"
+import { addArrow, addShape, deleteShapeItems, duplicateShapes, setArrowAnchors, shapeLayoutGraph } from "../shape/commands"
+import { arrowGeometry, shapeDrawOrder, shapeOutline, shapeRect, shapeTextSize } from "../shape/geometry"
 import { shapeDiagram } from "../shape-access"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
@@ -56,10 +57,8 @@ export function shapeOps(doc: DevDocument): DiagramOps {
       const d = diagram()
       const shape = d.model.shapes[key]
       const view = d.view.nodes[key]
-      const corner = CORNERS.find((c) => c === handle)
-      if (!shape || !view || !corner) return null
-      const { rect, w, h } = resizedShape(shape, view, corner, dx, dy)
-      return { rect, recipe: resizeShape(key, { x: rect.x, y: rect.y, w, h }) }
+      const r = shape && view ? cornerResize(shapeTextSize(shape), view, handle, dx, dy) : null
+      return r && { rect: r.rect, recipe: resizeNode("shape", key, r.next) }
     },
 
     validate: () => validateShapes(diagram().model),

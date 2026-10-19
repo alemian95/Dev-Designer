@@ -1,5 +1,5 @@
 import type { Note } from "@/model/note/schema"
-import type { NodeView } from "@/model/shared"
+import { chosenSize, type ChosenSize, type SizedNodeView } from "@/model/shared"
 import { pathFromPoints, routePorts, type EdgeGeometry } from "../edge-routing"
 import { CHAR_W, GRID, MIN_W, PAD_X, ROW_H, type Rect, type Size } from "../geometry"
 import type { EdgePorts } from "../ports"
@@ -18,15 +18,15 @@ const NOTE_PAD_Y = 6
  * morderebbe l'ultimo carattere della riga più lunga. Il minimo è metà di quello di una classe —
  * una nota vuota deve restare cliccabile, non larga quanto una classe.
  */
-export function noteSize(note: Pick<Note, "text">): Size {
+export function noteSize(note: Pick<Note, "text">, view: ChosenSize = {}): Size {
   const lines = note.text.split("\n")
   const chars = Math.max(0, ...lines.map((l) => l.length))
   const w = Math.max(MIN_W / 2, Math.ceil((chars * CHAR_W + 2 * PAD_X + NOTE_FOLD) / GRID) * GRID)
-  return { w, h: lines.length * ROW_H + 2 * NOTE_PAD_Y }
+  return chosenSize({ w, h: lines.length * ROW_H + 2 * NOTE_PAD_Y }, view)
 }
 
-export function noteRect(note: Pick<Note, "text">, view: NodeView): Rect {
-  return { x: view.x, y: view.y, ...noteSize(note) }
+export function noteRect(note: Pick<Note, "text">, view: SizedNodeView): Rect {
+  return { x: view.x, y: view.y, ...noteSize(note, view) }
 }
 
 /**

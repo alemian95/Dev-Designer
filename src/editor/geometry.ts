@@ -1,4 +1,5 @@
 import { GRID } from "@/model/metrics"
+import { chosenSize, type ChosenSize } from "@/model/shared"
 
 // Le metriche del testo vivono nel modello (spec 2b §3): qui si riesportano, così nessun chiamante
 // cambia import.
@@ -21,6 +22,27 @@ export function snap(v: number): number {
 /** I quattro spigoli di un riquadro: le maniglie di ridimensionamento di un nodo. */
 export type Corner = "nw" | "ne" | "se" | "sw"
 export const CORNERS: readonly Corner[] = ["nw", "ne", "se", "sw"]
+
+/**
+ * Il ridimensionamento di un nodo dalla maniglia `handle` (spec 3b §5): la misura vera più il
+ * trascinamento, allineata alla griglia e mai sotto quella del contenuto, con lo spigolo opposto
+ * fermo. `next` è da scrivere nella view: `w`/`h` sono `null` dove la misura nuova non supera quella
+ * del contenuto, così portare la maniglia fino al contenuto riporta il nodo alla misura automatica. Un
+ * nodo collassato cambia solo la larghezza. `null` se `handle` non è uno spigolo.
+ */
+export function cornerResize(
+  content: Size,
+  view: Point & ChosenSize,
+  handle: string | null,
+  dx: number,
+  dy: number,
+): { rect: Rect; next: Point & { w: number | null; h: number | null } } | null {
+  const corner = CORNERS.find((c) => c === handle)
+  if (!corner) return null
+  const rect = resizeFromCorner({ x: view.x, y: view.y, ...chosenSize(content, view) }, content, corner, dx, view.collapsed ? 0 : dy)
+  const h = view.collapsed ? (view.h ?? null) : rect.h > content.h ? rect.h : null
+  return { rect, next: { x: rect.x, y: rect.y, w: rect.w > content.w ? rect.w : null, h } }
+}
 
 /**
  * Il riquadro `r` trascinato dallo spigolo `corner` di (`dx`, `dy`): la misura si allinea alla griglia

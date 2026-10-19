@@ -20,7 +20,7 @@ interface Props {
 /** Vista pura e memoizzata: ri-renderizza solo se cambiano entità, view o selezione di questo nodo. */
 export const EntityNodeView = memo(function EntityNodeView({ nodeKey, entity, view, selected }: Props) {
   const id = qualify("er", nodeKey)
-  const { w, h } = entitySize(entity, view.collapsed)
+  const { w, h } = entitySize(entity, view)
   const lines = view.collapsed ? [] : attributeLines(entity.attributes)
   return (
     <g

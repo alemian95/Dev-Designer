@@ -58,7 +58,7 @@ function EntityNameEditor({ editing, viewport, close }: { editing: Editing; view
   const entity = useStore(documentStore, (s) => erDiagram(s.doc).model.entities[editing.key])
   const view = useStore(documentStore, (s) => erDiagram(s.doc).view.nodes[editing.key])
   if (!entity || !view) return null
-  const { w } = entitySize(entity, view.collapsed)
+  const { w } = entitySize(entity, view)
   const tl = worldToScreen(viewport, { x: view.x, y: view.y })
   const commit = (value: string) => {
     // Il blur committa sempre, anche quando l'editor si chiude col testo intatto: senza questa guardia
@@ -73,7 +73,7 @@ function ClassNameEditor({ editing, viewport, close }: { editing: Editing; viewp
   const cls = useStore(documentStore, (s) => classDiagram(s.doc).model.classes[editing.key])
   const view = useStore(documentStore, (s) => classDiagram(s.doc).view.nodes[editing.key])
   if (!cls || !view) return null
-  const { w } = classSize(cls, view.collapsed)
+  const { w } = classSize(cls, view)
   const tl = worldToScreen(viewport, { x: view.x, y: view.y })
   const commit = (value: string) => {
     if (value.trim() !== cls.name) renameClassWithNotice(editing.key, value)

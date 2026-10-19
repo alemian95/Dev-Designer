@@ -173,7 +173,7 @@ export function classLayoutGraph(diagram: ClassDiagram): LayoutGraph {
   const nodes: LayoutNode[] = []
   for (const [key, cls] of Object.entries(diagram.model.classes)) {
     const view = diagram.view.nodes[key]
-    if (view) nodes.push({ id: key, ...classSize(cls, view.collapsed) })
+    if (view) nodes.push({ id: key, ...classSize(cls, view) })
   }
 
   const present = new Set(nodes.map((n) => n.id))

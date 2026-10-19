@@ -1,6 +1,7 @@
 import { LANE_MIN_H, POOL_MIN_W, nextName, type FlowDiagram, type FlowModel, type FlowShape } from "@/model/flow/schema"
 import type { LayoutPositions } from "@/model/layout"
 import { writeAnchors, type EdgeAnchors } from "@/model/shared"
+import { resizeNode } from "../commands/view"
 import type { Recipe } from "../document-store"
 import { flowDiagram } from "../flow-access"
 import { DUPLICATE_OFFSET, GRID, snap, type Point } from "../geometry"
@@ -64,7 +65,7 @@ export function moveFlowNodes(keys: readonly string[], dx: number, dy: number): 
       if (!node || !view) continue
       view.x = snap(view.x + dx)
       view.y = snap(view.y + dy)
-      const { w, h } = flowNodeSize(node)
+      const { w, h } = flowNodeSize(node, view)
       node.lane = laneAt(d, { x: view.x + w / 2, y: view.y + h / 2 })
     }
   }
@@ -106,9 +107,21 @@ function keepInLane(d: FlowDiagram, key: string): void {
   if (!node || !view || node.lane === null) return
   const rect = laneRect(d, node.lane)
   if (!rect) return
-  const { w, h } = flowNodeSize(node)
+  const { w, h } = flowNodeSize(node, view)
   view.x = keepInSpan(rect.x, rect.w, w, view.x)
   view.y = keepInSpan(rect.y, rect.h, h, view.y)
+}
+
+/**
+ * Scrive la misura scelta a mano di un nodo (`resizeNode`): allargato, può uscire dalla corsia, quindi
+ * rientra con `keepInLane`, come per un cambio di forma.
+ */
+export function resizeFlowNode(key: string, next: { x: number; y: number; w: number | null; h: number | null }): Recipe {
+  const resize = resizeNode("flow", key, next)
+  return (draft) => {
+    resize(draft)
+    keepInLane(flowDiagram(draft), key)
+  }
 }
 
 /**
@@ -146,7 +159,7 @@ export function setNodeLane(key: string, laneId: string | null): Recipe {
     const rect = laneRect(d, laneId)
     if (!rect) return
     node.lane = laneId
-    const { w, h } = flowNodeSize(node)
+    const { w, h } = flowNodeSize(node, view)
     view.y = keepInSpan(rect.y, rect.h, h, rect.y + rect.h / 2 - h / 2)
     view.x = keepInSpan(rect.x, rect.w, w, view.x)
   }
@@ -285,7 +298,7 @@ export function clampPoolW(d: FlowDiagram, poolId: string, w: number): number {
   for (const key of poolMembers(d, poolId)) {
     const node = d.model.nodes[key]
     const v = d.view.nodes[key]
-    if (node && v) min = Math.max(min, v.x + flowNodeSize(node).w + LANE_PAD - view.x)
+    if (node && v) min = Math.max(min, v.x + flowNodeSize(node, v).w + LANE_PAD - view.x)
   }
   return Math.max(snap(w), ceilToGrid(min))
 }
@@ -298,7 +311,7 @@ export function clampLaneH(d: FlowDiagram, laneId: string, h: number): number {
   for (const [key, node] of Object.entries(d.model.nodes)) {
     if (node.lane !== laneId) continue
     const v = d.view.nodes[key]
-    if (v) min = Math.max(min, v.y + flowNodeSize(node).h + LANE_PAD - rect.y)
+    if (v) min = Math.max(min, v.y + flowNodeSize(node, v).h + LANE_PAD - rect.y)
   }
   return Math.max(snap(h), ceilToGrid(min))
 }

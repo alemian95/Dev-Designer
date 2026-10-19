@@ -15,7 +15,7 @@ export function expectLaneInvariant(d: FlowDiagram): void {
     if (node.lane === null) continue
     const view = d.view.nodes[key]
     if (!view) continue
-    const { w, h } = flowNodeSize(node)
+    const { w, h } = flowNodeSize(node, view)
     expect(laneAt(d, { x: view.x + w / 2, y: view.y + h / 2 }), `nodo ${key} fuori dalla sua corsia`).toBe(node.lane)
   }
 }

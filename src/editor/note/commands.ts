@@ -85,7 +85,7 @@ export function duplicateNotes(model: NoteModel, keys: readonly string[]): { key
 export function noteLayoutGraph(doc: DevDocument): LayoutGraph {
   const d = noteDiagram(doc)
   const nodes: LayoutNode[] = Object.entries(d.model.notes).flatMap(([key, note]) =>
-    d.view.nodes[key] && !isAnchored(doc, note) ? [{ id: key, ...noteSize(note) }] : [],
+    d.view.nodes[key] && !isAnchored(doc, note) ? [{ id: key, ...noteSize(note, d.view.nodes[key]) }] : [],
   )
   return { nodes, edges: [], direction: "DOWN" }
 }

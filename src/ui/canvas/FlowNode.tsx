@@ -29,7 +29,7 @@ interface Props {
  */
 export const FlowNodeView = memo(function FlowNodeView({ nodeKey, node, view, selected }: Props) {
   const id = qualify("flow", nodeKey)
-  const { w, h } = flowNodeSize(node)
+  const { w, h } = flowNodeSize(node, view)
   const d = shapePath(node.shape, w, h)
   const lines = node.label === "" ? [] : node.label.split("\n")
   const stroke = selected ? "var(--primary)" : "var(--border)"

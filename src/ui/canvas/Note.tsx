@@ -25,7 +25,7 @@ interface Props {
  * Nessuno scomparto, nessun header: una nota è testo e basta, e `collapsed` non le si applica.
  */
 export const NoteView = memo(function NoteView({ id, note, view, selected }: Props) {
-  const { w, h } = noteSize(note)
+  const { w, h } = noteSize(note, view)
   const { body, fold } = notePath(w, h)
   const lines = note.text === "" ? [] : note.text.split("\n")
   const stroke = selected ? "var(--primary)" : "var(--border)"

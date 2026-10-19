@@ -1,4 +1,5 @@
 import { CHAR_W, GRID, MIN_NODE_H, MIN_NODE_W, PAD_X, ROW_H } from "../metrics"
+import { chosenSize, type ChosenSize } from "../shared"
 import type { FlowNode } from "./schema"
 
 /**
@@ -16,9 +17,10 @@ export const DECISION_FACTOR = 2
  * un rombo — non un punto — e non solo il rettangolo che conterrebbe.
  *
  * Sta nel modello (spec 2b §3) perché la usa la migrazione 5 → 6; `editor/flow/geometry.ts` la
- * riesporta. Prende solo etichetta e forma: la corsia non cambia la misura.
+ * riesporta. Prende solo etichetta e forma: la corsia non cambia la misura. `view` porta la misura
+ * scelta a mano, che allarga quella dell'etichetta; senza, la misura è quella dell'etichetta.
  */
-export function flowNodeSize(node: Pick<FlowNode, "label" | "shape">): { w: number; h: number } {
+export function flowNodeSize(node: Pick<FlowNode, "label" | "shape">, view: ChosenSize = {}): { w: number; h: number } {
   const lines = node.label.split("\n")
   const chars = Math.max(0, ...lines.map((l) => l.length))
   // Arrotondata alla griglia come `entitySize`, `classSize` e `noteSize`: il bordo sinistro di un
@@ -26,5 +28,5 @@ export function flowNodeSize(node: Pick<FlowNode, "label" | "shape">): { w: numb
   // quello destro non lo sarebbe.
   const w = Math.max(MIN_NODE_W, Math.ceil((chars * CHAR_W + 2 * PAD_X) / GRID) * GRID)
   const h = Math.max(MIN_NODE_H, lines.length * ROW_H)
-  return node.shape === "decision" ? { w: w * DECISION_FACTOR, h: h * DECISION_FACTOR } : { w, h }
+  return chosenSize(node.shape === "decision" ? { w: w * DECISION_FACTOR, h: h * DECISION_FACTOR } : { w, h }, view)
 }

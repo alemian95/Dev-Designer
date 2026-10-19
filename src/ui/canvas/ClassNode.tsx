@@ -54,7 +54,7 @@ function MemberRow({ line, y }: { line: MemberLine; y: number }) {
  */
 export const ClassNodeView = memo(function ClassNodeView({ nodeKey, node, view, selected }: Props) {
   const id = qualify("class", nodeKey)
-  const { w, h } = classSize(node, view.collapsed)
+  const { w, h } = classSize(node, view)
   const stereo = hasStereotypeLine(node)
   const headerH = HEADER_H + (stereo ? STEREO_H : 0)
   const italic = node.stereotype === "abstract"

@@ -14,7 +14,7 @@ export function layoutGraph(diagram: ErDiagram): LayoutGraph {
   for (const [key, entity] of Object.entries(diagram.model.entities)) {
     const view = diagram.view.nodes[key]
     // Un nodo collassato occupa lo spazio che occupa davvero, non quello che occuperebbe aperto.
-    if (view) nodes.push({ id: key, ...entitySize(entity, view.collapsed) })
+    if (view) nodes.push({ id: key, ...entitySize(entity, view) })
   }
 
   const present = new Set(nodes.map((n) => n.id))

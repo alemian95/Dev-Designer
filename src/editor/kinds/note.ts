@@ -1,7 +1,9 @@
 import type { DevDocument } from "@/model/document"
 import { validateNotes } from "@/model/note/validate"
 import { addNote, deleteNoteItems, duplicateNotes, noteLayoutGraph } from "../note/commands"
-import { anchorGeometry, noteRect } from "../note/geometry"
+import { resizeNode } from "../commands/view"
+import { cornerResize } from "../geometry"
+import { anchorGeometry, noteRect, noteSize } from "../note/geometry"
 import { noteDiagram } from "../note-access"
 import type { DiagramOps } from "./ops"
 
@@ -40,6 +42,13 @@ export function noteOps(doc: DevDocument): DiagramOps {
     duplicateNodes: (keys) => duplicateNotes(diagram().model, keys),
 
     layoutGraph: () => noteLayoutGraph(doc),
+
+    resize: (key, handle, dx, dy) => {
+      const note = diagram().model.notes[key]
+      const view = diagram().view.nodes[key]
+      const r = note && view ? cornerResize(noteSize(note), view, handle, dx, dy) : null
+      return r && { rect: r.rect, recipe: resizeNode("note", key, r.next) }
+    },
 
     validate: () => validateNotes(doc),
   }

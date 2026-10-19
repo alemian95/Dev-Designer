@@ -22,12 +22,12 @@ describe("entitySize", () => {
   const entity: Entity = { name: "t", attributes: [attr("id", "int", { primaryKey: true }), attr("name", "varchar(255)")] }
 
   it("collassata: solo l'header, larghezza minima", () => {
-    expect(entitySize(entity, true)).toEqual({ w: MIN_W, h: HEADER_H })
+    expect(entitySize(entity, { collapsed: true })).toEqual({ w: MIN_W, h: HEADER_H })
   })
 
   it("espansa: una riga per attributo, larghezza dal testo più lungo arrotondata alla griglia", () => {
     const longest = Math.max(...attributeLines(entity.attributes).map((l) => l.length))
-    const { w, h } = entitySize(entity, false)
+    const { w, h } = entitySize(entity, {})
     expect(h).toBe(HEADER_H + 2 * ROW_H + 6)
     expect(w).toBeGreaterThanOrEqual(longest * CHAR_W + 2 * PAD_X)
     expect(w % 10).toBe(0)

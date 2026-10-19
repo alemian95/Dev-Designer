@@ -6,7 +6,9 @@ import type { LayoutGraph } from "@/model/layout"
 import { writeAnchors } from "@/model/shared"
 import { classDiagram } from "../class-access"
 import { addClass, addRelation, classLayoutGraph, deleteClassItems, duplicateClasses, updateRelation } from "../class/commands"
-import { classEdgeGeometry, classRect } from "../class/geometry"
+import { classEdgeGeometry, classRect, classSize } from "../class/geometry"
+import { resizeNode } from "../commands/view"
+import { cornerResize } from "../geometry"
 import type { EdgeGeometry } from "../edge-routing"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
@@ -51,6 +53,13 @@ export function classOps(doc: DevDocument): DiagramOps {
     duplicateNodes: (keys) => duplicateClasses(diagram().model, keys),
 
     layoutGraph: (): LayoutGraph => classLayoutGraph(diagram()),
+
+    resize: (key, handle, dx, dy) => {
+      const cls = diagram().model.classes[key]
+      const view = diagram().view.nodes[key]
+      const r = cls && view ? cornerResize(classSize(cls, { collapsed: view.collapsed }), view, handle, dx, dy) : null
+      return r && { rect: r.rect, recipe: resizeNode("class", key, r.next) }
+    },
 
     validate: (): Issue[] => validateClass(diagram().model),
   }

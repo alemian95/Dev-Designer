@@ -24,7 +24,7 @@ export const GUTTER = 40
  */
 export function placeNew(entities: Record<string, Entity>, diagram: ErDiagram, occupied: readonly Rect[]): Record<string, Point> {
   const fresh = Object.entries(entities).filter(([key]) => !Object.hasOwn(diagram.view.nodes, key))
-  return placeInGrid(fresh.map(([key, entity]) => [key, entitySize(entity, false)]), occupied)
+  return placeInGrid(fresh.map(([key, entity]) => [key, entitySize(entity, {})]), occupied)
 }
 
 /** La griglia di `placeNew` per nodi di qualunque famiglia, già filtrati e misurati: la usa anche l'import delle classi. */

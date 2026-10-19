@@ -1,7 +1,7 @@
 import type { DevDocument } from "@/model/document"
 import type { Family } from "@/model/family"
 import type { LayoutPositions } from "@/model/layout"
-import type { NodeView } from "@/model/shared"
+import type { NodeView, SizedNodeView } from "@/model/shared"
 import type { Recipe } from "../document-store"
 import { snap } from "../geometry"
 
@@ -20,6 +20,21 @@ export function moveNodes(family: Family, keys: readonly string[], dx: number, d
       node.x = snap(node.x + dx)
       node.y = snap(node.y + dy)
     }
+  }
+}
+
+/** Le famiglie i cui nodi si ridimensionano dagli spigoli: tutte tranne le sequenze, che si dispongono da sole. */
+export type SizedFamily = Exclude<Family, "sequence">
+
+/** Scrive origine e misura scelte a mano di un nodo: un solo passo di annulla, e niente se non cambia. */
+export function resizeNode(family: SizedFamily, key: string, next: { x: number; y: number; w: number | null; h: number | null }): Recipe {
+  return (draft) => {
+    const view: SizedNodeView | undefined = draft.diagram[family].view.nodes[key]
+    if (!view) return
+    if (view.x !== next.x) view.x = next.x
+    if (view.y !== next.y) view.y = next.y
+    if ((view.w ?? null) !== next.w) view.w = next.w
+    if ((view.h ?? null) !== next.h) view.h = next.h
   }
 }
 

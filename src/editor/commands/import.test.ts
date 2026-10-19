@@ -137,6 +137,6 @@ describe("placeNew", () => {
   it("dentro una colonna le entità non si sovrappongono", () => {
     const entities = { a: entity("a", ["id", "x", "y"]), b: entity("b"), c: entity("c"), d: entity("d") }
     const placed = placeNew(entities, diagram(), occupied())
-    expect(placed["c"]!.y).toBeGreaterThanOrEqual(placed["a"]!.y + entitySize(entities.a, false).h)
+    expect(placed["c"]!.y).toBeGreaterThanOrEqual(placed["a"]!.y + entitySize(entities.a, {}).h)
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { ShapeDiagram } from "@/model/shape/schema"
 import { autoPorts } from "../ports"
-import { arrowGeometry, resizedShape, shapeDrawOrder, shapeOutline, shapeSize, shapeTextSize } from "./geometry"
+import { arrowGeometry, shapeDrawOrder, shapeOutline, shapeSize, shapeTextSize } from "./geometry"
 
 const at = (w: number | null = null, h: number | null = null) => ({ x: 0, y: 0, collapsed: false, w, h })
 
@@ -56,32 +56,5 @@ describe("geometria delle frecce", () => {
     expect(shapeOutline("ellipse")).toBe("ellipse")
     expect(shapeOutline("rect")).toBe("rect")
     expect(shapeOutline("text")).toBe("rect")
-  })
-})
-
-describe("ridimensionamento", () => {
-  const vuoto = { kind: "rect" as const, label: "" }
-
-  it("allarga della distanza trascinata, allineata alla griglia", () => {
-    // 60 × 40 + (103, 47) → 163 → 160, 87 → 90.
-    expect(resizedShape(vuoto, { x: 0, y: 0, w: null, h: null }, "se", 103, 47)).toEqual({ rect: { x: 0, y: 0, w: 160, h: 90 }, w: 160, h: 90 })
-  })
-
-  it("non scende sotto il testo, e fino al testo torna alla misura automatica", () => {
-    expect(resizedShape(vuoto, { x: 0, y: 0, w: 200, h: 100 }, "se", -500, -500)).toEqual({ rect: { x: 0, y: 0, w: 60, h: 40 }, w: null, h: null })
-  })
-
-  it("dall'angolo in alto a sinistra sposta l'origine e tiene fermo l'angolo opposto", () => {
-    // 60 × 40 in (100, 100), trascinato di (-43, -47): 103 → 100, 87 → 90; l'angolo in basso a destra resta in (160, 140).
-    expect(resizedShape(vuoto, { x: 100, y: 100, w: null, h: null }, "nw", -43, -47)).toEqual({ rect: { x: 60, y: 50, w: 100, h: 90 }, w: 100, h: 90 })
-  })
-
-  it("dagli angoli ne e sw sposta solo l'origine sul lato trascinato", () => {
-    expect(resizedShape(vuoto, { x: 100, y: 100, w: null, h: null }, "ne", 40, -20).rect).toEqual({ x: 100, y: 80, w: 100, h: 60 })
-    expect(resizedShape(vuoto, { x: 100, y: 100, w: null, h: null }, "sw", -40, 20).rect).toEqual({ x: 60, y: 100, w: 100, h: 60 })
-  })
-
-  it("dall'angolo in alto a sinistra non scende sotto il testo, e l'angolo opposto resta fermo", () => {
-    expect(resizedShape(vuoto, { x: 100, y: 100, w: 200, h: 100 }, "nw", 500, 500).rect).toEqual({ x: 240, y: 160, w: 60, h: 40 })
   })
 })

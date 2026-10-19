@@ -1,9 +1,10 @@
 import type { DevDocument } from "@/model/document"
 import { nextName, type FlowShape } from "@/model/flow/schema"
 import { validateFlow } from "@/model/flow/validate"
-import { addFlowEdge, addFlowNode, addPool, applyFlowLayout, clampLaneH, clampPoolW, deleteFlowItems, duplicateFlowNodes, moveFlowNodes, resizeLane, resizePool, setFlowEdgeAnchors } from "../flow/commands"
+import { addFlowEdge, addFlowNode, addPool, applyFlowLayout, clampLaneH, clampPoolW, deleteFlowItems, duplicateFlowNodes, moveFlowNodes, resizeFlowNode, resizeLane, resizePool, setFlowEdgeAnchors } from "../flow/commands"
 import { flowEdgeGeometry, flowNodeRect, flowOutline, flowNodeSize, laneAt, laneRect, poolAt, poolMembers, poolRect } from "../flow/geometry"
 import { flowDiagram } from "../flow-access"
+import { cornerResize } from "../geometry"
 import { flowLayoutGraph, keepInSpan, placedBounds, placedRectOf } from "../flow/layout"
 import type { DiagramOps, EdgeEnds } from "./ops"
 
@@ -93,8 +94,15 @@ export function flowOps(doc: DevDocument): DiagramOps {
 
     layoutRecipe: (positions, offset) => applyFlowLayout(positions, offset),
 
+    // Un nodo da uno spigolo; un pool dal bordo destro (`lane` `null`) o una sua corsia dal bordo inferiore.
     resize: (key, lane, dx, dy) => {
       const d = diagram()
+      const node = d.model.nodes[key]
+      const nodeView = d.view.nodes[key]
+      if (node && nodeView) {
+        const r = cornerResize(flowNodeSize(node), nodeView, lane, dx, dy)
+        return r && { rect: r.rect, recipe: resizeFlowNode(key, r.next) }
+      }
       if (lane === null) {
         const view = d.view.pools[key]
         const rect = poolRect(d, key)

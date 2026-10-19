@@ -30,7 +30,7 @@ export function FlowNodeEditor() {
   if (!own || own.target !== "body" || !node || !view) return null
 
   const close = () => sessionStore.getState().setEditing(null)
-  const { w, h } = flowNodeSize(node)
+  const { w, h } = flowNodeSize(node, view)
 
   return (
     <TextEditorOverlay

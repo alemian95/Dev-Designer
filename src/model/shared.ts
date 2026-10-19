@@ -18,6 +18,21 @@ export const ChosenSideSchema = z.number().positive().nullable()
 export const SizedNodeViewSchema = NodeViewSchema.extend({ w: ChosenSideSchema.optional(), h: ChosenSideSchema.optional() })
 export type SizedNodeView = z.infer<typeof SizedNodeViewSchema>
 
+/** Della view, ciò che conta per la misura di un nodo: la misura scelta e, per chi lo ha, il collasso. */
+export interface ChosenSize {
+  w?: number | null
+  h?: number | null
+  collapsed?: boolean
+}
+
+/**
+ * La misura di un nodo: quella del contenuto, allargata a quella scelta a mano. Un nodo collassato
+ * mostra il solo header, e tiene l'altezza del contenuto.
+ */
+export function chosenSize(content: { w: number; h: number }, view: ChosenSize): { w: number; h: number } {
+  return { w: Math.max(content.w, view.w ?? 0), h: view.collapsed ? content.h : Math.max(content.h, view.h ?? 0) }
+}
+
 /**
  * I 16 punti di aggancio di un nodo (spec agganci §3): tre per lato a ¼, ½ e ¾, contati in senso
  * orario lungo il perimetro (`n1` è il più vicino a `nw`, `e1` a `ne`, `s1` a `se`, `w1` a `sw`), e i

@@ -35,7 +35,7 @@ describe("ClassNodeView", () => {
     expect(html).toContain(">Cliente<")
     expect(html).toContain("+ id: int")
     expect(html).toContain("- salva(): void")
-    expect(html).toContain(`height="${classSize(cliente, false).h}"`)
+    expect(html).toContain(`height="${classSize(cliente, {}).h}"`)
   })
 
   it("uno scomparto vuoto non produce il suo separatore", () => {
@@ -108,7 +108,7 @@ describe("ClassNodeView", () => {
       methods: [],
     }
     const senza: ClassNode = { ...conStatico, attributes: [{ ...conStatico.attributes[0]!, isStatic: false }] }
-    expect(classSize(conStatico, false).w).toBe(classSize(senza, false).w)
+    expect(classSize(conStatico, {}).w).toBe(classSize(senza, {}).w)
   })
 })
 

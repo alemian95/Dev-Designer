@@ -24,7 +24,7 @@ describe("EntityNodeView", () => {
     expect(html).toContain('transform="translate(10 20)"')
     expect(html).toContain(">auth.users<")
     expect(html).toContain("PK id     bigint")
-    expect(html).toContain(`width="${entitySize(entity, false).w}"`)
+    expect(html).toContain(`width="${entitySize(entity, {}).w}"`)
   })
 
   it("collassata: solo header, larghezza minima, bordo primario se selezionata", () => {

@@ -8,7 +8,7 @@ import { notePath } from "@/editor/note/geometry"
 import { selId, selectedKeys, sessionStore } from "@/editor/session-store"
 import { stepDrop } from "@/editor/sequence/commands"
 import { subRect } from "@/editor/sequence/geometry"
-import { ROOT, ROW_GAP, SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
+import { NOTE_INSET, ROOT, ROW_GAP, SELF_TEXT_DX, messageNumbers, sequenceLayout, type SequenceLayout } from "@/editor/sequence/layout"
 import { sequenceDiagram } from "@/editor/sequence-access"
 import { allSteps, type BlockStep, type Head, type MessageStep, type NoteStep, type Participant, type Sequence } from "@/model/sequence/schema"
 import type { NodeView } from "@/model/shared"
@@ -33,7 +33,6 @@ const SELF_LOOP_W = 38
 const SELF_LOOP_H = 22
 const HEAD_LEN = 10
 const HEAD_HALF = 5
-const NOTE_INSET = 4
 const TAB_CUT = 8
 
 /** Una punta di messaggio che arriva in `tip` andando nel verso `dir` (1 verso destra, -1 verso sinistra). */

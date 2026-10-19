@@ -129,3 +129,71 @@ describe("messaggi a sé stessi", () => {
     expect([...messageNumbers(s)]).toEqual([["m1", 1], ["m2", 2], ["m3", 3]])
   })
 })
+
+describe("testi lunghi", () => {
+  const lungo = "un testo molto più lungo dello spazio fra due colonne"
+  const w = lungo.length * CHAR_W
+  const text = (s: Step): Step => ({ ...s, text: lungo }) as Step
+  const placed = (id: string, placement: "left" | "right" | "over", ...ps: [string] | [string, string]): Step =>
+    ({ kind: "note", id, placement, participants: ps, text: lungo })
+  const inside = (l: ReturnType<typeof sequenceLayout>, x0: number, x1: number) => {
+    expect(x0).toBeGreaterThanOrEqual(PAD)
+    expect(x1).toBeLessThanOrEqual(l.width - PAD)
+  }
+
+  it("un messaggio allarga lo spazio fra le sue colonne quanto basta per il testo, numero compreso", () => {
+    const s: Sequence = { ...seq(["a", "b", "c"], [text(msg("m1", "c", "a"))]), autonumber: true }
+    const l = sequenceLayout(s)
+    expect(l.columns.c!.x - l.columns.a!.x).toBeGreaterThan(`1. ${lungo}`.length * CHAR_W)
+  })
+
+  it("l'allargamento va nello spazio prima della colonna più a destra", () => {
+    const corto = sequenceLayout(seq(["a", "b", "c"], [msg("m1", "b", "c")]))
+    const l = sequenceLayout(seq(["a", "b", "c"], [text(msg("m1", "b", "c"))]))
+    expect(l.columns.b!.x).toBe(corto.columns.b!.x)
+    expect(l.columns.c!.x).toBeGreaterThan(corto.columns.c!.x)
+  })
+
+  it("una nota over su un partecipante è larga quanto il testo e sta nella cornice, anche sulla prima colonna", () => {
+    const l = sequenceLayout(seq(["a", "b"], [placed("n", "over", "a")]))
+    const r = l.rows.n!
+    expect(r.w).toBeGreaterThan(w)
+    expect(r.x + r.w / 2).toBe(l.columns.a!.x)
+    inside(l, r.x, r.x + r.w)
+    expect(r.x + r.w).toBeLessThan(l.columns.b!.x)
+  })
+
+  it("una nota over su due partecipanti allarga lo spazio fra loro", () => {
+    const l = sequenceLayout(seq(["a", "b"], [placed("n", "over", "b", "a")]))
+    expect(l.rows.n!.w).toBeGreaterThan(w)
+    inside(l, l.rows.n!.x, l.rows.n!.x + l.rows.n!.w)
+  })
+
+  it("una nota right non arriva alla colonna dopo, e sull'ultima sta nella cornice", () => {
+    const mezzo = sequenceLayout(seq(["a", "b"], [placed("n", "right", "a")]))
+    expect(mezzo.columns.a!.x + w).toBeLessThan(mezzo.columns.b!.x)
+    expect(mezzo.rows.n!.x + mezzo.rows.n!.w).toBeGreaterThan(mezzo.columns.a!.x + w)
+    const ultima = sequenceLayout(seq(["a", "b"], [placed("n", "right", "b")]))
+    inside(ultima, ultima.rows.n!.x, ultima.rows.n!.x + ultima.rows.n!.w)
+    expect(ultima.rows.n!.x + ultima.rows.n!.w).toBeGreaterThan(ultima.columns.b!.x + w)
+  })
+
+  it("una nota left non arriva alla colonna prima, e sulla prima sta nella cornice", () => {
+    const mezzo = sequenceLayout(seq(["a", "b"], [placed("n", "left", "b")]))
+    expect(mezzo.columns.b!.x - w).toBeGreaterThan(mezzo.columns.a!.x)
+    expect(mezzo.rows.n!.x).toBeLessThan(mezzo.columns.b!.x - w)
+    const prima = sequenceLayout(seq(["a", "b"], [placed("n", "left", "a")]))
+    inside(prima, prima.rows.n!.x, prima.rows.n!.x + prima.rows.n!.w)
+    expect(prima.rows.n!.x).toBeLessThan(prima.columns.a!.x - w)
+  })
+
+  it("conta anche i testi dentro i blocchi", () => {
+    const l = sequenceLayout(seq(["a", "b"], [block("k", { id: "s", steps: [text(msg("m1", "a", "b"))] })]))
+    expect(l.columns.b!.x - l.columns.a!.x).toBeGreaterThan(w)
+  })
+
+  it("con testi corti le colonne restano dove erano", () => {
+    const l = sequenceLayout(seq(["a", "b"], [msg("m1", "a", "b"), note("n", "a")]))
+    expect(l.columns.a!.x).toBe(PAD + COLUMN_MIN_W / 2)
+  })
+})

@@ -1,4 +1,4 @@
-import type { Sequence, Step } from "@/model/sequence/schema"
+import { allSteps, type NoteStep, type Sequence, type Step } from "@/model/sequence/schema"
 import { CHAR_W, type Rect } from "../geometry"
 
 // Le metriche del prototipo (spec §4.1): tutto il resto del disegno si ricava da queste.
@@ -27,6 +27,13 @@ export const ROOT = "root"
 /** Dove comincia, a destra della linea di vita, il testo di un messaggio a sé stesso; e il margine dopo. */
 export const SELF_TEXT_DX = 8
 export const SELF_TEXT_PAD = 8
+/** Margine orizzontale del foglio di una nota `left`/`right` dalla linea di vita. */
+export const NOTE_INSET = 4
+/** Aria attorno al testo di un messaggio fra le sue colonne, e di una nota dentro il suo foglio. */
+const MESSAGE_TEXT_PAD = 24
+const NOTE_TEXT_PAD = 20
+/** Distanza minima fra il foglio di una nota e la linea di vita accanto. */
+const NOTE_MARGIN = 12
 /** Larghezza minima di una sequenza senza partecipanti: il titolo deve restare cliccabile. */
 const MIN_WIDTH = 160
 
@@ -62,19 +69,59 @@ function messageLabel(text: string, number: number | undefined): string {
   return number === undefined ? text : `${number}. ${text}`
 }
 
-/** Per partecipante, la larghezza del testo più lungo fra i suoi messaggi a sé stesso. */
-function selfTextWidths(seq: Sequence, measure: (text: string) => number): Map<string, number> {
-  const numbers = seq.autonumber ? messageNumbers(seq) : new Map<string, number>()
-  const widths = new Map<string, number>()
-  const walk = (steps: Step[]): void =>
-    steps.forEach((s) => {
-      if (s.kind === "block") return s.sections.forEach((x) => walk(x.steps))
-      if (s.kind !== "message" || s.from !== s.to) return
-      widths.set(s.from, Math.max(widths.get(s.from) ?? 0, measure(messageLabel(s.text, numbers.get(s.id)))))
-    })
-  walk(seq.steps)
-  return widths
+/** Una distanza minima fra gli assi di due colonne, `from` a sinistra di `to`. */
+interface Spacing {
+  from: number
+  to: number
+  d: number
 }
+
+/**
+ * Lo spazio che chiedono i testi (spec §4.1): un messaggio fra le sue colonne, una nota `over` attorno
+ * all'asse o fra i due partecipanti, una nota `left`/`right` fino alla linea di vita accanto. Verso
+ * il bordo, dove non c'è una colonna, la richiesta va al margine: `lead` a sinistra della prima,
+ * `tail` a destra dell'ultima. `selfText` è a parte, perché parte dalla linea di vita come nell'anello.
+ */
+function textDemands(seq: Sequence, widths: number[], measure: (text: string) => number) {
+  const index = new Map(seq.participants.map((p, i) => [p.id, i]))
+  const last = seq.participants.length - 1
+  const numbers = seq.autonumber ? messageNumbers(seq) : new Map<string, number>()
+  const spacings: Spacing[] = []
+  const selfText = new Map<number, number>()
+  let lead = 0
+  let tail = 0
+  // Lo spazio da un asse verso il vicino a sinistra (`side` -1) o a destra (1), o verso il bordo.
+  const around = (i: number, side: -1 | 1, d: number): void => {
+    const j = i + side
+    if (j >= 0 && j <= last) spacings.push(side === 1 ? { from: i, to: j, d } : { from: j, to: i, d })
+    else if (side === -1) lead = Math.max(lead, d)
+    else tail = Math.max(tail, d)
+  }
+  for (const s of allSteps(seq.steps)) {
+    if (s.kind === "message") {
+      const a = index.get(s.from)
+      const b = index.get(s.to)
+      if (a === undefined || b === undefined) continue
+      const text = measure(messageLabel(s.text, numbers.get(s.id)))
+      if (a === b) selfText.set(a, Math.max(selfText.get(a) ?? 0, text))
+      else spacings.push({ from: Math.min(a, b), to: Math.max(a, b), d: text + MESSAGE_TEXT_PAD })
+    }
+    if (s.kind !== "note") continue
+    const ids = s.participants.flatMap((id) => index.get(id) ?? [])
+    if (ids.length !== s.participants.length) continue
+    const sheet = noteWidth(s, measure)
+    if (s.placement === "over" && ids.length === 2) {
+      const [a, b] = [Math.min(...ids), Math.max(...ids)]
+      spacings.push({ from: a, to: b, d: sheet - widths[a]! / 2 - widths[b]! / 2 })
+    } else if (s.placement === "over") {
+      around(ids[0]!, -1, sheet / 2 + NOTE_MARGIN)
+      around(ids[0]!, 1, sheet / 2 + NOTE_MARGIN)
+    } else around(ids[0]!, s.placement === "left" ? -1 : 1, NOTE_INSET + sheet + NOTE_MARGIN)
+  }
+  return { spacings, selfText, lead, tail }
+}
+
+const noteWidth = (note: NoteStep, measure: (text: string) => number): number => measure(note.text) + NOTE_TEXT_PAD
 
 function rowHeight(step: Exclude<Step, { kind: "block" }>): number {
   if (step.kind === "note") return NOTE_H
@@ -83,26 +130,48 @@ function rowHeight(step: Exclude<Step, { kind: "block" }>): number {
 
 export function sequenceLayout(seq: Sequence, measure: (text: string) => number = estimate): SequenceLayout {
   const columns: SequenceLayout["columns"] = {}
-  const selfText = selfTextWidths(seq, measure)
-  let left = PAD
-  let right = PAD
-  for (const p of seq.participants) {
-    const w = Math.max(COLUMN_MIN_W, measure(p.label ?? p.name) + COLUMN_TEXT_PAD)
-    const x = left + w / 2
-    columns[p.id] = { x, w, head: { x: left, y: 6, w, h: HEAD_H - 4 } }
-    // Il testo di un messaggio a sé stesso parte dalla linea di vita verso destra: la colonna dopo, o
-    // il bordo, si scosta quanto basta.
-    const text = selfText.get(p.id)
-    right = Math.max(left + w, text === undefined ? 0 : x + SELF_TEXT_DX + text + SELF_TEXT_PAD)
-    left = right + COLUMN_GAP
+  const widths = seq.participants.map((p) => Math.max(COLUMN_MIN_W, measure(p.label ?? p.name) + COLUMN_TEXT_PAD))
+  const { spacings, selfText, lead, tail } = textDemands(seq, widths, measure)
+  // Quanto occupa una colonna a destra del suo asse: metà larghezza, o il testo di un messaggio a sé
+  // stesso, che parte dalla linea di vita verso destra.
+  const reach = (i: number): number => {
+    const text = selfText.get(i)
+    return Math.max(widths[i]! / 2, text === undefined ? 0 : SELF_TEXT_DX + text + SELF_TEXT_PAD)
   }
-  const width = seq.participants.length === 0 ? MIN_WIDTH : right + PAD
+  // Gli assi da sinistra: ognuno è il più a sinistra che rispetta la colonna prima e ogni distanza
+  // chiesta dai testi verso le colonne già piazzate. Così l'allargamento va nello spazio prima della
+  // colonna più a destra.
+  const xs: number[] = []
+  seq.participants.forEach((p, i) => {
+    const w = widths[i]!
+    let x = i === 0 ? PAD + Math.max(w / 2, lead) : xs[i - 1]! + reach(i - 1) + COLUMN_GAP + w / 2
+    for (const s of spacings) if (s.to === i) x = Math.max(x, xs[s.from]! + s.d)
+    xs.push(x)
+    columns[p.id] = { x, w, head: { x: x - w / 2, y: 6, w, h: HEAD_H - 4 } }
+  })
+  const last = xs.length - 1
+  const width = last < 0 ? MIN_WIDTH : xs[last]! + Math.max(reach(last), tail) + PAD
   // `margin` allarga (o, se negativo, stringe) l'estensione, anche quando nessun partecipante si risolve.
   const spanOf = (step: Step, margin: number): { x0: number; x1: number } => {
     const cols = stepParticipants(step).flatMap((id) => columns[id] ?? [])
     const x0 = cols.length ? Math.min(...cols.map((c) => c.x - c.w / 2)) : PAD
     const x1 = cols.length ? Math.max(...cols.map((c) => c.x + c.w / 2)) : width - PAD
     return { x0: x0 - margin, x1: x1 + margin }
+  }
+
+  // Il foglio di una nota, almeno largo quanto il testo: `over` centrato sull'asse, `left`/`right`
+  // dalla linea di vita verso il suo lato. La riga resta il rettangolo che `Sequence.tsx` disegna.
+  const noteSpan = (step: NoteStep): { x0: number; x1: number } => {
+    const span = spanOf(step, 0)
+    const col = columns[step.participants[0]]
+    if (!col || (step.placement === "over" && step.participants.length === 2)) return span
+    const sheet = noteWidth(step, measure)
+    if (step.placement === "over") {
+      const half = Math.max(col.w, sheet) / 2
+      return { x0: col.x - half, x1: col.x + half }
+    }
+    const out = NOTE_INSET + sheet
+    return step.placement === "left" ? { x0: Math.min(span.x0, col.x - out), x1: span.x1 } : { x0: span.x0, x1: Math.max(span.x1, col.x + out) }
   }
 
   const rows: SequenceLayout["rows"] = {}
@@ -116,7 +185,7 @@ export function sequenceLayout(seq: Sequence, measure: (text: string) => number 
       slots.push({ container, index, y, depth })
       if (step.kind !== "block") {
         const h = rowHeight(step)
-        const { x0, x1 } = spanOf(step, 0)
+        const { x0, x1 } = step.kind === "note" ? noteSpan(step) : spanOf(step, 0)
         rows[step.id] = { x: x0, y, w: x1 - x0, h }
         y += h + ROW_GAP
         return
